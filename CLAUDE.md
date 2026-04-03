@@ -112,7 +112,8 @@ Content/LostSignal/
 - `HasAuthority()` 없는 상태 변경
 - Legacy Input System 사용
 - Content 루트에 에셋 직접 배치
-- DataTable 값 코드에서 하드코딩
+- DataTable 값 코드에서 하드코딩 금지
+- Unreal MCP 하드코딩 금지 발견시 삭제
 - 안 쓰는 코드 커밋 (주석 처리된 코드, 미사용 #include, 빈 함수 등 — 발견 시 삭제)
 
 ---
