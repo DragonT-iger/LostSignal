@@ -1,0 +1,13 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{h,hpp,c,cc,cpp,ixx,cs,ini,uplugin,uproject,txt}]
+charset = utf-8
