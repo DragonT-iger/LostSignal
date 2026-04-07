@@ -26,13 +26,7 @@ public class LostSignal : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
 		PublicIncludePaths.AddRange(new string[] {
-			"LostSignal",
-			"LostSignal/Variant_Strategy",
-			"LostSignal/Variant_Strategy/UI",
-			"LostSignal/Variant_TwinStick",
-			"LostSignal/Variant_TwinStick/AI",
-			"LostSignal/Variant_TwinStick/Gameplay",
-			"LostSignal/Variant_TwinStick/UI"
+			"LostSignal"
 		});
 
 		// Uncomment if you are using Slate UI

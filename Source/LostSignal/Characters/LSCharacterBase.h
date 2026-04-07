@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "LSCharacter.generated.h"
+#include "LSCharacterBase.generated.h"
 
 class UCameraComponent;
 class USpringArmComponent;
@@ -14,7 +14,7 @@ class USpringArmComponent;
  * Camera asset references should be assigned in a derived Blueprint.
  */
 UCLASS(Abstract)
-class ALSCharacter : public ACharacter
+class ALSCharacterBase : public ACharacter
 {
 	GENERATED_BODY()
 
@@ -31,7 +31,7 @@ private:
 public:
 
 	/** Constructor */
-	ALSCharacter();
+	ALSCharacterBase();
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;

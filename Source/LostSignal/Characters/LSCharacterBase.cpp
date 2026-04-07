@@ -1,13 +1,13 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Characters/LSCharacter.h"
+#include "Characters/LSCharacterBase.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
-ALSCharacter::ALSCharacter()
+ALSCharacterBase::ALSCharacterBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
@@ -35,12 +35,12 @@ ALSCharacter::ALSCharacter()
 	FollowCamera->bUsePawnControlRotation = false;
 }
 
-void ALSCharacter::BeginPlay()
+void ALSCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 }
 
-void ALSCharacter::Tick(float DeltaSeconds)
+void ALSCharacterBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 }

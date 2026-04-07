@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Core/LSPlayerController.h"
+#include "Core/LSPlayerControllerBase.h"
 
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "EnhancedInputComponent.h"
@@ -15,7 +15,7 @@
 #include "InputMappingContext.h"
 #include "LostSignal.h"
 
-ALSPlayerController::ALSPlayerController()
+ALSPlayerControllerBase::ALSPlayerControllerBase()
 {
 	bIsTouch = false;
 	bMoveToMouseCursor = false;
@@ -26,7 +26,7 @@ ALSPlayerController::ALSPlayerController()
 	DefaultMouseCursor = EMouseCursor::Default;
 }
 
-void ALSPlayerController::SetupInputComponent()
+void ALSPlayerControllerBase::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
@@ -45,15 +45,15 @@ void ALSPlayerController::SetupInputComponent()
 
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
 	{
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &ALSPlayerController::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &ALSPlayerController::OnSetDestinationTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &ALSPlayerController::OnSetDestinationReleased);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &ALSPlayerController::OnSetDestinationReleased);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &ALSPlayerControllerBase::OnInputStarted);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &ALSPlayerControllerBase::OnSetDestinationTriggered);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &ALSPlayerControllerBase::OnSetDestinationReleased);
+		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &ALSPlayerControllerBase::OnSetDestinationReleased);
 
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &ALSPlayerController::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &ALSPlayerController::OnTouchTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &ALSPlayerController::OnTouchReleased);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &ALSPlayerController::OnTouchReleased);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &ALSPlayerControllerBase::OnInputStarted);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &ALSPlayerControllerBase::OnTouchTriggered);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &ALSPlayerControllerBase::OnTouchReleased);
+		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &ALSPlayerControllerBase::OnTouchReleased);
 	}
 	else
 	{
@@ -61,13 +61,13 @@ void ALSPlayerController::SetupInputComponent()
 	}
 }
 
-void ALSPlayerController::OnInputStarted()
+void ALSPlayerControllerBase::OnInputStarted()
 {
 	StopMovement();
 	UpdateCachedDestination();
 }
 
-void ALSPlayerController::OnSetDestinationTriggered()
+void ALSPlayerControllerBase::OnSetDestinationTriggered()
 {
 	FollowTime += GetWorld()->GetDeltaSeconds();
 	UpdateCachedDestination();
@@ -80,7 +80,7 @@ void ALSPlayerController::OnSetDestinationTriggered()
 	}
 }
 
-void ALSPlayerController::OnSetDestinationReleased()
+void ALSPlayerControllerBase::OnSetDestinationReleased()
 {
 	if (FollowTime <= ShortPressThreshold)
 	{
@@ -94,19 +94,19 @@ void ALSPlayerController::OnSetDestinationReleased()
 	FollowTime = 0.0f;
 }
 
-void ALSPlayerController::OnTouchTriggered()
+void ALSPlayerControllerBase::OnTouchTriggered()
 {
 	bIsTouch = true;
 	OnSetDestinationTriggered();
 }
 
-void ALSPlayerController::OnTouchReleased()
+void ALSPlayerControllerBase::OnTouchReleased()
 {
 	bIsTouch = false;
 	OnSetDestinationReleased();
 }
 
-void ALSPlayerController::UpdateCachedDestination()
+void ALSPlayerControllerBase::UpdateCachedDestination()
 {
 	FHitResult Hit;
 	bool bHitSuccessful = false;

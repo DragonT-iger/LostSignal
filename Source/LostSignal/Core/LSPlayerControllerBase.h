@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
-#include "LSPlayerController.generated.h"
+#include "LSPlayerControllerBase.generated.h"
 
 class UNiagaraSystem;
 class UInputAction;
@@ -16,7 +16,7 @@ class UPathFollowingComponent;
  * Handles top-down click-to-move input and default mapping setup.
  */
 UCLASS(Abstract)
-class ALSPlayerController : public APlayerController
+class ALSPlayerControllerBase : public APlayerController
 {
 	GENERATED_BODY()
 
@@ -60,7 +60,7 @@ protected:
 
 public:
 
-	ALSPlayerController();
+	ALSPlayerControllerBase();
 
 protected:
 
