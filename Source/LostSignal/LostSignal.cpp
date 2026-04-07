@@ -5,5 +5,5 @@
 
 IMPLEMENT_PRIMARY_GAME_MODULE( FDefaultGameModuleImpl, LostSignal, "LostSignal" );
 
-DEFINE_LOG_CATEGORY(LogLostSignal)
+DEFINE_LOG_CATEGORY(LogLS)
  

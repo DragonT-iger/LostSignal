@@ -30,7 +30,7 @@ void ATwinStickPlayerController::BeginPlay()
 
 		} else {
 
-			UE_LOG(LogLostSignal, Error, TEXT("Could not spawn mobile controls widget."));
+			UE_LOG(LogLS, Error, TEXT("Could not spawn mobile controls widget."));
 
 		}
 
