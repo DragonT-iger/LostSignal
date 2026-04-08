@@ -38,18 +38,49 @@ void ALSPlayerCharacter::Tick(float DeltaSeconds)
 
 void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
-	{
-		if (MoveAction)
-		{
-			EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ALSPlayerCharacter::Move);
-		}
-	}
-	else
+	UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
+	if (!EIC)
 	{
 		UE_LOG(LogLS, Error, TEXT("'%s' Enhanced Input component를 찾지 못했습니다."), *GetNameSafe(this));
+		return;
 	}
+
+	// 이동 (Triggered = 누르는 동안 매 프레임)
+	if (MoveAction)    EIC->BindAction(MoveAction,    ETriggerEvent::Triggered, this, &ALSPlayerCharacter::Move);
+
+	// 전투 / 스킬 (Started = 누른 순간 1회)
+	if (AttackAction)  EIC->BindAction(AttackAction,  ETriggerEvent::Started, this, &ALSPlayerCharacter::OnAttack);
+	if (DodgeAction)   EIC->BindAction(DodgeAction,   ETriggerEvent::Started, this, &ALSPlayerCharacter::OnDodge);
+	if (Skill1Action)  EIC->BindAction(Skill1Action,  ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill1);
+	if (Skill2Action)  EIC->BindAction(Skill2Action,  ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill2);
+	if (Skill3Action)  EIC->BindAction(Skill3Action,  ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill3);
+
+	// 아이템 슬롯 (Started = 누른 순간 1회)
+	if (Item1Action)   EIC->BindAction(Item1Action,   ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem1);
+	if (Item2Action)   EIC->BindAction(Item2Action,   ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem2);
+	if (Item3Action)   EIC->BindAction(Item3Action,   ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem3);
+	if (Item4Action)   EIC->BindAction(Item4Action,   ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem4);
+	if (Item5Action)   EIC->BindAction(Item5Action,   ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem5);
+	if (Item6Action)   EIC->BindAction(Item6Action,   ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem6);
+
+	// 상호작용
+	if (InteractAction) EIC->BindAction(InteractAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnInteract);
 }
+
+// ── 입력 핸들러 스텁 — 나중에 GAS 어빌리티 활성화로 교체 예정 ──────────
+
+void ALSPlayerCharacter::OnAttack()  {}
+void ALSPlayerCharacter::OnDodge()   {}
+void ALSPlayerCharacter::OnSkill1()  {}
+void ALSPlayerCharacter::OnSkill2()  {}
+void ALSPlayerCharacter::OnSkill3()  {}
+void ALSPlayerCharacter::OnItem1()   {}
+void ALSPlayerCharacter::OnItem2()   {}
+void ALSPlayerCharacter::OnItem3()   {}
+void ALSPlayerCharacter::OnItem4()   {}
+void ALSPlayerCharacter::OnItem5()   {}
+void ALSPlayerCharacter::OnItem6()   {}
+void ALSPlayerCharacter::OnInteract() {}
 
 void ALSPlayerCharacter::Move(const FInputActionValue& Value)
 {

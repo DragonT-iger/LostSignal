@@ -8,9 +8,14 @@
 
 /**
  * Abstract base character for LostSignal.
- * 공통 이동 세팅만 담당. 카메라는 ALSPlayerCharacter에만 있음.
- *
- * Unity 비교: abstract class BaseCharacter : MonoBehaviour에 해당.
+ * 
+ ACharacter 
+└── ALSCharacter [abstract] ← GAS IAbilitySystemInterface, 공통 로직
+├── ALSPlayerCharacter [abstract] ← 카메라, 마우스 추적, Enhanced Input
+│ └── BP_PlayerCharacter ← (메시, 에셋 매핑만)
+└── ALSEnemyCharacter [abstract] ← 카메라 없음, AI용 Move/Look 오버라이드
+  └── BP_Enemy_Base ← (메시, 에셋 매핑만)
+ * 
  */
 UCLASS(Abstract)
 class ALSCharacterBase : public ACharacter

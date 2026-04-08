@@ -15,8 +15,6 @@ struct FInputActionValue;
  * Abstract player character for LostSignal.
  * Top-down 쿼터뷰 카메라 + 마우스 방향 추적을 담당.
  * 실제 메시·에셋은 파생 Blueprint(BP_PlayerCharacter)에서 할당.
- *
- * AnimationTest의 ATP_ThirdPersonCharacter 기능을 이식한 클래스.
  */
 UCLASS(Abstract)
 class ALSPlayerCharacter : public ALSCharacterBase
@@ -33,9 +31,49 @@ class ALSPlayerCharacter : public ALSCharacterBase
 
 protected:
 
-	/** 이동 Input Action (IA_Move). BP 또는 에디터에서 할당. */
+	// ── Input Actions ────────────────────────────────────
+	// BP_PlayerCharacter Details 패널에서 각 슬롯에 에셋 할당
+
 	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> MoveAction;
+	TObjectPtr<UInputAction> MoveAction;      // IA_Move      (WASD)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> AttackAction;    // IA_Attack    (마우스 좌클릭)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> DodgeAction;     // IA_Dodge     (Space)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> Skill1Action;    // IA_Skill1    (Q)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> Skill2Action;    // IA_Skill2    (E)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> Skill3Action;    // IA_Skill3    (R)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> Item1Action;     // IA_Item1     (1)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> Item2Action;     // IA_Item2     (2)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> Item3Action;     // IA_Item3     (3)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> Item4Action;     // IA_Item4     (4)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> Item5Action;     // IA_Item5     (5)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> Item6Action;     // IA_Item6     (6)
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> InteractAction;  // IA_Interact  (F 등)
+
+	// ── 카메라 파라미터 ──────────────────────────────────
 
 	/** Top-down 카메라 피치 각도. */
 	UPROPERTY(EditAnywhere, Category="Camera")
@@ -79,4 +117,18 @@ private:
 
 	void Move(const FInputActionValue& Value);
 	void FaceMouseCursor(float DeltaSeconds);
+
+	// ── 입력 핸들러 (나중에 GAS로 어빌리티 활성화 예정) ──
+	void OnAttack();
+	void OnDodge();
+	void OnSkill1();
+	void OnSkill2();
+	void OnSkill3();
+	void OnItem1();
+	void OnItem2();
+	void OnItem3();
+	void OnItem4();
+	void OnItem5();
+	void OnItem6();
+	void OnInteract();
 };
