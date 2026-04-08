@@ -2,28 +2,31 @@
 
 #include "Core/LSPlayerControllerBase.h"
 
-#include "Blueprint/AIBlueprintHelperLibrary.h"
-#include "EnhancedInputComponent.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "EnhancedInputSubsystems.h"
-#include "InputActionValue.h"
-#include "NiagaraFunctionLibrary.h"
-#include "NiagaraSystem.h"
-#include "Navigation/PathFollowingComponent.h"
 #include "Engine/LocalPlayer.h"
-#include "Engine/World.h"
-#include "GameFramework/Pawn.h"
 #include "InputMappingContext.h"
-#include "LostSignal.h"
 
-ALSPlayerControllerBase::ALSPlayerControllerBase()
+void ALSPlayerControllerBase::BeginPlay()
 {
-	bIsTouch = false;
-	bMoveToMouseCursor = false;
+	Super::BeginPlay();
 
-	PathFollowingComponent = CreateDefaultSubobject<UPathFollowingComponent>(TEXT("PathFollowingComponent"));
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
 
+	// 마우스 커서 활성화 + GameAndUI 모드 (UI 클릭 + 게임플레이 동시 가능)
 	bShowMouseCursor = true;
-	DefaultMouseCursor = EMouseCursor::Default;
+	bEnableMouseOverEvents = true;
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+
+	// 뷰포트에 포커스 — UI와 게임 입력이 모두 동작하도록
+	UWidgetBlueprintLibrary::SetFocusToGameViewport();
 }
 
 void ALSPlayerControllerBase::SetupInputComponent()
@@ -35,93 +38,15 @@ void ALSPlayerControllerBase::SetupInputComponent()
 		return;
 	}
 
+	// EnhancedInput 서브시스템에 IMC 등록
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		if (DefaultMappingContext != nullptr)
+		for (UInputMappingContext* IMC : DefaultMappingContexts)
 		{
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+			if (IMC)
+			{
+				Subsystem->AddMappingContext(IMC, 0);
+			}
 		}
-	}
-
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
-	{
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Started, this, &ALSPlayerControllerBase::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Triggered, this, &ALSPlayerControllerBase::OnSetDestinationTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Completed, this, &ALSPlayerControllerBase::OnSetDestinationReleased);
-		EnhancedInputComponent->BindAction(SetDestinationClickAction, ETriggerEvent::Canceled, this, &ALSPlayerControllerBase::OnSetDestinationReleased);
-
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Started, this, &ALSPlayerControllerBase::OnInputStarted);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Triggered, this, &ALSPlayerControllerBase::OnTouchTriggered);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Completed, this, &ALSPlayerControllerBase::OnTouchReleased);
-		EnhancedInputComponent->BindAction(SetDestinationTouchAction, ETriggerEvent::Canceled, this, &ALSPlayerControllerBase::OnTouchReleased);
-	}
-	else
-	{
-		UE_LOG(LogLS, Error, TEXT("'%s' failed to find an Enhanced Input component."), *GetNameSafe(this));
-	}
-}
-
-void ALSPlayerControllerBase::OnInputStarted()
-{
-	StopMovement();
-	UpdateCachedDestination();
-}
-
-void ALSPlayerControllerBase::OnSetDestinationTriggered()
-{
-	FollowTime += GetWorld()->GetDeltaSeconds();
-	UpdateCachedDestination();
-
-	APawn* ControlledPawn = GetPawn();
-	if (ControlledPawn != nullptr)
-	{
-		const FVector WorldDirection = (CachedDestination - ControlledPawn->GetActorLocation()).GetSafeNormal();
-		ControlledPawn->AddMovementInput(WorldDirection, 1.0f, false);
-	}
-}
-
-void ALSPlayerControllerBase::OnSetDestinationReleased()
-{
-	if (FollowTime <= ShortPressThreshold)
-	{
-		UAIBlueprintHelperLibrary::SimpleMoveToLocation(this, CachedDestination);
-		if (FXCursor != nullptr)
-		{
-			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, FXCursor, CachedDestination, FRotator::ZeroRotator, FVector(1.0f), true, true, ENCPoolMethod::None, true);
-		}
-	}
-
-	FollowTime = 0.0f;
-}
-
-void ALSPlayerControllerBase::OnTouchTriggered()
-{
-	bIsTouch = true;
-	OnSetDestinationTriggered();
-}
-
-void ALSPlayerControllerBase::OnTouchReleased()
-{
-	bIsTouch = false;
-	OnSetDestinationReleased();
-}
-
-void ALSPlayerControllerBase::UpdateCachedDestination()
-{
-	FHitResult Hit;
-	bool bHitSuccessful = false;
-
-	if (bIsTouch)
-	{
-		bHitSuccessful = GetHitResultUnderFinger(ETouchIndex::Touch1, ECollisionChannel::ECC_Visibility, true, Hit);
-	}
-	else
-	{
-		bHitSuccessful = GetHitResultUnderCursor(ECollisionChannel::ECC_Visibility, true, Hit);
-	}
-
-	if (bHitSuccessful)
-	{
-		CachedDestination = Hit.Location;
 	}
 }

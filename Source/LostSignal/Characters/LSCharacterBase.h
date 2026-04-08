@@ -6,36 +6,18 @@
 #include "GameFramework/Character.h"
 #include "LSCharacterBase.generated.h"
 
-class UCameraComponent;
-class USpringArmComponent;
-
 /**
- * Base top-down player character for LostSignal.
- * Camera asset references should be assigned in a derived Blueprint.
+ * Abstract base character for LostSignal.
+ * 공통 이동 세팅만 담당. 카메라는 ALSPlayerCharacter에만 있음.
+ *
+ * Unity 비교: abstract class BaseCharacter : MonoBehaviour에 해당.
  */
 UCLASS(Abstract)
 class ALSCharacterBase : public ACharacter
 {
 	GENERATED_BODY()
 
-private:
-
-	/** Camera boom positioning the camera above the character. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
-	TObjectPtr<USpringArmComponent> CameraBoom;
-
-	/** Top-down gameplay camera. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
-	TObjectPtr<UCameraComponent> FollowCamera;
-
 public:
 
-	/** Constructor */
 	ALSCharacterBase();
-
-	virtual void BeginPlay() override;
-	virtual void Tick(float DeltaSeconds) override;
-
-	UCameraComponent* GetFollowCamera() const { return FollowCamera.Get(); }
-	USpringArmComponent* GetCameraBoom() const { return CameraBoom.Get(); }
 };
