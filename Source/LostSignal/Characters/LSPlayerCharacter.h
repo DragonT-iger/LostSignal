@@ -103,7 +103,12 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Camera", meta=(ClampMin="0.0"))
 	float MouseCameraLeadInterpSpeed = 8.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Animation")
+	TObjectPtr<UAnimMontage> AttackMontage;
+
 public:
+
+	void Attack();
 
 	ALSPlayerCharacter();
 

@@ -8,6 +8,7 @@
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
 #include "LostSignal.h"
+#include "InputCoreTypes.h"
 
 ALSPlayerCharacter::ALSPlayerCharacter()
 {
@@ -28,6 +29,8 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+
+
 }
 
 void ALSPlayerCharacter::Tick(float DeltaSeconds)
@@ -65,6 +68,11 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 	// 상호작용
 	if (InteractAction) EIC->BindAction(InteractAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnInteract);
+
+
+	//테스트 코드
+	PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ALSPlayerCharacter::Attack);
+
 }
 
 // ── 입력 핸들러 스텁 — 나중에 GAS 어빌리티 활성화로 교체 예정 ──────────
@@ -81,6 +89,15 @@ void ALSPlayerCharacter::OnItem4()   {}
 void ALSPlayerCharacter::OnItem5()   {}
 void ALSPlayerCharacter::OnItem6()   {}
 void ALSPlayerCharacter::OnInteract() {}
+
+
+void ALSPlayerCharacter::Attack()
+{
+	if (AttackMontage)
+	{
+		PlayAnimMontage(AttackMontage);
+	}
+}
 
 void ALSPlayerCharacter::Move(const FInputActionValue& Value)
 {
