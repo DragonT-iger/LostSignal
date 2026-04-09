@@ -1,9 +1,10 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "Characters/LSCharacterBase.h"
 
+#include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbility.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "LostSignal.h"
 
 ALSCharacterBase::ALSCharacterBase()
 {
@@ -18,24 +19,50 @@ ALSCharacterBase::ALSCharacterBase()
 
 	// 이동 방향으로 자동 회전하지 않음 — 플레이어는 마우스, 적은 AI가 회전 담당
 	GetCharacterMovement()->bOrientRotationToMovement = false;
-	//GetCharacterMovement()->RotationRate = FRotator(0.0f, 720.0f, 0.0f);
 
 	// 메시 원점(발바닥)과 캡슐 원점(중심)의 차이 보정
-	// Z: 캡슐 절반 높이(96)만큼 내림, Yaw: UE 기본 메시 방향 보정
 	GetMesh()->SetRelativeLocationAndRotation(
 		FVector(0.0f, 0.0f, -96.0f),
 		FRotator(0.0f, -90.0f, 0.0f)
 	);
 
-	//바닥에 고정하고 싶으면 이거 두개 활성화
-	//GetCharacterMovement()->bConstrainToPlane = true;
-	//GetCharacterMovement()->bSnapToPlaneAtStart = true;
-	//
-	// 
-	//GetCharacterMovement()->JumpZVelocity = 500.0f; // 점프는 사용하지 않음
-	//GetCharacterMovement()->AirControl = 0.35f;
-	//GetCharacterMovement()->MaxWalkSpeed = 500.0f;
-	//GetCharacterMovement()->MinAnalogWalkSpeed = 20.0f;
-	//GetCharacterMovement()->BrakingDecelerationWalking = 2000.0f;
-	//GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
+	// AbilitySystemComponent 생성
+	// Unity: new AbilityManager() 에 해당 — GAS의 어빌리티·이펙트·태그를 모두 관리
+	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AbilitySystemComponent->SetIsReplicated(true);
+
+	// 복제 모드: 싱글은 Full, 멀티 전환 시 Mixed(플레이어) / Minimal(적)로 변경
+	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Full);
+}
+
+UAbilitySystemComponent* ALSCharacterBase::GetAbilitySystemComponent() const
+{
+	return AbilitySystemComponent;
+}
+
+void ALSCharacterBase::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (AbilitySystemComponent)
+	{
+		// InitAbilityActorInfo: ASC에 "나는 이 액터의 ASC다" 라고 등록.
+		// 인자1(OwnerActor): 소유자(여기선 캐릭터 자신)
+		// 인자2(AvatarActor): 실제 월드에서 움직이는 액터(동일)
+		// PlayerState 방식으로 전환 시 인자1만 PlayerState로 변경
+		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+	}
+}
+
+void ALSCharacterBase::GrantAbility(TSubclassOf<UGameplayAbility> AbilityClass)
+{
+	if (!HasAuthority() || !AbilitySystemComponent || !AbilityClass)
+	{
+		return;
+	}
+
+	FGameplayAbilitySpec Spec(AbilityClass, /*Level=*/1);
+	AbilitySystemComponent->GiveAbility(Spec);
+
+	UE_LOG(LogLS, Log, TEXT("GrantAbility: %s → %s"), *GetNameSafe(this), *AbilityClass->GetName());
 }

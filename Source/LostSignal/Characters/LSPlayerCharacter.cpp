@@ -2,8 +2,10 @@
 
 #include "Characters/LSPlayerCharacter.h"
 
+#include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
+#include "GAS/LSGameplayTags.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
@@ -29,8 +31,17 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+}
 
+void ALSPlayerCharacter::BeginPlay()
+{
+	Super::BeginPlay(); // LSCharacterBase::BeginPlay에서 InitAbilityActorInfo 호출
 
+	// BP_PlayerCharacter Details에서 할당한 어빌리티 클래스를 부여
+	if (DashAbilityClass)
+	{
+		GrantAbility(DashAbilityClass);
+	}
 }
 
 void ALSPlayerCharacter::Tick(float DeltaSeconds)
@@ -53,7 +64,7 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 	// 전투 / 스킬 (Started = 누른 순간 1회)
 	if (AttackAction)  EIC->BindAction(AttackAction,  ETriggerEvent::Started, this, &ALSPlayerCharacter::OnAttack);
-	if (DodgeAction)   EIC->BindAction(DodgeAction,   ETriggerEvent::Started, this, &ALSPlayerCharacter::OnDodge);
+	if (DashAction)    EIC->BindAction(DashAction,    ETriggerEvent::Started, this, &ALSPlayerCharacter::OnDash);
 	if (Skill1Action)  EIC->BindAction(Skill1Action,  ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill1);
 	if (Skill2Action)  EIC->BindAction(Skill2Action,  ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill2);
 	if (Skill3Action)  EIC->BindAction(Skill3Action,  ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill3);
@@ -78,7 +89,17 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 // ── 입력 핸들러 스텁 — 나중에 GAS 어빌리티 활성화로 교체 예정 ──────────
 
 void ALSPlayerCharacter::OnAttack()  {}
-void ALSPlayerCharacter::OnDodge()   {}
+void ALSPlayerCharacter::OnDash()
+{
+	if (AbilitySystemComponent)
+	{
+		// LS.Ability.Dash 태그가 달린 어빌리티를 발동
+		// LS.State.Dodging 태그가 이미 있으면 LSGA_Dash의 ActivationBlockedTags가 차단
+		AbilitySystemComponent->TryActivateAbilitiesByTag(
+			FGameplayTagContainer(LSGameplayTags::Ability_Dash)
+		);
+	}
+}
 void ALSPlayerCharacter::OnSkill1()  {}
 void ALSPlayerCharacter::OnSkill2()  {}
 void ALSPlayerCharacter::OnSkill3()  {}

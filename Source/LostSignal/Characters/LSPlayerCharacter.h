@@ -9,6 +9,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UGameplayAbility;
 struct FInputActionValue;
 
 /**
@@ -41,7 +42,7 @@ protected:
 	TObjectPtr<UInputAction> AttackAction;    // IA_Attack    (마우스 좌클릭)
 
 	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> DodgeAction;     // IA_Dodge     (Space)
+	TObjectPtr<UInputAction> DashAction;      // IA_Dash      (Space)
 
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> Skill1Action;    // IA_Skill1    (Q)
@@ -106,12 +107,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Animation")
 	TObjectPtr<UAnimMontage> AttackMontage;
 
+	/** 대쉬 어빌리티 클래스. BP_PlayerCharacter Details에서 BP_GA_Dash 할당 */
+	UPROPERTY(EditDefaultsOnly, Category="GAS|Abilities")
+	TSubclassOf<UGameplayAbility> DashAbilityClass;
+
 public:
 
 	void Attack();
 
 	ALSPlayerCharacter();
 
+	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
 protected:
@@ -125,7 +131,7 @@ private:
 
 	// ── 입력 핸들러 (나중에 GAS로 어빌리티 활성화 예정) ──
 	void OnAttack();
-	void OnDodge();
+	void OnDash();
 	void OnSkill1();
 	void OnSkill2();
 	void OnSkill3();
