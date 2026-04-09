@@ -26,8 +26,12 @@ ALSCharacterBase::ALSCharacterBase()
 		FVector(0.0f, 0.0f, -96.0f),
 		FRotator(0.0f, -90.0f, 0.0f)
 	);
-	GetCharacterMovement()->bConstrainToPlane = true;
-	GetCharacterMovement()->bSnapToPlaneAtStart = true;
+
+	//바닥에 고정하고 싶으면 이거 두개 활성화
+	//GetCharacterMovement()->bConstrainToPlane = true;
+	//GetCharacterMovement()->bSnapToPlaneAtStart = true;
+	//
+	// 
 	//GetCharacterMovement()->JumpZVelocity = 500.0f; // 점프는 사용하지 않음
 	//GetCharacterMovement()->AirControl = 0.35f;
 	//GetCharacterMovement()->MaxWalkSpeed = 500.0f;
