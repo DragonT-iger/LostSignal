@@ -18,8 +18,17 @@ ULSGA_Dash::ULSGA_Dash()
 	// 무적(=대쉬 중)이면 재발동 차단
 	ActivationBlockedTags.AddTag(LSGameplayTags::State_Invincible);
 
+	// 쿨타임 태그 등록 — CommitAbility()가 GE_DashCooldown 적용 후 이 태그로 재발동 차단
+	// CooldownGameplayEffectClass는 BP_GA_Dash Details에서 GE_DashCooldown 에셋 할당 필요
+	CooldownTagContainer.AddTag(LSGameplayTags::Cooldown_Dash);
+
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+}
+
+const FGameplayTagContainer* ULSGA_Dash::GetCooldownTags() const
+{
+	return &CooldownTagContainer;
 }
 
 void ULSGA_Dash::ActivateAbility(

@@ -18,4 +18,9 @@ namespace LSGameplayTags
 	// ── 어빌리티 태그 ─────────────────────────────────────────
 	/** 대쉬 어빌리티 식별 태그 */
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Dash)
+
+	// ── 쿨타임 태그 ───────────────────────────────────────────
+	/** 대쉬 쿨타임 중 ASC에 부여되는 태그.
+	 *  GE_DashCooldown이 활성화된 동안 존재 → CommitAbility가 이 태그로 재발동 차단. */
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Dash)
 }

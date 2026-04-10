@@ -2,6 +2,7 @@
 
 namespace LSGameplayTags
 {
-	UE_DEFINE_GAMEPLAY_TAG(State_Invincible,"LS.State.Invincible")
+	UE_DEFINE_GAMEPLAY_TAG(State_Invincible, "LS.State.Invincible")
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Dash,    "LS.Ability.Dash")
+	UE_DEFINE_GAMEPLAY_TAG(Cooldown_Dash,   "LS.Cooldown.Dash")
 }

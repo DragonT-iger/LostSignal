@@ -113,7 +113,7 @@ protected:
 
 public:
 
-	void Attack();
+	//void Attack();
 
 	ALSPlayerCharacter();
 

@@ -15,7 +15,7 @@ class UGameplayAbility;
  * └── ALSCharacterBase [abstract] ← GAS IAbilitySystemInterface, 공통 로직
  *     ├── ALSPlayerCharacter [abstract] ← 카메라, 마우스 추적, Enhanced Input
  *     │   └── BP_PlayerCharacter ← (메시, 에셋 매핑만)
- *     └── ALSEnemyCharacter [abstract] ← 카메라 없음, AI용 Move/Look 오버라이드
+ *     └── ALSEnemyCharacter [abstract] ← 카메라 없음
  *         └── BP_Enemy_Base ← (메시, 에셋 매핑만)
  *
  * GAS 구조:

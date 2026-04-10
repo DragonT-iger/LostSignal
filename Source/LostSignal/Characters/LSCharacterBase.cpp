@@ -50,6 +50,7 @@ void ALSCharacterBase::BeginPlay()
 		// 인자1(OwnerActor): 소유자(여기선 캐릭터 자신)
 		// 인자2(AvatarActor): 실제 월드에서 움직이는 액터(동일)
 		// PlayerState 방식으로 전환 시 인자1만 PlayerState로 변경
+		// OwnerActor가 이 Actor이므로 죽게 되면 기존 수정된 ASC 정보가 날아감.
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
 	}
 }

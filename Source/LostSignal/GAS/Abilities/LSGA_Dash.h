@@ -40,6 +40,9 @@ protected:
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
 
+	/** 쿨타임 태그 반환. GAS가 CommitAbility 후 이 태그로 재발동을 차단한다. */
+	virtual const FGameplayTagContainer* GetCooldownTags() const override;
+
 	/** 대쉬 속도 (cm/s). Duration과 무관하게 독립적으로 조정 */
 	UPROPERTY(EditDefaultsOnly, Category="Dash|Config")
 	float DashSpeed = 2000.f;
@@ -63,4 +66,7 @@ private:
 	FTimerHandle DashTimerHandle;
 	FActiveGameplayEffectHandle InvincibilityHandle;
 	uint16 RootMotionSourceID = 0;
+
+	/** GetCooldownTags()가 반환할 태그 컨테이너 */
+	FGameplayTagContainer CooldownTagContainer;
 };

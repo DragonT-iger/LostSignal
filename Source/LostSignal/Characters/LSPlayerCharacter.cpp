@@ -82,7 +82,7 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 
 	//테스트 코드
-	PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ALSPlayerCharacter::Attack);
+	//PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ALSPlayerCharacter::Attack);
 
 }
 
@@ -112,13 +112,13 @@ void ALSPlayerCharacter::OnItem6()   {}
 void ALSPlayerCharacter::OnInteract() {}
 
 
-void ALSPlayerCharacter::Attack()
-{
-	if (AttackMontage)
-	{
-		PlayAnimMontage(AttackMontage);
-	}
-}
+//void ALSPlayerCharacter::Attack()
+//{
+//	if (AttackMontage)
+//	{
+//		PlayAnimMontage(AttackMontage);
+//	}
+//}
 
 void ALSPlayerCharacter::Move(const FInputActionValue& Value)
 {
