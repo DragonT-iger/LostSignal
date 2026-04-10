@@ -50,8 +50,8 @@
 | `GameplayTag` | 상태 플래그 (아래 참고) |
 | `GameplayCue` | 비주얼/사운드 전용 (로직 금지) |
 
-**태그:** `LS.State.{Dodging/Invincible/Dead}` · `LS.Combat.{ComboWindow/Attacking}` · `LS.Debuff.Stunned`
-**규칙:** 수치 변경은 반드시 GameplayEffect 통해서. Build.cs에 `GameplayAbilities, GameplayTags, GameplayTasks` 필수.
+**태그:** `LS.State.{Dash/Invincible/Dead}` · `LS.Combat.{ComboWindow/Attacking}` · `LS.Debuff.Stunned`
+**규칙:** 수치 변경은 반드시 GameplayEffect 통해서.
 
 ---
 

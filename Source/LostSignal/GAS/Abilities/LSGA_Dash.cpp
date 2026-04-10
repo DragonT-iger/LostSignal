@@ -3,7 +3,9 @@
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/RootMotionSource.h"
 #include "GAS/LSGameplayTags.h"
+#include "NiagaraFunctionLibrary.h"
 #include "LostSignal.h"
 
 ULSGA_Dash::ULSGA_Dash()
@@ -13,8 +15,8 @@ ULSGA_Dash::ULSGA_Dash()
 	AssetTags.AddTag(LSGameplayTags::Ability_Dash);
 	SetAssetTags(AssetTags);
 
-	// 이미 대쉬 중이면 재발동 차단
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dodging);
+	// 무적(=대쉬 중)이면 재발동 차단
+	ActivationBlockedTags.AddTag(LSGameplayTags::State_Invincible);
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
@@ -64,13 +66,27 @@ void ULSGA_Dash::ActivateAbility(
 		UE_LOG(LogLS, Warning, TEXT("LSGA_Dash: InvincibilityEffectClass가 설정되지 않음 — 무적 없이 대쉬만 실행"));
 	}
 
-	// ── 대쉬 이동 ────────────────────────────────────────────
-	const float DashSpeed = DashDistance / FMath::Max(DashDuration, KINDA_SMALL_NUMBER);
-	Character->LaunchCharacter(DashDir * DashSpeed, true, false);
+	// ── 대쉬 이동 (Root Motion Source) ──────────────────────
+	// LaunchCharacter와 달리 DashDuration 동안 일정 속도를 유지하다 자동 종료.
+	// Unity의 Vector3.MoveTowards를 코루틴으로 구현하는 것과 유사.
+	TSharedPtr<FRootMotionSource_ConstantForce> RootMotion =
+		MakeShared<FRootMotionSource_ConstantForce>();
+	RootMotion->InstanceName    = FName("Dash");
+	RootMotion->AccumulateMode  = ERootMotionAccumulateMode::Override; // 다른 이동 무시
+	RootMotion->Priority        = 5;
+	RootMotion->Force           = DashDir * DashSpeed;
+	RootMotion->Duration        = DashDuration;
+	// 대쉬 끝나면 속도 0으로 — MaintainLastRootMotionVelocity로 바꾸면 미끄러짐
+	RootMotion->FinishVelocityParams.Mode        = ERootMotionFinishVelocityMode::SetVelocity;
+	RootMotion->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
 
-	UE_LOG(LogLS, Verbose, TEXT("LSGA_Dash: 대쉬 시작 방향=%s 속도=%.0f"), *DashDir.ToString(), DashSpeed);
+	RootMotionSourceID = Character->GetCharacterMovement()->ApplyRootMotionSource(RootMotion);
+
+	UE_LOG(LogLS, Verbose, TEXT("LSGA_Dash: 대쉬 시작 방향=%s 속도=%.0f 시간=%.2f"),
+		*DashDir.ToString(), DashSpeed, DashDuration);
 
 	// ── 종료 타이머 ──────────────────────────────────────────
+	// Root Motion이 Duration 후 자동 만료되지만, GE 제거와 EndAbility는 직접 처리
 	GetWorld()->GetTimerManager().SetTimer(
 		DashTimerHandle,
 		FTimerDelegate::CreateWeakLambda(this, [this]()
@@ -99,6 +115,12 @@ void ULSGA_Dash::EndAbility(
 			ASC->RemoveActiveGameplayEffect(InvincibilityHandle);
 			InvincibilityHandle = FActiveGameplayEffectHandle();
 		}
+	}
+
+	// Root Motion 강제 제거 (어빌리티 캔슬 시에도 이동이 즉시 멈춤)
+	if (ACharacter* Character = Cast<ACharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr))
+	{
+		Character->GetCharacterMovement()->RemoveRootMotionSourceByID(RootMotionSourceID);
 	}
 
 	if (UWorld* World = GetWorld())

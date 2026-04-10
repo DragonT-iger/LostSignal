@@ -12,10 +12,7 @@
 namespace LSGameplayTags
 {
 	// ── 상태 태그 ─────────────────────────────────────────────
-	/** 대쉬(구르기) 중인 상태 */
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dodging)
-
-	/** 무적 상태 — 대쉬 중 DatamiGE가 부여 */
+	/** 무적 상태 — 대쉬 중 GE가 부여. 재발동 차단 태그로도 사용 */
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Invincible)
 
 	// ── 어빌리티 태그 ─────────────────────────────────────────
