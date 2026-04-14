@@ -3,6 +3,7 @@ Binaries/
 Saved/
 DerivedDataCache/
 .vs/
+.claude/
 .vsconfig
 Docs/startup-roadmap.md
 
@@ -35,3 +36,7 @@ Plugins/*/Intermediate/
 *.bak
 *.orig
 desktop.ini
+_BACKUP_1997.gitignore
+_BASE_1997.gitignore
+_LOCAL_1997.gitignore
+_REMOTE_1997.gitignore
