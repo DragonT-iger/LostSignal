@@ -34,3 +34,4 @@ Plugins/*/Intermediate/
 *.tmp
 *.bak
 *.orig
+desktop.ini
