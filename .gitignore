@@ -36,3 +36,8 @@ Plugins/*/Intermediate/
 *.bak
 *.orig
 desktop.ini
+
+tools/unreal-mcp/.venv/
+tools/unreal-mcp/**/__pycache__/
+tools/unreal-mcp/__pycache__/
+tools/unreal-mcp/*.egg-info/
