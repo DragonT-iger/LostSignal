@@ -92,7 +92,16 @@ Content/LostSignal/
 ├── Weapons/     Mesh, 이펙트
 ├── VFX/         Niagara, GameplayCue
 ├── UI/          WBP_*, 아이콘, 폰트
-├── Maps/        레벨
+├── Maps/
+│   ├── MainMenu/   타이틀 레벨
+│   ├── Lobby/      매칭 전 로비
+│   ├── Raid/       레이드 맵
+│   └── Dev/        팀 공용 테스트 맵 (패키징 제외)
+├── Sandbox/     담당자별 개인 작업 공간 (패키징 제외)
+│   ├── ArtistA/
+│   ├── ArtistB/
+│   ├── ProgrammerA/
+│   └── ProgrammerB/
 ├── Data/        DataTables/, GAS/(GE·GA 에셋), Input/(IA·IMC)
 ├── Audio/       SFX/, Music/
 ├── Materials/
