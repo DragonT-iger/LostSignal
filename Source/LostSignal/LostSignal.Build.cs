@@ -23,7 +23,12 @@ public class LostSignal : ModuleRules
 			"Slate",
 			"GameplayAbilities",
 			"GameplayTags",
-			"GameplayTasks"
+			"GameplayTasks",
+			"RenderCore",
+			"RHI",
+			"Renderer",
+			"Projects",
+			"DeveloperSettings"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

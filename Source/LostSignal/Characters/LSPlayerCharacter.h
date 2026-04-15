@@ -10,6 +10,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UGameplayAbility;
+class ULSVisionComponent;
 struct FInputActionValue;
 
 /**
@@ -29,6 +30,9 @@ class ALSPlayerCharacter : public ALSCharacterBase
 	/** 실제 렌더링 카메라. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UCameraComponent> FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<ULSVisionComponent> VisionComponent;
 
 protected:
 

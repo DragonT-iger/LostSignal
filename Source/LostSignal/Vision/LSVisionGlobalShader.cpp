@@ -1,0 +1,43 @@
+#include "Vision/LSVisionGlobalShader.h"
+
+#include "GlobalShader.h"
+#include "RenderGraphBuilder.h"
+#include "RenderGraphResources.h"
+#include "RenderGraphUtils.h"
+#include "ShaderCompilerCore.h"
+
+IMPLEMENT_GLOBAL_SHADER(FLSVisionMaskCS, "/LostSignal/Private/TopDownVisionMask.usf", "MainCS", SF_Compute);
+
+// Queues the compute shader pass that rasterizes the current vision polygon into the mask RT.
+void LSVision::AddVisionMaskPass(FRDGBuilder& GraphBuilder, const FMaskDispatchInputs& Inputs)
+{
+	if (Inputs.OutputTexture == nullptr)
+	{
+		return;
+	}
+
+	FLSVisionMaskCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FLSVisionMaskCS::FParameters>();
+	PassParameters->VisionOrigin = Inputs.VisionOrigin;
+	PassParameters->VisionRadius = Inputs.VisionRadius;
+	PassParameters->FeatherWidth = Inputs.FeatherWidth;
+	PassParameters->WorldMin = Inputs.WorldMin;
+	PassParameters->WorldMax = Inputs.WorldMax;
+	PassParameters->OutputTextureSize = FVector2f(
+		static_cast<float>(Inputs.OutputTexture->Desc.Extent.X),
+		static_cast<float>(Inputs.OutputTexture->Desc.Extent.Y));
+	PassParameters->VisibleColor = Inputs.VisibleColor;
+	PassParameters->HiddenColor = Inputs.HiddenColor;
+	PassParameters->PolygonPointCount = Inputs.PolygonPointCount;
+	PassParameters->PolygonPoints = Inputs.PolygonPointsSRV;
+	PassParameters->RWOutputTexture = GraphBuilder.CreateUAV(Inputs.OutputTexture);
+
+	TShaderMapRef<FLSVisionMaskCS> ComputeShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
+	const FIntVector GroupCount = FComputeShaderUtils::GetGroupCount(Inputs.OutputTexture->Desc.Extent, FIntPoint(8, 8));
+
+	FComputeShaderUtils::AddPass(
+		GraphBuilder,
+		RDG_EVENT_NAME("LostSignal.Vision.Mask"),
+		ComputeShader,
+		PassParameters,
+		GroupCount);
+}

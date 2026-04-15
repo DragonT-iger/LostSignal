@@ -7,7 +7,7 @@
 		{
 			"Name": "LostSignal",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "PostConfigInit"
 		}
 	],
 	"Plugins": [

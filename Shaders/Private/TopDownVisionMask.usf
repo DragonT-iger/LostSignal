@@ -1,0 +1,79 @@
+#include "/Engine/Public/Platform.ush"
+#include "/Engine/Private/Common.ush"
+
+RWTexture2D<float4> RWOutputTexture;
+
+float2 VisionOrigin;
+float VisionRadius;
+float FeatherWidth;
+float2 WorldMin;
+float2 WorldMax;
+float2 OutputTextureSize;
+float4 VisibleColor;
+float4 HiddenColor;
+uint PolygonPointCount;
+StructuredBuffer<float2> PolygonPoints;
+
+float PointSegmentDistance(float2 Point, float2 A, float2 B)
+{
+    float2 AB = B - A;
+    float LengthSq = dot(AB, AB);
+
+    if (LengthSq <= 0.000001f)
+    {
+        return distance(Point, A);
+    }
+
+    float T = saturate(dot(Point - A, AB) / LengthSq);
+    float2 ClosestPoint = A + AB * T;
+    return distance(Point, ClosestPoint);
+}
+
+[numthreads(8, 8, 1)]
+void MainCS(uint3 DispatchThreadId : SV_DispatchThreadID)
+{
+    if (DispatchThreadId.x >= (uint)OutputTextureSize.x || DispatchThreadId.y >= (uint)OutputTextureSize.y)
+    {
+        return;
+    }
+
+    const float2 PixelUV = (float2(DispatchThreadId.xy) + 0.5f) / OutputTextureSize;
+    const float2 WorldPos = lerp(WorldMin, WorldMax, PixelUV);
+    const float DistanceToVision = length(WorldPos);
+    const float CircleAlpha = smoothstep(max(VisionRadius - FeatherWidth, 0.0f), VisionRadius, DistanceToVision);
+
+    bool bInside = false;
+    float MinEdgeDistance = 1000000.0f;
+
+    if (PolygonPointCount < 3)
+    {
+        RWOutputTexture[DispatchThreadId.xy] = float4(HiddenColor.rgb, CircleAlpha);
+        return;
+    }
+
+    for (uint i = 0, j = PolygonPointCount - 1; i < PolygonPointCount; j = i++)
+    {
+        float2 Pi = PolygonPoints[i];
+        float2 Pj = PolygonPoints[j];
+        MinEdgeDistance = min(MinEdgeDistance, PointSegmentDistance(WorldPos, Pj, Pi));
+
+        float Denom = Pj.y - Pi.y;
+        bool bIntersect =
+            ((Pi.y > WorldPos.y) != (Pj.y > WorldPos.y)) &&
+            (WorldPos.x < (Pj.x - Pi.x) * (WorldPos.y - Pi.y) / Denom + Pi.x);
+
+        if (bIntersect)
+        {
+            bInside = !bInside;
+        }
+    }
+
+    float PolygonAlpha = 1.0f;
+    if (bInside)
+    {
+        PolygonAlpha = 1.0f - smoothstep(0.0f, max(FeatherWidth, 0.0001f), MinEdgeDistance);
+    }
+
+    const float FinalAlpha = min(CircleAlpha, PolygonAlpha);
+    RWOutputTexture[DispatchThreadId.xy] = float4(HiddenColor.rgb, FinalAlpha);
+}
