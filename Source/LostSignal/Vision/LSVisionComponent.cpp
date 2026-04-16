@@ -2,6 +2,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Vision/LSVisionMaskRenderer.h"
@@ -139,7 +140,13 @@ void ULSVisionComponent::UpdateVisionPolygon()
 bool ULSVisionComponent::IsLocalVisionController() const
 {
 	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	return OwnerPawn != nullptr && OwnerPawn->IsLocallyControlled();
+	if (OwnerPawn == nullptr || !OwnerPawn->IsPlayerControlled())
+	{
+		return false;
+	}
+
+	const APlayerController* PlayerController = Cast<APlayerController>(OwnerPawn->GetController());
+	return PlayerController != nullptr && PlayerController->IsLocalPlayerController();
 }
 
 // Checks whether a 2D point lies inside the latest solved visibility polygon.

@@ -1,6 +1,7 @@
 #include "Vision/LSMPCVisionSourceComponent.h"
 
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialParameterCollection.h"
 
@@ -58,7 +59,13 @@ bool ULSMPCVisionSourceComponent::ShouldUpdateForLocalView() const
 	}
 
 	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	return OwnerPawn != nullptr && OwnerPawn->IsLocallyControlled();
+	if (OwnerPawn == nullptr || !OwnerPawn->IsPlayerControlled())
+	{
+		return false;
+	}
+
+	const APlayerController* PlayerController = Cast<APlayerController>(OwnerPawn->GetController());
+	return PlayerController != nullptr && PlayerController->IsLocalPlayerController();
 }
 
 FVector ULSMPCVisionSourceComponent::GetVisionCenterWorld() const
