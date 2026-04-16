@@ -11,6 +11,7 @@
 #include "InputActionValue.h"
 #include "LostSignal.h"
 #include "InputCoreTypes.h"
+#include "Vision/LSMPCVisionSourceComponent.h"
 #include "Vision/LSVisionComponent.h"
 
 ALSPlayerCharacter::ALSPlayerCharacter()
@@ -33,6 +34,7 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
+	MPCVisionSourceComponent = CreateDefaultSubobject<ULSMPCVisionSourceComponent>(TEXT("MPCVisionSourceComponent"));
 	VisionComponent = CreateDefaultSubobject<ULSVisionComponent>(TEXT("VisionComponent"));
 }
 
