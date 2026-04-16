@@ -89,7 +89,7 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	SolverInfo.HalfFovDegrees = HalfFOVDegrees;
 	SolverInfo.VisionRadius = VisionRadius;
 	SolverInfo.AngleEpsilon = 0.01f;
-	SolverInfo.DivideAngleDegree = 1.0f;
+	SolverInfo.DivideAngleDegree = DivideAngleDegree;
 	SolverInfo.MaxRayDistance = MaxRayDistance;
 	SolverInfo.World = World;
 

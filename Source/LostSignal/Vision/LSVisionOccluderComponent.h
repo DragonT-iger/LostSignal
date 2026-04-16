@@ -7,12 +7,14 @@
 #include "LSVisionOccluderComponent.generated.h"
 
 class UBoxComponent;
+class UStaticMeshComponent;
 class UPrimitiveComponent;
 class USceneComponent;
 
 UENUM(BlueprintType)
 enum class ELSVisionOccluderSourceMode : uint8
 {
+	MeshBounds UMETA(DisplayName = "Mesh Bounds"),
 	PrimitiveBounds UMETA(DisplayName = "Primitive Bounds"),
 	BoxComponent UMETA(DisplayName = "Box Component"),
 	ManualSegments UMETA(DisplayName = "Manual Segments")
@@ -31,6 +33,10 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnUnregister() override;
+	virtual void TickComponent(
+		float DeltaTime,
+		ELevelTick TickType,
+		FActorComponentTickFunction* ThisTickFunction) override;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source")
@@ -45,7 +51,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::BoxComponent", EditConditionHides))
 	TObjectPtr<UBoxComponent> SourceBoxComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::PrimitiveBounds", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::PrimitiveBounds || SourceMode == ELSVisionOccluderSourceMode::MeshBounds", EditConditionHides))
 	TObjectPtr<UPrimitiveComponent> SourcePrimitiveComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Manual", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::ManualSegments", EditConditionHides))
@@ -53,6 +59,18 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vision")
 	TArray<FLSVisionSegment2D> Segments;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug")
+	bool bDrawDebugSegments = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug")
+	FColor DebugSegmentColor = FColor::Green;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug", meta = (ClampMin = "0.0"))
+	float DebugDrawZOffset = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug", meta = (ClampMin = "0.0"))
+	float DebugDrawThickness = 2.0f;
 
 	UFUNCTION(BlueprintCallable, Category = "Vision")
 	void RebuildSegments();
@@ -63,13 +81,22 @@ public:
 	}
 
 private:
+	void DrawDebugSegments() const;
 	void UpdateObservedComponentBinding();
 	void HandleObservedComponentTransformUpdated(USceneComponent* UpdatedComponent, EUpdateTransformFlags UpdateTransformFlags, ETeleportType Teleport);
 	void BuildSegmentsFromBox(const UBoxComponent* BoxComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
+	void BuildSegmentsFromMeshBounds(const UPrimitiveComponent* PrimitiveComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
 	void BuildSegmentsFromPrimitiveBounds(const UPrimitiveComponent* PrimitiveComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
 	void AddRectangleSegments(const FVector2D& Min, const FVector2D& Max, TArray<FLSVisionSegment2D>& OutSegments) const;
+	void AddTransformedRectangleSegments(
+		const FVector& LocalCenter,
+		const FVector2D& LocalMin,
+		const FVector2D& LocalMax,
+		const FTransform& LocalToWorld,
+		TArray<FLSVisionSegment2D>& OutSegments) const;
 
 	UBoxComponent* ResolveBoxComponent() const;
+	UPrimitiveComponent* ResolveMeshPrimitiveComponent() const;
 	UPrimitiveComponent* ResolvePrimitiveComponent() const;
 	USceneComponent* ResolveObservedSceneComponent() const;
 
