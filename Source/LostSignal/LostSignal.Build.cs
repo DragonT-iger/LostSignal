@@ -28,10 +28,13 @@ public class LostSignal : ModuleRules
 			"RHI",
 			"Renderer",
 			"Projects",
-			"DeveloperSettings"
+			"DeveloperSettings",
+			"LostSignalVisionShaders"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] {
+			"LostSignalVisionShaders"
+		});
 
 		PublicIncludePaths.AddRange(new string[] {
 			"LostSignal"

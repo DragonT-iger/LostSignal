@@ -3,6 +3,7 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "LostSignal.h"
+#include "RenderingThread.h"
 #include "Vision/LSVisionMaskRenderer.h"
 #include "Vision/LSVisionOccluderComponent.h"
 #include "Vision/LSVisionSettings.h"
@@ -53,8 +54,12 @@ void ULSVisionSubsystem::Deinitialize()
 	RegisteredSurfaces.Reset();
 	RegisteredTargets.Reset();
 
+	// Drain any queued mask updates before tearing down the renderer and its RT resource.
+	FlushRenderingCommands();
+
 	if (IsValid(MaskRenderer))
 	{
+		MaskRenderer->VisibilityMaskRenderTarget = nullptr;
 		MaskRenderer->Destroy();
 		MaskRenderer = nullptr;
 	}
@@ -115,9 +120,14 @@ UTextureRenderTarget2D* ULSVisionSubsystem::ResolveVisibilityMaskRenderTarget()
 	const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>();
 	if (VisionSettings != nullptr && !VisionSettings->VisibilityMaskRenderTarget.IsNull())
 	{
-		if (UTextureRenderTarget2D* ConfiguredRenderTarget = VisionSettings->VisibilityMaskRenderTarget.LoadSynchronous())
+		if (const UTextureRenderTarget2D* ConfiguredRenderTarget = VisionSettings->VisibilityMaskRenderTarget.LoadSynchronous())
 		{
-			return ConfiguredRenderTarget;
+			if (UTextureRenderTarget2D* RuntimeRenderTarget = CreateRenderTargetFromTemplate(ConfiguredRenderTarget))
+			{
+				return RuntimeRenderTarget;
+			}
+
+			UE_LOG(LogLS, Warning, TEXT("Failed to create runtime vision mask render target from configured asset. Falling back to transient RT."));
 		}
 	}
 
@@ -126,6 +136,46 @@ UTextureRenderTarget2D* ULSVisionSubsystem::ResolveVisibilityMaskRenderTarget()
 		: 1024;
 
 	return CreateFallbackRenderTarget(FallbackSize);
+}
+
+// Creates a per-world runtime RT so PIE worlds and listen-server views do not overwrite the same asset.
+UTextureRenderTarget2D* ULSVisionSubsystem::CreateRenderTargetFromTemplate(const UTextureRenderTarget2D* TemplateRenderTarget)
+{
+	if (TemplateRenderTarget == nullptr)
+	{
+		return nullptr;
+	}
+
+	UTextureRenderTarget2D* RenderTarget = NewObject<UTextureRenderTarget2D>(this, TEXT("LSVisionMaskRT_Runtime"));
+	if (RenderTarget == nullptr)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Failed to allocate runtime vision mask render target from template."));
+		return nullptr;
+	}
+
+	RenderTarget->ClearColor = TemplateRenderTarget->ClearColor;
+	RenderTarget->bAutoGenerateMips = TemplateRenderTarget->bAutoGenerateMips;
+	RenderTarget->bCanCreateUAV = true;
+	RenderTarget->AddressX = TemplateRenderTarget->AddressX;
+	RenderTarget->AddressY = TemplateRenderTarget->AddressY;
+	RenderTarget->TargetGamma = TemplateRenderTarget->TargetGamma;
+
+	if (TemplateRenderTarget->OverrideFormat != PF_Unknown)
+	{
+		RenderTarget->InitCustomFormat(
+			TemplateRenderTarget->SizeX,
+			TemplateRenderTarget->SizeY,
+			TemplateRenderTarget->OverrideFormat,
+			TemplateRenderTarget->bForceLinearGamma);
+	}
+	else
+	{
+		RenderTarget->RenderTargetFormat = TemplateRenderTarget->RenderTargetFormat;
+		RenderTarget->InitAutoFormat(TemplateRenderTarget->SizeX, TemplateRenderTarget->SizeY);
+	}
+
+	RenderTarget->UpdateResourceImmediate(true);
+	return RenderTarget;
 }
 
 // Creates a transient UAV-capable render target so the shader path works without BP setup.

@@ -15,7 +15,7 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 	const float ForwardAngleDeg = FMath::RadiansToDegrees(FMath::Atan2(SolverInfo.OriginForward.Y, SolverInfo.OriginForward.X));
 
 	TArray<float> AnglesDeg;
-	AnglesDeg.Reserve(2 + FMath::CeilToInt((SolverInfo.HalfFovDegrees * 2.0f) / SolverInfo.DivideAngleDegree) + (SolverInfo.Segments.Num() * 3));
+	AnglesDeg.Reserve(2 + (SolverInfo.Segments.Num() * 6));
 
 	const float StartAngleDeg = ForwardAngleDeg - SolverInfo.HalfFovDegrees;
 	const float EndAngleDeg = ForwardAngleDeg + SolverInfo.HalfFovDegrees;
@@ -37,15 +37,26 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 		return RelativeDeg;
 	};
 
-	for (float Angle = StartAngleDeg; Angle <= EndAngleDeg; Angle += SolverInfo.DivideAngleDegree)
-	{
-		AnglesDeg.Add(Angle);
-	}
-
+	// Always keep the FOV boundary rays so the solved polygon still matches the requested cone limits.
+	AnglesDeg.Add(StartAngleDeg);
 	AnglesDeg.Add(EndAngleDeg);
 
-	TArray<FIntPoint> UniqueVertices;
+	TArray<FVector2D> UniqueVertices;
 	UniqueVertices.Reserve(SolverInfo.Segments.Num() * 2);
+
+	const auto AddUniqueVertex = [&UniqueVertices](const FVector2D& Vertex)
+	{
+		const bool bAlreadyAdded = UniqueVertices.ContainsByPredicate(
+			[&Vertex](const FVector2D& ExistingVertex)
+			{
+				return ExistingVertex.Equals(Vertex, KINDA_SMALL_NUMBER);
+			});
+
+		if (!bAlreadyAdded)
+		{
+			UniqueVertices.Add(Vertex);
+		}
+	};
 
 	for (const FLSVisionSegment2D* Segment : SolverInfo.Segments)
 	{
@@ -54,11 +65,11 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 			continue;
 		}
 
-		UniqueVertices.AddUnique(FIntPoint(FMath::RoundToInt(Segment->Start.X), FMath::RoundToInt(Segment->Start.Y)));
-		UniqueVertices.AddUnique(FIntPoint(FMath::RoundToInt(Segment->End.X), FMath::RoundToInt(Segment->End.Y)));
+		AddUniqueVertex(Segment->Start);
+		AddUniqueVertex(Segment->End);
 	}
 
-	for (const FIntPoint& Vertex : UniqueVertices)
+	for (const FVector2D& Vertex : UniqueVertices)
 	{
 		const float AngleDeg = FMath::RadiansToDegrees(FMath::Atan2(Vertex.Y - SolverInfo.OriginPos.Y, Vertex.X - SolverInfo.OriginPos.X));
 		if (!IsAngleInsideFov(AngleDeg))
@@ -97,14 +108,59 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 		}
 	}
 
+	// Endpoint rays capture silhouette changes, but large empty spans still need a few samples to keep the
+	// outer vision radius from collapsing into one big triangle. DivideAngleDegree now acts as the max gap.
+	const float MaxAngleGapDeg = FMath::Max(SolverInfo.DivideAngleDegree, 0.1f);
+	TArray<float> FinalAngles;
+	FinalAngles.Reserve(UniqueAngles.Num() + FMath::CeilToInt((SolverInfo.HalfFovDegrees * 2.0f) / MaxAngleGapDeg));
+
+	for (int32 AngleIndex = 0; AngleIndex < UniqueAngles.Num(); ++AngleIndex)
+	{
+		const float CurrentAngle = UniqueAngles[AngleIndex];
+		FinalAngles.Add(CurrentAngle);
+
+		if (AngleIndex == UniqueAngles.Num() - 1)
+		{
+			continue;
+		}
+
+		const float NextAngle = UniqueAngles[AngleIndex + 1];
+		const float RelativeCurrent = NormalizeAngleForSort(CurrentAngle);
+		const float RelativeNext = NormalizeAngleForSort(NextAngle);
+		const float GapDeg = RelativeNext - RelativeCurrent;
+
+		if (GapDeg <= MaxAngleGapDeg)
+		{
+			continue;
+		}
+
+		const int32 AdditionalSampleCount = FMath::FloorToInt(GapDeg / MaxAngleGapDeg);
+		for (int32 SampleIndex = 1; SampleIndex <= AdditionalSampleCount; ++SampleIndex)
+		{
+			const float InsertedRelativeAngle = RelativeCurrent + (MaxAngleGapDeg * SampleIndex);
+			if (InsertedRelativeAngle >= RelativeNext - KINDA_SMALL_NUMBER)
+			{
+				break;
+			}
+
+			FinalAngles.Add(StartAngleDeg + InsertedRelativeAngle);
+		}
+	}
+
+	FinalAngles.Sort([&](const float A, const float B)
+	{
+		return NormalizeAngleForSort(A) < NormalizeAngleForSort(B);
+	});
+
 	FLSVisionPolygonData PolygonData;
 	PolygonData.Origin = SolverInfo.OriginPos;
 	PolygonData.VisionRadius = SolverInfo.VisionRadius;
 	PolygonData.Extent = SolverInfo.MaxRayDistance;
-	PolygonData.Points.Reserve(UniqueAngles.Num() + 1);
+	PolygonData.Points.Reserve(FinalAngles.Num() + 1);
+	PolygonData.DebugRayHitPoints.Reserve(FinalAngles.Num());
 	PolygonData.Points.Add(SolverInfo.OriginPos);
 
-	for (const float AngleDeg : UniqueAngles)
+	for (const float AngleDeg : FinalAngles)
 	{
 		const float AngleRad = FMath::DegreesToRadians(AngleDeg);
 		const FVector2D RayDir = FVector2D(FMath::Cos(AngleRad), FMath::Sin(AngleRad)).GetSafeNormal();
@@ -134,6 +190,7 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 		}
 
 		PolygonData.Points.Add(ClosestHit.HitPoint);
+		PolygonData.DebugRayHitPoints.Add(ClosestHit.HitPoint);
 	}
 
 	return PolygonData;

@@ -46,6 +46,11 @@ struct LOSTSIGNAL_API FLSVisionPolygonData
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
 	TArray<FVector2D> Points;
+
+	// Stores the exact ray hit points used while solving visibility so debug drawing can show
+	// actual raycasts without reconstructing them from the polygon outline.
+	UPROPERTY(Transient)
+	TArray<FVector2D> DebugRayHitPoints;
 };
 
 USTRUCT()

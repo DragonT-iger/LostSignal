@@ -55,6 +55,7 @@ public:
 
 private:
 	UTextureRenderTarget2D* ResolveVisibilityMaskRenderTarget();
+	UTextureRenderTarget2D* CreateRenderTargetFromTemplate(const UTextureRenderTarget2D* TemplateRenderTarget);
 	UTextureRenderTarget2D* CreateFallbackRenderTarget(int32 Size);
 
 	UPROPERTY(Transient)

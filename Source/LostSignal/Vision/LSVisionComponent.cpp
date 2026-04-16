@@ -1,6 +1,7 @@
 #include "Vision/LSVisionComponent.h"
 
 #include "Camera/CameraComponent.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
@@ -108,6 +109,11 @@ void ULSVisionComponent::UpdateVisionPolygon()
 
 	CurrentPolygon = FLSVisionSolver::Solve(SolverInfo);
 
+	if (bDrawDebugRays)
+	{
+		DrawDebugVisionRays();
+	}
+
 	if (PostProcessMID != nullptr)
 	{
 		PostProcessMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, 0.0f, 0.0f));
@@ -134,6 +140,34 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	}
 
 	UpdateVisionTargets(SolverInfo.OriginPos);
+}
+
+// Draws each sampled visibility ray so the current endpoint-based solver can be inspected in the world.
+void ULSVisionComponent::DrawDebugVisionRays() const
+{
+	UWorld* World = GetWorld();
+	if (World == nullptr || CurrentPolygon.DebugRayHitPoints.Num() == 0)
+	{
+		return;
+	}
+
+	const FVector RayOrigin(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, DebugRayZOffset);
+	const bool bPersistentLines = DebugRayDuration > 0.0f;
+
+	for (const FVector2D& Point2D : CurrentPolygon.DebugRayHitPoints)
+	{
+		const FVector RayEnd(Point2D.X, Point2D.Y, DebugRayZOffset);
+
+		DrawDebugLine(
+			World,
+			RayOrigin,
+			RayEnd,
+			DebugRayColor,
+			bPersistentLines,
+			DebugRayDuration,
+			0,
+			DebugRayThickness);
+	}
 }
 
 // Limits vision simulation to the locally controlled pawn so remote pawns do not drive local rendering.

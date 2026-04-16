@@ -1,4 +1,4 @@
-#include "Vision/LSVisionGlobalShader.h"
+#include "LSVisionGlobalShader.h"
 
 #include "GlobalShader.h"
 #include "RenderGraphBuilder.h"
@@ -6,7 +6,7 @@
 #include "RenderGraphUtils.h"
 #include "ShaderCompilerCore.h"
 
-IMPLEMENT_GLOBAL_SHADER(FLSVisionMaskCS, "/LostSignal/Private/TopDownVisionMask.usf", "MainCS", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FLSVisionMaskCS, "/LostSignalVisionShaders/Private/TopDownVisionMask.usf", "MainCS", SF_Compute);
 
 // Queues the compute shader pass that rasterizes the current vision polygon into the mask RT.
 void LSVision::AddVisionMaskPass(FRDGBuilder& GraphBuilder, const FMaskDispatchInputs& Inputs)

@@ -1,8 +1,9 @@
 #include "Vision/LSVisionMaskRenderer.h"
 
+#include "CoreGlobals.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "LSVisionGlobalShader.h"
 #include "RenderGraphUtils.h"
-#include "Vision/LSVisionGlobalShader.h"
 
 ALSVisionMaskRenderer::ALSVisionMaskRenderer()
 {
@@ -14,7 +15,7 @@ void ALSVisionMaskRenderer::RequestMaskUpdate(const FLSVisionPolygonData& Polygo
 {
 	LastRenderedPolygon = PolygonData;
 
-	if (VisibilityMaskRenderTarget == nullptr)
+	if (VisibilityMaskRenderTarget == nullptr || IsEngineExitRequested())
 	{
 		return;
 	}
@@ -25,8 +26,20 @@ void ALSVisionMaskRenderer::RequestMaskUpdate(const FLSVisionPolygonData& Polygo
 		return;
 	}
 
+	TArray<FVector2f> PolygonUploadData;
+	PolygonUploadData.Reserve(PolygonData.Points.Num());
+
+	for (const FVector2D& Point : PolygonData.Points)
+	{
+		const FVector2D LocalPoint = Point - PolygonData.Origin;
+		PolygonUploadData.Add(FVector2f(LocalPoint));
+	}
+
+	const float VisionRadius = PolygonData.VisionRadius;
+	const float Extent = PolygonData.Extent;
+
 	ENQUEUE_RENDER_COMMAND(RenderLostSignalVisionMask)(
-		[RenderTargetResource, PolygonData](FRHICommandListImmediate& RHICmdList)
+		[RenderTargetResource, VisionRadius, Extent, PolygonUploadData = MoveTemp(PolygonUploadData)](FRHICommandListImmediate& RHICmdList)
 		{
 			FRDGBuilder GraphBuilder(RHICmdList);
 
@@ -42,29 +55,23 @@ void ALSVisionMaskRenderer::RequestMaskUpdate(const FLSVisionPolygonData& Polygo
 			LSVision::FMaskDispatchInputs Inputs;
 			Inputs.OutputTexture = OutputTexture;
 			Inputs.VisionOrigin = FVector2f::ZeroVector;
-			Inputs.VisionRadius = PolygonData.VisionRadius;
+			Inputs.VisionRadius = VisionRadius;
 			Inputs.FeatherWidth = 30.0f;
-			Inputs.WorldMin = FVector2f(-PolygonData.Extent, -PolygonData.Extent);
-			Inputs.WorldMax = FVector2f(PolygonData.Extent, PolygonData.Extent);
+			Inputs.WorldMin = FVector2f(-Extent, -Extent);
+			Inputs.WorldMax = FVector2f(Extent, Extent);
 			Inputs.VisibleColor = FLinearColor::White;
 			Inputs.HiddenColor = FLinearColor(0.5f, 0.5f, 0.5f, 1.0f);
 
-			TArray<FVector2f> PolygonUploadData;
-			PolygonUploadData.Reserve(PolygonData.Points.Num());
-
-			for (const FVector2D& Point : PolygonData.Points)
-			{
-				const FVector2D LocalPoint = Point - PolygonData.Origin;
-				PolygonUploadData.Add(FVector2f(LocalPoint));
-			}
-
-			FRDGBufferRef PolygonBuffer = CreateStructuredBuffer(
-				GraphBuilder,
-				TEXT("LostSignalVision.PolygonPoints"),
-				PolygonUploadData);
-
 			Inputs.PolygonPointCount = PolygonUploadData.Num();
-			Inputs.PolygonPointsSRV = GraphBuilder.CreateSRV(PolygonBuffer);
+			if (PolygonUploadData.Num() > 0)
+			{
+				FRDGBufferRef PolygonBuffer = CreateStructuredBuffer(
+					GraphBuilder,
+					TEXT("LostSignalVision.PolygonPoints"),
+					PolygonUploadData);
+
+				Inputs.PolygonPointsSRV = GraphBuilder.CreateSRV(PolygonBuffer);
+			}
 
 			LSVision::AddVisionMaskPass(GraphBuilder, Inputs);
 			GraphBuilder.Execute();

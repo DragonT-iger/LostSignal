@@ -7,7 +7,7 @@
 
 class FRDGBuilder;
 
-class LOSTSIGNAL_API FLSVisionMaskCS : public FGlobalShader
+class LOSTSIGNALVISIONSHADERS_API FLSVisionMaskCS : public FGlobalShader
 {
 public:
 	DECLARE_GLOBAL_SHADER(FLSVisionMaskCS);
@@ -35,7 +35,7 @@ public:
 
 namespace LSVision
 {
-	struct LOSTSIGNAL_API FMaskDispatchInputs
+	struct LOSTSIGNALVISIONSHADERS_API FMaskDispatchInputs
 	{
 		FRDGTextureRef OutputTexture = nullptr;
 		FVector2f VisionOrigin = FVector2f::ZeroVector;
@@ -49,5 +49,5 @@ namespace LSVision
 		FRDGBufferSRVRef PolygonPointsSRV = nullptr;
 	};
 
-	LOSTSIGNAL_API void AddVisionMaskPass(FRDGBuilder& GraphBuilder, const FMaskDispatchInputs& Inputs);
+	LOSTSIGNALVISIONSHADERS_API void AddVisionMaskPass(FRDGBuilder& GraphBuilder, const FMaskDispatchInputs& Inputs);
 }

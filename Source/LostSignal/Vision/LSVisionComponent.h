@@ -24,6 +24,7 @@ protected:
 	bool IsLocalVisionController() const;
 	bool IsPointVisibleInCurrentVision(const FVector2D& Point2D) const;
 	void UpdateVisionTargets(const FVector2D& VisionOrigin2D);
+	void DrawDebugVisionRays() const;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
@@ -43,6 +44,21 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vision")
 	FLSVisionPolygonData CurrentPolygon;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug")
+	bool bDrawDebugRays = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug")
+	FColor DebugRayColor = FColor::Yellow;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug", meta = (ClampMin = "0.0"))
+	float DebugRayDuration = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug", meta = (ClampMin = "0.0"))
+	float DebugRayThickness = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug")
+	float DebugRayZOffset = 8.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Vision")
 	TObjectPtr<UMaterialInterface> PostProcessMaterial;
