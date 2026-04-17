@@ -116,14 +116,14 @@ void ULSGA_Dash::EndAbility(
 	bool bReplicateEndAbility,
 	bool bWasCancelled)
 {
-	// 무적 GE 제거
+	// 무적 GE 제거 — LocalPredicted이므로 서버(Authority)에서만 제거. 클라이언트의 예측 GE는 GAS가 자동 정리.
 	if (UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr)
 	{
-		if (InvincibilityHandle.IsValid())
+		if (ASC->HasAuthority() && InvincibilityHandle.IsValid())
 		{
 			ASC->RemoveActiveGameplayEffect(InvincibilityHandle);
-			InvincibilityHandle = FActiveGameplayEffectHandle();
 		}
+		InvincibilityHandle = FActiveGameplayEffectHandle();
 	}
 
 	// Root Motion 강제 제거 (어빌리티 캔슬 시에도 이동이 즉시 멈춤)
