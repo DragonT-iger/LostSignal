@@ -14,6 +14,7 @@ class USceneComponent;
 UENUM(BlueprintType)
 enum class ELSVisionOccluderSourceMode : uint8
 {
+	CollisionGeometry UMETA(DisplayName = "Collision Geometry"),
 	MeshBounds UMETA(DisplayName = "Mesh Bounds"),
 	PrimitiveBounds UMETA(DisplayName = "Primitive Bounds"),
 	BoxComponent UMETA(DisplayName = "Box Component"),
@@ -51,7 +52,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::BoxComponent", EditConditionHides))
 	TObjectPtr<UBoxComponent> SourceBoxComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::PrimitiveBounds || SourceMode == ELSVisionOccluderSourceMode::MeshBounds", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::CollisionGeometry || SourceMode == ELSVisionOccluderSourceMode::PrimitiveBounds || SourceMode == ELSVisionOccluderSourceMode::MeshBounds", EditConditionHides))
 	TObjectPtr<UPrimitiveComponent> SourcePrimitiveComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Manual", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::ManualSegments", EditConditionHides))
@@ -85,6 +86,7 @@ private:
 	void UpdateObservedComponentBinding();
 	void HandleObservedComponentTransformUpdated(USceneComponent* UpdatedComponent, EUpdateTransformFlags UpdateTransformFlags, ETeleportType Teleport);
 	void BuildSegmentsFromBox(const UBoxComponent* BoxComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
+	void BuildSegmentsFromCollisionGeometry(const UPrimitiveComponent* PrimitiveComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
 	void BuildSegmentsFromMeshBounds(const UPrimitiveComponent* PrimitiveComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
 	void BuildSegmentsFromPrimitiveBounds(const UPrimitiveComponent* PrimitiveComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
 	void AddRectangleSegments(const FVector2D& Min, const FVector2D& Max, TArray<FLSVisionSegment2D>& OutSegments) const;
@@ -94,6 +96,8 @@ private:
 		const FVector2D& LocalMax,
 		const FTransform& LocalToWorld,
 		TArray<FLSVisionSegment2D>& OutSegments) const;
+	void AddClosedPointLoopSegments(const TArray<FVector2D>& Points, TArray<FLSVisionSegment2D>& OutSegments) const;
+	void BuildConvexHull2D(const TArray<FVector2D>& InputPoints, TArray<FVector2D>& OutHullPoints) const;
 
 	UBoxComponent* ResolveBoxComponent() const;
 	UPrimitiveComponent* ResolveMeshPrimitiveComponent() const;

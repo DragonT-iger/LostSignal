@@ -13,6 +13,11 @@
 			"Name": "LostSignalVisionShaders",
 			"Type": "Runtime",
 			"LoadingPhase": "PostConfigInit"
+		},
+		{
+			"Name": "LostSignalEditorAddComponentTool",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [

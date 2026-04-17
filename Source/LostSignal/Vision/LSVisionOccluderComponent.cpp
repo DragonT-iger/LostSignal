@@ -5,8 +5,10 @@
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "DrawDebugHelpers.h"
+#include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
 #include "LostSignal.h"
+#include "PhysicsEngine/BodySetup.h"
 #include "Vision/LSVisionSubsystem.h"
 
 ULSVisionOccluderComponent::ULSVisionOccluderComponent()
@@ -69,6 +71,13 @@ void ULSVisionOccluderComponent::RebuildSegments()
 
 	switch (SourceMode)
 	{
+	case ELSVisionOccluderSourceMode::CollisionGeometry:
+		if (UPrimitiveComponent* PrimitiveComponent = ResolveMeshPrimitiveComponent())
+		{
+			BuildSegmentsFromCollisionGeometry(PrimitiveComponent, RebuiltSegments);
+		}
+		break;
+
 	case ELSVisionOccluderSourceMode::BoxComponent:
 		if (UBoxComponent* BoxComponent = ResolveBoxComponent())
 		{
@@ -186,6 +195,75 @@ void ULSVisionOccluderComponent::BuildSegmentsFromBox(const UBoxComponent* BoxCo
 	OutSegments.Add(Segment30);
 }
 
+// Builds 2D segments from simple collision geometry so holes/openings can be described by multiple primitives.
+void ULSVisionOccluderComponent::BuildSegmentsFromCollisionGeometry(
+	const UPrimitiveComponent* PrimitiveComponent,
+	TArray<FLSVisionSegment2D>& OutSegments) const
+{
+	if (PrimitiveComponent == nullptr)
+	{
+		return;
+	}
+
+	const UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(PrimitiveComponent);
+	const UStaticMesh* StaticMesh = StaticMeshComponent != nullptr ? StaticMeshComponent->GetStaticMesh() : nullptr;
+	const UBodySetup* BodySetup = StaticMesh != nullptr ? StaticMesh->GetBodySetup() : nullptr;
+	if (BodySetup == nullptr)
+	{
+		BuildSegmentsFromMeshBounds(PrimitiveComponent, OutSegments);
+		return;
+	}
+
+	const FTransform ComponentTransform = PrimitiveComponent->GetComponentTransform();
+	const FKAggregateGeom& AggregateGeometry = BodySetup->AggGeom;
+
+	for (const FKBoxElem& BoxElement : AggregateGeometry.BoxElems)
+	{
+		const FVector HalfExtent(BoxElement.X * 0.5f, BoxElement.Y * 0.5f, BoxElement.Z * 0.5f);
+		const FTransform BoxLocalTransform = BoxElement.GetTransform();
+
+		const FVector World0 = ComponentTransform.TransformPosition(BoxLocalTransform.TransformPosition(FVector(HalfExtent.X, HalfExtent.Y, 0.0f)));
+		const FVector World1 = ComponentTransform.TransformPosition(BoxLocalTransform.TransformPosition(FVector(HalfExtent.X, -HalfExtent.Y, 0.0f)));
+		const FVector World2 = ComponentTransform.TransformPosition(BoxLocalTransform.TransformPosition(FVector(-HalfExtent.X, -HalfExtent.Y, 0.0f)));
+		const FVector World3 = ComponentTransform.TransformPosition(BoxLocalTransform.TransformPosition(FVector(-HalfExtent.X, HalfExtent.Y, 0.0f)));
+
+		TArray<FVector2D> BoxLoop;
+		BoxLoop.Reserve(4);
+		BoxLoop.Add(FVector2D(World0.X, World0.Y));
+		BoxLoop.Add(FVector2D(World1.X, World1.Y));
+		BoxLoop.Add(FVector2D(World2.X, World2.Y));
+		BoxLoop.Add(FVector2D(World3.X, World3.Y));
+		AddClosedPointLoopSegments(BoxLoop, OutSegments);
+	}
+
+	for (const FKConvexElem& ConvexElement : AggregateGeometry.ConvexElems)
+	{
+		if (ConvexElement.VertexData.Num() < 3)
+		{
+			continue;
+		}
+
+		TArray<FVector2D> ProjectedPoints;
+		ProjectedPoints.Reserve(ConvexElement.VertexData.Num());
+
+		const FTransform ConvexLocalTransform = ConvexElement.GetTransform();
+		for (const FVector& LocalVertex : ConvexElement.VertexData)
+		{
+			const FVector WorldVertex = ComponentTransform.TransformPosition(ConvexLocalTransform.TransformPosition(LocalVertex));
+			ProjectedPoints.Add(FVector2D(WorldVertex.X, WorldVertex.Y));
+		}
+
+		TArray<FVector2D> HullPoints;
+		BuildConvexHull2D(ProjectedPoints, HullPoints);
+		AddClosedPointLoopSegments(HullPoints, OutSegments);
+	}
+
+	if (OutSegments.Num() == 0)
+	{
+		BuildSegmentsFromMeshBounds(PrimitiveComponent, OutSegments);
+	}
+}
+
 // Builds 2D segments from the owning mesh's local bounds so rotation/pivot are preserved better than a world AABB.
 void ULSVisionOccluderComponent::BuildSegmentsFromMeshBounds(
 	const UPrimitiveComponent* PrimitiveComponent,
@@ -295,6 +373,113 @@ void ULSVisionOccluderComponent::AddRectangleSegments(
 	OutSegments.Add(SegmentRight);
 }
 
+// Emits a segment per edge in a closed 2D loop, skipping zero-length edges.
+void ULSVisionOccluderComponent::AddClosedPointLoopSegments(
+	const TArray<FVector2D>& Points,
+	TArray<FLSVisionSegment2D>& OutSegments) const
+{
+	if (Points.Num() < 2)
+	{
+		return;
+	}
+
+	for (int32 PointIndex = 0; PointIndex < Points.Num(); ++PointIndex)
+	{
+		const FVector2D& StartPoint = Points[PointIndex];
+		const FVector2D& EndPoint = Points[(PointIndex + 1) % Points.Num()];
+
+		if (StartPoint.Equals(EndPoint, KINDA_SMALL_NUMBER))
+		{
+			continue;
+		}
+
+		FLSVisionSegment2D Segment;
+		Segment.Start = StartPoint;
+		Segment.End = EndPoint;
+		OutSegments.Add(Segment);
+	}
+}
+
+// Builds a 2D convex hull from projected collision vertices so convex simple collision maps cleanly to segments.
+void ULSVisionOccluderComponent::BuildConvexHull2D(const TArray<FVector2D>& InputPoints, TArray<FVector2D>& OutHullPoints) const
+{
+	OutHullPoints.Reset();
+	if (InputPoints.Num() < 3)
+	{
+		OutHullPoints = InputPoints;
+		return;
+	}
+
+	TArray<FVector2D> UniquePoints;
+	UniquePoints.Reserve(InputPoints.Num());
+
+	for (const FVector2D& Point : InputPoints)
+	{
+		const bool bAlreadyAdded = UniquePoints.ContainsByPredicate(
+			[&Point](const FVector2D& ExistingPoint)
+			{
+				return ExistingPoint.Equals(Point, KINDA_SMALL_NUMBER);
+			});
+
+		if (!bAlreadyAdded)
+		{
+			UniquePoints.Add(Point);
+		}
+	}
+
+	if (UniquePoints.Num() < 3)
+	{
+		OutHullPoints = UniquePoints;
+		return;
+	}
+
+	UniquePoints.Sort([](const FVector2D& A, const FVector2D& B)
+	{
+		if (!FMath::IsNearlyEqual(A.X, B.X))
+		{
+			return A.X < B.X;
+		}
+
+		return A.Y < B.Y;
+	});
+
+	const auto Cross = [](const FVector2D& A, const FVector2D& B, const FVector2D& C)
+	{
+		const FVector2D AB = B - A;
+		const FVector2D AC = C - A;
+		return (AB.X * AC.Y) - (AB.Y * AC.X);
+	};
+
+	TArray<FVector2D> LowerHull;
+	for (const FVector2D& Point : UniquePoints)
+	{
+		while (LowerHull.Num() >= 2 && Cross(LowerHull[LowerHull.Num() - 2], LowerHull[LowerHull.Num() - 1], Point) <= 0.0f)
+		{
+			LowerHull.Pop();
+		}
+
+		LowerHull.Add(Point);
+	}
+
+	TArray<FVector2D> UpperHull;
+	for (int32 PointIndex = UniquePoints.Num() - 1; PointIndex >= 0; --PointIndex)
+	{
+		const FVector2D& Point = UniquePoints[PointIndex];
+		while (UpperHull.Num() >= 2 && Cross(UpperHull[UpperHull.Num() - 2], UpperHull[UpperHull.Num() - 1], Point) <= 0.0f)
+		{
+			UpperHull.Pop();
+		}
+
+		UpperHull.Add(Point);
+	}
+
+	LowerHull.Pop();
+	UpperHull.Pop();
+
+	OutHullPoints = MoveTemp(LowerHull);
+	OutHullPoints.Append(UpperHull);
+}
+
 // Resolves the box source explicitly first, then falls back to the owner's first box component.
 UBoxComponent* ULSVisionOccluderComponent::ResolveBoxComponent() const
 {
@@ -381,6 +566,9 @@ USceneComponent* ULSVisionOccluderComponent::ResolveObservedSceneComponent() con
 	{
 	case ELSVisionOccluderSourceMode::BoxComponent:
 		return ResolveBoxComponent();
+
+	case ELSVisionOccluderSourceMode::CollisionGeometry:
+		return ResolveMeshPrimitiveComponent();
 
 	case ELSVisionOccluderSourceMode::MeshBounds:
 		return ResolveMeshPrimitiveComponent();

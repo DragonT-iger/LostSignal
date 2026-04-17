@@ -12,5 +12,6 @@ public class LostSignalEditorTarget : TargetRules
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
 		ExtraModuleNames.Add("LostSignal");
 		ExtraModuleNames.Add("LostSignalVisionShaders");
+		ExtraModuleNames.Add("LostSignalEditorAddComponentTool");
 	}
 }
