@@ -119,7 +119,8 @@ void ULSGA_Dash::EndAbility(
 	// 무적 GE 제거 — LocalPredicted이므로 서버(Authority)에서만 제거. 클라이언트의 예측 GE는 GAS가 자동 정리.
 	if (UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr)
 	{
-		if (ASC->HasAuthority() && InvincibilityHandle.IsValid())
+		const AActor* AvatarActor = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+		if (AvatarActor && AvatarActor->HasAuthority() && InvincibilityHandle.IsValid())
 		{
 			ASC->RemoveActiveGameplayEffect(InvincibilityHandle);
 		}
