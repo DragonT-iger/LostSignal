@@ -12,6 +12,7 @@ class UInputAction;
 class UGameplayAbility;
 class ULSMPCVisionSourceComponent;
 class ULSVisionComponent;
+class ULSPlayerXRayComponent;
 struct FInputActionValue;
 
 /**
@@ -37,6 +38,9 @@ class ALSPlayerCharacter : public ALSCharacterBase
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSVisionComponent> VisionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<ULSPlayerXRayComponent> PlayerXRayComponent;
 
 protected:
 

@@ -18,6 +18,7 @@ void ULSVisionSurfaceComponent::BeginPlay()
 	Super::BeginPlay();
 
 	InitializeVisionMaterials();
+	SetPrimitiveComponentCustomDepthStencilValue();
 
 	if (UWorld* World = GetWorld())
 	{
@@ -65,6 +66,40 @@ void ULSVisionSurfaceComponent::GatherTargetMeshComponents(TArray<UMeshComponent
 		TArray<UMeshComponent*> OwnerMeshComponents;
 		OwnerActor->GetComponents<UMeshComponent>(OwnerMeshComponents);
 		OutMeshComponents.Append(OwnerMeshComponents);
+	}
+}
+
+void ULSVisionSurfaceComponent::SetPrimitiveComponentCustomDepthStencilValue()
+{
+	if (TargetPrimitives.Num() > 0)
+	{
+		for (UPrimitiveComponent* Primitive : TargetPrimitives)
+		{
+			if (Primitive != nullptr)
+			{
+				Primitive->SetRenderCustomDepth(true);
+				Primitive->SetCustomDepthStencilValue(StencilValue);
+			}
+		}
+		return;
+	}
+	else
+	{
+		if (const AActor* OwnerActor = GetOwner())
+		{
+			TArray<UPrimitiveComponent*> OwnerMeshComponents;
+			OwnerActor->GetComponents<UPrimitiveComponent>(OwnerMeshComponents);
+
+			for (UPrimitiveComponent* Primitive : OwnerMeshComponents)
+			{
+				if (Primitive != nullptr)
+				{
+					Primitive->SetRenderCustomDepth(true);
+					Primitive->SetCustomDepthStencilValue(StencilValue);
+				}
+			}
+			return;
+		}
 	}
 }
 

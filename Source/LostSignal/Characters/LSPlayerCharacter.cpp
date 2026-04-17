@@ -12,6 +12,7 @@
 #include "LostSignal.h"
 #include "InputCoreTypes.h"
 #include "Vision/LSMPCVisionSourceComponent.h"
+#include "Vision/LSPlayerXRayComponent.h"
 #include "Vision/LSVisionComponent.h"
 
 ALSPlayerCharacter::ALSPlayerCharacter()
@@ -37,6 +38,7 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 
 	MPCVisionSourceComponent = CreateDefaultSubobject<ULSMPCVisionSourceComponent>(TEXT("MPCVisionSourceComponent"));
 	VisionComponent = CreateDefaultSubobject<ULSVisionComponent>(TEXT("VisionComponent"));
+	PlayerXRayComponent = CreateDefaultSubobject<ULSPlayerXRayComponent>(TEXT("PlayerXRayComponent"));
 }
 
 void ALSPlayerCharacter::BeginPlay()
