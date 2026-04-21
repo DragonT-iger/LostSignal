@@ -95,13 +95,8 @@ Content/LostSignal/
 ├── Maps/
 │   ├── MainMenu/   타이틀 레벨
 │   ├── Lobby/      매칭 전 로비
-│   ├── Raid/       레이드 맵
-│   └── Dev/        팀 공용 테스트 맵 (패키징 제외)
+│   └── Raid/       레이드 맵
 ├── Sandbox/     담당자별 개인 작업 공간 (패키징 제외)
-│   ├── ArtistA/
-│   ├── ArtistB/
-│   ├── ProgrammerA/
-│   └── ProgrammerB/
 ├── Data/        DataTables/, GAS/(GE·GA 에셋), Input/(IA·IMC)
 ├── Audio/       SFX/, Music/
 ├── Materials/
@@ -109,6 +104,21 @@ Content/LostSignal/
 ```
 
 > 에셋은 반드시 `Content/LostSignal/` 하위에. 루트 Content에 직접 넣지 말 것.
+
+---
+
+## 기획자 수치 관리
+
+기획자는 수치 데이터를 **엑셀 테이블**로 작성하고, 프로그래머가 DataTable로 임포트한다.
+
+### 워크플로우
+1. 기획자 → 엑셀에서 수치 작성 → 프로그래머가 DataTable로 임포트
+2. 런타임에 DataTable 값 로드 → 각 캐릭터 인스턴스 컨트롤러의 UPROPERTY에 덮어씀 (캐릭터별 행 분리)
+3. DataTable 행이 없으면 블루프린트 기본값(UPROPERTY 초기값) 사용
+
+### PIE 튜닝
+- **어빌리티 수치** (속도, 지속시간 등): Outliner에서 PlayerController 선택 → Details 패널에서 직접 수정
+- **GE 수치** (쿨타임 등): GE Blueprint 에셋 열어서 Duration Magnitude 직접 수정 → 다음 발동부터 반영
 
 ---
 
