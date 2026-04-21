@@ -71,35 +71,18 @@ void ULSVisionSurfaceComponent::GatherTargetMeshComponents(TArray<UMeshComponent
 
 void ULSVisionSurfaceComponent::SetPrimitiveComponentCustomDepthStencilValue()
 {
-	if (TargetPrimitives.Num() > 0)
-	{
-		for (UPrimitiveComponent* Primitive : TargetPrimitives)
-		{
-			if (Primitive != nullptr)
-			{
-				Primitive->SetRenderCustomDepth(true);
-				Primitive->SetCustomDepthStencilValue(StencilValue);
-			}
-		}
-		return;
-	}
-	else
-	{
-		if (const AActor* OwnerActor = GetOwner())
-		{
-			TArray<UPrimitiveComponent*> OwnerMeshComponents;
-			OwnerActor->GetComponents<UPrimitiveComponent>(OwnerMeshComponents);
+	TArray<UMeshComponent*> MeshComponents;
+	GatherTargetMeshComponents(MeshComponents);
 
-			for (UPrimitiveComponent* Primitive : OwnerMeshComponents)
-			{
-				if (Primitive != nullptr)
-				{
-					Primitive->SetRenderCustomDepth(true);
-					Primitive->SetCustomDepthStencilValue(StencilValue);
-				}
-			}
-			return;
+	for (UMeshComponent* MeshComponent : MeshComponents)
+	{
+		if (MeshComponent == nullptr)
+		{
+			continue;
 		}
+
+		MeshComponent->SetRenderCustomDepth(true);
+		MeshComponent->SetCustomDepthStencilValue(StencilValue);
 	}
 }
 

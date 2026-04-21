@@ -23,6 +23,11 @@ void ULSVisionComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (!IsLocalVisionController())
+	{
+		return;
+	}
+
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
@@ -45,6 +50,8 @@ void ULSVisionComponent::BeginPlay()
 			}
 		}
 	}
+
+	UpdateVisionPolygon();
 }
 
 // Stops the periodic vision update loop when the owning actor leaves the world.
@@ -53,6 +60,20 @@ void ULSVisionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(VisionUpdateTimerHandle);
+	}
+
+	if (PostProcessMID != nullptr)
+	{
+		if (UCameraComponent* Camera = GetOwner() ? GetOwner()->FindComponentByClass<UCameraComponent>() : nullptr)
+		{
+			Camera->PostProcessSettings.WeightedBlendables.Array.RemoveAll(
+				[this](const FWeightedBlendable& WeightedBlendable)
+				{
+					return WeightedBlendable.Object == PostProcessMID;
+				});
+		}
+
+		PostProcessMID = nullptr;
 	}
 
 	Super::EndPlay(EndPlayReason);

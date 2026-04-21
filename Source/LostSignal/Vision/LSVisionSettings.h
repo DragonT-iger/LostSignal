@@ -5,6 +5,7 @@
 #include "LSVisionSettings.generated.h"
 
 class ALSVisionMaskRenderer;
+class UMaterialInterface;
 class UTextureRenderTarget2D;
 
 UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "LS Vision"))
@@ -20,6 +21,9 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Vision")
 	TSoftObjectPtr<UTextureRenderTarget2D> VisibilityMaskRenderTarget;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Vision|Roof Fade")
+	TSoftObjectPtr<UMaterialInterface> DefaultShadowProxyMaterial;
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Vision", meta = (ClampMin = "128", ClampMax = "4096"))
 	int32 FallbackRenderTargetSize = 1024;

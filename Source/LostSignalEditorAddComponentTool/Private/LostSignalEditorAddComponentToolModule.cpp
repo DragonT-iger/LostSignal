@@ -6,6 +6,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "ScopedTransaction.h"
 #include "ToolMenus.h"
+#include "Vision/LSRoofFadeComponent.h"
 #include "Vision/LSVisionOccluderComponent.h"
 #include "Vision/LSVisionSurfaceComponent.h"
 
@@ -39,6 +40,14 @@ void FLostSignalEditorAddComponentToolModule::RegisterMenus()
 		LOCTEXT("AddVisionSetupTooltip", "Add VisionOccluder and VisionSurface components to selected static mesh actors."),
 		FSlateIcon(),
 		FUIAction(FExecuteAction::CreateRaw(this, &FLostSignalEditorAddComponentToolModule::AddVisionSetupToSelectedActors))
+	);
+
+	Section.AddMenuEntry(
+		"AddRoofSetup",
+		LOCTEXT("AddRoofSetupLabel", "Add Roof Setup"),
+		LOCTEXT("AddRoofSetupTooltip", "Add RoofFadeComponent to selected static mesh actors."),
+		FSlateIcon(),
+		FUIAction(FExecuteAction::CreateRaw(this, &FLostSignalEditorAddComponentToolModule::AddRoofSetupToSelectedActors))
 	);
 }
 
@@ -123,6 +132,66 @@ void FLostSignalEditorAddComponentToolModule::AddVisionSetupToSelectedActors()
 		{
 			SurfaceComponent->Modify();
 			SurfaceComponent->TargetPrimitives.AddUnique(StaticMeshComponent);
+		}
+
+		StaticMeshActor->MarkPackageDirty();
+	}
+}
+
+void FLostSignalEditorAddComponentToolModule::AddRoofSetupToSelectedActors()
+{
+	if (GEditor == nullptr)
+	{
+		return;
+	}
+
+	USelection* SelectedActors = GEditor->GetSelectedActors();
+	if (SelectedActors == nullptr || SelectedActors->Num() == 0)
+	{
+		return;
+	}
+
+	const FScopedTransaction Transaction(LOCTEXT("AddRoofSetupTransaction", "Add Roof Setup"));
+
+	for (FSelectionIterator SelectionIt(*SelectedActors); SelectionIt; ++SelectionIt)
+	{
+		AStaticMeshActor* StaticMeshActor = Cast<AStaticMeshActor>(*SelectionIt);
+		if (StaticMeshActor == nullptr)
+		{
+			continue;
+		}
+
+		UStaticMeshComponent* StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent();
+		if (StaticMeshComponent == nullptr)
+		{
+			continue;
+		}
+
+		StaticMeshActor->Modify();
+		StaticMeshComponent->Modify();
+
+		ULSRoofFadeComponent* RoofFadeComponent = StaticMeshActor->FindComponentByClass<ULSRoofFadeComponent>();
+		if (RoofFadeComponent == nullptr)
+		{
+			RoofFadeComponent = NewObject<ULSRoofFadeComponent>(
+				StaticMeshActor,
+				ULSRoofFadeComponent::StaticClass(),
+				TEXT("RoofFadeComponent"),
+				RF_Transactional);
+
+			if (RoofFadeComponent != nullptr)
+			{
+				StaticMeshActor->AddInstanceComponent(RoofFadeComponent);
+				RoofFadeComponent->TargetPrimitives.AddUnique(StaticMeshComponent);
+				RoofFadeComponent->OnComponentCreated();
+				RoofFadeComponent->RegisterComponent();
+				RoofFadeComponent->Modify();
+			}
+		}
+		else
+		{
+			RoofFadeComponent->Modify();
+			RoofFadeComponent->TargetPrimitives.AddUnique(StaticMeshComponent);
 		}
 
 		StaticMeshActor->MarkPackageDirty();
