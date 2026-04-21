@@ -90,13 +90,19 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 
 	//테스트 코드
-	//PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ALSPlayerCharacter::Attack);
+	PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ALSPlayerCharacter::OnAttack);
 
 }
 
 // ── 입력 핸들러 스텁 — 나중에 GAS 어빌리티 활성화로 교체 예정 ──────────
 
-void ALSPlayerCharacter::OnAttack()  {}
+void ALSPlayerCharacter::OnAttack()
+{
+	if (AttackMontage)
+	{
+		PlayAnimMontage(AttackMontage);
+	}
+}
 void ALSPlayerCharacter::OnDash()
 {
 	if (AbilitySystemComponent)
