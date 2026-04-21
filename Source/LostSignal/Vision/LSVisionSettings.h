@@ -27,4 +27,7 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Vision", meta = (ClampMin = "128", ClampMax = "4096"))
 	int32 FallbackRenderTargetSize = 1024;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Vision|Optimization", meta = (ClampMin = "100.0"))
+	float SpatialGridCellSize = 800.0f;
 };

@@ -66,6 +66,9 @@ public:
 	FVector TriggerCenterOffset = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	float TriggerGroundZ = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
 	FVector TriggerExtentScale = FVector(1.2f, 1.2f, 1.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")

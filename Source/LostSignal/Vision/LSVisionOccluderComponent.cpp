@@ -113,6 +113,17 @@ void ULSVisionOccluderComponent::RebuildSegments()
 	{
 		UE_LOG(LogLS, Warning, TEXT("LSVisionOccluderComponent on '%s' could not build any occluder segments."), *GetNameSafe(GetOwner()));
 	}
+
+	if (GetOwner() != nullptr && GetOwner()->HasActorBegunPlay())
+	{
+		if (UWorld* World = GetWorld())
+		{
+			if (ULSVisionSubsystem* VisionSubsystem = World->GetSubsystem<ULSVisionSubsystem>())
+			{
+				VisionSubsystem->RefreshOccluder(this);
+			}
+		}
+	}
 }
 
 void ULSVisionOccluderComponent::TickComponent(

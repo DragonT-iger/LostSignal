@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "LSVisionTypes.generated.h"
 
+class ULSVisionOccluderComponent;
+
 USTRUCT(BlueprintType)
 struct LOSTSIGNAL_API FLSVisionSegment2D
 {
@@ -67,4 +69,59 @@ struct LOSTSIGNAL_API FLSVisionSolverInfo
 	float AngleEpsilon = 0.01f;
 	float MaxRayDistance = 2500.0f;
 	UWorld* World = nullptr;
+};
+
+USTRUCT()
+struct LOSTSIGNAL_API FLSVisionGridCellKey
+{
+	GENERATED_BODY()
+
+	int32 X = 0;
+	int32 Y = 0;
+
+	FLSVisionGridCellKey() = default;
+
+	FLSVisionGridCellKey(const int32 InX, const int32 InY)
+		: X(InX)
+		, Y(InY)
+	{
+	}
+
+	bool operator==(const FLSVisionGridCellKey& Other) const
+	{
+		return X == Other.X && Y == Other.Y;
+	}
+};
+
+FORCEINLINE uint32 GetTypeHash(const FLSVisionGridCellKey& Key)
+{
+	return HashCombine(GetTypeHash(Key.X), GetTypeHash(Key.Y));
+}
+
+USTRUCT()
+struct LOSTSIGNAL_API FLSVisionGridCell
+{
+	GENERATED_BODY()
+
+	TArray<int32> SegmentIds;
+};
+
+USTRUCT()
+struct LOSTSIGNAL_API FLSVisionCachedSegment
+{
+	GENERATED_BODY()
+
+	int32 SegmentId = INDEX_NONE;
+	TWeakObjectPtr<ULSVisionOccluderComponent> Owner;
+	FLSVisionSegment2D Segment;
+	FBox2D Bounds = FBox2D(EForceInit::ForceInitToZero);
+};
+
+USTRUCT()
+struct LOSTSIGNAL_API FLSVisionOccluderGridState
+{
+	GENERATED_BODY()
+
+	TArray<int32> SegmentIds;
+	TArray<FLSVisionGridCellKey> OccupiedCells;
 };

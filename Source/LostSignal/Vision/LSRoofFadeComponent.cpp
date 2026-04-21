@@ -249,10 +249,6 @@ void ULSRoofFadeComponent::UpdateTriggerVolumeFromSourceMesh()
 	SourceStaticMeshComponent->GetLocalBounds(LocalBoundsMin, LocalBoundsMax);
 
 	const FVector BaseExtent = (LocalBoundsMax - LocalBoundsMin) * 0.5f;
-	const float LocalHeight = LocalBoundsMax.Z - LocalBoundsMin.Z;
-	FVector LocalCenter = (LocalBoundsMin + LocalBoundsMax) * 0.5f;
-	LocalCenter.Z -= SourceStaticMeshComponent->GetComponentLocation().Z;
-	LocalCenter += TriggerCenterOffset;
 	const FVector SafeScale(
 		FMath::Max(TriggerExtentScale.X, 0.0f),
 		FMath::Max(TriggerExtentScale.Y, 0.0f),
@@ -266,7 +262,13 @@ void ULSRoofFadeComponent::UpdateTriggerVolumeFromSourceMesh()
 		FMath::Max((BaseExtent.Y * SafeScale.Y) + SafePadding.Y, 1.0f),
 		FMath::Max((BaseExtent.Z * SafeScale.Z) + SafePadding.Z, 1.0f));
 
-	TriggerVolume->SetRelativeLocation(LocalCenter);
+	const FVector DesiredWorldCenter(
+		SourceStaticMeshComponent->Bounds.Origin.X,
+		SourceStaticMeshComponent->Bounds.Origin.Y,
+		TriggerGroundZ + FinalExtent.Z);
+	const FVector RelativeCenter = SourceStaticMeshComponent->GetComponentTransform().InverseTransformPosition(DesiredWorldCenter);
+
+	TriggerVolume->SetRelativeLocation(RelativeCenter + TriggerCenterOffset);
 	TriggerVolume->SetRelativeRotation(FRotator::ZeroRotator);
 	TriggerVolume->SetBoxExtent(FinalExtent);
 }

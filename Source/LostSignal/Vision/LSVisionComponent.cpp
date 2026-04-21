@@ -7,7 +7,6 @@
 #include "GameFramework/Pawn.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Vision/LSVisionMaskRenderer.h"
-#include "Vision/LSVisionOccluderComponent.h"
 #include "Vision/LSVisionSolver.h"
 #include "Vision/LSVisionSubsystem.h"
 #include "Vision/LSVisionSurfaceComponent.h"
@@ -115,18 +114,7 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	SolverInfo.MaxRayDistance = MaxRayDistance;
 	SolverInfo.World = World;
 
-	for (ULSVisionOccluderComponent* Occluder : VisionSubsystem->GetRegisteredOccluders())
-	{
-		if (Occluder == nullptr)
-		{
-			continue;
-		}
-
-		for (FLSVisionSegment2D& Segment : Occluder->Segments)
-		{
-			SolverInfo.Segments.Add(&Segment);
-		}
-	}
+	VisionSubsystem->QuerySegmentsInRadius(ActorLocation2D, MaxRayDistance, SolverInfo.Segments);
 
 	CurrentPolygon = FLSVisionSolver::Solve(SolverInfo);
 

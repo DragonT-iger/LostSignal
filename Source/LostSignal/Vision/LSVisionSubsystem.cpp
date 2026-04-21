@@ -9,6 +9,16 @@
 #include "Vision/LSVisionSettings.h"
 #include "Vision/LSVisionTargetComponent.h"
 
+namespace
+{
+	float ComputeSquaredDistanceToBounds(const FVector2D& Point, const FBox2D& Bounds)
+	{
+		const float DeltaX = Point.X < Bounds.Min.X ? Bounds.Min.X - Point.X : (Point.X > Bounds.Max.X ? Point.X - Bounds.Max.X : 0.0f);
+		const float DeltaY = Point.Y < Bounds.Min.Y ? Bounds.Min.Y - Point.Y : (Point.Y > Bounds.Max.Y ? Point.Y - Bounds.Max.Y : 0.0f);
+		return FMath::Square(DeltaX) + FMath::Square(DeltaY);
+	}
+}
+
 // Creates the shared runtime objects that every local vision calculation depends on.
 void ULSVisionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -45,6 +55,13 @@ void ULSVisionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	RegisteredOccluders.Reset();
 	RegisteredSurfaces.Reset();
 	RegisteredTargets.Reset();
+	GridCells.Reset();
+	CachedSegments.Reset();
+	OccluderGridStates.Reset();
+	NextSegmentId = 0;
+	GridCellSize = VisionSettings != nullptr
+		? FMath::Max(VisionSettings->SpatialGridCellSize, 100.0f)
+		: 800.0f;
 }
 
 // Releases the shared vision runtime objects when the world is torn down.
@@ -53,6 +70,10 @@ void ULSVisionSubsystem::Deinitialize()
 	RegisteredOccluders.Reset();
 	RegisteredSurfaces.Reset();
 	RegisteredTargets.Reset();
+	GridCells.Reset();
+	CachedSegments.Reset();
+	OccluderGridStates.Reset();
+	NextSegmentId = 0;
 
 	// Drain any queued mask updates before tearing down the renderer and its RT resource.
 	FlushRenderingCommands();
@@ -72,16 +93,44 @@ void ULSVisionSubsystem::Deinitialize()
 // Tracks occluders so the solver can collect all blocking segments in one place.
 void ULSVisionSubsystem::RegisterOccluder(ULSVisionOccluderComponent* Occluder)
 {
-	if (Occluder != nullptr)
+	if (Occluder == nullptr)
 	{
-		RegisteredOccluders.AddUnique(Occluder);
+		return;
 	}
+
+	if (RegisteredOccluders.Contains(Occluder))
+	{
+		RefreshOccluder(Occluder);
+		return;
+	}
+
+	RegisteredOccluders.AddUnique(Occluder);
+	RegisterOccluderInGrid(Occluder);
 }
 
 // Removes occluders that are no longer valid for this world.
 void ULSVisionSubsystem::UnregisterOccluder(ULSVisionOccluderComponent* Occluder)
 {
+	UnregisterOccluderFromGrid(Occluder);
 	RegisteredOccluders.Remove(Occluder);
+}
+
+// Refreshes the grid membership after an occluder moved or rebuilt its source segments.
+void ULSVisionSubsystem::RefreshOccluder(ULSVisionOccluderComponent* Occluder)
+{
+	if (Occluder == nullptr)
+	{
+		return;
+	}
+
+	if (!RegisteredOccluders.Contains(Occluder))
+	{
+		RegisterOccluder(Occluder);
+		return;
+	}
+
+	UnregisterOccluderFromGrid(Occluder);
+	RegisterOccluderInGrid(Occluder);
 }
 
 // Tracks surfaces that need the latest mask texture and transform parameters.
@@ -112,6 +161,56 @@ void ULSVisionSubsystem::RegisterTarget(ULSVisionTargetComponent* Target)
 void ULSVisionSubsystem::UnregisterTarget(ULSVisionTargetComponent* Target)
 {
 	RegisteredTargets.Remove(Target);
+}
+
+// Returns only the cached occluder segments near the viewer instead of making every solver traverse the whole world.
+void ULSVisionSubsystem::QuerySegmentsInRadius(const FVector2D& Origin, const float Radius, TArray<FLSVisionSegment2D*>& OutSegments) const
+{
+	OutSegments.Reset();
+
+	if (Radius <= 0.0f || GridCellSize <= 0.0f)
+	{
+		return;
+	}
+
+	TArray<FLSVisionGridCellKey> QueryCells;
+	CollectGridCellsForBounds(
+		FBox2D(Origin - FVector2D(Radius, Radius), Origin + FVector2D(Radius, Radius)),
+		QueryCells);
+
+	TSet<int32> UniqueSegmentIds;
+	const float RadiusSquared = FMath::Square(Radius);
+
+	for (const FLSVisionGridCellKey& CellKey : QueryCells)
+	{
+		const FLSVisionGridCell* GridCell = GridCells.Find(CellKey);
+		if (GridCell == nullptr)
+		{
+			continue;
+		}
+
+		for (const int32 SegmentId : GridCell->SegmentIds)
+		{
+			if (UniqueSegmentIds.Contains(SegmentId))
+			{
+				continue;
+			}
+
+			const FLSVisionCachedSegment* CachedSegment = CachedSegments.Find(SegmentId);
+			if (CachedSegment == nullptr)
+			{
+				continue;
+			}
+
+			if (ComputeSquaredDistanceToBounds(Origin, CachedSegment->Bounds) > RadiusSquared)
+			{
+				continue;
+			}
+
+			UniqueSegmentIds.Add(SegmentId);
+			OutSegments.Add(const_cast<FLSVisionSegment2D*>(&CachedSegment->Segment));
+		}
+	}
 }
 
 // Chooses either a configured render target asset or a transient fallback created at runtime.
@@ -195,4 +294,118 @@ UTextureRenderTarget2D* ULSVisionSubsystem::CreateFallbackRenderTarget(const int
 	RenderTarget->InitAutoFormat(Size, Size);
 	RenderTarget->UpdateResourceImmediate(true);
 	return RenderTarget;
+}
+
+FLSVisionGridCellKey ULSVisionSubsystem::WorldToGridCell(const FVector2D& Position) const
+{
+	const float SafeCellSize = FMath::Max(GridCellSize, 1.0f);
+	return FLSVisionGridCellKey(
+		FMath::FloorToInt(Position.X / SafeCellSize),
+		FMath::FloorToInt(Position.Y / SafeCellSize));
+}
+
+void ULSVisionSubsystem::CollectGridCellsForBounds(const FBox2D& Bounds, TArray<FLSVisionGridCellKey>& OutCells) const
+{
+	OutCells.Reset();
+
+	const FLSVisionGridCellKey MinCell = WorldToGridCell(Bounds.Min);
+	const FLSVisionGridCellKey MaxCell = WorldToGridCell(Bounds.Max);
+
+	OutCells.Reserve((MaxCell.X - MinCell.X + 1) * (MaxCell.Y - MinCell.Y + 1));
+
+	for (int32 CellX = MinCell.X; CellX <= MaxCell.X; ++CellX)
+	{
+		for (int32 CellY = MinCell.Y; CellY <= MaxCell.Y; ++CellY)
+		{
+			OutCells.Add(FLSVisionGridCellKey(CellX, CellY));
+		}
+	}
+}
+
+void ULSVisionSubsystem::RegisterOccluderInGrid(ULSVisionOccluderComponent* Occluder)
+{
+	if (Occluder == nullptr)
+	{
+		return;
+	}
+
+	UnregisterOccluderFromGrid(Occluder);
+
+	FLSVisionOccluderGridState GridState;
+	TSet<FLSVisionGridCellKey> UniqueOccupiedCells;
+	TArray<FLSVisionGridCellKey> SegmentCells;
+
+	for (const FLSVisionSegment2D& Segment : Occluder->GetSegments())
+	{
+		const FVector2D SegmentMin(
+			FMath::Min(Segment.Start.X, Segment.End.X),
+			FMath::Min(Segment.Start.Y, Segment.End.Y));
+		const FVector2D SegmentMax(
+			FMath::Max(Segment.Start.X, Segment.End.X),
+			FMath::Max(Segment.Start.Y, Segment.End.Y));
+
+		const FBox2D SegmentBounds(SegmentMin, SegmentMax);
+		CollectGridCellsForBounds(SegmentBounds, SegmentCells);
+
+		const int32 SegmentId = NextSegmentId++;
+		FLSVisionCachedSegment& CachedSegment = CachedSegments.Add(SegmentId);
+		CachedSegment.SegmentId = SegmentId;
+		CachedSegment.Owner = Occluder;
+		CachedSegment.Segment = Segment;
+		CachedSegment.Bounds = SegmentBounds;
+
+		GridState.SegmentIds.Add(SegmentId);
+
+		for (const FLSVisionGridCellKey& CellKey : SegmentCells)
+		{
+			GridCells.FindOrAdd(CellKey).SegmentIds.Add(SegmentId);
+			UniqueOccupiedCells.Add(CellKey);
+		}
+	}
+
+	GridState.OccupiedCells.Reserve(UniqueOccupiedCells.Num());
+	for (const FLSVisionGridCellKey& CellKey : UniqueOccupiedCells)
+	{
+		GridState.OccupiedCells.Add(CellKey);
+	}
+	OccluderGridStates.Add(Occluder, MoveTemp(GridState));
+}
+
+void ULSVisionSubsystem::UnregisterOccluderFromGrid(ULSVisionOccluderComponent* Occluder)
+{
+	if (Occluder == nullptr)
+	{
+		return;
+	}
+
+	FLSVisionOccluderGridState GridState;
+	if (!OccluderGridStates.RemoveAndCopyValue(Occluder, GridState))
+	{
+		return;
+	}
+
+	for (const FLSVisionGridCellKey& CellKey : GridState.OccupiedCells)
+	{
+		FLSVisionGridCell* GridCell = GridCells.Find(CellKey);
+		if (GridCell == nullptr)
+		{
+			continue;
+		}
+
+		GridCell->SegmentIds.RemoveAll(
+			[&GridState](const int32 SegmentId)
+			{
+				return GridState.SegmentIds.Contains(SegmentId);
+			});
+
+		if (GridCell->SegmentIds.Num() == 0)
+		{
+			GridCells.Remove(CellKey);
+		}
+	}
+
+	for (const int32 SegmentId : GridState.SegmentIds)
+	{
+		CachedSegments.Remove(SegmentId);
+	}
 }
