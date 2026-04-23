@@ -34,7 +34,7 @@ public:
 	float HalfFOVDegrees = 45.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
-	float MaxRayDistance = 1500.0f;
+	float MaxRayDistance = 2500.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision", meta = (ClampMin = "0.01"))
 	float UpdateInterval = 0.016f;

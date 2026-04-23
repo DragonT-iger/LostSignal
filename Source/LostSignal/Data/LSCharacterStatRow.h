@@ -45,4 +45,7 @@ struct LOSTSIGNAL_API FLSCharacterStatRow : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stats", DisplayName="이동속도")
 	float Char_Speed = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stats", DisplayName = "대쉬속도")
+	float Char_DashSpeed = 1500.0f;
 };

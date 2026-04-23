@@ -3,6 +3,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "LSGA_Dash.generated.h"
 
+class UAttributeSet;
 /**
  * 대쉬 GameplayAbility.
  *
@@ -61,6 +62,8 @@ protected:
 	 */
 	UPROPERTY(EditDefaultsOnly, Category="Dash|Effects")
 	TSubclassOf<UGameplayEffect> InvincibilityEffectClass;
+
+	TSubclassOf<UAttributeSet> CharacterAttributeClass;
 
 private:
 	FTimerHandle DashTimerHandle;

@@ -75,4 +75,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Stats")
 	FGameplayAttributeData MoveSpeed;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, MoveSpeed)
+
+	// 대쉬속도
+	UPROPERTY(BlueprintReadOnly, Category = "Stats")
+	FGameplayAttributeData DashSpeed;
+	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DashSpeed)
 };

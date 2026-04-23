@@ -28,6 +28,8 @@ const FLSCharacterStatRow* ALSTestPlayerCharacter::FindStatRow() const
 
 void ALSTestPlayerCharacter::InitializeStats()
 {
+	UE_LOG(LogLS, Warning, TEXT("Player Initialize"));
+
 	if (!AbilitySystemComponent || !CharacterAttributeSet)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s: ASC 또는 AttributeSet이 없음"), *GetNameSafe(this));
@@ -50,6 +52,7 @@ void ALSTestPlayerCharacter::InitializeStats()
 		CharacterAttributeSet->InitRecovery(Row->Char_Recovery);
 		CharacterAttributeSet->InitMaxStamina(Row->Char_Stamina);
 		CharacterAttributeSet->InitMoveSpeed(Row->Char_Speed);
+		CharacterAttributeSet->InitDashSpeed(Row->Char_DashSpeed);
 	}
 	else
 	{
@@ -66,5 +69,6 @@ void ALSTestPlayerCharacter::InitializeStats()
 		CharacterAttributeSet->InitRecovery(BaseRecovery);
 		CharacterAttributeSet->InitMaxStamina(BaseStamina);
 		CharacterAttributeSet->InitMoveSpeed(BaseMoveSpeed);
+		CharacterAttributeSet->InitDashSpeed(BaseDashSpeed);
 	}
 }

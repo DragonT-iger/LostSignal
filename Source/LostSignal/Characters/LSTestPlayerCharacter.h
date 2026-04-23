@@ -69,6 +69,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="이동속도")
 	float BaseMoveSpeed = 1.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Stats|Default Values", DisplayName = "대쉬속도")
+	float BaseDashSpeed = 1.0f;
+
 private:
 	UPROPERTY(VisibleAnywhere, Category="GAS")
 	TObjectPtr<ULSCharacterAttributeSet> CharacterAttributeSet;

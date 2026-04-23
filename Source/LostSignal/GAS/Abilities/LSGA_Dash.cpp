@@ -7,6 +7,7 @@
 #include "GAS/LSGameplayTags.h"
 #include "NiagaraFunctionLibrary.h"
 #include "LostSignal.h"
+#include "../LSCharacterAttributeSet.h"
 
 ULSGA_Dash::ULSGA_Dash()
 {
@@ -38,6 +39,8 @@ void ULSGA_Dash::ActivateAbility(
 	const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	UE_LOG(LogLS, Warning, TEXT("대쉬 발동"));
 
 	ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
@@ -75,6 +78,8 @@ void ULSGA_Dash::ActivateAbility(
 		UE_LOG(LogLS, Warning, TEXT("LSGA_Dash: InvincibilityEffectClass가 설정되지 않음 — 무적 없이 대쉬만 실행"));
 	}
 
+	float AttributeDashSpeed = ASC->GetNumericAttribute(ULSCharacterAttributeSet::GetDashSpeedAttribute());
+
 	// ── 대쉬 이동 (Root Motion Source) ──────────────────────
 	// LaunchCharacter와 달리 DashDuration 동안 일정 속도를 유지하다 자동 종료.
 	// Unity의 Vector3.MoveTowards를 코루틴으로 구현하는 것과 유사.
@@ -83,7 +88,7 @@ void ULSGA_Dash::ActivateAbility(
 	RootMotion->InstanceName    = FName("Dash");
 	RootMotion->AccumulateMode  = ERootMotionAccumulateMode::Override; // 다른 이동 무시
 	RootMotion->Priority        = 5;
-	RootMotion->Force           = DashDir * DashSpeed;
+	RootMotion->Force           = DashDir * AttributeDashSpeed;
 	RootMotion->Duration        = DashDuration;
 	// 대쉬 끝나면 속도 0으로 — MaintainLastRootMotionVelocity로 바꾸면 미끄러짐
 	RootMotion->FinishVelocityParams.Mode        = ERootMotionFinishVelocityMode::SetVelocity;
