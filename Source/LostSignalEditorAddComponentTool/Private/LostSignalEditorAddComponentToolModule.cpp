@@ -7,10 +7,49 @@
 #include "ScopedTransaction.h"
 #include "ToolMenus.h"
 #include "Vision/LSRoofFadeComponent.h"
+#include "Vision/LSStencilMarkerComponent.h"
 #include "Vision/LSVisionOccluderComponent.h"
 #include "Vision/LSVisionSurfaceComponent.h"
 
 #define LOCTEXT_NAMESPACE "LostSignalEditorAddComponentTool"
+
+namespace
+{
+	ULSStencilMarkerComponent* EnsureStencilMarkerComponent(AStaticMeshActor* StaticMeshActor, UStaticMeshComponent* StaticMeshComponent)
+	{
+		if (StaticMeshActor == nullptr || StaticMeshComponent == nullptr)
+		{
+			return nullptr;
+		}
+
+		ULSStencilMarkerComponent* StencilMarkerComponent = StaticMeshActor->FindComponentByClass<ULSStencilMarkerComponent>();
+		if (StencilMarkerComponent == nullptr)
+		{
+			StencilMarkerComponent = NewObject<ULSStencilMarkerComponent>(
+				StaticMeshActor,
+				ULSStencilMarkerComponent::StaticClass(),
+				TEXT("StencilMarkerComponent"),
+				RF_Transactional);
+
+			if (StencilMarkerComponent != nullptr)
+			{
+				StaticMeshActor->AddInstanceComponent(StencilMarkerComponent);
+				StencilMarkerComponent->TargetPrimitives.AddUnique(StaticMeshComponent);
+				StencilMarkerComponent->OnComponentCreated();
+				StencilMarkerComponent->RegisterComponent();
+				StencilMarkerComponent->Modify();
+			}
+		}
+		else
+		{
+			StencilMarkerComponent->Modify();
+			StencilMarkerComponent->TargetPrimitives.AddUnique(StaticMeshComponent);
+			StencilMarkerComponent->ApplyStencilSettings();
+		}
+
+		return StencilMarkerComponent;
+	}
+}
 
 void FLostSignalEditorAddComponentToolModule::StartupModule()
 {
@@ -37,7 +76,7 @@ void FLostSignalEditorAddComponentToolModule::RegisterMenus()
 	Section.AddMenuEntry(
 		"AddVisionSetup",
 		LOCTEXT("AddVisionSetupLabel", "Add Vision Setup"),
-		LOCTEXT("AddVisionSetupTooltip", "Add VisionOccluder and VisionSurface components to selected static mesh actors."),
+		LOCTEXT("AddVisionSetupTooltip", "Add VisionOccluder, VisionSurface, and StencilMarker components to selected static mesh actors."),
 		FSlateIcon(),
 		FUIAction(FExecuteAction::CreateRaw(this, &FLostSignalEditorAddComponentToolModule::AddVisionSetupToSelectedActors))
 	);
@@ -45,7 +84,7 @@ void FLostSignalEditorAddComponentToolModule::RegisterMenus()
 	Section.AddMenuEntry(
 		"AddRoofSetup",
 		LOCTEXT("AddRoofSetupLabel", "Add Roof Setup"),
-		LOCTEXT("AddRoofSetupTooltip", "Add RoofFadeComponent to selected static mesh actors."),
+		LOCTEXT("AddRoofSetupTooltip", "Add RoofFadeComponent and StencilMarker to selected static mesh actors."),
 		FSlateIcon(),
 		FUIAction(FExecuteAction::CreateRaw(this, &FLostSignalEditorAddComponentToolModule::AddRoofSetupToSelectedActors))
 	);
@@ -134,6 +173,8 @@ void FLostSignalEditorAddComponentToolModule::AddVisionSetupToSelectedActors()
 			SurfaceComponent->TargetPrimitives.AddUnique(StaticMeshComponent);
 		}
 
+		EnsureStencilMarkerComponent(StaticMeshActor, StaticMeshComponent);
+
 		StaticMeshActor->MarkPackageDirty();
 	}
 }
@@ -193,6 +234,8 @@ void FLostSignalEditorAddComponentToolModule::AddRoofSetupToSelectedActors()
 			RoofFadeComponent->Modify();
 			RoofFadeComponent->TargetPrimitives.AddUnique(StaticMeshComponent);
 		}
+
+		EnsureStencilMarkerComponent(StaticMeshActor, StaticMeshComponent);
 
 		StaticMeshActor->MarkPackageDirty();
 	}

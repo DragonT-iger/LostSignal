@@ -47,7 +47,6 @@ void ULSRoofFadeComponent::BeginPlay()
 	UpdateTriggerVolumeFromSourceMesh();
 	CreateShadowProxyMeshes();
 	InitializeFadeMaterials();
-	ApplyCustomDepthStencil();
 
 	if (GetWorld() != nullptr && GetWorld()->IsNetMode(NM_DedicatedServer))
 	{
@@ -223,6 +222,8 @@ void ULSRoofFadeComponent::EnsureTriggerVolume()
 	TriggerVolume->SetHiddenInGame(true);
 	TriggerVolume->OnComponentCreated();
 	TriggerVolume->RegisterComponent();
+
+	TriggerExtentPadding = FVector(FadeRadius, FadeRadius, 0.0f);
 }
 
 // Sizes the trigger box from the source static mesh local bounds, then applies offset, scale, and padding adjustments.
@@ -423,24 +424,6 @@ void ULSRoofFadeComponent::InitializeFadeMaterials()
 			RoofFadeMaterialInstances.Add(RoofFadeMID);
 			MeshComponent->SetMaterial(MaterialIndex, RoofFadeMID);
 		}
-	}
-}
-
-// Enables custom depth/stencil on the configured roof primitives so roof-specific effects can filter against stencil 10.
-void ULSRoofFadeComponent::ApplyCustomDepthStencil() const
-{
-	TArray<UMeshComponent*> MeshComponents;
-	GatherTargetMeshComponents(MeshComponents);
-
-	for (UMeshComponent* MeshComponent : MeshComponents)
-	{
-		if (MeshComponent == nullptr)
-		{
-			continue;
-		}
-
-		MeshComponent->SetRenderCustomDepth(true);
-		MeshComponent->SetCustomDepthStencilValue(StencilValue);
 	}
 }
 

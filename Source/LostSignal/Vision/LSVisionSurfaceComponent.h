@@ -53,10 +53,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Vision")
 	void ApplyVisionParameters(UTextureRenderTarget2D* VisibilityMaskRT, const FVector& MaskOriginWS, float MaskExtent, const FVector2D& PlayerForward2D);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision", meta = (ClampMin = "0", ClampMax = "255"))
-	int32 StencilValue = 10;
-
 private:
 	void GatherTargetMeshComponents(TArray<UMeshComponent*>& OutMeshComponents) const;
-	void SetPrimitiveComponentCustomDepthStencilValue();
 };

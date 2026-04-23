@@ -191,17 +191,20 @@ void ULSVisionSubsystem::QuerySegmentsInRadius(const FVector2D& Origin, const fl
 
 		for (const int32 SegmentId : GridCell->SegmentIds)
 		{
+			//이미 포함된 세그먼트는 스킵
 			if (UniqueSegmentIds.Contains(SegmentId))
 			{
 				continue;
 			}
 
+			//세그먼트 ID로 캐시된 세그먼트 정보 없으면 스킵
 			const FLSVisionCachedSegment* CachedSegment = CachedSegments.Find(SegmentId);
 			if (CachedSegment == nullptr)
 			{
 				continue;
 			}
 
+			//범위안에 없으면 스킵
 			if (ComputeSquaredDistanceToBounds(Origin, CachedSegment->Bounds) > RadiusSquared)
 			{
 				continue;

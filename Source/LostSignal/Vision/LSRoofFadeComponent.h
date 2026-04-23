@@ -98,9 +98,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade", meta = (ClampMin = "0.0"))
 	float HeightFadeWidth = 80.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade", meta = (ClampMin = "0", ClampMax = "255"))
-	int32 StencilValue = 10;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
 	FName FadeEnabledParamName = TEXT("FadeEnabled");
 
@@ -149,9 +146,6 @@ private:
 
 	// Resolves which opaque material the hidden shadow proxy should use.
 	UMaterialInterface* ResolveShadowProxyMaterial() const;
-
-	// Marks the roof meshes in custom depth so stencil-based post effects can identify roof occluders.
-	void ApplyCustomDepthStencil() const;
 
 	// Finds the local player pawn that should drive the cylinder mask center.
 	APawn* ResolveLocalPlayerPawn() const;
