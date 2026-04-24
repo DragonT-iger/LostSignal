@@ -57,7 +57,7 @@ void ULSRoofFadeComponent::BeginPlay()
 // Resets the fade so destroyed roof actors do not leave stale enabled parameters behind.
 void ULSRoofFadeComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	ApplyFadeParameters(0.0f, FVector::ZeroVector);
+	ApplyFadeParameters(0.0f, 0.0f, FVector::ZeroVector, 0.0f, FVector::ZeroVector);
 
 	for (UStaticMeshComponent* ShadowProxyMeshComponent : ShadowProxyMeshComponents)
 	{
@@ -103,19 +103,34 @@ void ULSRoofFadeComponent::TickComponent(
 	}
 
 	APawn* PlayerPawn = ResolveLocalPlayerPawn();
-	if (PlayerPawn == nullptr)
+	FVector MouseWorldPoint = FVector::ZeroVector;
+	const bool bHasMouseWorldPoint = ResolveMouseWorldPoint(MouseWorldPoint);
+	const bool bHasPlayerPawn = PlayerPawn != nullptr;
+
+	if (!bHasPlayerPawn && !bHasMouseWorldPoint)
 	{
-		ApplyFadeParameters(0.0f, FVector::ZeroVector);
+		ApplyFadeParameters(0.0f, 0.0f, FVector::ZeroVector, 0.0f, FVector::ZeroVector);
 		return;
 	}
 
-	if (bUseTriggerVolume && TriggerVolume != nullptr && !TriggerVolume->IsOverlappingActor(PlayerPawn))
+	if (bUseTriggerVolume && TriggerVolume != nullptr)
 	{
-		ApplyFadeParameters(0.0f, FVector::ZeroVector);
-		return;
+		const bool bPlayerTriggerPassed = bUsePlayerTrigger && bHasPlayerPawn && TriggerVolume->IsOverlappingActor(PlayerPawn);
+		const bool bMouseTriggerPassed = bUseMouseTrigger && bHasMouseWorldPoint && IsMouseInsideTriggerXY();
+		const bool bTriggerPassed = (!bUsePlayerTrigger && !bUseMouseTrigger) || bPlayerTriggerPassed || bMouseTriggerPassed;
+		if (!bTriggerPassed)
+		{
+			ApplyFadeParameters(0.0f, 0.0f, FVector::ZeroVector, 0.0f, FVector::ZeroVector);
+			return;
+		}
 	}
 
-	ApplyFadeParameters(1.0f, PlayerPawn->GetActorLocation() + FadeCenterOffset);
+	ApplyFadeParameters(
+		bHasPlayerPawn || bHasMouseWorldPoint ? 1.0f : 0.0f,
+		bHasPlayerPawn ? 1.0f : 0.0f,
+		bHasPlayerPawn ? PlayerPawn->GetActorLocation() + FadeCenterOffset : FVector::ZeroVector,
+		bHasMouseWorldPoint ? 1.0f : 0.0f,
+		bHasMouseWorldPoint ? MouseWorldPoint + FadeCenterOffset : FVector::ZeroVector);
 }
 
 // Collects explicit target primitives when provided, otherwise falls back to every mesh component on the owner.
@@ -430,6 +445,12 @@ void ULSRoofFadeComponent::InitializeFadeMaterials()
 // Resolves the first local player pawn so every client can drive its own roof fade without sharing state.
 APawn* ULSRoofFadeComponent::ResolveLocalPlayerPawn() const
 {
+	APlayerController* PlayerController = ResolveLocalPlayerController();
+	return PlayerController != nullptr ? PlayerController->GetPawn() : nullptr;
+}
+
+APlayerController* ULSRoofFadeComponent::ResolveLocalPlayerController() const
+{
 	if (GetWorld() == nullptr)
 	{
 		return nullptr;
@@ -443,20 +464,67 @@ APawn* ULSRoofFadeComponent::ResolveLocalPlayerPawn() const
 			continue;
 		}
 
-		APawn* PlayerPawn = PlayerController->GetPawn();
-		if (PlayerPawn == nullptr)
-		{
-			continue;
-		}
-
-		return PlayerPawn;
+		return PlayerController;
 	}
 
 	return nullptr;
 }
 
+bool ULSRoofFadeComponent::ResolveMouseWorldPoint(FVector& OutMouseWorldPoint) const
+{
+	APlayerController* PlayerController = ResolveLocalPlayerController();
+	if (PlayerController == nullptr)
+	{
+		return false;
+	}
+
+	FVector WorldOrigin = FVector::ZeroVector;
+	FVector WorldDirection = FVector::ZeroVector;
+	if (!PlayerController->DeprojectMousePositionToWorld(WorldOrigin, WorldDirection))
+	{
+		return false;
+	}
+
+	if (FMath::IsNearlyZero(WorldDirection.Z))
+	{
+		return false;
+	}
+
+	const float RayDistance = (MouseProjectionPlaneZ - WorldOrigin.Z) / WorldDirection.Z;
+	if (RayDistance < 0.0f)
+	{
+		return false;
+	}
+
+	OutMouseWorldPoint = WorldOrigin + (WorldDirection * RayDistance);
+	return true;
+}
+
+bool ULSRoofFadeComponent::IsMouseInsideTriggerXY() const
+{
+	if (TriggerVolume == nullptr)
+	{
+		return false;
+	}
+
+	FVector MouseWorldPoint = FVector::ZeroVector;
+	if (!ResolveMouseWorldPoint(MouseWorldPoint))
+	{
+		return false;
+	}
+
+	const FVector LocalPoint = TriggerVolume->GetComponentTransform().InverseTransformPosition(MouseWorldPoint);
+	const FVector Extent = TriggerVolume->GetUnscaledBoxExtent();
+	return FMath::Abs(LocalPoint.X) <= Extent.X && FMath::Abs(LocalPoint.Y) <= Extent.Y;
+}
+
 // Writes the enabled flag plus cylinder dimensions so the material can build a smooth discard mask around the player.
-void ULSRoofFadeComponent::ApplyFadeParameters(const float EnabledValue, const FVector& FadeCenterWS) const
+void ULSRoofFadeComponent::ApplyFadeParameters(
+	const float EnabledValue,
+	const float PlayerEnabledValue,
+	const FVector& PlayerFadeCenterWS,
+	const float MouseEnabledValue,
+	const FVector& MouseFadeCenterWS) const
 {
 	for (UMaterialInstanceDynamic* RoofFadeMID : RoofFadeMaterialInstances)
 	{
@@ -466,7 +534,11 @@ void ULSRoofFadeComponent::ApplyFadeParameters(const float EnabledValue, const F
 		}
 
 		RoofFadeMID->SetScalarParameterValue(FadeEnabledParamName, EnabledValue);
-		RoofFadeMID->SetVectorParameterValue(FadeCenterParamName, FLinearColor(FadeCenterWS.X, FadeCenterWS.Y, FadeCenterWS.Z, 1.0f));
+		RoofFadeMID->SetVectorParameterValue(FadeCenterParamName, FLinearColor(PlayerFadeCenterWS.X, PlayerFadeCenterWS.Y, PlayerFadeCenterWS.Z, 1.0f));
+		RoofFadeMID->SetScalarParameterValue(PlayerFadeEnabledParamName, PlayerEnabledValue);
+		RoofFadeMID->SetVectorParameterValue(PlayerFadeCenterParamName, FLinearColor(PlayerFadeCenterWS.X, PlayerFadeCenterWS.Y, PlayerFadeCenterWS.Z, 1.0f));
+		RoofFadeMID->SetScalarParameterValue(MouseFadeEnabledParamName, MouseEnabledValue);
+		RoofFadeMID->SetVectorParameterValue(MouseFadeCenterParamName, FLinearColor(MouseFadeCenterWS.X, MouseFadeCenterWS.Y, MouseFadeCenterWS.Z, 1.0f));
 		RoofFadeMID->SetScalarParameterValue(FadeRadiusParamName, FadeRadius);
 		RoofFadeMID->SetScalarParameterValue(FadeWidthParamName, FadeWidth);
 		RoofFadeMID->SetScalarParameterValue(FadeHalfHeightParamName, FadeHalfHeight);

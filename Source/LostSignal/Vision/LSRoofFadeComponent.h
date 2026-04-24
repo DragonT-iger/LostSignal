@@ -57,6 +57,12 @@ public:
 	bool bUseTriggerVolume = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	bool bUsePlayerTrigger = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	bool bUseMouseTrigger = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
 	bool bAutoCreateTriggerVolume = true;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Roof Fade|Trigger")
@@ -67,6 +73,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
 	float TriggerGroundZ = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	float MouseProjectionPlaneZ = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
 	FVector TriggerExtentScale = FVector(1.2f, 1.2f, 1.0f);
@@ -103,6 +112,18 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
 	FName FadeCenterParamName = TEXT("FadeCenterWS");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	FName PlayerFadeEnabledParamName = TEXT("PlayerFadeEnabled");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	FName PlayerFadeCenterParamName = TEXT("PlayerFadeCenterWS");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	FName MouseFadeEnabledParamName = TEXT("MouseFadeEnabled");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	FName MouseFadeCenterParamName = TEXT("MouseFadeCenterWS");
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
 	FName FadeRadiusParamName = TEXT("FadeRadius");
@@ -150,8 +171,22 @@ private:
 	// Finds the local player pawn that should drive the cylinder mask center.
 	APawn* ResolveLocalPlayerPawn() const;
 
-	// Pushes the current cylinder parameters into every bound MID.
-	void ApplyFadeParameters(float EnabledValue, const FVector& FadeCenterWS) const;
+	// Finds the local player controller used for mouse world projection.
+	APlayerController* ResolveLocalPlayerController() const;
+
+	// Projects the current mouse position onto a world Z plane for roof interaction checks.
+	bool ResolveMouseWorldPoint(FVector& OutMouseWorldPoint) const;
+
+	// Tests whether the current mouse XY lies within the trigger box footprint.
+	bool IsMouseInsideTriggerXY() const;
+
+	// Pushes the current player/mouse fade sources into every bound MID.
+	void ApplyFadeParameters(
+		float EnabledValue,
+		float PlayerEnabledValue,
+		const FVector& PlayerFadeCenterWS,
+		float MouseEnabledValue,
+		const FVector& MouseFadeCenterWS) const;
 
 	TArray<TWeakObjectPtr<UStaticMeshComponent>> ShadowSourceMeshComponents;
 	TArray<bool> ShadowSourceCastShadowStates;
