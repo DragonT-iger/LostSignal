@@ -6,17 +6,42 @@
 #include "Characters/LSCharacterBase.h"
 #include "LSEnemyCharacter.generated.h"
 
-/**
- * Abstract enemy character for LostSignal.
- * 카메라 없음. AI Controller(BehaviorTree)가 이동/회전 제어.
- * 구체적인 적 타입은 이 클래스를 상속해 BP에서 메시·에셋 할당.
- */
+class UDataTable;
+class ULSMonsterCombatComponent;
+class ULSMonsterSenseComponent;
+struct FLSMonsterArchetypeRow;
+
+/** Base enemy pawn that wires monster AI components and archetype data. */
 UCLASS(Abstract)
-class ALSEnemyCharacter : public ALSCharacterBase
+class LOSTSIGNAL_API ALSEnemyCharacter : public ALSCharacterBase
 {
 	GENERATED_BODY()
 
 public:
-
 	ALSEnemyCharacter();
+
+	virtual void BeginPlay() override;
+
+	UFUNCTION(BlueprintPure, Category="AI")
+	ULSMonsterSenseComponent* GetMonsterSenseComponent() const { return MonsterSenseComponent; }
+
+	UFUNCTION(BlueprintPure, Category="AI")
+	ULSMonsterCombatComponent* GetMonsterCombatComponent() const { return MonsterCombatComponent; }
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category="AI|DataTable")
+	TObjectPtr<UDataTable> MonsterArchetypeTable;
+
+	UPROPERTY(EditDefaultsOnly, Category="AI|DataTable")
+	FName MonsterRowName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="AI")
+	TObjectPtr<ULSMonsterSenseComponent> MonsterSenseComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="AI")
+	TObjectPtr<ULSMonsterCombatComponent> MonsterCombatComponent;
+
+private:
+	const FLSMonsterArchetypeRow* FindMonsterArchetypeRow() const;
+	void InitializeMonsterArchetype();
 };

@@ -43,6 +43,8 @@ void ULSVisionComponent::BeginPlay()
 
 		if (PostProcessMID != nullptr)
 		{
+			PostProcessMID->SetScalarParameterValue(EnableParamName, bEnableVision ? 1.0f : 0.0f);
+
 			if (UCameraComponent* Camera = GetOwner() ? GetOwner()->FindComponentByClass<UCameraComponent>() : nullptr)
 			{
 				Camera->PostProcessSettings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, PostProcessMID));
@@ -125,6 +127,7 @@ void ULSVisionComponent::UpdateVisionPolygon()
 
 	if (PostProcessMID != nullptr)
 	{
+		PostProcessMID->SetScalarParameterValue(EnableParamName, bEnableVision ? 1.0f : 0.0f);
 		PostProcessMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, 0.0f, 0.0f));
 		PostProcessMID->SetScalarParameterValue(MaskExtentParamName, CurrentPolygon.Extent);
 

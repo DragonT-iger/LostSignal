@@ -28,6 +28,9 @@ protected:
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	bool bEnableVision = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
 	float VisionRadius = 150.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
@@ -71,6 +74,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
 	FName MaskExtentParamName = TEXT("MaskExtent");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	FName EnableParamName = TEXT("VisionEnable");
 
 private:
 	FTimerHandle VisionUpdateTimerHandle;
