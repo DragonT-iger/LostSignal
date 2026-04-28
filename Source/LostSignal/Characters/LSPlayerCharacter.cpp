@@ -29,7 +29,7 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	CameraBoom->bInheritPitch = false;
 	CameraBoom->bInheritYaw = false;
 	CameraBoom->bInheritRoll = false;
-	CameraBoom->TargetArmLength = 1300;
+	CameraBoom->TargetArmLength = 1100;
 
 	// 카메라 생성
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
