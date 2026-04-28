@@ -36,41 +36,41 @@ protected:
 
 	// ── Blueprint 기본값 (DataTable 행이 없을 때 사용) ──────────────────────
 	// 아래 값은 PIE 중 Details 패널에서 실시간 편집 가능
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="공격력")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="공격력")
 	int32 BaseAttack = 100;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="공격속도")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="공격속도")
 	float BaseAttackSpeed = 1.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="가속력(쿨타임)")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="가속력(쿨타임)")
 	float BaseCooldownReduction = 0.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="치명타 확률")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="치명타 확률")
 	float BaseCritChance = 0.3f;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="치명타 배율")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="치명타 배율")
 	float BaseCritDamage = 1.5f;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="방관통")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="방관통")
 	float BaseArmorPenetration = 0.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="체력")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="체력")
 	int32 BaseHealth = 100;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="방어")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="방어")
 	int32 BaseDefence = 10;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="회복력")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="회복력")
 	int32 BaseRecovery = 5;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="스태미나")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="스태미나")
 	int32 BaseStamina = 100;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|Default Values", DisplayName="이동속도")
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="이동속도")
 	float BaseMoveSpeed = 1.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Stats|Default Values", DisplayName = "대쉬속도")
-	float BaseDashSpeed = 1.0f;
+	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="대쉬속도")
+	float BaseDashSpeed = 100.0f;
 
 private:
 	UPROPERTY(VisibleAnywhere, Category="GAS")
