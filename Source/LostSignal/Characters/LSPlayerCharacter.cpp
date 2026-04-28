@@ -6,6 +6,7 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
 #include "GAS/LSGameplayTags.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
@@ -42,6 +43,8 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	PlayerXRayComponent = CreateDefaultSubobject<ULSPlayerXRayComponent>(TEXT("PlayerXRayComponent"));
 
 	DashAbilityClass = ULSGA_Dash::StaticClass();
+
+	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 }
 
 void ALSPlayerCharacter::BeginPlay()
@@ -57,7 +60,14 @@ void ALSPlayerCharacter::BeginPlay()
 void ALSPlayerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	FaceMouseCursor(DeltaSeconds);
+	if (bIsRunning)
+	{
+		FaceMovementDirection(DeltaSeconds);
+	}
+	else
+	{
+		FaceMouseCursor(DeltaSeconds);
+	}
 }
 
 void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -71,6 +81,13 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 	// 이동 (Triggered = 누르는 동안 매 프레임)
 	if (MoveAction)    EIC->BindAction(MoveAction,    ETriggerEvent::Triggered, this, &ALSPlayerCharacter::Move);
+
+	// 달리기 (누르고 있는 동안)
+	if (RunAction)
+	{
+		EIC->BindAction(RunAction, ETriggerEvent::Started,   this, &ALSPlayerCharacter::OnRunStart);
+		EIC->BindAction(RunAction, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnRunEnd);
+	}
 
 	// 전투 / 스킬 (Started = 누른 순간 1회)
 	if (AttackAction)  EIC->BindAction(AttackAction,  ETriggerEvent::Started, this, &ALSPlayerCharacter::OnAttack);
@@ -126,6 +143,18 @@ void ALSPlayerCharacter::OnItem5()   {}
 void ALSPlayerCharacter::OnItem6()   {}
 void ALSPlayerCharacter::OnInteract() {}
 
+void ALSPlayerCharacter::OnRunStart()
+{
+	bIsRunning = true;
+	GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
+}
+
+void ALSPlayerCharacter::OnRunEnd()
+{
+	bIsRunning = false;
+	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+}
+
 
 //void ALSPlayerCharacter::Attack()
 //{
@@ -150,6 +179,29 @@ void ALSPlayerCharacter::Move(const FInputActionValue& Value)
 
 	AddMovementInput(RightDir, Input.X);
 	AddMovementInput(ForwardDir, Input.Y);
+}
+
+void ALSPlayerCharacter::FaceMovementDirection(float DeltaSeconds)
+{
+	FVector MoveDir = GetVelocity();
+	MoveDir.Z = 0.0f;
+
+	if (MoveDir.IsNearlyZero())
+	{
+		return;
+	}
+
+	// 카메라 오프셋을 이동 방향 쪽으로 서서히 이동
+	if (CameraBoom)
+	{
+		const FVector OffsetTarget = MoveDir.GetSafeNormal() * (MouseCameraLeadDistance * 0.6f);
+		CameraBoom->TargetOffset = FMath::VInterpTo(CameraBoom->TargetOffset, OffsetTarget, DeltaSeconds, MouseCameraLeadInterpSpeed);
+	}
+
+	// 이동 방향으로 천천히 회전
+	const FRotator TargetRot = MoveDir.Rotation();
+	const FRotator NewRot = FMath::RInterpTo(GetActorRotation(), FRotator(0.0f, TargetRot.Yaw, 0.0f), DeltaSeconds, RunFacingInterpSpeed);
+	SetActorRotation(NewRot);
 }
 
 void ALSPlayerCharacter::FaceMouseCursor(float DeltaSeconds)

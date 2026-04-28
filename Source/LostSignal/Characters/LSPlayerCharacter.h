@@ -86,6 +86,17 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> InteractAction;  // IA_Interact  (F 등)
 
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> RunAction;       // IA_Run       (Shift)
+
+	// ── 이동 파라미터 ────────────────────────────────────
+
+	UPROPERTY(EditAnywhere, Category="Movement", meta=(ClampMin="0.0"))
+	float WalkSpeed = 300.0f;
+
+	UPROPERTY(EditAnywhere, Category="Movement", meta=(ClampMin="0.0"))
+	float RunSpeed = 600.0f;
+
 	// ── 카메라 파라미터 ──────────────────────────────────
 
 	/** Top-down 카메라 피치 각도. */
@@ -103,6 +114,10 @@ protected:
 	/** 마우스 방향으로 회전할 때 보간 속도. */
 	UPROPERTY(EditAnywhere, Category="Camera", meta=(ClampMin="0.0"))
 	float MouseFacingInterpSpeed = 15.0f;
+
+	/** 달리는 동안 이동 방향으로 천천히 돌아가는 보간 속도. */
+	UPROPERTY(EditAnywhere, Category="Camera", meta=(ClampMin="0.0"))
+	float RunFacingInterpSpeed = 4.0f;
 
 	/** 마우스 위치 쪽으로 카메라가 이동하는 최대 거리. */
 	UPROPERTY(EditAnywhere, Category="Camera", meta=(ClampMin="0.0"))
@@ -138,12 +153,17 @@ protected:
 
 private:
 
+	bool bIsRunning = false;
+
 	void Move(const FInputActionValue& Value);
 	void FaceMouseCursor(float DeltaSeconds);
+	void FaceMovementDirection(float DeltaSeconds);
 
 	// ── 입력 핸들러 ──
 	void OnAttack();
 	void OnDash();
+	void OnRunStart();
+	void OnRunEnd();
 	void OnSkill1();
 	void OnSkill2();
 	void OnSkill3();
