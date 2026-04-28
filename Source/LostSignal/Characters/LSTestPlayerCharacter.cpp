@@ -14,8 +14,20 @@ ALSTestPlayerCharacter::ALSTestPlayerCharacter()
 void ALSTestPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay(); // LSCharacterBase::BeginPlay → InitAbilityActorInfo 호출
-	InitializeStats();
+	LoadStatsFromDataTable();
+	ApplyStatsToAttributeSet();
 }
+
+#if WITH_EDITOR
+void ALSTestPlayerCharacter::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+	if (AbilitySystemComponent && CharacterAttributeSet)
+	{
+		ApplyStatsToAttributeSet();
+	}
+}
+#endif
 
 const FLSCharacterStatRow* ALSTestPlayerCharacter::FindStatRow() const
 {
@@ -26,7 +38,32 @@ const FLSCharacterStatRow* ALSTestPlayerCharacter::FindStatRow() const
 	return CharacterStatTable->FindRow<FLSCharacterStatRow>(CharacterRowName, TEXT("LSTestPlayerCharacter"));
 }
 
-void ALSTestPlayerCharacter::InitializeStats()
+void ALSTestPlayerCharacter::LoadStatsFromDataTable()
+{
+	const FLSCharacterStatRow* Row = FindStatRow();
+	if (!Row)
+	{
+		UE_LOG(LogLS, Log, TEXT("%s: DataTable 행 없음 → Base* 기본값 유지"), *GetNameSafe(this));
+		return;
+	}
+
+	UE_LOG(LogLS, Log, TEXT("%s: DataTable 행 '%s' → Base* 덮어쓰기"), *GetNameSafe(this), *CharacterRowName.ToString());
+
+	BaseAttack           = Row->Char_Attack;
+	BaseAttackSpeed      = Row->Char_Atkspead;
+	BaseCooldownReduction= Row->Char_Cal;
+	BaseCritChance       = Row->Char_Crit;
+	BaseCritDamage       = Row->Char_CritDmg;
+	BaseArmorPenetration = Row->Char_ArmorPen;
+	BaseHealth           = Row->Char_Health;
+	BaseDefence          = Row->Char_Defence;
+	BaseRecovery         = Row->Char_Recovery;
+	BaseStamina          = Row->Char_Stamina;
+	BaseMoveSpeed        = Row->Char_Speed;
+	BaseDashSpeed        = Row->Char_DashSpeed;
+}
+
+void ALSTestPlayerCharacter::ApplyStatsToAttributeSet()
 {
 	UE_LOG(LogLS, Warning, TEXT("Player Initialize"));
 
@@ -36,39 +73,16 @@ void ALSTestPlayerCharacter::InitializeStats()
 		return;
 	}
 
-	const FLSCharacterStatRow* Row = FindStatRow();
-	if (Row)
-	{
-		UE_LOG(LogLS, Log, TEXT("%s: DataTable 행 '%s' 로드 성공"), *GetNameSafe(this), *CharacterRowName.ToString());
-
-		CharacterAttributeSet->InitAttack(Row->Char_Attack);
-		CharacterAttributeSet->InitAttackSpeed(Row->Char_Atkspead);
-		CharacterAttributeSet->InitCooldownReduction(Row->Char_Cal);
-		CharacterAttributeSet->InitCritChance(Row->Char_Crit);
-		CharacterAttributeSet->InitCritDamage(Row->Char_CritDmg);
-		CharacterAttributeSet->InitArmorPenetration(Row->Char_ArmorPen);
-		CharacterAttributeSet->InitMaxHealth(Row->Char_Health);
-		CharacterAttributeSet->InitDefence(Row->Char_Defence);
-		CharacterAttributeSet->InitRecovery(Row->Char_Recovery);
-		CharacterAttributeSet->InitMaxStamina(Row->Char_Stamina);
-		CharacterAttributeSet->InitMoveSpeed(Row->Char_Speed);
-		CharacterAttributeSet->InitDashSpeed(Row->Char_DashSpeed);
-	}
-	else
-	{
-		UE_LOG(LogLS, Log, TEXT("%s: DataTable 없음 → Blueprint 기본값 사용"), *GetNameSafe(this));
-
-		CharacterAttributeSet->InitAttack(BaseAttack);
-		CharacterAttributeSet->InitAttackSpeed(BaseAttackSpeed);
-		CharacterAttributeSet->InitCooldownReduction(BaseCooldownReduction);
-		CharacterAttributeSet->InitCritChance(BaseCritChance);
-		CharacterAttributeSet->InitCritDamage(BaseCritDamage);
-		CharacterAttributeSet->InitArmorPenetration(BaseArmorPenetration);
-		CharacterAttributeSet->InitMaxHealth(BaseHealth);
-		CharacterAttributeSet->InitDefence(BaseDefence);
-		CharacterAttributeSet->InitRecovery(BaseRecovery);
-		CharacterAttributeSet->InitMaxStamina(BaseStamina);
-		CharacterAttributeSet->InitMoveSpeed(BaseMoveSpeed);
-		CharacterAttributeSet->InitDashSpeed(BaseDashSpeed);
-	}
+	CharacterAttributeSet->InitAttack(BaseAttack);
+	CharacterAttributeSet->InitAttackSpeed(BaseAttackSpeed);
+	CharacterAttributeSet->InitCooldownReduction(BaseCooldownReduction);
+	CharacterAttributeSet->InitCritChance(BaseCritChance);
+	CharacterAttributeSet->InitCritDamage(BaseCritDamage);
+	CharacterAttributeSet->InitArmorPenetration(BaseArmorPenetration);
+	CharacterAttributeSet->InitMaxHealth(BaseHealth);
+	CharacterAttributeSet->InitDefence(BaseDefence);
+	CharacterAttributeSet->InitRecovery(BaseRecovery);
+	CharacterAttributeSet->InitMaxStamina(BaseStamina);
+	CharacterAttributeSet->InitMoveSpeed(BaseMoveSpeed);
+	CharacterAttributeSet->InitDashSpeed(BaseDashSpeed);
 }

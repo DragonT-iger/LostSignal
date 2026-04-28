@@ -119,8 +119,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Animation")
 	TObjectPtr<UAnimMontage> AttackMontage;
 
-	/** 대쉬 어빌리티 클래스. BP_PlayerCharacter Details에서 BP_GA_Dash 할당 */
-	UPROPERTY(EditDefaultsOnly, Category="GAS|Abilities")
+	/** 대쉬 어빌리티 클래스. C++ 생성자에서 ULSGA_Dash로 초기화됨 */
+	UPROPERTY(VisibleDefaultsOnly, Category="GAS|Abilities")
 	TSubclassOf<UGameplayAbility> DashAbilityClass;
 
 public:
@@ -141,7 +141,7 @@ private:
 	void Move(const FInputActionValue& Value);
 	void FaceMouseCursor(float DeltaSeconds);
 
-	// ── 입력 핸들러 (나중에 GAS로 어빌리티 활성화 예정) ──
+	// ── 입력 핸들러 ──
 	void OnAttack();
 	void OnDash();
 	void OnSkill1();

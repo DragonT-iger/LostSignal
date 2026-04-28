@@ -5,6 +5,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
 #include "GAS/LSGameplayTags.h"
+#include "GAS/Effects/LSGE_DashCooldown.h"
+#include "GAS/Effects/LSGE_DashInvincible.h"
 #include "NiagaraFunctionLibrary.h"
 #include "LostSignal.h"
 #include "../LSCharacterAttributeSet.h"
@@ -25,6 +27,9 @@ ULSGA_Dash::ULSGA_Dash()
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+
+	CooldownGameplayEffectClass = ULSGE_DashCooldown::StaticClass();
+	InvincibilityEffectClass = ULSGE_DashInvincible::StaticClass();
 }
 
 const FGameplayTagContainer* ULSGA_Dash::GetCooldownTags() const

@@ -14,6 +14,7 @@
 #include "Vision/LSMPCVisionSourceComponent.h"
 #include "Vision/LSPlayerXRayComponent.h"
 #include "Vision/LSVisionComponent.h"
+#include "GAS/Abilities/LSGA_Dash.h"
 
 ALSPlayerCharacter::ALSPlayerCharacter()
 {
@@ -39,13 +40,14 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	MPCVisionSourceComponent = CreateDefaultSubobject<ULSMPCVisionSourceComponent>(TEXT("MPCVisionSourceComponent"));
 	VisionComponent = CreateDefaultSubobject<ULSVisionComponent>(TEXT("VisionComponent"));
 	PlayerXRayComponent = CreateDefaultSubobject<ULSPlayerXRayComponent>(TEXT("PlayerXRayComponent"));
+
+	DashAbilityClass = ULSGA_Dash::StaticClass();
 }
 
 void ALSPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay(); // LSCharacterBase::BeginPlay에서 InitAbilityActorInfo 호출
 
-	// BP_PlayerCharacter Details에서 할당한 어빌리티 클래스를 부여
 	if (DashAbilityClass)
 	{
 		GrantAbility(DashAbilityClass);
@@ -94,7 +96,7 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 }
 
-// ── 입력 핸들러 스텁 — 나중에 GAS 어빌리티 활성화로 교체 예정 ──────────
+// ── 입력 핸들러 ──────────────────────────────────────────────────────────
 
 void ALSPlayerCharacter::OnAttack()
 {
@@ -107,8 +109,7 @@ void ALSPlayerCharacter::OnDash()
 {
 	if (AbilitySystemComponent)
 	{
-		// LS.Ability.Dash 태그가 달린 어빌리티를 발동
-		// LS.State.Dodging 태그가 이미 있으면 LSGA_Dash의 ActivationBlockedTags가 차단
+		// LS.State.Invincible 태그가 이미 있으면 LSGA_Dash의 ActivationBlockedTags가 차단
 		AbilitySystemComponent->TryActivateAbilitiesByTag(
 			FGameplayTagContainer(LSGameplayTags::Ability_Dash)
 		);

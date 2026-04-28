@@ -25,13 +25,17 @@ public:
 
 	virtual void BeginPlay() override;
 
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
 protected:
 	// ── DataTable 연결 ────────────────────────────────────────────────────────
 	// Content Browser에서 만든 DataTable 에셋과 조회할 행 이름을 할당
 	UPROPERTY(EditDefaultsOnly, Category="Stats|DataTable")
 	TObjectPtr<UDataTable> CharacterStatTable;
 
-	UPROPERTY(EditDefaultsOnly, Category="Stats|DataTable")
+	UPROPERTY(EditAnywhere, Category="Stats|DataTable")
 	FName CharacterRowName;
 
 	// ── Blueprint 기본값 (DataTable 행이 없을 때 사용) ──────────────────────
@@ -70,12 +74,13 @@ protected:
 	float BaseMoveSpeed = 1.0f;
 
 	UPROPERTY(EditAnywhere, Category="Stats|Default Values", DisplayName="대쉬속도")
-	float BaseDashSpeed = 100.0f;
+	float BaseDashSpeed = 1200.0f;
 
 private:
 	UPROPERTY(VisibleAnywhere, Category="GAS")
 	TObjectPtr<ULSCharacterAttributeSet> CharacterAttributeSet;
 
 	const FLSCharacterStatRow* FindStatRow() const;
-	void InitializeStats();
+	void LoadStatsFromDataTable();
+	void ApplyStatsToAttributeSet();
 };
