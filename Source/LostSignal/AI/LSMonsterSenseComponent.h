@@ -63,49 +63,49 @@ private:
 	AActor* FindBestVisibleTarget() const;
 	bool IsNoiseFresh() const;
 
-	UPROPERTY(EditAnywhere, Category="Sense", meta=(ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float BaseSightRadius = 1200.0f;
 
-	UPROPERTY(EditAnywhere, Category="Sense", meta=(ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float MaxSightRadius = 1800.0f;
 
-	UPROPERTY(EditAnywhere, Category="Sense", meta=(ClampMin="0.0", ClampMax="180.0"))
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0", ClampMax="180.0"))
 	float SightHalfAngleDegrees = 55.0f;
 
-	UPROPERTY(EditAnywhere, Category="Sense", meta=(ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float HearingRadius = 900.0f;
 
-	UPROPERTY(EditAnywhere, Category="Sense", meta=(ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float InterestMemorySeconds = 4.0f;
 
-	UPROPERTY(EditAnywhere, Category="Sense", meta=(ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float SuspicionDecayPerSecond = 30.0f;
 
-	UPROPERTY(EditAnywhere, Category="Sense", meta=(ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float AlertDuration = 5.0f;
 
-	UPROPERTY(EditAnywhere, Category="Sense", meta=(ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float AlertMoveSpeedMultiplier = 1.2f;
 
-	UPROPERTY(EditAnywhere, Category="Sense", meta=(ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float LeashDistance = 2000.0f;
 
-	UPROPERTY(VisibleAnywhere, Category="Sense")
+	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	TWeakObjectPtr<AActor> CurrentTarget;
 
-	UPROPERTY(VisibleAnywhere, Category="Sense")
+	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	FVector LastSeenLocation = FVector::ZeroVector;
 
-	UPROPERTY(VisibleAnywhere, Category="Sense")
+	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	FVector LastHeardLocation = FVector::ZeroVector;
 
-	UPROPERTY(VisibleAnywhere, Category="Sense")
+	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	FVector HomeLocation = FVector::ZeroVector;
 
-	UPROPERTY(VisibleAnywhere, Category="Sense")
+	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	float Suspicion = 0.0f;
 
-	UPROPERTY(VisibleAnywhere, Category="Sense")
+	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	float ThreatMultiplier = 1.0f;
 
 	float LastSeenTime = -1.0f;

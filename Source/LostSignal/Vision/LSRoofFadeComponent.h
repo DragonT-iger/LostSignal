@@ -35,115 +35,115 @@ public:
 		ELevelTick TickType,
 		FActorComponentTickFunction* ThisTickFunction) override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	TArray<TObjectPtr<UPrimitiveComponent>> TargetPrimitives;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	bool bUseExistingMaterials = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	TObjectPtr<UMaterialInterface> RoofFadeMaterialOverride;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Shadow Proxy")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|ShadowProxy")
 	bool bCreateShadowProxyMesh = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Shadow Proxy")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|ShadowProxy")
 	bool bUseSourceMaterialsForShadowProxy = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Shadow Proxy")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|ShadowProxy")
 	TObjectPtr<UMaterialInterface> ShadowProxyMaterialOverride;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	bool bUseTriggerVolume = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	bool bUsePlayerTrigger = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	bool bUseMouseTrigger = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	bool bAutoCreateTriggerVolume = true;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Roof Fade|Trigger")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision|RoofFade|Trigger")
 	TObjectPtr<UBoxComponent> TriggerVolume;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	FVector TriggerCenterOffset = FVector::ZeroVector;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	float TriggerGroundZ = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	float MouseProjectionPlaneZ = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	FVector TriggerExtentScale = FVector(1.2f, 1.2f, 1.0f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	FVector TriggerExtentPadding = FVector(0.0f, 0.0f, 0.0f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	bool bDrawDebugTriggerVolume = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	FColor TriggerDebugColor = FColor::Cyan;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade|Trigger", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger", meta = (ClampMin = "0.0"))
 	float TriggerDebugThickness = 2.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FVector FadeCenterOffset = FVector::ZeroVector;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade", meta = (ClampMin = "0.0"))
 	float FadeRadius = 800.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade", meta = (ClampMin = "0.0"))
 	float FadeWidth = 80.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade", meta = (ClampMin = "0.0"))
 	float FadeHalfHeight = 1000.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade", meta = (ClampMin = "0.0"))
 	float HeightFadeWidth = 80.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FName FadeEnabledParamName = TEXT("FadeEnabled");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FName FadeCenterParamName = TEXT("FadeCenterWS");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FName PlayerFadeEnabledParamName = TEXT("PlayerFadeEnabled");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FName PlayerFadeCenterParamName = TEXT("PlayerFadeCenterWS");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FName MouseFadeEnabledParamName = TEXT("MouseFadeEnabled");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FName MouseFadeCenterParamName = TEXT("MouseFadeCenterWS");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FName FadeRadiusParamName = TEXT("FadeRadius");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FName FadeWidthParamName = TEXT("FadeWidth");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FName FadeHalfHeightParamName = TEXT("FadeHalfHeight");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Roof Fade")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade")
 	FName HeightFadeWidthParamName = TEXT("FadeHeightFadeWidth");
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Roof Fade")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision|RoofFade")
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> RoofFadeMaterialInstances;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Roof Fade|Shadow Proxy")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision|RoofFade|ShadowProxy")
 	TArray<TObjectPtr<UStaticMeshComponent>> ShadowProxyMeshComponents;
 
-	UFUNCTION(BlueprintCallable, Category = "Roof Fade")
+	UFUNCTION(BlueprintCallable, Category = "LS/Vision|RoofFade")
 	void InitializeFadeMaterials();
 
 private:

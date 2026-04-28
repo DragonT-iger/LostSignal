@@ -31,12 +31,12 @@ public:
 	bool RequestAbilityByTag(FGameplayTag AbilityTag) const;
 
 private:
-	UPROPERTY(EditAnywhere, Category="Combat")
+	UPROPERTY(EditAnywhere, Category="LS/Combat")
 	FGameplayTag DefaultAttackAbilityTag;
 
-	UPROPERTY(EditAnywhere, Category="Combat", meta=(ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
 	float LeashDistance = 2000.0f;
 
-	UPROPERTY(EditAnywhere, Category="Combat", meta=(ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
 	float AlertMoveSpeedMultiplier = 1.2f;
 };

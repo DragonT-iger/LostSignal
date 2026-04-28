@@ -22,34 +22,34 @@ protected:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "XRay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|XRay")
 	TObjectPtr<UMaterialInterface> OverlayMaterial;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "XRay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|XRay")
 	bool bOnlyLocallyControlled = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "XRay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|XRay")
 	float DepthBias = 2.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "XRay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|XRay")
 	float XRayOpacity = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "XRay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|XRay")
 	FLinearColor XRayColor = FLinearColor(0.2f, 0.9f, 1.0f, 1.0f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "XRay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|XRay")
 	FName DepthBiasParamName = TEXT("DepthBias");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "XRay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|XRay")
 	FName XRayOpacityParamName = TEXT("XRayOpacity");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "XRay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|XRay")
 	FName XRayColorParamName = TEXT("XRayColor");
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "XRay")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision|XRay")
 	TObjectPtr<USkeletalMeshComponent> OverlayMeshComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "XRay")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision|XRay")
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> OverlayMaterialInstances;
 
 private:

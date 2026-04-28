@@ -15,10 +15,10 @@ class LOSTSIGNAL_API ALSVisionMaskRenderer : public AActor
 public:
 	ALSVisionMaskRenderer();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	TObjectPtr<UTextureRenderTarget2D> VisibilityMaskRenderTarget;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vision")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	FLSVisionPolygonData LastRenderedPolygon;
 
 	void RequestMaskUpdate(const FLSVisionPolygonData& PolygonData);

@@ -40,40 +40,40 @@ protected:
 		FActorComponentTickFunction* ThisTickFunction) override;
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Source")
 	ELSVisionOccluderSourceMode SourceMode = ELSVisionOccluderSourceMode::PrimitiveBounds;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Source")
 	bool bAutoFindOwnerComponents = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Source")
 	bool bRebuildOnTransformChanged = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::BoxComponent", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Source", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::BoxComponent", EditConditionHides))
 	TObjectPtr<UBoxComponent> SourceBoxComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Source", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::CollisionGeometry || SourceMode == ELSVisionOccluderSourceMode::PrimitiveBounds || SourceMode == ELSVisionOccluderSourceMode::MeshBounds", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Source", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::CollisionGeometry || SourceMode == ELSVisionOccluderSourceMode::PrimitiveBounds || SourceMode == ELSVisionOccluderSourceMode::MeshBounds", EditConditionHides))
 	TObjectPtr<UPrimitiveComponent> SourcePrimitiveComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Manual", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::ManualSegments", EditConditionHides))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Manual", meta = (EditCondition = "SourceMode == ELSVisionOccluderSourceMode::ManualSegments", EditConditionHides))
 	TArray<FLSVisionSegment2D> ManualSegments;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vision")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	TArray<FLSVisionSegment2D> Segments;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Debug")
 	bool bDrawDebugSegments = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Debug")
 	FColor DebugSegmentColor = FColor::Green;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Debug", meta = (ClampMin = "0.0"))
 	float DebugDrawZOffset = 10.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Debug", meta = (ClampMin = "0.0"))
 	float DebugDrawThickness = 2.0f;
 
-	UFUNCTION(BlueprintCallable, Category = "Vision")
+	UFUNCTION(BlueprintCallable, Category = "LS/Vision")
 	void RebuildSegments();
 
 	const TArray<FLSVisionSegment2D>& GetSegments() const

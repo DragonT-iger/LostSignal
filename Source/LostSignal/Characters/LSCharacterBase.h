@@ -46,6 +46,6 @@ protected:
 	 * 모든 캐릭터(플레이어·적)가 공유하는 AbilitySystemComponent.
 	 * Unity의 스탯/상태 컴포넌트에 해당하며, GAS의 핵심 허브 역할.
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="GAS")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/GAS")
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 };

@@ -14,16 +14,16 @@ struct FLSSTTask_RequestAbilityByTagInstanceData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, Category="Context")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	TObjectPtr<ALSEnemyCharacter> EnemyCharacter = nullptr;
 
-	UPROPERTY(EditAnywhere, Category="Context")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	TObjectPtr<ULSMonsterCombatComponent> CombatComponent = nullptr;
 
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	FGameplayTag AbilityTag;
 
-	UPROPERTY(EditAnywhere, Category="Task")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bFallbackToDefaultAttackTag = true;
 };
 

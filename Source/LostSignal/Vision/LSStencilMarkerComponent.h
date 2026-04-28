@@ -22,19 +22,19 @@ protected:
 	virtual void OnUnregister() override;
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stencil")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Stencil")
 	TArray<TObjectPtr<UPrimitiveComponent>> TargetPrimitives;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stencil")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Stencil")
 	bool bAutoFindOwnerMeshes = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stencil")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Stencil")
 	bool bEnableCustomDepth = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stencil", meta = (ClampMin = "0", ClampMax = "255"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Stencil", meta = (ClampMin = "0", ClampMax = "255"))
 	int32 StencilValue = 10;
 
-	UFUNCTION(BlueprintCallable, Category = "Stencil")
+	UFUNCTION(BlueprintCallable, Category = "LS/Vision|Stencil")
 	void ApplyStencilSettings();
 
 private:

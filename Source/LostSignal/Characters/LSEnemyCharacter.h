@@ -22,23 +22,23 @@ public:
 
 	virtual void BeginPlay() override;
 
-	UFUNCTION(BlueprintPure, Category="AI")
+	UFUNCTION(BlueprintPure, Category="LS/AI")
 	ULSMonsterSenseComponent* GetMonsterSenseComponent() const { return MonsterSenseComponent; }
 
-	UFUNCTION(BlueprintPure, Category="AI")
+	UFUNCTION(BlueprintPure, Category="LS/AI")
 	ULSMonsterCombatComponent* GetMonsterCombatComponent() const { return MonsterCombatComponent; }
 
 protected:
-	UPROPERTY(EditDefaultsOnly, Category="AI|DataTable")
+	UPROPERTY(EditDefaultsOnly, Category="LS/AI|DataTable")
 	TObjectPtr<UDataTable> MonsterArchetypeTable;
 
-	UPROPERTY(EditDefaultsOnly, Category="AI|DataTable")
+	UPROPERTY(EditDefaultsOnly, Category="LS/AI|DataTable")
 	FName MonsterRowName;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="AI")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/AI")
 	TObjectPtr<ULSMonsterSenseComponent> MonsterSenseComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="AI")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/AI")
 	TObjectPtr<ULSMonsterCombatComponent> MonsterCombatComponent;
 
 private:

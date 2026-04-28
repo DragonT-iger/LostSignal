@@ -45,11 +45,11 @@ protected:
 	virtual const FGameplayTagContainer* GetCooldownTags() const override;
 
 	/** 대쉬 속도 (cm/s). Duration과 무관하게 독립적으로 조정 */
-	UPROPERTY(EditDefaultsOnly, Category="Dash|Config")
+	UPROPERTY(EditDefaultsOnly, Category="LS/Dash|Config")
 	float DashSpeed = 2000.f;
 
 	/** 대쉬 지속 시간 (초). 무적 유지 시간과 동일 */
-	UPROPERTY(EditDefaultsOnly, Category="Dash|Config")
+	UPROPERTY(EditDefaultsOnly, Category="LS/Dash|Config")
 	float DashDuration = 0.3f;
 
 	/**
@@ -60,7 +60,7 @@ protected:
 	 *   - Duration Policy: Infinite
 	 *   - Granted Tags: LS.State.Invincible, LS.State.Dodging
 	 */
-	UPROPERTY(EditDefaultsOnly, Category="Dash|Effects")
+	UPROPERTY(EditDefaultsOnly, Category="LS/Dash|Effects")
 	TSubclassOf<UGameplayEffect> InvincibilityEffectClass;
 
 	TSubclassOf<UAttributeSet> CharacterAttributeClass;

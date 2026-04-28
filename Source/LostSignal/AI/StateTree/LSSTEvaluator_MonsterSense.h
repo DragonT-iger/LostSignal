@@ -15,43 +15,43 @@ struct FLSSTEvaluator_MonsterSenseInstanceData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, Category="Context")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	TObjectPtr<AAIController> AIController = nullptr;
 
-	UPROPERTY(EditAnywhere, Category="Context")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	TObjectPtr<ALSEnemyCharacter> EnemyCharacter = nullptr;
 
-	UPROPERTY(Transient, VisibleAnywhere, Category = "Internal")
+	UPROPERTY(Transient, VisibleAnywhere, Category = "LS/AI")
 	TObjectPtr<ULSMonsterSenseComponent> SenseComponent = nullptr;
 
-	UPROPERTY(Transient, VisibleAnywhere, Category = "Internal")
+	UPROPERTY(Transient, VisibleAnywhere, Category = "LS/AI")
 	TObjectPtr<ULSMonsterCombatComponent> CombatComponent = nullptr;
 
-	UPROPERTY(EditAnywhere, Category="Output")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	TObjectPtr<AActor> CurrentTarget = nullptr;
 
-	UPROPERTY(EditAnywhere, Category="Output")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	FVector InterestLocation = FVector::ZeroVector;
 
-	UPROPERTY(EditAnywhere, Category="Output")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	FVector HomeLocation = FVector::ZeroVector;
 
-	UPROPERTY(EditAnywhere, Category="Output")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	float DistanceToTarget = 0.0f;
 
-	UPROPERTY(EditAnywhere, Category="Output")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	float LeashDistance = 0.0f;
 
-	UPROPERTY(EditAnywhere, Category="Output")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	float AlertDuration = 0.0f;
 
-	UPROPERTY(EditAnywhere, Category="Output")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	float AlertMoveSpeedMultiplier = 1.0f;
 
-	UPROPERTY(EditAnywhere, Category="Output")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bHasVisualTarget = false;
 
-	UPROPERTY(EditAnywhere, Category="Output")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bHasInterestLocation = false;
 };
 

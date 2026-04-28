@@ -21,13 +21,13 @@ public:
 
 	void TryStartStateTreeLogic();
 
-	UFUNCTION(BlueprintPure, Category="AI|StateTree")
+	UFUNCTION(BlueprintPure, Category="LS/AI|StateTree")
 	UStateTreeAIComponent* GetStateTreeAIComponent() const { return StateTreeComponent; }
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="AI|StateTree")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/AI|StateTree")
 	TObjectPtr<UStateTreeAIComponent> StateTreeComponent;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|StateTree", meta=(RequiredAssetDataTags="Schema=/Script/GameplayStateTreeModule.StateTreeAIComponentSchema"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/AI|StateTree", meta=(RequiredAssetDataTags="Schema=/Script/GameplayStateTreeModule.StateTreeAIComponentSchema"))
 	TObjectPtr<UStateTree> DefaultStateTree;
 };

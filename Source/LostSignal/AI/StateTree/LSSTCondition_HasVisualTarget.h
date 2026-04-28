@@ -10,10 +10,10 @@ struct FLSSTCondition_HasVisualTargetInstanceData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bHasVisualTarget = false;
 
-	UPROPERTY(EditAnywhere, Category="Condition")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bInvert = false;
 };
 

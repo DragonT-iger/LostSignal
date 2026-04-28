@@ -19,18 +19,18 @@ public:
 	ALSVisionTargetActor();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> SceneRoot;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> VisualMesh;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UBoxComponent> OccluderBox;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vision", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<ULSVisionOccluderComponent> VisionOccluderComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vision", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<ULSVisionSurfaceComponent> VisionSurfaceComponent;
 };

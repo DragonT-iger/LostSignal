@@ -28,31 +28,31 @@ public:
 		ELevelTick TickType,
 		FActorComponentTickFunction* ThisTickFunction) override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Vision|MPC")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|MPC")
 	TObjectPtr<UMaterialParameterCollection> VisionParameterCollection;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|MPC")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|MPC")
 	FName CenterParameterName = TEXT("LS_Vision_CenterWS");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|MPC")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|MPC")
 	FName RadiusParameterName = TEXT("LS_Vision_Radius");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|MPC")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|MPC")
 	FName FeatherParameterName = TEXT("LS_Vision_Feather");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|MPC")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|MPC")
 	FName EnabledParameterName = TEXT("LS_Vision_Enabled");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|MPC", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|MPC", meta = (ClampMin = "0.0"))
 	float Radius = 300.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|MPC", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|MPC", meta = (ClampMin = "0.0"))
 	float FeatherWidth = 64.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|MPC")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|MPC")
 	FVector WorldOffset = FVector::ZeroVector;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|MPC")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|MPC")
 	bool bOnlyLocallyControlled = true;
 
 private:

@@ -28,6 +28,7 @@
 ## 코드 규칙
 
 - **네이밍:** `A`=Actor, `U`=UObject, `I`=Interface, `F`=Struct, `E`=Enum. UPROPERTY `Category` 필수.
+- **Category:** 모든 UPROPERTY의 Category는 반드시 `"LS/"` 하위로. 예: `Category="LS/Combat"`, `Category="LS/Stats"`. 루트 `"LS/"` 그대로 써도 됨.
 - **입력:** Enhanced Input System 전용 (Legacy 금지). `IA_Move/Attack/Dodge/Interact/Skill1~3`, `IMC_Default`
 - **네트워크:** 싱글에서도 `if (!HasAuthority()) return;` 습관화 (멀티 전환 대비)
 - **UI:** `FText`/`LOCTEXT` 필수 (`FString` 금지). 모든 위젯 C++ 상속 `UUserWidget` → `WBP_*`

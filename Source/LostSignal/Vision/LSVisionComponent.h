@@ -27,55 +27,55 @@ protected:
 	void DrawDebugVisionRays() const;
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	bool bEnableVision = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	float VisionRadius = 150.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	float HalfFOVDegrees = 45.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	float MaxRayDistance = 2500.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision", meta = (ClampMin = "0.01"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision", meta = (ClampMin = "0.01"))
 	float UpdateInterval = 0.016f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision", meta = (ClampMin = "0.01"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision", meta = (ClampMin = "0.01"))
 	float DivideAngleDegree = 0.5f;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vision")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	FLSVisionPolygonData CurrentPolygon;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Debug")
 	bool bDrawDebugRays = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Debug")
 	FColor DebugRayColor = FColor::Yellow;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Debug", meta = (ClampMin = "0.0"))
 	float DebugRayDuration = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Debug", meta = (ClampMin = "0.0"))
 	float DebugRayThickness = 1.5f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision|Debug")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|Debug")
 	float DebugRayZOffset = 8.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	TObjectPtr<UMaterialInterface> PostProcessMaterial;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FName VisibilityMaskTextureParamName = TEXT("VisibilityMaskRT");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FName MaskOriginParamName = TEXT("MaskOriginWS");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FName MaskExtentParamName = TEXT("MaskExtent");
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FName EnableParamName = TEXT("VisionEnable");
 
 private:

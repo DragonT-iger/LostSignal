@@ -12,13 +12,13 @@ struct FLSSTTask_SetFocusTargetInstanceData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, Category="Context")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	TObjectPtr<AAIController> AIController = nullptr;
 
-	UPROPERTY(EditAnywhere, Category="Input")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	TObjectPtr<AActor> TargetActor = nullptr;
 
-	UPROPERTY(EditAnywhere, Category="Task")
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bClearFocusOnExit = true;
 };
 

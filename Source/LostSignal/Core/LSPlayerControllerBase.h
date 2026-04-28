@@ -21,7 +21,7 @@ class ALSPlayerControllerBase : public APlayerController
 protected:
 
 	/** 게임플레이에 사용할 Input Mapping Context 목록. 우선순위 0으로 일괄 등록됨. */
-	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
+	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TArray<TObjectPtr<UInputMappingContext>> DefaultMappingContexts;
 
 protected:

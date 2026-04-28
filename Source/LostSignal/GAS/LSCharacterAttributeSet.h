@@ -22,62 +22,62 @@ class LOSTSIGNAL_API ULSCharacterAttributeSet : public UAttributeSet
 
 public:
 	// 공격력
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData Attack;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Attack)
 
 	// 공격속도
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData AttackSpeed;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, AttackSpeed)
 
 	// 가속력(스킬 쿨타임 관련)
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData CooldownReduction;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CooldownReduction)
 
 	// 치명타 확률
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData CritChance;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CritChance)
 
 	// 치명타 배율
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData CritDamage;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CritDamage)
 
 	// 방관통
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData ArmorPenetration;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, ArmorPenetration)
 
 	// 최대 체력
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData MaxHealth;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, MaxHealth)
 
 	// 방어
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData Defence;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Defence)
 
 	// 자연회복량
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData Recovery;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Recovery)
 
 	// 최대 스태미나
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData MaxStamina;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, MaxStamina)
 
 	// 이동속도
-	UPROPERTY(BlueprintReadOnly, Category="Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData MoveSpeed;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, MoveSpeed)
 
 	// 대쉬속도
-	UPROPERTY(BlueprintReadOnly, Category = "Stats")
+	UPROPERTY(BlueprintReadOnly, Category = "LS/Stats")
 	FGameplayAttributeData DashSpeed;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DashSpeed)
 };

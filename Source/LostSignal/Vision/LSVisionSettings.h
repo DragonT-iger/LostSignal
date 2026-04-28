@@ -16,18 +16,18 @@ class LOSTSIGNAL_API ULSVisionSettings : public UDeveloperSettings
 public:
 	virtual FName GetCategoryName() const override;
 
-	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Vision")
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	TSoftClassPtr<ALSVisionMaskRenderer> MaskRendererClass;
 
-	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Vision")
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	TSoftObjectPtr<UTextureRenderTarget2D> VisibilityMaskRenderTarget;
 
-	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Vision|Roof Fade")
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|RoofFade")
 	TSoftObjectPtr<UMaterialInterface> DefaultShadowProxyMaterial;
 
-	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Vision", meta = (ClampMin = "128", ClampMax = "4096"))
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision", meta = (ClampMin = "128", ClampMax = "4096"))
 	int32 FallbackRenderTargetSize = 1024;
 
-	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "Vision|Optimization", meta = (ClampMin = "100.0"))
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Optimization", meta = (ClampMin = "100.0"))
 	float SpatialGridCellSize = 800.0f;
 };

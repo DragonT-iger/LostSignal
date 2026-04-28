@@ -10,10 +10,10 @@ struct LOSTSIGNAL_API FLSVisionSegment2D
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FVector2D Start = FVector2D::ZeroVector;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FVector2D End = FVector2D::ZeroVector;
 };
 
@@ -22,13 +22,13 @@ struct LOSTSIGNAL_API FLSVisionRayHit
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FVector2D HitPoint = FVector2D::ZeroVector;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	float Distance = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	bool bHit = false;
 };
 
@@ -37,16 +37,16 @@ struct LOSTSIGNAL_API FLSVisionPolygonData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	float VisionRadius = 100.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	float Extent = 2500.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FVector2D Origin = FVector2D::ZeroVector;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vision")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	TArray<FVector2D> Points;
 
 	// Stores the exact ray hit points used while solving visibility so debug drawing can show
