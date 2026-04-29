@@ -9,6 +9,7 @@
 
 void FLSSTEvaluator_MonsterSense::TreeStart(FStateTreeExecutionContext& Context) const
 {
+	UE_LOG(LogLS, Warning, TEXT("Tree Start"));
 	UpdateData(Context);
 }
 
