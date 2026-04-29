@@ -167,10 +167,10 @@ void ULSMonsterSenseComponent::UpdateSensing(float DeltaTime)
 		LastSeenTime = GetWorld()->GetTimeSeconds();
 		Suspicion = 100.0f;
 
-		UE_LOG(LogLS, Warning, TEXT("Sense Hit: Owner=%s Target=%s HasVisual=%d"),
+		/*UE_LOG(LogLS, Warning, TEXT("Sense Hit: Owner=%s Target=%s HasVisual=%d"),
 			*GetNameSafe(GetOwner()),
 			*GetNameSafe(CurrentTarget.Get()),
-			HasVisualTarget());
+			HasVisualTarget());*/
 
 		return;
 	}

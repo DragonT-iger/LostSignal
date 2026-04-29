@@ -56,6 +56,11 @@ public:
 	FGameplayAttributeData MaxHealth;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, MaxHealth)
 
+	// 최대 체력
+	UPROPERTY(BlueprintReadOnly, Category = "LS/Stats")
+	FGameplayAttributeData CurrentHealth;
+	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CurrentHealth)
+
 	// 방어
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData Defence;

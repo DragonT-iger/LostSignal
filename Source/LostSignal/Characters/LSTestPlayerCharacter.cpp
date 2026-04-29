@@ -80,6 +80,7 @@ void ALSTestPlayerCharacter::ApplyStatsToAttributeSet()
 	CharacterAttributeSet->InitCritDamage(BaseCritDamage);
 	CharacterAttributeSet->InitArmorPenetration(BaseArmorPenetration);
 	CharacterAttributeSet->InitMaxHealth(BaseHealth);
+	CharacterAttributeSet->InitCurrentHealth(BaseHealth);
 	CharacterAttributeSet->InitDefence(BaseDefence);
 	CharacterAttributeSet->InitRecovery(BaseRecovery);
 	CharacterAttributeSet->InitMaxStamina(BaseStamina);
