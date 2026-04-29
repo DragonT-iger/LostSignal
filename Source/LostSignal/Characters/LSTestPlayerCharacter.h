@@ -46,7 +46,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category="LS/Stats|Default Values", DisplayName="공격속도")
 	float BaseAttackSpeed = 1.0f;
 
-	UPROPERTY(EditAnywhere, Category="LS/Stats|Default Values", DisplayName="가속력(쿨타임)")
+	UPROPERTY(EditAnywhere, Category="LS/Stats|Default Values", DisplayName="스킬가속")
 	float BaseCooldownReduction = 0.0f;
 
 	UPROPERTY(EditAnywhere, Category="LS/Stats|Default Values", DisplayName="치명타 확률")

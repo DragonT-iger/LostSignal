@@ -31,7 +31,7 @@ public:
 	FGameplayAttributeData AttackSpeed;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, AttackSpeed)
 
-	// 가속력(스킬 쿨타임 관련)
+	// 스킬가속(스킬 쿨타임 관련)
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData CooldownReduction;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CooldownReduction)
@@ -77,7 +77,17 @@ public:
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, MoveSpeed)
 
 	// 대쉬속도
-	UPROPERTY(BlueprintReadOnly, Category = "LS/Stats")
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData DashSpeed;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DashSpeed)
+
+	// 대쉬 지속시간 (초)
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
+	FGameplayAttributeData DashDuration;
+	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DashDuration)
+
+	// 대쉬 쿨타임 (초)
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
+	FGameplayAttributeData DashCooldown;
+	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DashCooldown)
 };

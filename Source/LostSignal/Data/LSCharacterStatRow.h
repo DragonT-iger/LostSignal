@@ -14,12 +14,12 @@ struct LOSTSIGNAL_API FLSCharacterStatRow : public FTableRowBase
 	FText Char_Name;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="공격력")
-	int32 Char_Attack = 0;
+	float Char_Attack = 100.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="공격속도")
 	float Char_Atkspead = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="가속력(쿨타임)")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="스킬가속")
 	float Char_Cal = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="치명타 확률")
@@ -32,20 +32,26 @@ struct LOSTSIGNAL_API FLSCharacterStatRow : public FTableRowBase
 	float Char_ArmorPen = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="체력")
-	int32 Char_Health = 100;
+	float Char_Health = 100.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="방어")
-	int32 Char_Defence = 0;
+	float Char_Defence = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="회복력")
-	int32 Char_Recovery = 0;
+	float Char_Recovery = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="스태미나")
-	int32 Char_Stamina = 100;
+	float Char_Stamina = 100.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="이동속도")
 	float Char_Speed = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "LS/Stats", DisplayName = "대쉬속도")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="대쉬속도")
 	float Char_DashSpeed = 1500.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="대쉬 지속시간(초)")
+	float Char_DashDuration = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="대쉬 쿨타임(초)")
+	float Char_DashCooldown = 1.0f;
 };
