@@ -32,6 +32,7 @@ void ULSGA_MonsterMelee::ActivateAbility(
 	ALSEnemyCharacter* EnemyCharacter = Cast<ALSEnemyCharacter>(GetAvatarActorFromActorInfo());
 	if (!EnemyCharacter)
 	{
+		UE_LOG(LogLS, Warning, TEXT("MonsterMelee ActivateAbility failed: avatar is not ALSEnemyCharacter."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -48,6 +49,7 @@ void ULSGA_MonsterMelee::ActivateAbility(
 
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s MonsterMelee CommitAbility failed."), *GetNameSafe(EnemyCharacter));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -55,6 +57,7 @@ void ULSGA_MonsterMelee::ActivateAbility(
 	UAnimInstance* AnimInstance = EnemyCharacter->GetMesh() ? EnemyCharacter->GetMesh()->GetAnimInstance() : nullptr;
 	if (!AnimInstance)
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s MonsterMelee has no AnimInstance."), *GetNameSafe(EnemyCharacter));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -62,6 +65,7 @@ void ULSGA_MonsterMelee::ActivateAbility(
 	const float PlayedDuration = AnimInstance->Montage_Play(ActiveAttackMontage);
 	if (PlayedDuration <= 0.0f)
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s MonsterMelee failed to play montage %s."), *GetNameSafe(EnemyCharacter), *GetNameSafe(ActiveAttackMontage));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -80,6 +84,16 @@ void ULSGA_MonsterMelee::EndAbility(
 	bool bReplicateEndAbility,
 	bool bWasCancelled)
 {
+	UE_LOG(
+		LogLS,
+		Log,
+		TEXT("%s EndAbility called. Cancelled=%d ReplicateEnd=%d Montage=%s"),
+		*GetNameSafe(GetAvatarActorFromActorInfo()),
+		bWasCancelled,
+		bReplicateEndAbility,
+		*GetNameSafe(ActiveAttackMontage)
+	);
+
 	if (ALSEnemyCharacter* EnemyCharacter = Cast<ALSEnemyCharacter>(GetAvatarActorFromActorInfo()))
 	{
 		if (UAnimInstance* AnimInstance = EnemyCharacter->GetMesh() ? EnemyCharacter->GetMesh()->GetAnimInstance() : nullptr)
@@ -98,6 +112,15 @@ void ULSGA_MonsterMelee::EndAbility(
 
 void ULSGA_MonsterMelee::HandleAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
+	UE_LOG(
+		LogLS,
+		Log,
+		TEXT("%s melee montage ended. Interrupted=%d Montage=%s"),
+		*GetNameSafe(GetAvatarActorFromActorInfo()),
+		bInterrupted,
+		*GetNameSafe(Montage)
+	);
+
 	if (IsActive())
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, bInterrupted);

@@ -8,6 +8,7 @@
 #include "Data/LSMonsterArchetypeRow.h"
 #include "Engine/DataTable.h"
 #include "GAS/Abilities/LSGA_MonsterMelee.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "LostSignal.h"
 
 ALSEnemyCharacter::ALSEnemyCharacter()
@@ -15,6 +16,11 @@ ALSEnemyCharacter::ALSEnemyCharacter()
 	AIControllerClass = ALSAIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 	DefaultAttackAbilityClass = ULSGA_MonsterMelee::StaticClass();
+
+	// Player uses its own facing logic, but AI should rotate from controller focus while chasing targets.
+	// bUseControllerDesiredRotation is the CharacterMovement-side switch that turns SetFocus() yaw into body rotation.
+	GetCharacterMovement()->bUseControllerDesiredRotation = true;
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
 
 	MonsterSenseComponent = CreateDefaultSubobject<ULSMonsterSenseComponent>(TEXT("MonsterSenseComponent"));
 	MonsterCombatComponent = CreateDefaultSubobject<ULSMonsterCombatComponent>(TEXT("MonsterCombatComponent"));
