@@ -129,6 +129,7 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	{
 		PostProcessMID->SetScalarParameterValue(EnableParamName, bEnableVision ? 1.0f : 0.0f);
 		PostProcessMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, 0.0f, 0.0f));
+		//MaskExtent -> RenderTarget을 World좌표범위로 치환한 값. ex)extent = 2500 -> uv 0 ~ 1 = world -2500 ~ 2500 크기, 원점은 플레이어 기준
 		PostProcessMID->SetScalarParameterValue(MaskExtentParamName, CurrentPolygon.Extent);
 
 		if (UTextureRenderTarget2D* VisibilityMaskRT = VisionSubsystem->GetVisibilityMaskRenderTarget())

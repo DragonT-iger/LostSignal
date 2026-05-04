@@ -56,7 +56,7 @@ void ALSVisionMaskRenderer::RequestMaskUpdate(const FLSVisionPolygonData& Polygo
 			Inputs.OutputTexture = OutputTexture;
 			Inputs.VisionOrigin = FVector2f::ZeroVector;
 			Inputs.VisionRadius = VisionRadius;
-			Inputs.FeatherWidth = 30.0f;
+			Inputs.FeatherWidth = 70.0f;
 			Inputs.WorldMin = FVector2f(-Extent, -Extent);
 			Inputs.WorldMax = FVector2f(Extent, Extent);
 			Inputs.VisibleColor = FLinearColor::White;
