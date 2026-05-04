@@ -43,6 +43,10 @@ private:
 	void CacheGroupTable();
 	FString FindItemName(const FString& ItemRowName) const;
 
+#if WITH_EDITOR
+	void ValidateGroupReferences();
+#endif
+
 	UPROPERTY()
 	TObjectPtr<UDataTable> RootingObjectTable;
 	UPROPERTY()

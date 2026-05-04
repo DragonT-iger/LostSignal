@@ -46,6 +46,10 @@ void ULSDropSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	CacheDropTable();
 	CacheGroupTable();
 
+#if WITH_EDITOR
+	ValidateGroupReferences();
+#endif
+
 	UE_LOG(LogLS, Log, TEXT("DropSubsystem 초기화 완료 - DropTable %d그룹, GroupTable %d그룹"),
 		DropTableMap.Num(), GroupTableMap.Num());
 }
@@ -94,6 +98,27 @@ void ULSDropSubsystem::CacheGroupTable()
 		GroupTableMap.FindOrAdd(GroupID).Add(Row);
 	}
 }
+
+#if WITH_EDITOR
+void ULSDropSubsystem::ValidateGroupReferences()
+{
+	for (const auto& DropGroup : DropTableMap)
+	{
+		for (const FLSDropTableRow* Entry : DropGroup.Value)
+		{
+			if (!Entry->Item_Table_ID.StartsWith(TEXT("G_")))
+				continue;
+
+			const int32 GroupID = ParseGroupIDFromReference(Entry->Item_Table_ID);
+			if (!GroupTableMap.Contains(GroupID))
+			{
+				UE_LOG(LogLS, Warning, TEXT("[데이터검증] DropTable %d 항목 '%s' → GroupTable %d 없음"),
+					DropGroup.Key, *Entry->Item_Table_ID, GroupID);
+			}
+		}
+	}
+}
+#endif
 
 TArray<FLSDropResult> ULSDropSubsystem::RollDropTable(int32 DropTableID)
 {
