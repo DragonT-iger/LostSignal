@@ -18,6 +18,11 @@
 			"Name": "LostSignalEditorAddComponentTool",
 			"Type": "Editor",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "LostSignalEditorDataTools",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [

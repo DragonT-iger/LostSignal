@@ -20,7 +20,24 @@ static int32 ParseGroupIDFromRowName(const FName& RowName)
 	{
 		return FCString::Atoi(*Parts[1]);
 	}
+
+	UE_LOG(LogLS, Warning, TEXT("Invalid group reference: %s"), *RowName);
+
 	return 0;
+}
+
+static int32 ParseGroupIDFromReference(const FString& Reference)
+{
+	TArray<FString> Parts;
+	Reference.ParseIntoArray(Parts, TEXT("_"));
+	if (Parts.Num() >= 2 && Parts[0].Equals(TEXT("G"), ESearchCase::IgnoreCase))
+	{
+		return FCString::Atoi(*Parts[1]);
+	}
+
+	UE_LOG(LogLS, Warning, TEXT("Invalid group reference: %s"), *Reference);
+
+	return FCString::Atoi(*Reference);
 }
 
 void ULSDropSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -101,9 +118,15 @@ TArray<FLSDropResult> ULSDropSubsystem::RollDropTable(int32 DropTableID)
 			continue;
 		}
 
-		if (Entry->Drop_Table_Type == 1)
+		if (Entry->Item_Table_ID.IsEmpty())
 		{
-			const int32 GroupID = FCString::Atoi(*Entry->Item_Table_ID);
+			UE_LOG(LogDrop, Warning, TEXT("    Empty Item_Table_ID in DropTable %d"), DropTableID);
+			continue;
+		}
+
+		if (Entry->Item_Table_ID.StartsWith(TEXT("G_")) || Entry->Drop_Table_Type == 1)
+		{
+			const int32 GroupID = ParseGroupIDFromReference(Entry->Item_Table_ID);
 			const FString ItemRowName = RollGroupTable(GroupID);
 			if (!ItemRowName.IsEmpty())
 			{

@@ -43,13 +43,20 @@ private:
 	void CacheGroupTable();
 	FString FindItemName(const FString& ItemRowName) const;
 
-	UPROPERTY() TObjectPtr<UDataTable> RootingObjectTable;
-	UPROPERTY() TObjectPtr<UDataTable> DropTableData;
-	UPROPERTY() TObjectPtr<UDataTable> GroupTableData;
-	UPROPERTY() TObjectPtr<UDataTable> ChipTable;
-	UPROPERTY() TObjectPtr<UDataTable> WeaponTable;
-	UPROPERTY() TObjectPtr<UDataTable> ArmorTable;
-	UPROPERTY() TObjectPtr<UDataTable> ItemTable;
+	UPROPERTY()
+	TObjectPtr<UDataTable> RootingObjectTable;
+	UPROPERTY()
+	TObjectPtr<UDataTable> DropTableData;
+	UPROPERTY()
+	TObjectPtr<UDataTable> GroupTableData;
+	UPROPERTY()
+	TObjectPtr<UDataTable> ChipTable;
+	UPROPERTY()
+	TObjectPtr<UDataTable> WeaponTable;
+	UPROPERTY()
+	TObjectPtr<UDataTable> ArmorTable;
+	UPROPERTY()
+	TObjectPtr<UDataTable> ItemTable;
 
 	TMap<int32, TArray<const FLSDropTableRow*>> DropTableMap;
 	TMap<int32, TArray<const FLSGroupTableRow*>> GroupTableMap;
