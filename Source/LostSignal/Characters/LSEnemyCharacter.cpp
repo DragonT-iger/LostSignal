@@ -7,15 +7,30 @@
 #include "AI/LSMonsterSenseComponent.h"
 #include "Data/LSMonsterArchetypeRow.h"
 #include "Engine/DataTable.h"
+#include "GAS/Abilities/LSGA_MonsterMelee.h"
 #include "LostSignal.h"
 
 ALSEnemyCharacter::ALSEnemyCharacter()
 {
 	AIControllerClass = ALSAIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+	DefaultAttackAbilityClass = ULSGA_MonsterMelee::StaticClass();
 
 	MonsterSenseComponent = CreateDefaultSubobject<ULSMonsterSenseComponent>(TEXT("MonsterSenseComponent"));
 	MonsterCombatComponent = CreateDefaultSubobject<ULSMonsterCombatComponent>(TEXT("MonsterCombatComponent"));
+}
+
+UAnimMontage* ALSEnemyCharacter::GetAbilityMontage(FGameplayTag AbilityTag) const
+{
+	for (const FLSMonsterAbilityMontageEntry& Entry : AbilityMontages)
+	{
+		if (Entry.AbilityTag == AbilityTag)
+		{
+			return Entry.Montage;
+		}
+	}
+
+	return nullptr;
 }
 
 void ALSEnemyCharacter::BeginPlay()
@@ -26,6 +41,12 @@ void ALSEnemyCharacter::BeginPlay()
 
 	if (HasAuthority())
 	{
+		if (DefaultAttackAbilityClass)
+		{
+			// StateTree can only request abilities that already exist on the monster ASC.
+			GrantAbility(DefaultAttackAbilityClass);
+		}
+
 		if (ALSAIController* LSAIController = Cast<ALSAIController>(GetController()))
 		{
 			LSAIController->TryStartStateTreeLogic();
