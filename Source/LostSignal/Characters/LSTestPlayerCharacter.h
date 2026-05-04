@@ -76,6 +76,12 @@ protected:
 	UPROPERTY(EditAnywhere, Category="LS/Stats|Default Values", DisplayName="대쉬속도")
 	float BaseDashSpeed = 1200.0f;
 
+	UPROPERTY(EditAnywhere, Category="LS/Stats|Default Values", DisplayName="대쉬 지속시간")
+	float BaseDashDuration = 0.3f;
+
+	UPROPERTY(EditAnywhere, Category="LS/Stats|Default Values", DisplayName="대쉬 쿨타임")
+	float BaseDashCooldown = 1.0f;
+
 private:
 	UPROPERTY(VisibleAnywhere, Category="LS/GAS")
 	TObjectPtr<ULSCharacterAttributeSet> CharacterAttributeSet;

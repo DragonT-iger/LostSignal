@@ -61,6 +61,8 @@ void ALSTestPlayerCharacter::LoadStatsFromDataTable()
 	BaseStamina          = Row->Char_Stamina;
 	BaseMoveSpeed        = Row->Char_Speed;
 	BaseDashSpeed        = Row->Char_DashSpeed;
+	BaseDashDuration     = Row->Char_DashDuration;
+	BaseDashCooldown     = Row->Char_DashCooldown;
 }
 
 void ALSTestPlayerCharacter::ApplyStatsToAttributeSet()
@@ -86,4 +88,6 @@ void ALSTestPlayerCharacter::ApplyStatsToAttributeSet()
 	CharacterAttributeSet->InitMaxStamina(BaseStamina);
 	CharacterAttributeSet->InitMoveSpeed(BaseMoveSpeed);
 	CharacterAttributeSet->InitDashSpeed(BaseDashSpeed);
+	CharacterAttributeSet->InitDashDuration(BaseDashDuration);
+	CharacterAttributeSet->InitDashCooldown(BaseDashCooldown);
 }
