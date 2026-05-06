@@ -2,6 +2,15 @@
 set RD=rmdir
 echo Cleaning UE generated folders...
 
+if exist ".vs" (
+    %RD% /s /q ".vs"
+    if errorlevel 1 (
+        echo [ERROR] Failed to delete .vs - Close Visual Studio, then try again.
+        pause
+        exit /b 1
+    )
+    echo Deleted: .vs
+)
 if exist "Intermediate" (
     %RD% /s /q "Intermediate"
     if errorlevel 1 (

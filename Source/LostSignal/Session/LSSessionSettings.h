@@ -14,5 +14,8 @@ public:
 	TSoftObjectPtr<UWorld> LobbyLevel;
 
 	UPROPERTY(config, EditAnywhere, Category="Levels")
+	TSoftObjectPtr<UWorld> FarmingLevel;
+
+	UPROPERTY(config, EditAnywhere, Category="Levels")
 	TSoftObjectPtr<UWorld> ResultLevel;
 };
