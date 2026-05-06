@@ -6,6 +6,8 @@
 #include "LSInteractableObject.generated.h"
 
 class USphereComponent;
+class UWidgetComponent;
+class ULSInteractHintWidget;
 
 UCLASS(Abstract, BlueprintType)
 class LOSTSIGNAL_API ALSInteractableObject : public AActor, public ILSInteractable
@@ -15,15 +17,32 @@ class LOSTSIGNAL_API ALSInteractableObject : public AActor, public ILSInteractab
 public:
 	ALSInteractableObject();
 
+	virtual void BeginPlay() override;
+
 	virtual bool CanInteract_Implementation(APawn* Interactor) override;
 	virtual void Interact_Implementation(APawn* Interactor) override;
 	virtual FText GetInteractText_Implementation() override;
 
+	// 현재 범위 내 로컬 폰 기준으로 위젯 표시 여부를 갱신
+	void RefreshWidgetVisibility();
+
 protected:
-	// 에디터에서 상호작용 범위를 시각적으로 확인하기 위한 구체
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Interact")
 	TObjectPtr<USphereComponent> InteractionSphere;
 
+	// 상호작용 힌트 UI (블루프린트에서 WidgetClass 설정)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Interact")
+	TObjectPtr<UWidgetComponent> InteractWidget;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact")
 	FText InteractText;
+
+private:
+	UFUNCTION()
+	void OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnSphereEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 };

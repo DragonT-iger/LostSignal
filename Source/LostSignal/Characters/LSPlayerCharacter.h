@@ -39,6 +39,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/GAS")
 	ULSCharacterAttributeSet* GetPlayerAttributeSet() const { return PlayerAttributeSet; }
 
+	UFUNCTION(BlueprintPure, Category="LS/Input")
+	UInputAction* GetInteractAction() const { return InteractAction; }
+
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
@@ -102,7 +105,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TObjectPtr<UInputAction> Item6Action;
 
-	UPROPERTY(EditAnywhere, Category="LS/Input")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Input")
 	TObjectPtr<UInputAction> InteractAction;
 
 	UPROPERTY(EditAnywhere, Category="LS/Input")
