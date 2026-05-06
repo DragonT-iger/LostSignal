@@ -9,6 +9,8 @@
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "EngineUtils.h"
+#include "Gameplay/LSInteractable.h"
 #include "InputActionValue.h"
 #include "LostSignal.h"
 #include "Vision/LSMPCVisionSourceComponent.h"
@@ -158,7 +160,52 @@ void ALSPlayerCharacter::OnItem3() {}
 void ALSPlayerCharacter::OnItem4() {}
 void ALSPlayerCharacter::OnItem5() {}
 void ALSPlayerCharacter::OnItem6() {}
-void ALSPlayerCharacter::OnInteract() {}
+void ALSPlayerCharacter::OnInteract()
+{
+	if (!IsLocallyControlled()) return;
+
+	const FVector MyLocation = GetActorLocation();
+	const FVector ForwardDir = GetActorForwardVector();
+
+	AActor* BestTarget = nullptr;
+	float BestDistSq = FLT_MAX;
+
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		AActor* Actor = *It;
+		if (!Actor || Actor == this || !Actor->Implements<ULSInteractable>()) continue;
+
+		const FVector ToActor = Actor->GetActorLocation() - MyLocation;
+		const float DistSq = ToActor.SizeSquared();
+		if (DistSq > FMath::Square(MaxInteractRange)) continue;
+
+		const float Dot = FVector::DotProduct(ForwardDir, ToActor.GetSafeNormal());
+		if (Dot < InteractFacingThreshold) continue;
+
+		if (DistSq < BestDistSq)
+		{
+			BestDistSq = DistSq;
+			BestTarget = Actor;
+		}
+	}
+
+	if (BestTarget)
+	{
+		ServerRequestInteract(BestTarget);
+	}
+}
+
+void ALSPlayerCharacter::ServerRequestInteract_Implementation(AActor* Target)
+{
+	if (!Target || !Target->Implements<ULSInteractable>()) return;
+
+	const float Dist = FVector::Dist(GetActorLocation(), Target->GetActorLocation());
+	if (Dist > MaxInteractRange * 1.5f) return;
+
+	if (!ILSInteractable::Execute_CanInteract(Target, this)) return;
+
+	ILSInteractable::Execute_Interact(Target, this);
+}
 
 void ALSPlayerCharacter::OnRunStart()
 {

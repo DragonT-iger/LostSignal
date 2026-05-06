@@ -108,6 +108,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TObjectPtr<UInputAction> RunAction;
 
+	// 상호작용 감지 최대 거리 (cm)
+	UPROPERTY(EditAnywhere, Category="LS/Interact", meta=(ClampMin="50.0"))
+	float MaxInteractRange = 250.0f;
+
+	// 플레이어 정면과 오브젝트 방향의 내적 최소값 (0=90도, 0.5=60도, -1=뒤)
+	UPROPERTY(EditAnywhere, Category="LS/Interact", meta=(ClampMin="-1.0", ClampMax="1.0"))
+	float InteractFacingThreshold = 0.3f;
+
 	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
 	float WalkSpeed = 300.0f;
 
@@ -180,6 +188,9 @@ private:
 
 	UFUNCTION(Server, Unreliable)
 	void ServerSyncFacingRotation(float NewYaw);
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestInteract(AActor* Target);
 
 	FVector GetDashDirection() const;
 };
