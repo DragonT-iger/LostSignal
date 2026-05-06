@@ -9,9 +9,15 @@ struct LOSTSIGNAL_API FLSArmorRow : public FTableRowBase
 {
 	GENERATED_BODY()
 
+	// 아이템 이름 출력용 텍스트
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
-	FString Item_Name;
+	FText Item_Text;
 
+	// 아이콘 에셋 경로
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
+	FString Icon_Path;
+
+	// 2 = 방어구
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Type = 2;
 
@@ -23,7 +29,7 @@ struct LOSTSIGNAL_API FLSArmorRow : public FTableRowBase
 	int32 Item_Max = 1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
-	FString Item_Description;
+	FText Item_Description;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Cost = 0;

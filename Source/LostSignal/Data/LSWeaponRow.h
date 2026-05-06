@@ -9,9 +9,15 @@ struct LOSTSIGNAL_API FLSWeaponRow : public FTableRowBase
 {
 	GENERATED_BODY()
 
+	// 아이템 이름 출력용 텍스트
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
-	FString Item_Name;
+	FText Item_Text;
 
+	// 아이콘 에셋 경로
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
+	FString Icon_Path;
+
+	// 1 = 무기
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Type = 1;
 
@@ -23,12 +29,12 @@ struct LOSTSIGNAL_API FLSWeaponRow : public FTableRowBase
 	int32 Item_Max = 1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
-	FString Item_Description;
+	FText Item_Description;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Cost = 0;
 
-	// Weapon_1=근접, Weapon_2=원거리
+	// Weapon_1=첫번째 캐릭터, Weapon_2=두번째 캐릭터, Weapon_3=세번째 캐릭터
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	FString Item_Equipment;
 

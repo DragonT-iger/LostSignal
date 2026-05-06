@@ -10,33 +10,28 @@
 #include "Data/LSItemRow.h"
 #include "Engine/DataTable.h"
 
-// "D_20000_1" → 20000, "G_30000_3" → 30000
-static int32 ParseGroupIDFromRowName(const FName& RowName)
+// "Drop_Chip_Chest_1" → "Drop_Chip_Chest"
+// "Group_Chip_Supply_2" → "Group_Chip_Supply"
+// 마지막 "_숫자" 부분만 제거. 숫자가 아니면 원본 반환.
+static FName ExtractRowNamePrefix(const FName& RowName)
 {
-	TArray<FString> Parts;
-	RowName.ToString().ParseIntoArray(Parts, TEXT("_"));
-	if (Parts.Num() >= 2)
+	FString Str = RowName.ToString();
+	int32 LastUnderscore;
+	if (!Str.FindLastChar(TEXT('_'), LastUnderscore))
 	{
-		return FCString::Atoi(*Parts[1]);
+		return RowName;
 	}
 
-	UE_LOG(LogLS, Warning, TEXT("Invalid group reference: %s"), *RowName.ToString());
-
-	return 0;
-}
-
-static int32 ParseGroupIDFromReference(const FString& Reference)
-{
-	TArray<FString> Parts;
-	Reference.ParseIntoArray(Parts, TEXT("_"));
-	if (Parts.Num() >= 2 && Parts[0].Equals(TEXT("G"), ESearchCase::IgnoreCase))
+	const FString Suffix = Str.Mid(LastUnderscore + 1);
+	for (TCHAR Ch : Suffix)
 	{
-		return FCString::Atoi(*Parts[1]);
+		if (!FChar::IsDigit(Ch))
+		{
+			return RowName;
+		}
 	}
 
-	UE_LOG(LogLS, Warning, TEXT("Invalid group reference: %s"), *Reference);
-
-	return FCString::Atoi(*Reference);
+	return FName(*Str.Left(LastUnderscore));
 }
 
 void ULSDropSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -59,16 +54,16 @@ void ULSDropSubsystem::LoadTables()
 	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
 
 	RootingObjectTable = Settings->RootingObjectTable.LoadSynchronous();
-	DropTableData = Settings->DropTable.LoadSynchronous();
-	GroupTableData = Settings->GroupTable.LoadSynchronous();
-	ChipTable = Settings->ChipTable.LoadSynchronous();
-	WeaponTable = Settings->WeaponTable.LoadSynchronous();
-	ArmorTable = Settings->ArmorTable.LoadSynchronous();
-	ItemTable = Settings->ItemTable.LoadSynchronous();
+	DropTableData      = Settings->DropTable.LoadSynchronous();
+	GroupTableData     = Settings->GroupTable.LoadSynchronous();
+	ChipTable          = Settings->ChipTable.LoadSynchronous();
+	WeaponTable        = Settings->WeaponTable.LoadSynchronous();
+	ArmorTable         = Settings->ArmorTable.LoadSynchronous();
+	ItemTable          = Settings->ItemTable.LoadSynchronous();
 
 	if (!RootingObjectTable) UE_LOG(LogLS, Warning, TEXT("RootingObjectTable 미설정 - 프로젝트 설정 > LS Drop Settings 확인"));
-	if (!DropTableData) UE_LOG(LogLS, Warning, TEXT("DropTable 미설정 - 프로젝트 설정 > LS Drop Settings 확인"));
-	if (!GroupTableData) UE_LOG(LogLS, Warning, TEXT("GroupTable 미설정 - 프로젝트 설정 > LS Drop Settings 확인"));
+	if (!DropTableData)      UE_LOG(LogLS, Warning, TEXT("DropTable 미설정 - 프로젝트 설정 > LS Drop Settings 확인"));
+	if (!GroupTableData)     UE_LOG(LogLS, Warning, TEXT("GroupTable 미설정 - 프로젝트 설정 > LS Drop Settings 확인"));
 }
 
 void ULSDropSubsystem::CacheDropTable()
@@ -76,12 +71,11 @@ void ULSDropSubsystem::CacheDropTable()
 	if (!DropTableData) return;
 
 	DropTableMap.Empty();
-	const TMap<FName, uint8*>& RowMap = DropTableData->GetRowMap();
-	for (const auto& Pair : RowMap)
+	for (const auto& Pair : DropTableData->GetRowMap())
 	{
-		const int32 GroupID = ParseGroupIDFromRowName(Pair.Key);
+		const FName Prefix = ExtractRowNamePrefix(Pair.Key);
 		const FLSDropTableRow* Row = reinterpret_cast<const FLSDropTableRow*>(Pair.Value);
-		DropTableMap.FindOrAdd(GroupID).Add(Row);
+		DropTableMap.FindOrAdd(Prefix).Add(Row);
 	}
 }
 
@@ -90,12 +84,11 @@ void ULSDropSubsystem::CacheGroupTable()
 	if (!GroupTableData) return;
 
 	GroupTableMap.Empty();
-	const TMap<FName, uint8*>& RowMap = GroupTableData->GetRowMap();
-	for (const auto& Pair : RowMap)
+	for (const auto& Pair : GroupTableData->GetRowMap())
 	{
-		const int32 GroupID = ParseGroupIDFromRowName(Pair.Key);
+		const FName Prefix = ExtractRowNamePrefix(Pair.Key);
 		const FLSGroupTableRow* Row = reinterpret_cast<const FLSGroupTableRow*>(Pair.Value);
-		GroupTableMap.FindOrAdd(GroupID).Add(Row);
+		GroupTableMap.FindOrAdd(Prefix).Add(Row);
 	}
 }
 
@@ -106,32 +99,30 @@ void ULSDropSubsystem::ValidateGroupReferences()
 	{
 		for (const FLSDropTableRow* Entry : DropGroup.Value)
 		{
-			if (!Entry->Item_Table_ID.StartsWith(TEXT("G_")))
-				continue;
+			if (Entry->Group_Table_Name.IsNone()) continue;
 
-			const int32 GroupID = ParseGroupIDFromReference(Entry->Item_Table_ID);
-			if (!GroupTableMap.Contains(GroupID))
+			if (!GroupTableMap.Contains(Entry->Group_Table_Name))
 			{
-				UE_LOG(LogLS, Warning, TEXT("[데이터검증] DropTable %d 항목 '%s' → GroupTable %d 없음"),
-					DropGroup.Key, *Entry->Item_Table_ID, GroupID);
+				UE_LOG(LogLS, Warning, TEXT("[데이터검증] DropTable '%s' → GroupTable '%s' 없음"),
+					*DropGroup.Key.ToString(), *Entry->Group_Table_Name.ToString());
 			}
 		}
 	}
 }
 #endif
 
-TArray<FLSDropResult> ULSDropSubsystem::RollDropTable(int32 DropTableID)
+TArray<FLSDropResult> ULSDropSubsystem::RollDropTable(FName DropTableName)
 {
 	TArray<FLSDropResult> Results;
 
-	const TArray<const FLSDropTableRow*>* Entries = DropTableMap.Find(DropTableID);
+	const TArray<const FLSDropTableRow*>* Entries = DropTableMap.Find(DropTableName);
 	if (!Entries)
 	{
-		UE_LOG(LogLS, Warning, TEXT("DropTable ID %d 없음"), DropTableID);
+		UE_LOG(LogLS, Warning, TEXT("DropTable '%s' 없음"), *DropTableName.ToString());
 		return Results;
 	}
 
-	UE_LOG(LogLS, Log, TEXT("  DropTable %d 처리 (%d개 항목)"), DropTableID, Entries->Num());
+	UE_LOG(LogLS, Log, TEXT("  DropTable '%s' 처리 (%d개 항목)"), *DropTableName.ToString(), Entries->Num());
 
 	for (const FLSDropTableRow* Entry : *Entries)
 	{
@@ -142,53 +133,40 @@ TArray<FLSDropResult> ULSDropSubsystem::RollDropTable(int32 DropTableID)
 			continue;
 		}
 
-		if (Entry->Item_Table_ID.IsEmpty())
+		if (Entry->Group_Table_Name.IsNone())
 		{
-			UE_LOG(LogLS, Warning, TEXT("    Empty Item_Table_ID in DropTable %d"), DropTableID);
+			UE_LOG(LogLS, Warning, TEXT("    Group_Table_Name 미설정 (DropTable '%s')"), *DropTableName.ToString());
 			continue;
 		}
 
-		if (Entry->Item_Table_ID.StartsWith(TEXT("G_")))
+		const FName ItemRowName = RollGroupTable(Entry->Group_Table_Name);
+		if (ItemRowName.IsNone())
 		{
-			const int32 GroupID = ParseGroupIDFromReference(Entry->Item_Table_ID);
-			const FString ItemRowName = RollGroupTable(GroupID);
-			if (ItemRowName.IsEmpty())
-			{
-				UE_LOG(LogLS, Warning, TEXT("    [경고] 그룹 %d 롤 결과 없음 - GroupTable 데이터 확인 필요"), GroupID);
-			}
-			else
-			{
-				FLSDropResult Result;
-				Result.ItemRowName = ItemRowName;
-				Result.Amount = Entry->Drop_Amount;
-				Result.ItemName = FindItemName(ItemRowName);
-				Results.Add(Result);
-				UE_LOG(LogLS, Log, TEXT("    [성공] 그룹 %d -> %s(%s) x%d"),
-					GroupID, *ItemRowName, *Result.ItemName, Entry->Drop_Amount);
-			}
+			UE_LOG(LogLS, Warning, TEXT("    [경고] 그룹 '%s' 롤 결과 없음"), *Entry->Group_Table_Name.ToString());
+			continue;
 		}
-		else
-		{
-			FLSDropResult Result;
-			Result.ItemRowName = Entry->Item_Table_ID;
-			Result.Amount = Entry->Drop_Amount;
-			Result.ItemName = FindItemName(Entry->Item_Table_ID);
-			Results.Add(Result);
-			UE_LOG(LogLS, Log, TEXT("    [성공] 고정드랍 -> %s(%s) x%d"),
-				*Entry->Item_Table_ID, *Result.ItemName, Entry->Drop_Amount);
-		}
+
+		FLSDropResult Result;
+		Result.ItemRowName = ItemRowName;
+		Result.Amount      = Entry->Drop_Amount;
+		Result.ItemText    = FindItemText(ItemRowName);
+		Results.Add(Result);
+
+		UE_LOG(LogLS, Log, TEXT("    [성공] 그룹 '%s' -> %s(%s) x%d"),
+			*Entry->Group_Table_Name.ToString(), *ItemRowName.ToString(),
+			*Result.ItemText.ToString(), Entry->Drop_Amount);
 	}
 
 	return Results;
 }
 
-FString ULSDropSubsystem::RollGroupTable(int32 GroupID)
+FName ULSDropSubsystem::RollGroupTable(FName GroupTableName)
 {
-	const TArray<const FLSGroupTableRow*>* Entries = GroupTableMap.Find(GroupID);
-	if (!Entries || Entries->Num() == 0)
+	const TArray<const FLSGroupTableRow*>* Entries = GroupTableMap.Find(GroupTableName);
+	if (!Entries || Entries->IsEmpty())
 	{
-		UE_LOG(LogLS, Warning, TEXT("GroupTable ID %d 없음"), GroupID);
-		return FString();
+		UE_LOG(LogLS, Warning, TEXT("GroupTable '%s' 없음"), *GroupTableName.ToString());
+		return NAME_None;
 	}
 
 	int32 TotalWeight = 0;
@@ -197,22 +175,39 @@ FString ULSDropSubsystem::RollGroupTable(int32 GroupID)
 		TotalWeight += Row->Group_Weight;
 	}
 
+	if (TotalWeight <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("GroupTable '%s' 총 가중치 0"), *GroupTableName.ToString());
+		return NAME_None;
+	}
+
 	int32 Roll = FMath::RandRange(1, TotalWeight);
 	int32 Accumulated = 0;
 
+	UE_LOG(LogLS, Log, TEXT("      [가중치 롤] 그룹='%s' 총가중치=%d 롤=%d"),
+		*GroupTableName.ToString(), TotalWeight, Roll);
+
 	for (const FLSGroupTableRow* Row : *Entries)
 	{
+		const int32 PrevAccumulated = Accumulated;
 		Accumulated += Row->Group_Weight;
-		if (Roll <= Accumulated)
+		const bool bSelected = Roll <= Accumulated;
+		UE_LOG(LogLS, Log, TEXT("        %s '%s' 가중치=%d 구간=[%d~%d] %s"),
+			bSelected ? TEXT("▶") : TEXT(" "),
+			*Row->Item_Name.ToString(),
+			Row->Group_Weight,
+			PrevAccumulated + 1, Accumulated,
+			bSelected ? TEXT("← 선택") : TEXT(""));
+		if (bSelected)
 		{
-			return Row->Group_Item_ID;
+			return Row->Item_Name;
 		}
 	}
 
-	return (*Entries).Last()->Group_Item_ID;
+	return (*Entries).Last()->Item_Name;
 }
 
-TArray<FLSDropResult> ULSDropSubsystem::OpenRootingObject(const FString& RootingObjectRowName)
+TArray<FLSDropResult> ULSDropSubsystem::OpenRootingObject(const FName& RootingObjectRowName)
 {
 	TArray<FLSDropResult> Results;
 
@@ -223,68 +218,68 @@ TArray<FLSDropResult> ULSDropSubsystem::OpenRootingObject(const FString& Rooting
 	}
 
 	const FLSRootingObjectRow* Row = RootingObjectTable->FindRow<FLSRootingObjectRow>(
-		FName(*RootingObjectRowName), TEXT("OpenRootingObject"));
+		RootingObjectRowName, TEXT("OpenRootingObject"));
 	if (!Row)
 	{
-		UE_LOG(LogLS, Warning, TEXT("RootingObject '%s' 없음"), *RootingObjectRowName);
+		UE_LOG(LogLS, Warning, TEXT("RootingObject '%s' 없음"), *RootingObjectRowName.ToString());
 		return Results;
 	}
 
-	UE_LOG(LogLS, Log, TEXT("루팅 오브젝트 [%s] %s (타입=%d) 열림"),
-		*RootingObjectRowName, *Row->Rooting_Object_Name, Row->Rooting_Object_Type);
+	UE_LOG(LogLS, Log, TEXT("루팅 오브젝트 [%s] '%s' 열림"),
+		*RootingObjectRowName.ToString(), *Row->Loot_Object_Text.ToString());
 
-	if (Row->Drop_Table_ID > 0)
+	if (!Row->Drop_Table_Name.IsNone())
 	{
-		Results = RollDropTable(Row->Drop_Table_ID);
+		Results = RollDropTable(Row->Drop_Table_Name);
 	}
 	else
 	{
-		UE_LOG(LogLS, Log, TEXT("  Drop_Table_ID 미설정"));
+		UE_LOG(LogLS, Log, TEXT("  Drop_Table_Name 미설정"));
 	}
 
 	UE_LOG(LogLS, Log, TEXT("  총 %d개 아이템 드랍"), Results.Num());
 	return Results;
 }
 
-void ULSDropSubsystem::TestDrop(const FString& RootingObjectRowName)
+void ULSDropSubsystem::TestDrop(const FName& RootingObjectRowName)
 {
-	UE_LOG(LogLS, Log, TEXT("========== 드랍 테스트: %s =========="), *RootingObjectRowName);
+	UE_LOG(LogLS, Log, TEXT("========== 드랍 테스트: %s =========="), *RootingObjectRowName.ToString());
 	TArray<FLSDropResult> Results = OpenRootingObject(RootingObjectRowName);
 
 	UE_LOG(LogLS, Log, TEXT("---------- 결과 ----------"));
 	for (const FLSDropResult& R : Results)
 	{
-		UE_LOG(LogLS, Log, TEXT("  [%s] %s x%d"), *R.ItemRowName, *R.ItemName, R.Amount);
+		UE_LOG(LogLS, Log, TEXT("  [%s] %s x%d"), *R.ItemRowName.ToString(), *R.ItemText.ToString(), R.Amount);
 	}
 	UE_LOG(LogLS, Log, TEXT("==========  끝  =========="));
 }
 
-FString ULSDropSubsystem::FindItemName(const FString& ItemRowName) const
+FText ULSDropSubsystem::FindItemText(const FName& ItemRowName) const
 {
-	if (ItemRowName.IsEmpty()) return TEXT("(없음)");
+	if (ItemRowName.IsNone()) return FText::FromString(TEXT("(없음)"));
 
-	const FName RowFName(*ItemRowName);
+	const FString NameStr = ItemRowName.ToString();
 
-	if (ItemRowName.StartsWith(TEXT("C_")) && ChipTable)
+	if (NameStr.StartsWith(TEXT("Chip_")) && ChipTable)
 	{
-		if (const FLSChipRow* Row = ChipTable->FindRow<FLSChipRow>(RowFName, TEXT("")))
-			return Row->Item_Name;
+		if (const FLSChipRow* Row = ChipTable->FindRow<FLSChipRow>(ItemRowName, TEXT("")))
+			return Row->Item_Text;
 	}
-	else if (ItemRowName.StartsWith(TEXT("W_")) && WeaponTable)
+	else if (NameStr.StartsWith(TEXT("Weapon_")) && WeaponTable)
 	{
-		if (const FLSWeaponRow* Row = WeaponTable->FindRow<FLSWeaponRow>(RowFName, TEXT("")))
-			return Row->Item_Name;
+		if (const FLSWeaponRow* Row = WeaponTable->FindRow<FLSWeaponRow>(ItemRowName, TEXT("")))
+			return Row->Item_Text;
 	}
-	else if (ItemRowName.StartsWith(TEXT("A_")) && ArmorTable)
+	else if (NameStr.StartsWith(TEXT("Armor_")) && ArmorTable)
 	{
-		if (const FLSArmorRow* Row = ArmorTable->FindRow<FLSArmorRow>(RowFName, TEXT("")))
-			return Row->Item_Name;
+		if (const FLSArmorRow* Row = ArmorTable->FindRow<FLSArmorRow>(ItemRowName, TEXT("")))
+			return Row->Item_Text;
 	}
-	else if (ItemRowName.StartsWith(TEXT("I_")) && ItemTable)
+	else if (NameStr.StartsWith(TEXT("Item_")) && ItemTable)
 	{
-		if (const FLSItemRow* Row = ItemTable->FindRow<FLSItemRow>(RowFName, TEXT("")))
-			return Row->Item_Name;
+		if (const FLSItemRow* Row = ItemTable->FindRow<FLSItemRow>(ItemRowName, TEXT("")))
+			return Row->Item_Text;
 	}
 
-	return FString::Printf(TEXT("Unknown_%s"), *ItemRowName);
+	return FText::FromString(FString::Printf(TEXT("Unknown_%s"), *NameStr));
 }

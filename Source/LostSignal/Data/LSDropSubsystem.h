@@ -12,9 +12,9 @@ struct FLSDropResult
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadOnly) FString ItemRowName;
+	UPROPERTY(BlueprintReadOnly) FName ItemRowName;
 	UPROPERTY(BlueprintReadOnly) int32 Amount = 0;
-	UPROPERTY(BlueprintReadOnly) FString ItemName;
+	UPROPERTY(BlueprintReadOnly) FText ItemText;
 };
 
 UCLASS()
@@ -25,23 +25,25 @@ class LOSTSIGNAL_API ULSDropSubsystem : public UGameInstanceSubsystem
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 
+	// DropTable prefix로 드랍 롤 (예: "Drop_Chip_Chest")
 	UFUNCTION(BlueprintCallable, Category="LS/Drop")
-	TArray<FLSDropResult> RollDropTable(int32 DropTableID);
+	TArray<FLSDropResult> RollDropTable(FName DropTableName);
+
+	// GroupTable prefix로 가중치 랜덤 아이템 1개 선택 (예: "Group_Chip_Supply")
+	UFUNCTION(BlueprintCallable, Category="LS/Drop")
+	FName RollGroupTable(FName GroupTableName);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Drop")
-	FString RollGroupTable(int32 GroupID);
+	TArray<FLSDropResult> OpenRootingObject(const FName& RootingObjectRowName);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Drop")
-	TArray<FLSDropResult> OpenRootingObject(const FString& RootingObjectRowName);
-
-	UFUNCTION(BlueprintCallable, Category="LS/Drop")
-	void TestDrop(const FString& RootingObjectRowName);
+	void TestDrop(const FName& RootingObjectRowName);
 
 private:
 	void LoadTables();
 	void CacheDropTable();
 	void CacheGroupTable();
-	FString FindItemName(const FString& ItemRowName) const;
+	FText FindItemText(const FName& ItemRowName) const;
 
 #if WITH_EDITOR
 	void ValidateGroupReferences();
@@ -62,6 +64,8 @@ private:
 	UPROPERTY()
 	TObjectPtr<UDataTable> ItemTable;
 
-	TMap<int32, TArray<const FLSDropTableRow*>> DropTableMap;
-	TMap<int32, TArray<const FLSGroupTableRow*>> GroupTableMap;
+	// key = DropTable RowName prefix (예: Drop_Chip_Chest)
+	TMap<FName, TArray<const FLSDropTableRow*>> DropTableMap;
+	// key = GroupTable RowName prefix (예: Group_Chip_Supply)
+	TMap<FName, TArray<const FLSGroupTableRow*>> GroupTableMap;
 };
