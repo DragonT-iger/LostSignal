@@ -28,6 +28,8 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
+	void ApplyFacingRotation(const FRotator& NewRotation);
+
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	ULSAimComponent* GetAimComponent() const { return AimComponent; }
 
@@ -135,6 +137,17 @@ protected:
 
 private:
 	bool bIsRunning = false;
+	bool bHasSentFacingRotation = false;
+
+	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
+	float FacingSyncInterval = 0.05f;
+
+	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
+	float FacingSyncYawTolerance = 1.0f;
+
+	float LastSentFacingYaw = 0.0f;
+	float LastFacingSyncTime = 0.0f;
+	FVector LastMoveWorldDirection = FVector::ZeroVector;
 
 	void Move(const FInputActionValue& Value);
 	void FaceMovementDirection(float DeltaSeconds);
@@ -152,4 +165,21 @@ private:
 	void OnItem5();
 	void OnItem6();
 	void OnInteract();
+
+	void ApplyRunState(bool bNewIsRunning);
+	bool ShouldSyncFacingRotation(float NewYaw) const;
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetRunState(bool bNewIsRunning);
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestBasicAttack();
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestDash(FVector_NetQuantizeNormal DashDirection);
+
+	UFUNCTION(Server, Unreliable)
+	void ServerSyncFacingRotation(float NewYaw);
+
+	FVector GetDashDirection() const;
 };

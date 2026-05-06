@@ -3,6 +3,7 @@
 #include "Core/LSPlayerControllerBase.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Characters/LSCharacterBase.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
@@ -32,6 +33,7 @@ void ALSPlayerControllerBase::BeginPlay()
 		DebugHpWidgetInstance = CreateWidget<ULSHpDebugWidget>(this, DebugHpWidgetClass);
 		if (DebugHpWidgetInstance)
 		{
+			DebugHpWidgetInstance->SetObservedCharacter(Cast<ALSCharacterBase>(GetPawn()));
 			DebugHpWidgetInstance->AddToViewport();
 		}
 	}
@@ -41,7 +43,7 @@ void ALSPlayerControllerBase::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	if (!IsLocalPlayerController())
+	if (!IsLocalPlayerController() || bDefaultMappingContextsApplied)
 	{
 		return;
 	}
@@ -55,5 +57,7 @@ void ALSPlayerControllerBase::SetupInputComponent()
 				Subsystem->AddMappingContext(IMC, 0);
 			}
 		}
+
+		bDefaultMappingContextsApplied = true;
 	}
 }

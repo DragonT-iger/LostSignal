@@ -32,8 +32,27 @@ void ULSHpDebugWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	RefreshObservedCharacter();
 }
 
+void ULSHpDebugWidget::SetObservedCharacter(ALSCharacterBase* InCharacter)
+{
+	bAutoObserveOwningPlayer = false;
+
+	if (ObservedCharacter.Get() == InCharacter)
+	{
+		return;
+	}
+
+	ObservedCharacter = InCharacter;
+	BindToObservedASC(InCharacter ? InCharacter->GetAbilitySystemComponent() : nullptr);
+	UpdateHealthDisplay();
+}
+
 void ULSHpDebugWidget::RefreshObservedCharacter()
 {
+	if (!bAutoObserveOwningPlayer)
+	{
+		return;
+	}
+
 	APawn* OwnerPawn = GetOwningPlayerPawn();
 	ALSCharacterBase* NewCharacter = Cast<ALSCharacterBase>(OwnerPawn);
 	if (ObservedCharacter.Get() == NewCharacter)

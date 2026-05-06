@@ -21,6 +21,9 @@ public:
 	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	void SetObservedCharacter(ALSCharacterBase* InCharacter);
+
 protected:
 	UPROPERTY(meta=(BindWidgetOptional), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UProgressBar> HealthProgressBar;
@@ -32,6 +35,7 @@ protected:
 	TObjectPtr<UTextBlock> CharacterNameText;
 
 private:
+	bool bAutoObserveOwningPlayer = true;
 	TWeakObjectPtr<ALSCharacterBase> ObservedCharacter;
 	TWeakObjectPtr<UAbilitySystemComponent> ObservedASC;
 

@@ -24,6 +24,9 @@ protected:
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSHpDebugWidget> DebugHpWidgetInstance;
 
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Input")
+	bool bDefaultMappingContextsApplied = false;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;

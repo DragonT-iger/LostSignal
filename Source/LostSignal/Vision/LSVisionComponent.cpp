@@ -14,7 +14,8 @@
 
 ULSVisionComponent::ULSVisionComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = true;
 }
 
 // Starts periodic vision updates and optionally injects the vision post-process material into the local camera.
@@ -22,10 +23,32 @@ void ULSVisionComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (!IsLocalVisionController())
+	InitializeLocalVision();
+}
+
+void ULSVisionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	const bool bShouldBeInitialized = IsLocalVisionController();
+	if (bShouldBeInitialized && !bLocalVisionInitialized)
+	{
+		InitializeLocalVision();
+	}
+	else if (!bShouldBeInitialized && bLocalVisionInitialized)
+	{
+		ShutdownLocalVision();
+	}
+}
+
+void ULSVisionComponent::InitializeLocalVision()
+{
+	if (bLocalVisionInitialized || !IsLocalVisionController())
 	{
 		return;
 	}
+
+	bLocalVisionInitialized = true;
 
 	if (UWorld* World = GetWorld())
 	{
@@ -55,9 +78,15 @@ void ULSVisionComponent::BeginPlay()
 	UpdateVisionPolygon();
 }
 
-// Stops the periodic vision update loop when the owning actor leaves the world.
-void ULSVisionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void ULSVisionComponent::ShutdownLocalVision()
 {
+	if (!bLocalVisionInitialized)
+	{
+		return;
+	}
+
+	bLocalVisionInitialized = false;
+
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(VisionUpdateTimerHandle);
@@ -76,6 +105,12 @@ void ULSVisionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 		PostProcessMID = nullptr;
 	}
+}
+
+// Stops the periodic vision update loop when the owning actor leaves the world.
+void ULSVisionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ShutdownLocalVision();
 
 	Super::EndPlay(EndPlayReason);
 }

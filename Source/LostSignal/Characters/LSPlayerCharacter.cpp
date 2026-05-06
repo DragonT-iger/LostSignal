@@ -10,7 +10,6 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
-#include "InputCoreTypes.h"
 #include "LostSignal.h"
 #include "Vision/LSMPCVisionSourceComponent.h"
 #include "Vision/LSPlayerXRayComponent.h"
@@ -64,6 +63,22 @@ void ALSPlayerCharacter::Tick(float DeltaSeconds)
 	}
 }
 
+void ALSPlayerCharacter::ApplyFacingRotation(const FRotator& NewRotation)
+{
+	const FRotator SanitizedRotation(0.0f, FRotator::NormalizeAxis(NewRotation.Yaw), 0.0f);
+	SetActorRotation(SanitizedRotation);
+
+	if (HasAuthority() || !IsLocallyControlled() || !ShouldSyncFacingRotation(SanitizedRotation.Yaw))
+	{
+		return;
+	}
+
+	LastSentFacingYaw = SanitizedRotation.Yaw;
+	LastFacingSyncTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	bHasSentFacingRotation = true;
+	ServerSyncFacingRotation(SanitizedRotation.Yaw);
+}
+
 void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent);
@@ -92,24 +107,46 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	if (Item5Action) { EnhancedInput->BindAction(Item5Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem5); }
 	if (Item6Action) { EnhancedInput->BindAction(Item6Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem6); }
 	if (InteractAction) { EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnInteract); }
-
-	PlayerInputComponent->BindKey(EKeys::T, IE_Pressed, this, &ALSPlayerCharacter::OnAttack);
 }
 
 void ALSPlayerCharacter::OnAttack()
 {
-	if (PlayerCombatComponent)
+	if (!PlayerCombatComponent)
+	{
+		return;
+	}
+
+	if (!HasAuthority())
 	{
 		PlayerCombatComponent->RequestBasicAttack();
+		ServerRequestBasicAttack();
+		return;
 	}
+
+	PlayerCombatComponent->RequestBasicAttack();
 }
 
 void ALSPlayerCharacter::OnDash()
 {
-	if (PlayerCombatComponent)
+	if (!PlayerCombatComponent)
 	{
-		PlayerCombatComponent->RequestDash();
+		return;
 	}
+
+	const FVector DashDirection = GetDashDirection();
+	if (!HasAuthority())
+	{
+		if (!PlayerCombatComponent->CanRequestDashLocally())
+		{
+			return;
+		}
+
+		PlayerCombatComponent->PredictDashMovement(DashDirection);
+		ServerRequestDash(DashDirection);
+		return;
+	}
+
+	PlayerCombatComponent->RequestDash(DashDirection);
 }
 
 void ALSPlayerCharacter::OnSkill1() {}
@@ -125,14 +162,22 @@ void ALSPlayerCharacter::OnInteract() {}
 
 void ALSPlayerCharacter::OnRunStart()
 {
-	bIsRunning = true;
-	GetCharacterMovement()->MaxWalkSpeed = RunSpeed;
+	ApplyRunState(true);
+
+	if (!HasAuthority())
+	{
+		ServerSetRunState(true);
+	}
 }
 
 void ALSPlayerCharacter::OnRunEnd()
 {
-	bIsRunning = false;
-	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+	ApplyRunState(false);
+
+	if (!HasAuthority())
+	{
+		ServerSetRunState(false);
+	}
 }
 
 void ALSPlayerCharacter::Move(const FInputActionValue& Value)
@@ -147,8 +192,17 @@ void ALSPlayerCharacter::Move(const FInputActionValue& Value)
 	RightDirection.Z = 0.0f;
 	RightDirection.Normalize();
 
-	AddMovementInput(RightDirection, Input.X);
-	AddMovementInput(ForwardDirection, Input.Y);
+	FVector MoveDirection = (RightDirection * Input.X) + (ForwardDirection * Input.Y);
+	MoveDirection.Z = 0.0f;
+
+	if (MoveDirection.IsNearlyZero())
+	{
+		LastMoveWorldDirection = FVector::ZeroVector;
+		return;
+	}
+
+	LastMoveWorldDirection = MoveDirection.GetSafeNormal();
+	AddMovementInput(LastMoveWorldDirection, FMath::Clamp(MoveDirection.Size(), 0.0f, 1.0f));
 }
 
 void ALSPlayerCharacter::FaceMovementDirection(float DeltaSeconds)
@@ -173,5 +227,80 @@ void ALSPlayerCharacter::FaceMovementDirection(float DeltaSeconds)
 		DeltaSeconds,
 		RunFacingInterpSpeed);
 
-	SetActorRotation(NewRotation);
+	ApplyFacingRotation(NewRotation);
+}
+
+bool ALSPlayerCharacter::ShouldSyncFacingRotation(float NewYaw) const
+{
+	if (!bHasSentFacingRotation)
+	{
+		return true;
+	}
+
+	if (!GetWorld())
+	{
+		return false;
+	}
+
+	const float TimeSinceLastSync = GetWorld()->GetTimeSeconds() - LastFacingSyncTime;
+	if (TimeSinceLastSync < FacingSyncInterval)
+	{
+		return false;
+	}
+
+	const float YawDelta = FMath::Abs(FRotator::NormalizeAxis(NewYaw - LastSentFacingYaw));
+	return YawDelta >= FacingSyncYawTolerance;
+}
+
+void ALSPlayerCharacter::ApplyRunState(bool bNewIsRunning)
+{
+	bIsRunning = bNewIsRunning;
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->MaxWalkSpeed = bIsRunning ? RunSpeed : WalkSpeed;
+	}
+}
+
+void ALSPlayerCharacter::ServerSetRunState_Implementation(bool bNewIsRunning)
+{
+	ApplyRunState(bNewIsRunning);
+}
+
+void ALSPlayerCharacter::ServerRequestBasicAttack_Implementation()
+{
+	if (PlayerCombatComponent)
+	{
+		PlayerCombatComponent->RequestBasicAttack();
+	}
+}
+
+void ALSPlayerCharacter::ServerRequestDash_Implementation(FVector_NetQuantizeNormal DashDirection)
+{
+	if (PlayerCombatComponent)
+	{
+		PlayerCombatComponent->RequestDash(FVector(DashDirection));
+	}
+}
+
+void ALSPlayerCharacter::ServerSyncFacingRotation_Implementation(float NewYaw)
+{
+	SetActorRotation(FRotator(0.0f, FRotator::NormalizeAxis(NewYaw), 0.0f));
+}
+
+FVector ALSPlayerCharacter::GetDashDirection() const
+{
+	FVector DashDirection = LastMoveWorldDirection;
+	if (DashDirection.IsNearlyZero() && GetCharacterMovement())
+	{
+		DashDirection = GetCharacterMovement()->GetLastInputVector();
+	}
+
+	if (DashDirection.IsNearlyZero())
+	{
+		DashDirection = GetActorForwardVector();
+	}
+
+	DashDirection.Z = 0.0f;
+	return DashDirection.IsNearlyZero() ? GetActorForwardVector() : DashDirection.GetSafeNormal();
 }

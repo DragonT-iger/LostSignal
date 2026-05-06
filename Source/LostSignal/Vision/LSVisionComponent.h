@@ -19,12 +19,15 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	void UpdateVisionPolygon();
 	bool IsLocalVisionController() const;
 	bool IsPointVisibleInCurrentVision(const FVector2D& Point2D) const;
 	void UpdateVisionTargets(const FVector2D& VisionOrigin2D);
 	void DrawDebugVisionRays() const;
+	void InitializeLocalVision();
+	void ShutdownLocalVision();
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
@@ -81,4 +84,5 @@ public:
 private:
 	FTimerHandle VisionUpdateTimerHandle;
 	TObjectPtr<UMaterialInstanceDynamic> PostProcessMID;
+	bool bLocalVisionInitialized = false;
 };

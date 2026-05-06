@@ -22,7 +22,12 @@ public:
 	bool RequestBasicAttack();
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
-	bool RequestDash() const;
+	bool RequestDash();
+
+	bool RequestDash(const FVector& DashDirection);
+	bool PredictDashMovement(const FVector& DashDirection);
+	bool CanRequestDashLocally() const;
+	bool GetPendingDashDirection(FVector& OutDashDirection) const;
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void PerformMeleeHit();
@@ -60,11 +65,23 @@ private:
 
 	FTimerHandle AttackHitTimerHandle;
 	FTimerHandle AttackRecoveryTimerHandle;
+	FTimerHandle PredictedDashTimerHandle;
+	FTimerHandle PredictedDashCooldownTimerHandle;
 	bool bAttackHitConsumed = false;
+	bool bPredictedDashInProgress = false;
+	bool bPredictedDashCooldownActive = false;
+	uint16 PredictedDashRootMotionSourceID = 0;
+	FVector PendingDashDirection = FVector::ZeroVector;
 
 	ULSAimComponent* ResolveAimComponent() const;
 	ULSCharacterCombatComponent* ResolveSharedCombatComponent() const;
 	class ALSCharacterBase* ResolveOwnerCharacter() const;
 	void FinishAttack();
+	void FinishPredictedDash();
+	void FinishPredictedDashCooldown();
 	void ExecuteMeleeHit(const FVector& AttackDirection);
+	bool ApplyDashRootMotion(const FVector& DashDirection, uint16& OutRootMotionSourceID) const;
+	float GetDashDuration() const;
+	float GetDashCooldown() const;
+	bool IsDashCooldownActive() const;
 };

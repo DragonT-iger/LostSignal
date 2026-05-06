@@ -1,5 +1,6 @@
 #include "Combat/LSAimComponent.h"
 
+#include "Characters/LSPlayerCharacter.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 
@@ -35,6 +36,12 @@ void ULSAimComponent::UpdateFacing(float DeltaSeconds)
 		FRotator(0.0f, TargetRotation.Yaw, 0.0f),
 		DeltaSeconds,
 		MouseFacingInterpSpeed);
+
+	if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(OwnerActor))
+	{
+		PlayerCharacter->ApplyFacingRotation(NewRotation);
+		return;
+	}
 
 	OwnerActor->SetActorRotation(NewRotation);
 }

@@ -1,6 +1,7 @@
 #include "GAS/Abilities/LSGA_Dash.h"
 
 #include "AbilitySystemComponent.h"
+#include "Combat/LSPlayerCombatComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
@@ -26,7 +27,7 @@ ULSGA_Dash::ULSGA_Dash()
 	CooldownTagContainer.AddTag(LSGameplayTags::Cooldown_Dash);
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 
 	CooldownGameplayEffectClass = ULSGE_DashCooldown::StaticClass();
 	InvincibilityEffectClass = ULSGE_DashInvincible::StaticClass();
@@ -63,10 +64,18 @@ void ULSGA_Dash::ActivateAbility(
 	}
 
 	// ── 대쉬 방향 ────────────────────────────────────────────
-	FVector DashDir = Character->GetCharacterMovement()->GetLastInputVector();
+	FVector DashDir = FVector::ZeroVector;
+	if (const ULSPlayerCombatComponent* PlayerCombatComponent = Character->FindComponentByClass<ULSPlayerCombatComponent>())
+	{
+		PlayerCombatComponent->GetPendingDashDirection(DashDir);
+	}
 	if (DashDir.IsNearlyZero())
 	{
-		DashDir = Character->GetActorForwardVector();
+		DashDir = Character->GetCharacterMovement()->GetLastInputVector();
+		if (DashDir.IsNearlyZero())
+		{
+			DashDir = Character->GetActorForwardVector();
+		}
 	}
 	DashDir.Z = 0.f;
 	DashDir = DashDir.GetSafeNormal();
