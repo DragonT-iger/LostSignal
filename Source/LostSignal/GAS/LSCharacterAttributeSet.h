@@ -1,8 +1,8 @@
 #pragma once
 
-#include "CoreMinimal.h"
-#include "AttributeSet.h"
 #include "AbilitySystemComponent.h"
+#include "AttributeSet.h"
+#include "CoreMinimal.h"
 #include "LSCharacterAttributeSet.generated.h"
 
 #define ATTRIBUTE_ACCESSORS(ClassName, PropertyName)           \
@@ -11,10 +11,6 @@
 	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName)               \
 	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
-/**
- * Shared character attribute set for early LostSignal combat slices.
- * CurrentHealth and MaxHealth are split so damage can modify current HP cleanly.
- */
 UCLASS()
 class LOSTSIGNAL_API ULSCharacterAttributeSet : public UAttributeSet
 {
@@ -25,65 +21,54 @@ public:
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData Attack;
+	FGameplayAttributeData Attack = 100.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Attack)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData AttackSpeed;
+	FGameplayAttributeData AttackSpeed = 1.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, AttackSpeed)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData CooldownReduction;
+	FGameplayAttributeData CooldownReduction = 0.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CooldownReduction)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData CritChance;
+	FGameplayAttributeData CritChance = 0.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CritChance)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData CritDamage;
+	FGameplayAttributeData CritDamage = 1.5f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CritDamage)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData ArmorPenetration;
+	FGameplayAttributeData ArmorPenetration = 0.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, ArmorPenetration)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData MaxHealth;
-	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, MaxHealth)
-
-	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData CurrentHealth;
-	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CurrentHealth)
-
-	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData Defence;
+	FGameplayAttributeData Defence = 0.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Defence)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData Recovery;
+	FGameplayAttributeData Recovery = 0.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Recovery)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData MaxStamina;
+	FGameplayAttributeData MaxStamina = 100.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, MaxStamina)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData MoveSpeed;
+	FGameplayAttributeData MoveSpeed = 1.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, MoveSpeed)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData DashSpeed;
+	FGameplayAttributeData DashSpeed = 1200.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DashSpeed)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData DashDuration;
+	FGameplayAttributeData DashDuration = 0.3f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DashDuration)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
-	FGameplayAttributeData DashCooldown;
+	FGameplayAttributeData DashCooldown = 1.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DashCooldown)
-
-private:
-	void ClampCurrentHealth();
 };

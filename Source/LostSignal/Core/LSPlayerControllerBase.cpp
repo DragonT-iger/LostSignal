@@ -6,6 +6,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
+#include "UI/Debug/LSHpDebugWidget.h"
 
 void ALSPlayerControllerBase::BeginPlay()
 {
@@ -16,7 +17,6 @@ void ALSPlayerControllerBase::BeginPlay()
 		return;
 	}
 
-	// 마우스 커서 활성화 + GameAndUI 모드 (UI 클릭 + 게임플레이 동시 가능)
 	bShowMouseCursor = true;
 	bEnableMouseOverEvents = true;
 
@@ -25,8 +25,16 @@ void ALSPlayerControllerBase::BeginPlay()
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(InputMode);
 
-	// 뷰포트에 포커스 — UI와 게임 입력이 모두 동작하도록
 	UWidgetBlueprintLibrary::SetFocusToGameViewport();
+
+	if (DebugHpWidgetClass && !DebugHpWidgetInstance)
+	{
+		DebugHpWidgetInstance = CreateWidget<ULSHpDebugWidget>(this, DebugHpWidgetClass);
+		if (DebugHpWidgetInstance)
+		{
+			DebugHpWidgetInstance->AddToViewport();
+		}
+	}
 }
 
 void ALSPlayerControllerBase::SetupInputComponent()
@@ -38,7 +46,6 @@ void ALSPlayerControllerBase::SetupInputComponent()
 		return;
 	}
 
-	// EnhancedInput 서브시스템에 IMC 등록
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
 		for (UInputMappingContext* IMC : DefaultMappingContexts)

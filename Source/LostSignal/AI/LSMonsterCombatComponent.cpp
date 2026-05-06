@@ -4,7 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "Characters/LSCharacterBase.h"
 #include "Data/LSMonsterArchetypeRow.h"
-#include "GAS/LSCharacterAttributeSet.h"
+#include "GAS/LSCombatAttributeSet.h"
 #include "GAS/Effects/LSGE_MonsterBasicDamage.h"
 #include "GAS/LSGameplayTags.h"
 #include "GameplayEffect.h"
@@ -132,9 +132,9 @@ void ULSMonsterCombatComponent::PerformMeleeHit()
 		const FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, DamageEffectLevel, EffectContext);
 		if (SpecHandle.IsValid())
 		{
-			const float BeforeHealth = TargetASC->GetNumericAttribute(ULSCharacterAttributeSet::GetCurrentHealthAttribute());
+			const float BeforeHealth = TargetASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
 			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
-			const float AfterHealth = TargetASC->GetNumericAttribute(ULSCharacterAttributeSet::GetCurrentHealthAttribute());
+			const float AfterHealth = TargetASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
 
 			UE_LOG(
 				LogLS,
