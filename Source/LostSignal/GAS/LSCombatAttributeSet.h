@@ -17,14 +17,15 @@ class LOSTSIGNAL_API ULSCombatAttributeSet : public UAttributeSet
 	GENERATED_BODY()
 
 public:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 
-	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxHealth, Category="LS/Stats")
 	FGameplayAttributeData MaxHealth = 100.0f;
 	LS_ATTRIBUTE_ACCESSORS(ULSCombatAttributeSet, MaxHealth)
 
-	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CurrentHealth, Category="LS/Stats")
 	FGameplayAttributeData CurrentHealth = 100.0f;
 	LS_ATTRIBUTE_ACCESSORS(ULSCombatAttributeSet, CurrentHealth)
 
@@ -33,5 +34,11 @@ public:
 	LS_ATTRIBUTE_ACCESSORS(ULSCombatAttributeSet, Damage)
 
 private:
+	UFUNCTION()
+	void OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth) const;
+
+	UFUNCTION()
+	void OnRep_CurrentHealth(const FGameplayAttributeData& OldCurrentHealth) const;
+
 	void ClampCurrentHealth();
 };

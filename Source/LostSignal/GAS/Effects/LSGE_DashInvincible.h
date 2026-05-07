@@ -13,5 +13,5 @@ class LOSTSIGNAL_API ULSGE_DashInvincible : public UGameplayEffect
 {
 	GENERATED_BODY()
 public:
-	ULSGE_DashInvincible();
+	ULSGE_DashInvincible(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 };

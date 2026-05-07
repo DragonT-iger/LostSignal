@@ -10,6 +10,7 @@
 class UDataTable;
 class UGameplayAbility;
 class UAnimMontage;
+class ULSHpDebugWidget;
 class ULSMonsterCombatComponent;
 class ULSMonsterSenseComponent;
 struct FLSMonsterArchetypeRow;
@@ -53,7 +54,15 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	UAnimMontage* GetAbilityMontage(FGameplayTag AbilityTag) const;
 
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayAbilityMontage(UAnimMontage* Montage);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastStopAbilityMontage(UAnimMontage* Montage, float BlendOutTime);
+
 protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	/** Ability granted on BeginPlay so StateTree can request a basic attack by gameplay tag. */
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TSubclassOf<UGameplayAbility> DefaultAttackAbilityClass;
@@ -74,7 +83,21 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/AI")
 	TObjectPtr<ULSMonsterCombatComponent> MonsterCombatComponent;
 
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Debug")
+	bool bCreateDebugHpWidget = true;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Debug")
+	FVector2D DebugHpWidgetBasePosition = FVector2D(40.0f, 120.0f);
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Debug", meta=(ClampMin="0.0"))
+	float DebugHpWidgetVerticalSpacing = 60.0f;
+
+	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/UI|Debug")
+	TObjectPtr<ULSHpDebugWidget> DebugHpWidgetInstance;
+
 private:
 	const FLSMonsterArchetypeRow* FindMonsterArchetypeRow() const;
 	void InitializeMonsterArchetype();
+	void TryCreateDebugHpWidget();
+	void DestroyDebugHpWidget();
 };

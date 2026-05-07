@@ -1,6 +1,15 @@
 #include "GAS/LSCombatAttributeSet.h"
 
 #include "GameplayEffectExtension.h"
+#include "Net/UnrealNetwork.h"
+
+void ULSCombatAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME_CONDITION_NOTIFY(ULSCombatAttributeSet, MaxHealth, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(ULSCombatAttributeSet, CurrentHealth, COND_None, REPNOTIFY_Always);
+}
 
 void ULSCombatAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
@@ -45,4 +54,14 @@ void ULSCombatAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCa
 void ULSCombatAttributeSet::ClampCurrentHealth()
 {
 	SetCurrentHealth(FMath::Clamp(GetCurrentHealth(), 0.0f, GetMaxHealth()));
+}
+
+void ULSCombatAttributeSet::OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth) const
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(ULSCombatAttributeSet, MaxHealth, OldMaxHealth);
+}
+
+void ULSCombatAttributeSet::OnRep_CurrentHealth(const FGameplayAttributeData& OldCurrentHealth) const
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(ULSCombatAttributeSet, CurrentHealth, OldCurrentHealth);
 }

@@ -62,6 +62,7 @@ private:
 	void UpdateSensing(float DeltaTime);
 	AActor* FindBestVisibleTarget() const;
 	bool IsNoiseFresh() const;
+	void DrawSenseDebug() const;
 
 	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float BaseSightRadius = 1200.0f;
@@ -89,6 +90,12 @@ private:
 
 	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float LeashDistance = 2000.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI|Debug")
+	bool bDrawSenseDebug = false;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI|Debug", meta=(ClampMin="0.0"))
+	float SenseDebugDrawHeight = 35.0f;
 
 	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	TWeakObjectPtr<AActor> CurrentTarget;

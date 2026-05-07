@@ -1,13 +1,11 @@
 #include "AI/LSMonsterCombatComponent.h"
 
-#include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Characters/LSCharacterBase.h"
+#include "Combat/LSCharacterCombatComponent.h"
 #include "Data/LSMonsterArchetypeRow.h"
-#include "GAS/LSCombatAttributeSet.h"
 #include "GAS/Effects/LSGE_MonsterBasicDamage.h"
 #include "GAS/LSGameplayTags.h"
-#include "GameplayEffect.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
 
@@ -58,10 +56,10 @@ void ULSMonsterCombatComponent::PerformMeleeHit()
 		return;
 	}
 
-	UAbilitySystemComponent* SourceASC = OwnerCharacter->GetAbilitySystemComponent();
-	if (!SourceASC || !DamageEffectClass)
+	ULSCharacterCombatComponent* SharedCombatComponent = OwnerCharacter->FindComponentByClass<ULSCharacterCombatComponent>();
+	if (!SharedCombatComponent || !DamageEffectClass)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s: PerformMeleeHit skipped, ASC or DamageEffectClass missing."), *GetNameSafe(GetOwner()));
+		UE_LOG(LogLS, Warning, TEXT("%s: PerformMeleeHit skipped, combat component or DamageEffectClass missing."), *GetNameSafe(GetOwner()));
 		return;
 	}
 
@@ -111,45 +109,31 @@ void ULSMonsterCombatComponent::PerformMeleeHit()
 			*GetNameSafe(HitActor)
 		);
 
-		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
-		if (!TargetASC)
+		if (!SharedCombatComponent->ApplyDamageEffectToTarget(
+			HitActor,
+			DamageEffectClass,
+			DamageEffectLevel,
+			MeleeBaseDamage,
+			MeleeAttackCoefficient,
+			bMeleeCanCrit))
 		{
 			UE_LOG(
 				LogLS,
 				Log,
-				TEXT("%s melee overlap ignored %s because it has no ASC."),
+				TEXT("%s melee overlap ignored %s because damage application failed."),
 				*GetNameSafe(OwnerCharacter),
-				*GetNameSafe(HitActor)
-			);
+				*GetNameSafe(HitActor));
 			continue;
 		}
 
 		UniqueTargets.Add(HitActor);
 
-		FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
-		EffectContext.AddSourceObject(this);
-
-		const FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, DamageEffectLevel, EffectContext);
-		if (SpecHandle.IsValid())
-		{
-			SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_Base, MeleeBaseDamage);
-			SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_AttackCoefficient, MeleeAttackCoefficient);
-			SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_CanCrit, bMeleeCanCrit ? 1.0f : 0.0f);
-
-			const float BeforeHealth = TargetASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
-			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
-			const float AfterHealth = TargetASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
-
-			UE_LOG(
-				LogLS,
-				Log,
-				TEXT("%s melee hit %s. HP Before: %.1f -> After: %.1f"),
-				*GetNameSafe(OwnerCharacter),
-				*GetNameSafe(HitActor),
-				BeforeHealth,
-				AfterHealth
-			);
-		}
+		UE_LOG(
+			LogLS,
+			Log,
+			TEXT("%s melee hit %s."),
+			*GetNameSafe(OwnerCharacter),
+			*GetNameSafe(HitActor));
 	}
 
 	if (UniqueTargets.Num() == 0)

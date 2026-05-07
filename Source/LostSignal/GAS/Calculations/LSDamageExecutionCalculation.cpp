@@ -1,9 +1,11 @@
 #include "GAS/Calculations/LSDamageExecutionCalculation.h"
 
+#include "AbilitySystemComponent.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "GameplayEffectExtension.h"
+#include "LostSignal.h"
 
 namespace
 {
@@ -75,13 +77,39 @@ void ULSDamageExecutionCalculation::Execute_Implementation(
 	const float RawDamage = FMath::Max(0.0f, BaseDamage + (FMath::Max(0.0f, Attack) * AttackCoefficient));
 	const float EffectiveDefence = FMath::Max(0.0f, Defence - ArmorPenetration);
 	float FinalDamage = RawDamage * (100.0f / (100.0f + EffectiveDefence));
+	const float DamageBeforeCrit = FinalDamage;
 
-	if (bCanCrit && FMath::FRand() < FMath::Clamp(CritChance, 0.0f, 1.0f))
+	const float ClampedCritChance = FMath::Clamp(CritChance, 0.0f, 1.0f);
+	const float CritRoll = bCanCrit ? FMath::FRand() : 1.0f;
+	const bool bCriticalHit = bCanCrit && CritRoll < ClampedCritChance;
+	const float AppliedCritDamage = FMath::Max(1.0f, CritDamage);
+	if (bCriticalHit)
 	{
-		FinalDamage *= FMath::Max(1.0f, CritDamage);
+		FinalDamage *= AppliedCritDamage;
 	}
 
 	FinalDamage = FMath::Max(0.0f, FinalDamage);
+	const UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
+	const UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
+	const AActor* SourceActor = SourceASC ? SourceASC->GetAvatarActor() : nullptr;
+	const AActor* TargetActor = TargetASC ? TargetASC->GetAvatarActor() : nullptr;
+
+	UE_LOG(
+		LogLS,
+		Log,
+		TEXT("DamageCalc %s -> %s | FinalDamage = max(0, (BaseDamage %.2f + Attack %.2f * Coef %.2f) * (100 / (100 + max(0, Defence %.2f - ArmorPen %.2f)))%s) = %.2f | CritRoll %.3f / CritChance %.3f"),
+		*GetNameSafe(SourceActor),
+		*GetNameSafe(TargetActor),
+		BaseDamage,
+		Attack,
+		AttackCoefficient,
+		Defence,
+		ArmorPenetration,
+		*(bCriticalHit ? FString::Printf(TEXT(" * CritDamage %.2f"), AppliedCritDamage) : FString()),
+		FinalDamage,
+		CritRoll,
+		ClampedCritChance);
+
 	if (FinalDamage <= 0.0f)
 	{
 		return;

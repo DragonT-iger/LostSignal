@@ -14,6 +14,10 @@ class LOSTSIGNAL_API ALSPlayerControllerBase : public APlayerController
 {
 	GENERATED_BODY()
 
+public:
+	UFUNCTION(BlueprintPure, Category="LS/UI")
+	TSubclassOf<ULSHpDebugWidget> GetDebugHpWidgetClass() const { return DebugHpWidgetClass; }
+
 protected:
 	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TArray<TObjectPtr<UInputMappingContext>> DefaultMappingContexts;

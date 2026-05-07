@@ -29,6 +29,8 @@ void ULSGA_MonsterMelee::ActivateAbility(
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
+	bEndingAbility = false;
+
 	ALSEnemyCharacter* EnemyCharacter = Cast<ALSEnemyCharacter>(GetAvatarActorFromActorInfo());
 	if (!EnemyCharacter)
 	{
@@ -62,8 +64,8 @@ void ULSGA_MonsterMelee::ActivateAbility(
 		return;
 	}
 
-	const float PlayedDuration = AnimInstance->Montage_Play(ActiveAttackMontage);
-	if (PlayedDuration <= 0.0f)
+	EnemyCharacter->MulticastPlayAbilityMontage(ActiveAttackMontage);
+	if (!AnimInstance->Montage_IsPlaying(ActiveAttackMontage))
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s MonsterMelee failed to play montage %s."), *GetNameSafe(EnemyCharacter), *GetNameSafe(ActiveAttackMontage));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -84,6 +86,8 @@ void ULSGA_MonsterMelee::EndAbility(
 	bool bReplicateEndAbility,
 	bool bWasCancelled)
 {
+	bEndingAbility = true;
+
 	UE_LOG(
 		LogLS,
 		Log,
@@ -100,7 +104,7 @@ void ULSGA_MonsterMelee::EndAbility(
 		{
 			if (ActiveAttackMontage && AnimInstance->Montage_IsPlaying(ActiveAttackMontage))
 			{
-				AnimInstance->Montage_Stop(0.1f, ActiveAttackMontage);
+				EnemyCharacter->MulticastStopAbilityMontage(ActiveAttackMontage, 0.1f);
 			}
 		}
 	}
@@ -112,6 +116,11 @@ void ULSGA_MonsterMelee::EndAbility(
 
 void ULSGA_MonsterMelee::HandleAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
+	if (bEndingAbility)
+	{
+		return;
+	}
+
 	UE_LOG(
 		LogLS,
 		Log,

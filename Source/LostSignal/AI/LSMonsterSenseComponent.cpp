@@ -1,6 +1,7 @@
 #include "AI/LSMonsterSenseComponent.h"
 
 #include "Data/LSMonsterArchetypeRow.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
@@ -26,7 +27,19 @@ void ULSMonsterSenseComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	const AActor* OwnerActor = GetOwner();
-	if (!OwnerActor || !OwnerActor->HasAuthority())
+	if (!OwnerActor)
+	{
+		return;
+	}
+
+#if !UE_BUILD_SHIPPING
+	if (bDrawSenseDebug)
+	{
+		DrawSenseDebug();
+	}
+#endif
+
+	if (!OwnerActor->HasAuthority())
 	{
 		return;
 	}
@@ -227,4 +240,51 @@ AActor* ULSMonsterSenseComponent::FindBestVisibleTarget() const
 bool ULSMonsterSenseComponent::IsNoiseFresh() const
 {
 	return LastHeardTime >= 0.0f && (GetWorld()->GetTimeSeconds() - LastHeardTime) <= InterestMemorySeconds;
+}
+
+void ULSMonsterSenseComponent::DrawSenseDebug() const
+{
+	UWorld* World = GetWorld();
+	const AActor* OwnerActor = GetOwner();
+	if (!World || !OwnerActor)
+	{
+		return;
+	}
+
+	const FVector Origin = OwnerActor->GetActorLocation() + FVector(0.0f, 0.0f, SenseDebugDrawHeight);
+	const FVector Forward = OwnerActor->GetActorForwardVector().GetSafeNormal2D();
+	if (Forward.IsNearlyZero())
+	{
+		return;
+	}
+
+	const float Radius = GetCurrentSightRadius();
+	const float Duration = FMath::Max(PrimaryComponentTick.TickInterval * 1.5f, 0.05f);
+	const int32 SegmentCount = 24;
+	const FColor SightColor = HasVisualTarget() ? FColor::Red : FColor::Green;
+
+	const FVector LeftEdge = Forward.RotateAngleAxis(-SightHalfAngleDegrees, FVector::UpVector).GetSafeNormal2D();
+	const FVector RightEdge = Forward.RotateAngleAxis(SightHalfAngleDegrees, FVector::UpVector).GetSafeNormal2D();
+
+	DrawDebugLine(World, Origin, Origin + (LeftEdge * Radius), SightColor, false, Duration, 0, 2.0f);
+	DrawDebugLine(World, Origin, Origin + (RightEdge * Radius), SightColor, false, Duration, 0, 2.0f);
+
+	FVector PreviousPoint = Origin + (LeftEdge * Radius);
+	for (int32 SegmentIndex = 1; SegmentIndex <= SegmentCount; ++SegmentIndex)
+	{
+		const float Alpha = static_cast<float>(SegmentIndex) / static_cast<float>(SegmentCount);
+		const float Angle = FMath::Lerp(-SightHalfAngleDegrees, SightHalfAngleDegrees, Alpha);
+		const FVector Direction = Forward.RotateAngleAxis(Angle, FVector::UpVector).GetSafeNormal2D();
+		const FVector CurrentPoint = Origin + (Direction * Radius);
+
+		DrawDebugLine(World, PreviousPoint, CurrentPoint, SightColor, false, Duration, 0, 2.0f);
+		PreviousPoint = CurrentPoint;
+	}
+
+	if (HasVisualTarget())
+	{
+		const FVector SeenLocation = LastSeenLocation + FVector(0.0f, 0.0f, SenseDebugDrawHeight);
+		DrawDebugLine(World, Origin, SeenLocation, FColor::Yellow, false, Duration, 0, 1.5f);
+		DrawDebugSphere(World, SeenLocation, 20.0f, 8, FColor::Yellow, false, Duration);
+	}
 }

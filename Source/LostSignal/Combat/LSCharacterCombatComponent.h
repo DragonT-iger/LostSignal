@@ -53,7 +53,12 @@ private:
 	void BindHealthDelegates();
 	void HandleCurrentHealthChanged(const FOnAttributeChangeData& ChangeData);
 	void RefreshDeathState();
+	void HandleDeathStateChanged(bool bIsDead);
+	bool CanDamageTarget(AActor* TargetActor) const;
+	bool IsFriendlyTarget(AActor* TargetActor) const;
 
 	UPROPERTY()
 	TMap<FGameplayTag, int32> LooseTagRefCounts;
+
+	bool bCachedIsDead = false;
 };

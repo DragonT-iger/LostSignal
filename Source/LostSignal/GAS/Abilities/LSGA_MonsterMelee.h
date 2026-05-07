@@ -37,4 +37,6 @@ private:
 	/** Cached montage resolved from the owning monster character when the ability activates. */
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveAttackMontage;
+
+	bool bEndingAbility = false;
 };

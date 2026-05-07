@@ -5,11 +5,20 @@
 #include "AI/LSAIController.h"
 #include "AI/LSMonsterCombatComponent.h"
 #include "AI/LSMonsterSenseComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Blueprint/UserWidget.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSMonsterArchetypeRow.h"
 #include "Engine/DataTable.h"
 #include "GAS/Abilities/LSGA_MonsterMelee.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "LostSignal.h"
+#include "UI/Debug/LSHpDebugWidget.h"
+
+namespace
+{
+	int32 GNextMonsterHpDebugWidgetStackIndex = 0;
+}
 
 ALSEnemyCharacter::ALSEnemyCharacter()
 {
@@ -39,11 +48,44 @@ UAnimMontage* ALSEnemyCharacter::GetAbilityMontage(FGameplayTag AbilityTag) cons
 	return nullptr;
 }
 
+void ALSEnemyCharacter::MulticastPlayAbilityMontage_Implementation(UAnimMontage* Montage)
+{
+	if (!Montage)
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance)
+	{
+		return;
+	}
+
+	AnimInstance->Montage_Play(Montage);
+}
+
+void ALSEnemyCharacter::MulticastStopAbilityMontage_Implementation(UAnimMontage* Montage, float BlendOutTime)
+{
+	if (!Montage)
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance || !AnimInstance->Montage_IsPlaying(Montage))
+	{
+		return;
+	}
+
+	AnimInstance->Montage_Stop(BlendOutTime, Montage);
+}
+
 void ALSEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
 	InitializeMonsterArchetype();
+	TryCreateDebugHpWidget();
 
 	if (HasAuthority())
 	{
@@ -58,6 +100,13 @@ void ALSEnemyCharacter::BeginPlay()
 			LSAIController->TryStartStateTreeLogic();
 		}
 	}
+}
+
+void ALSEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	DestroyDebugHpWidget();
+
+	Super::EndPlay(EndPlayReason);
 }
 
 const FLSMonsterArchetypeRow* ALSEnemyCharacter::FindMonsterArchetypeRow() const
@@ -88,4 +137,64 @@ void ALSEnemyCharacter::InitializeMonsterArchetype()
 	{
 		MonsterCombatComponent->ApplyArchetype(*Row);
 	}
+}
+
+void ALSEnemyCharacter::TryCreateDebugHpWidget()
+{
+	if (!bCreateDebugHpWidget || DebugHpWidgetInstance || GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	ALSPlayerControllerBase* LocalPlayerController = nullptr;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(It->Get());
+		if (PlayerController && PlayerController->IsLocalPlayerController())
+		{
+			LocalPlayerController = PlayerController;
+			break;
+		}
+	}
+
+	if (!LocalPlayerController)
+	{
+		World->GetTimerManager().SetTimerForNextTick(this, &ALSEnemyCharacter::TryCreateDebugHpWidget);
+		return;
+	}
+
+	TSubclassOf<ULSHpDebugWidget> DebugHpWidgetClass = LocalPlayerController->GetDebugHpWidgetClass();
+	if (!DebugHpWidgetClass)
+	{
+		return;
+	}
+
+	DebugHpWidgetInstance = CreateWidget<ULSHpDebugWidget>(LocalPlayerController, DebugHpWidgetClass);
+	if (!DebugHpWidgetInstance)
+	{
+		return;
+	}
+
+	const int32 StackIndex = GNextMonsterHpDebugWidgetStackIndex++;
+	DebugHpWidgetInstance->SetObservedCharacter(this);
+	DebugHpWidgetInstance->AddToViewport();
+	DebugHpWidgetInstance->SetPositionInViewport(
+		DebugHpWidgetBasePosition + FVector2D(0.0f, DebugHpWidgetVerticalSpacing * StackIndex));
+}
+
+void ALSEnemyCharacter::DestroyDebugHpWidget()
+{
+	if (!DebugHpWidgetInstance)
+	{
+		return;
+	}
+
+	DebugHpWidgetInstance->RemoveFromParent();
+	DebugHpWidgetInstance = nullptr;
 }
