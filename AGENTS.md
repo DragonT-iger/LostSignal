@@ -31,7 +31,8 @@
 - **Category:** 모든 UPROPERTY의 Category는 반드시 `"LS/"` 하위로. 예: `Category="LS/Combat"`, `Category="LS/Stats"`. 루트 `"LS/"` 그대로 써도 됨.
 - **입력:** Enhanced Input System 전용 (Legacy 금지). `IA_Move/Attack/Dodge/Interact/Skill1~3`, `IMC_Default`
 - **네트워크:** 싱글에서도 `if (!HasAuthority()) return;` 습관화 (멀티 전환 대비)
-- **UI:** `FText`/`LOCTEXT` 필수 (`FString` 금지). 모든 위젯 C++ 상속 `UUserWidget` → `WBP_*`
+- **UI:** `FText`/`LOCTEXT` 필수 (`FString` 금지). 모든 위젯 C++ 상속 `UUserWidget` → `WBP_*`. UMG 위젯 바인딩은 항상 강제 `BindWidget` 사용 (`BindWidgetOptional` 금지).
+- **UI 로그:** 위젯 클래스, 필수 참조, 설정값이 미할당이면 `UE_LOG(LogLS, Warning, ...)`로 반드시 남긴다.
 - **DataTable:** 접두사 `DT_`, Row 구조체 `FLS~`. 수치 하드코딩 금지 — 기획자가 DataTable 편집
 - **로그:** `UE_LOG(LogLS, ...)` 카테고리 통일. `GEngine->AddOnScreenDebugMessage` 커밋 금지
 - **초기화:** 초기화 로직은 C++ 생성자에서 처리. BP(블루프린트)에서는 메시·이펙트·사운드 등 에셋 경로 매핑만 수행
