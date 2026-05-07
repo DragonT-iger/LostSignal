@@ -290,7 +290,9 @@ void ALSPlayerCharacter::FaceMovementDirection(float DeltaSeconds)
 
 	if (CameraBoom)
 	{
-		const FVector OffsetTarget = MoveDirection.GetSafeNormal() * (MouseCameraLeadDistance * 0.6f);
+		const FVector OffsetTarget = bEnableMouseCameraLead
+			? MoveDirection.GetSafeNormal() * (MouseCameraLeadDistance * 0.6f)
+			: FVector::ZeroVector;
 		CameraBoom->TargetOffset = FMath::VInterpTo(CameraBoom->TargetOffset, OffsetTarget, DeltaSeconds, MouseCameraLeadInterpSpeed);
 	}
 

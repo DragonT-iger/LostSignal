@@ -140,6 +140,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category="LS/Camera", meta=(ClampMin="0.0"))
 	float TopDownCameraDistance = 900.0f;
 
+	UPROPERTY(EditAnywhere, Category="LS/Camera")
+	bool bEnableMouseCameraLead = false;
+
 	UPROPERTY(EditAnywhere, Category="LS/Camera", meta=(ClampMin="0.0"))
 	float RunFacingInterpSpeed = 4.0f;
 

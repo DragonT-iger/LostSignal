@@ -22,7 +22,7 @@ ALSRaidEntranceZone::ALSRaidEntranceZone()
 
 	MarkerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MarkerMesh"));
 	MarkerMesh->SetupAttachment(EntranceBox);
-	MarkerMesh->SetRelativeLocation(FVector(0.f, 0.f, 20.f));
+	MarkerMesh->SetRelativeLocation(FVector(0.f, 0.f, -190.f));
 	MarkerMesh->SetRelativeScale3D(FVector(2.8f, 2.8f, 0.12f));
 	MarkerMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MarkerMesh->SetGenerateOverlapEvents(false);
@@ -38,7 +38,8 @@ ALSRaidEntranceZone::ALSRaidEntranceZone()
 	MarkerText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("MarkerText"));
 	MarkerText->SetupAttachment(EntranceBox);
 	MarkerText->SetRelativeLocation(FVector(0.f, 0.f, 260.f));
-	MarkerText->SetRelativeRotation(FRotator(60.f, 0.f, 0.f));
+	MarkerText->SetRelativeRotation(FRotator(60.f, 180.f, 0.f));
+	MarkerText->SetRelativeScale3D(FVector(3.f, 3.f, 3.f));
 	MarkerText->SetHorizontalAlignment(EHTA_Center);
 	MarkerText->SetVerticalAlignment(EVRTA_TextCenter);
 	MarkerText->SetText(LOCTEXT("RaidEntranceMarkerText", "RAID"));
