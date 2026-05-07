@@ -3,6 +3,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "AbilitySystemComponent.h"
 #include "Combat/LSCharacterCombatComponent.h"
+#include "Combat/LSCombatStateComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -29,6 +30,7 @@ ALSCharacterBase::ALSCharacterBase()
 
 	CombatAttributeSet = CreateDefaultSubobject<ULSCombatAttributeSet>(TEXT("CombatAttributeSet"));
 	CharacterCombatComponent = CreateDefaultSubobject<ULSCharacterCombatComponent>(TEXT("CharacterCombatComponent"));
+	CombatStateComponent = CreateDefaultSubobject<ULSCombatStateComponent>(TEXT("CombatStateComponent"));
 }
 
 UAbilitySystemComponent* ALSCharacterBase::GetAbilitySystemComponent() const

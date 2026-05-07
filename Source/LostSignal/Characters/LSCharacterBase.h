@@ -9,6 +9,7 @@ class UAbilitySystemComponent;
 class ULSCombatAttributeSet;
 class UGameplayAbility;
 class ULSCharacterCombatComponent;
+class ULSCombatStateComponent;
 
 UCLASS(Abstract)
 class LOSTSIGNAL_API ALSCharacterBase : public ACharacter, public IAbilitySystemInterface
@@ -26,6 +27,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	ULSCharacterCombatComponent* GetCharacterCombatComponent() const { return CharacterCombatComponent; }
 
+	UFUNCTION(BlueprintPure, Category="LS/Combat")
+	ULSCombatStateComponent* GetCombatStateComponent() const { return CombatStateComponent; }
+
 	void GrantAbility(TSubclassOf<UGameplayAbility> AbilityClass);
 
 protected:
@@ -39,4 +43,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Combat")
 	TObjectPtr<ULSCharacterCombatComponent> CharacterCombatComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Combat")
+	TObjectPtr<ULSCombatStateComponent> CombatStateComponent;
 };

@@ -1,6 +1,8 @@
 #include "GAS/Abilities/LSGA_Dash.h"
 
 #include "AbilitySystemComponent.h"
+#include "Combat/LSCombatStateComponent.h"
+#include "Combat/LSCombatTypes.h"
 #include "Combat/LSPlayerCombatComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -148,6 +150,13 @@ void ULSGA_Dash::EndAbility(
 	if (ACharacter* Character = Cast<ACharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr))
 	{
 		Character->GetCharacterMovement()->RemoveRootMotionSourceByID(RootMotionSourceID);
+		if (ULSCombatStateComponent* CombatStateComponent = Character->FindComponentByClass<ULSCombatStateComponent>())
+		{
+			if (CombatStateComponent->GetCurrentState() == ELSCombatActionState::Dash)
+			{
+				CombatStateComponent->EndAction();
+			}
+		}
 	}
 
 	if (UWorld* World = GetWorld())

@@ -139,12 +139,17 @@ void ALSPlayerCharacter::OnDash()
 	const FVector DashDirection = GetDashDirection();
 	if (!HasAuthority())
 	{
-		if (!PlayerCombatComponent->CanRequestDashLocally())
+		bool bShouldExecuteImmediately = false;
+		if (!PlayerCombatComponent->SubmitDashInput(DashDirection, bShouldExecuteImmediately))
 		{
 			return;
 		}
 
-		PlayerCombatComponent->PredictDashMovement(DashDirection);
+		if (bShouldExecuteImmediately)
+		{
+			PlayerCombatComponent->PredictDashMovement(DashDirection);
+		}
+
 		ServerRequestDash(DashDirection);
 		return;
 	}

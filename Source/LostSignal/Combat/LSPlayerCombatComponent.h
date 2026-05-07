@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Combat/LSCombatTypes.h"
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "LSPlayerCombatComponent.generated.h"
@@ -9,6 +10,7 @@ class UGameplayAbility;
 class UGameplayEffect;
 class ULSAimComponent;
 class ULSCharacterCombatComponent;
+class ULSCombatStateComponent;
 
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
 class LOSTSIGNAL_API ULSPlayerCombatComponent : public UActorComponent
@@ -27,10 +29,14 @@ public:
 	bool RequestDash(const FVector& DashDirection);
 	bool PredictDashMovement(const FVector& DashDirection);
 	bool CanRequestDashLocally() const;
+	bool SubmitDashInput(const FVector& DashDirection, bool& bOutShouldExecuteImmediately);
 	bool GetPendingDashDirection(FVector& OutDashDirection) const;
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void PerformMeleeHit();
+
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void HandleCombatActionEnd(ELSCombatActionState ExpectedState);
 
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	bool IsAttackInProgress() const;
@@ -49,10 +55,7 @@ private:
 	TSubclassOf<UGameplayEffect> BasicAttackDamageEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
-	float BasicAttackHitDelay = 0.12f;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
-	float BasicAttackRecoveryTime = 0.45f;
+	float AttackCancelBlendOutTime = 0.08f;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
 	float BasicAttackForwardOffset = 120.0f;
@@ -63,8 +66,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="1.0"))
 	float DamageEffectLevel = 1.0f;
 
-	FTimerHandle AttackHitTimerHandle;
-	FTimerHandle AttackRecoveryTimerHandle;
 	FTimerHandle PredictedDashTimerHandle;
 	FTimerHandle PredictedDashCooldownTimerHandle;
 	bool bAttackHitConsumed = false;
@@ -75,8 +76,11 @@ private:
 
 	ULSAimComponent* ResolveAimComponent() const;
 	ULSCharacterCombatComponent* ResolveSharedCombatComponent() const;
+	ULSCombatStateComponent* ResolveCombatStateComponent() const;
 	class ALSCharacterBase* ResolveOwnerCharacter() const;
 	void FinishAttack();
+	void CancelAttackForDash();
+	void TryExecuteBufferedCommand();
 	void FinishPredictedDash();
 	void FinishPredictedDashCooldown();
 	void ExecuteMeleeHit(const FVector& AttackDirection);

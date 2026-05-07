@@ -1,9 +1,12 @@
 #include "Combat/LSPlayerCombatComponent.h"
 
 #include "AbilitySystemComponent.h"
+#include "Animation/AnimInstance.h"
 #include "Characters/LSCharacterBase.h"
 #include "Combat/LSAimComponent.h"
 #include "Combat/LSCharacterCombatComponent.h"
+#include "Combat/LSCombatStateComponent.h"
+#include "Combat/LSCombatTypes.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/World.h"
 #include "GAS/Abilities/LSGA_Dash.h"
@@ -27,7 +30,8 @@ bool ULSPlayerCombatComponent::RequestBasicAttack()
 {
 	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
 	ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent();
-	if (!OwnerCharacter || OwnerCharacter->IsTemplate() || !SharedCombatComponent || !SharedCombatComponent->CanStartAttack())
+	ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent();
+	if (!OwnerCharacter || OwnerCharacter->IsTemplate() || !SharedCombatComponent || !CombatStateComponent || SharedCombatComponent->IsDead())
 	{
 		return false;
 	}
@@ -46,6 +50,11 @@ bool ULSPlayerCombatComponent::RequestBasicAttack()
 		return false;
 	}
 
+	if (!CombatStateComponent->TrySubmitCommand(ELSCombatCommandType::BasicAttack))
+	{
+		return false;
+	}
+
 	const float AttackDuration = OwnerCharacter->PlayAnimMontage(AttackMontage);
 	if (AttackDuration <= 0.0f)
 	{
@@ -54,15 +63,8 @@ bool ULSPlayerCombatComponent::RequestBasicAttack()
 	}
 
 	bAttackHitConsumed = false;
+	CombatStateComponent->BeginAction(ELSCombatActionState::BasicAttack, ELSCombatActionPhase::Startup);
 	SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_Attacking, true);
-
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(AttackHitTimerHandle);
-		World->GetTimerManager().ClearTimer(AttackRecoveryTimerHandle);
-		World->GetTimerManager().SetTimer(AttackHitTimerHandle, this, &ULSPlayerCombatComponent::PerformMeleeHit, BasicAttackHitDelay, false);
-		World->GetTimerManager().SetTimer(AttackRecoveryTimerHandle, this, &ULSPlayerCombatComponent::FinishAttack, AttackDuration, false);
-	}
 
 	return true;
 }
@@ -78,7 +80,8 @@ bool ULSPlayerCombatComponent::RequestDash(const FVector& DashDirection)
 {
 	const ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
 	ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent();
-	if (!OwnerCharacter || !SharedCombatComponent || SharedCombatComponent->IsDead())
+	ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent();
+	if (!OwnerCharacter || !SharedCombatComponent || !CombatStateComponent || SharedCombatComponent->IsDead())
 	{
 		return false;
 	}
@@ -94,6 +97,11 @@ bool ULSPlayerCombatComponent::RequestDash(const FVector& DashDirection)
 		PendingDashDirection = OwnerCharacter->GetActorForwardVector().GetSafeNormal2D();
 	}
 
+	if (!CombatStateComponent->TrySubmitCommand(ELSCombatCommandType::Dash))
+	{
+		return false;
+	}
+
 	UAbilitySystemComponent* ASC = SharedCombatComponent->GetAbilitySystemComponent();
 	if (!ASC)
 	{
@@ -102,7 +110,14 @@ bool ULSPlayerCombatComponent::RequestDash(const FVector& DashDirection)
 
 	FGameplayTagContainer AbilityTags;
 	AbilityTags.AddTag(LSGameplayTags::Ability_Dash);
-	return ASC->TryActivateAbilitiesByTag(AbilityTags);
+	const bool bActivated = ASC->TryActivateAbilitiesByTag(AbilityTags);
+	if (bActivated)
+	{
+		CancelAttackForDash();
+		CombatStateComponent->BeginAction(ELSCombatActionState::Dash, ELSCombatActionPhase::Active);
+	}
+
+	return bActivated;
 }
 
 bool ULSPlayerCombatComponent::PredictDashMovement(const FVector& DashDirection)
@@ -128,6 +143,12 @@ bool ULSPlayerCombatComponent::PredictDashMovement(const FVector& DashDirection)
 	bPredictedDashInProgress = true;
 	bPredictedDashCooldownActive = true;
 	PredictedDashRootMotionSourceID = NewRootMotionSourceID;
+	CancelAttackForDash();
+
+	if (ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent())
+	{
+		CombatStateComponent->BeginAction(ELSCombatActionState::Dash, ELSCombatActionPhase::Active);
+	}
 
 	if (UWorld* World = GetWorld())
 	{
@@ -144,7 +165,39 @@ bool ULSPlayerCombatComponent::CanRequestDashLocally() const
 {
 	const ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
 	const ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent();
-	return OwnerCharacter && !OwnerCharacter->IsTemplate() && SharedCombatComponent && !SharedCombatComponent->IsDead() && !IsDashCooldownActive();
+	const ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent();
+	return OwnerCharacter && !OwnerCharacter->IsTemplate() && SharedCombatComponent && CombatStateComponent &&
+		!SharedCombatComponent->IsDead() && !IsDashCooldownActive() && CombatStateComponent->CanExecuteCommand(ELSCombatCommandType::Dash);
+}
+
+bool ULSPlayerCombatComponent::SubmitDashInput(const FVector& DashDirection, bool& bOutShouldExecuteImmediately)
+{
+	bOutShouldExecuteImmediately = false;
+
+	const ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
+	const ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent();
+	ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent();
+	if (!OwnerCharacter || OwnerCharacter->IsTemplate() || !SharedCombatComponent || !CombatStateComponent || SharedCombatComponent->IsDead() || IsDashCooldownActive())
+	{
+		return false;
+	}
+
+	PendingDashDirection = DashDirection.GetSafeNormal2D();
+	if (PendingDashDirection.IsNearlyZero())
+	{
+		PendingDashDirection = OwnerCharacter->GetActorForwardVector().GetSafeNormal2D();
+	}
+
+	if (CombatStateComponent->CanExecuteCommand(ELSCombatCommandType::Dash))
+	{
+		bOutShouldExecuteImmediately = true;
+		return true;
+	}
+
+	CombatStateComponent->TrySubmitCommand(ELSCombatCommandType::Dash);
+
+	ELSCombatCommandType BufferedCommand = ELSCombatCommandType::BasicAttack;
+	return CombatStateComponent->PeekBufferedCommand(BufferedCommand) && BufferedCommand == ELSCombatCommandType::Dash;
 }
 
 bool ULSPlayerCombatComponent::GetPendingDashDirection(FVector& OutDashDirection) const
@@ -195,6 +248,20 @@ void ULSPlayerCombatComponent::PerformMeleeHit()
 	SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_AttackActive, false);
 }
 
+void ULSPlayerCombatComponent::HandleCombatActionEnd(ELSCombatActionState ExpectedState)
+{
+	const ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent();
+	if (!CombatStateComponent || CombatStateComponent->GetCurrentState() != ExpectedState)
+	{
+		return;
+	}
+
+	if (ExpectedState == ELSCombatActionState::BasicAttack)
+	{
+		FinishAttack();
+	}
+}
+
 bool ULSPlayerCombatComponent::IsAttackInProgress() const
 {
 	const ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent();
@@ -221,6 +288,11 @@ ULSCharacterCombatComponent* ULSPlayerCombatComponent::ResolveSharedCombatCompon
 	return GetOwner() ? GetOwner()->FindComponentByClass<ULSCharacterCombatComponent>() : nullptr;
 }
 
+ULSCombatStateComponent* ULSPlayerCombatComponent::ResolveCombatStateComponent() const
+{
+	return GetOwner() ? GetOwner()->FindComponentByClass<ULSCombatStateComponent>() : nullptr;
+}
+
 ALSCharacterBase* ULSPlayerCombatComponent::ResolveOwnerCharacter() const
 {
 	return Cast<ALSCharacterBase>(GetOwner());
@@ -233,10 +305,82 @@ void ULSPlayerCombatComponent::FinishAttack()
 		SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_Attacking, false);
 	}
 
-	if (UWorld* World = GetWorld())
+	if (ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent())
 	{
-		World->GetTimerManager().ClearTimer(AttackHitTimerHandle);
-		World->GetTimerManager().ClearTimer(AttackRecoveryTimerHandle);
+		if (CombatStateComponent->GetCurrentState() == ELSCombatActionState::BasicAttack)
+		{
+			CombatStateComponent->EndAction();
+		}
+	}
+
+	TryExecuteBufferedCommand();
+}
+
+void ULSPlayerCombatComponent::CancelAttackForDash()
+{
+	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
+	if (OwnerCharacter && AttackMontage)
+	{
+		if (UAnimInstance* AnimInstance = OwnerCharacter->GetMesh() ? OwnerCharacter->GetMesh()->GetAnimInstance() : nullptr)
+		{
+			if (AnimInstance->Montage_IsPlaying(AttackMontage))
+			{
+				AnimInstance->Montage_Stop(AttackCancelBlendOutTime, AttackMontage);
+			}
+		}
+	}
+
+	if (ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent())
+	{
+		SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_Attacking, false);
+		SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_AttackActive, false);
+	}
+
+	bAttackHitConsumed = true;
+}
+
+void ULSPlayerCombatComponent::TryExecuteBufferedCommand()
+{
+	ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent();
+	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
+	if (!CombatStateComponent || !OwnerCharacter)
+	{
+		return;
+	}
+
+	ELSCombatCommandType BufferedCommand = ELSCombatCommandType::BasicAttack;
+	if (!CombatStateComponent->ConsumeBufferedCommand(BufferedCommand))
+	{
+		return;
+	}
+
+	switch (BufferedCommand)
+	{
+	case ELSCombatCommandType::BasicAttack:
+		RequestBasicAttack();
+		break;
+
+	case ELSCombatCommandType::Dash:
+	{
+		FVector DashDirection = PendingDashDirection;
+		if (DashDirection.IsNearlyZero())
+		{
+			DashDirection = OwnerCharacter->GetActorForwardVector();
+		}
+
+		if (OwnerCharacter->HasAuthority())
+		{
+			RequestDash(DashDirection);
+		}
+		else if (OwnerCharacter->IsLocallyControlled())
+		{
+			PredictDashMovement(DashDirection);
+		}
+		break;
+	}
+
+	default:
+		break;
 	}
 }
 
@@ -252,6 +396,14 @@ void ULSPlayerCombatComponent::FinishPredictedDash()
 
 	PredictedDashRootMotionSourceID = 0;
 	bPredictedDashInProgress = false;
+
+	if (ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent())
+	{
+		if (CombatStateComponent->GetCurrentState() == ELSCombatActionState::Dash)
+		{
+			CombatStateComponent->EndAction();
+		}
+	}
 
 	if (UWorld* World = GetWorld())
 	{
