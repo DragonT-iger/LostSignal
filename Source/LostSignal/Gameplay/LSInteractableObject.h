@@ -18,6 +18,7 @@ public:
 	ALSInteractableObject();
 
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 
 	virtual bool CanInteract_Implementation(APawn* Interactor) override;
 	virtual void Interact_Implementation(APawn* Interactor) override;
@@ -37,7 +38,18 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact")
 	FText InteractText;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact", meta=(ClampMin="0.0"))
+	float MouseAimDistanceWeight = 0.55f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact", meta=(ClampMin="0.0"))
+	float MouseAimAngleWeight = 0.45f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact", meta=(ClampMin="0.0"))
+	float MouseAimScoreThreshold = 0.25f;
+
 private:
+	TWeakObjectPtr<APawn> FocusedLocalPawn;
+
 	UFUNCTION()
 	void OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
@@ -45,4 +57,9 @@ private:
 	UFUNCTION()
 	void OnSphereEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	APawn* FindOverlappingLocalPawn() const;
+	bool IsInsideMouseAimCone(APawn* Pawn) const;
+	bool ResolveMouseWorldPoint(APawn* Pawn, FVector& OutMouseWorldPoint) const;
+	void UpdateHintWidget(APawn* Pawn);
 };

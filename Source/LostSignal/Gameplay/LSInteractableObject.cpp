@@ -1,16 +1,18 @@
 #include "Gameplay/LSInteractableObject.h"
+
 #include "Characters/LSPlayerCharacter.h"
-#include "LostSignal.h"
 #include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "LostSignal.h"
 #include "UI/LSInteractHintWidget.h"
 
 ALSInteractableObject::ALSInteractableObject()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 	bReplicates = true;
 
 	InteractionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionSphere"));
@@ -35,6 +37,12 @@ void ALSInteractableObject::BeginPlay()
 	InteractionSphere->OnComponentEndOverlap.AddDynamic(this, &ALSInteractableObject::OnSphereEndOverlap);
 }
 
+void ALSInteractableObject::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	RefreshWidgetVisibility();
+}
+
 bool ALSInteractableObject::CanInteract_Implementation(APawn* Interactor)
 {
 	return true;
@@ -51,18 +59,19 @@ FText ALSInteractableObject::GetInteractText_Implementation()
 
 void ALSInteractableObject::RefreshWidgetVisibility()
 {
-	TArray<AActor*> Overlapping;
-	InteractionSphere->GetOverlappingActors(Overlapping, APawn::StaticClass());
-
-	for (AActor* Actor : Overlapping)
+	APawn* Pawn = FocusedLocalPawn.Get();
+	if (!Pawn)
 	{
-		APawn* Pawn = Cast<APawn>(Actor);
-		if (!Pawn || !Pawn->IsLocallyControlled()) continue;
-
-		InteractWidget->SetHiddenInGame(!CanInteract_Implementation(Pawn));
-		return;
+		Pawn = FindOverlappingLocalPawn();
 	}
-	InteractWidget->SetHiddenInGame(true);
+
+	const bool bShouldShow =
+		Pawn &&
+		CanInteract_Implementation(Pawn) &&
+		IsInsideMouseAimCone(Pawn);
+
+	InteractWidget->SetHiddenInGame(!bShouldShow);
+	SetActorTickEnabled(Pawn != nullptr);
 }
 
 void ALSInteractableObject::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
@@ -74,13 +83,117 @@ void ALSInteractableObject::OnSphereBeginOverlap(UPrimitiveComponent* Overlapped
 	if (!Pawn || !Pawn->IsLocallyControlled()) return;
 	if (!CanInteract_Implementation(Pawn)) return;
 
-	UE_LOG(LogLS, Log, TEXT("[InteractHint] 위젯 표시 시도 - WidgetClass: %s"),
+	FocusedLocalPawn = Pawn;
+	UpdateHintWidget(Pawn);
+	SetActorTickEnabled(true);
+	RefreshWidgetVisibility();
+}
+
+void ALSInteractableObject::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	APawn* Pawn = Cast<APawn>(OtherActor);
+	if (!Pawn || !Pawn->IsLocallyControlled()) return;
+
+	if (FocusedLocalPawn.Get() == Pawn)
+	{
+		FocusedLocalPawn.Reset();
+	}
+
+	InteractWidget->SetHiddenInGame(true);
+	SetActorTickEnabled(false);
+}
+
+APawn* ALSInteractableObject::FindOverlappingLocalPawn() const
+{
+	TArray<AActor*> Overlapping;
+	InteractionSphere->GetOverlappingActors(Overlapping, APawn::StaticClass());
+
+	for (AActor* Actor : Overlapping)
+	{
+		APawn* Pawn = Cast<APawn>(Actor);
+		if (Pawn && Pawn->IsLocallyControlled())
+		{
+			return Pawn;
+		}
+	}
+
+	return nullptr;
+}
+
+bool ALSInteractableObject::IsInsideMouseAimCone(APawn* Pawn) const
+{
+	if (!Pawn)
+	{
+		return false;
+	}
+
+	FVector MouseWorldPoint = FVector::ZeroVector;
+	if (!ResolveMouseWorldPoint(Pawn, MouseWorldPoint))
+	{
+		return false;
+	}
+
+	FVector MouseDirection = MouseWorldPoint - Pawn->GetActorLocation();
+	MouseDirection.Z = 0.0f;
+
+	FVector ObjectDirection = GetActorLocation() - Pawn->GetActorLocation();
+	ObjectDirection.Z = 0.0f;
+
+	if (MouseDirection.IsNearlyZero() || ObjectDirection.IsNearlyZero())
+	{
+		return false;
+	}
+
+	const float DistanceScore = 1.0f - FMath::Clamp(
+		ObjectDirection.Size2D() / FMath::Max(InteractionSphere->GetScaledSphereRadius(), 1.0f),
+		0.0f,
+		1.0f);
+	const float Dot = FVector::DotProduct(MouseDirection.GetSafeNormal(), ObjectDirection.GetSafeNormal());
+	const float AngleScore = (FMath::Clamp(Dot, -1.0f, 1.0f) + 1.0f) * 0.5f;
+	const float InteractionScore = (DistanceScore * MouseAimDistanceWeight) + (AngleScore * MouseAimAngleWeight);
+	return InteractionScore >= MouseAimScoreThreshold;
+}
+
+bool ALSInteractableObject::ResolveMouseWorldPoint(APawn* Pawn, FVector& OutMouseWorldPoint) const
+{
+	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
+	if (!PC || !PC->IsLocalPlayerController())
+	{
+		return false;
+	}
+
+	FVector WorldOrigin = FVector::ZeroVector;
+	FVector WorldDirection = FVector::ZeroVector;
+	if (!PC->DeprojectMousePositionToWorld(WorldOrigin, WorldDirection))
+	{
+		return false;
+	}
+
+	if (FMath::IsNearlyZero(WorldDirection.Z))
+	{
+		return false;
+	}
+
+	const float RayDistance = (GetActorLocation().Z - WorldOrigin.Z) / WorldDirection.Z;
+	if (RayDistance < 0.0f)
+	{
+		return false;
+	}
+
+	OutMouseWorldPoint = WorldOrigin + (WorldDirection * RayDistance);
+	return true;
+}
+
+void ALSInteractableObject::UpdateHintWidget(APawn* Pawn)
+{
+	UE_LOG(LogLS, Log, TEXT("[InteractHint] Update widget - WidgetClass: %s"),
 		*GetNameSafe(InteractWidget->GetWidgetClass()));
 
 	FText KeyName = FText::FromString(TEXT("?"));
 
 	ALSPlayerCharacter* LSChar = Cast<ALSPlayerCharacter>(Pawn);
-	APlayerController* PC = Cast<APlayerController>(Pawn->GetController());
+	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
 	if (LSChar && PC)
 	{
 		UEnhancedInputLocalPlayerSubsystem* Subsystem =
@@ -100,13 +213,4 @@ void ALSInteractableObject::OnSphereBeginOverlap(UPrimitiveComponent* Overlapped
 	{
 		HintWidget->UpdateHintInfo(GetInteractText_Implementation(), KeyName);
 	}
-	InteractWidget->SetHiddenInGame(false);
-}
-
-void ALSInteractableObject::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
-	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-	APawn* Pawn = Cast<APawn>(OtherActor);
-	if (!Pawn || !Pawn->IsLocallyControlled()) return;
-	InteractWidget->SetHiddenInGame(true);
 }

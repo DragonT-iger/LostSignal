@@ -116,8 +116,14 @@ protected:
 	float MaxInteractRange = 250.0f;
 
 	// 플레이어 정면과 오브젝트 방향의 내적 최소값 (0=90도, 0.5=60도, -1=뒤)
-	UPROPERTY(EditAnywhere, Category="LS/Interact", meta=(ClampMin="-1.0", ClampMax="1.0"))
-	float InteractFacingThreshold = 0.3f;
+	UPROPERTY(EditAnywhere, Category="LS/Interact", meta=(ClampMin="0.0"))
+	float InteractDistanceWeight = 0.55f;
+
+	UPROPERTY(EditAnywhere, Category="LS/Interact", meta=(ClampMin="0.0"))
+	float InteractAngleWeight = 0.45f;
+
+	UPROPERTY(EditAnywhere, Category="LS/Interact", meta=(ClampMin="0.0"))
+	float InteractScoreThreshold = 0.25f;
 
 	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
 	float WalkSpeed = 300.0f;
@@ -196,4 +202,5 @@ private:
 	void ServerRequestInteract(AActor* Target);
 
 	FVector GetDashDirection() const;
+	bool ResolveMouseWorldPoint(FVector& OutMouseWorldPoint) const;
 };

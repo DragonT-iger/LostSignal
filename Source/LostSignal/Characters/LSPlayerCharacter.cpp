@@ -8,6 +8,7 @@
 #include "EnhancedInputComponent.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "EngineUtils.h"
 #include "Gameplay/LSInteractable.h"
@@ -165,10 +166,24 @@ void ALSPlayerCharacter::OnInteract()
 	if (!IsLocallyControlled()) return;
 
 	const FVector MyLocation = GetActorLocation();
-	const FVector ForwardDir = GetActorForwardVector();
+
+	FVector MouseWorldPoint = FVector::ZeroVector;
+	if (!ResolveMouseWorldPoint(MouseWorldPoint))
+	{
+		return;
+	}
+
+	FVector AimDirection = MouseWorldPoint - MyLocation;
+	AimDirection.Z = 0.0f;
+	if (AimDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	AimDirection.Normalize();
 
 	AActor* BestTarget = nullptr;
-	float BestDistSq = FLT_MAX;
+	float BestScore = -FLT_MAX;
 
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
@@ -179,12 +194,19 @@ void ALSPlayerCharacter::OnInteract()
 		const float DistSq = ToActor.SizeSquared();
 		if (DistSq > FMath::Square(MaxInteractRange)) continue;
 
-		const float Dot = FVector::DotProduct(ForwardDir, ToActor.GetSafeNormal());
-		if (Dot < InteractFacingThreshold) continue;
+		FVector TargetDirection = ToActor;
+		TargetDirection.Z = 0.0f;
+		if (TargetDirection.IsNearlyZero()) continue;
 
-		if (DistSq < BestDistSq)
+		const float DistanceScore = 1.0f - FMath::Clamp(FMath::Sqrt(DistSq) / FMath::Max(MaxInteractRange, 1.0f), 0.0f, 1.0f);
+		const float Dot = FVector::DotProduct(AimDirection, TargetDirection.GetSafeNormal());
+		const float AngleScore = (FMath::Clamp(Dot, -1.0f, 1.0f) + 1.0f) * 0.5f;
+		const float Score = (DistanceScore * InteractDistanceWeight) + (AngleScore * InteractAngleWeight);
+		if (Score < InteractScoreThreshold) continue;
+
+		if (Score > BestScore)
 		{
-			BestDistSq = DistSq;
+			BestScore = Score;
 			BestTarget = Actor;
 		}
 	}
@@ -350,4 +372,34 @@ FVector ALSPlayerCharacter::GetDashDirection() const
 
 	DashDirection.Z = 0.0f;
 	return DashDirection.IsNearlyZero() ? GetActorForwardVector() : DashDirection.GetSafeNormal();
+}
+
+bool ALSPlayerCharacter::ResolveMouseWorldPoint(FVector& OutMouseWorldPoint) const
+{
+	const APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (!PlayerController || !PlayerController->IsLocalPlayerController())
+	{
+		return false;
+	}
+
+	FVector WorldOrigin = FVector::ZeroVector;
+	FVector WorldDirection = FVector::ZeroVector;
+	if (!PlayerController->DeprojectMousePositionToWorld(WorldOrigin, WorldDirection))
+	{
+		return false;
+	}
+
+	if (FMath::IsNearlyZero(WorldDirection.Z))
+	{
+		return false;
+	}
+
+	const float RayDistance = (GetActorLocation().Z - WorldOrigin.Z) / WorldDirection.Z;
+	if (RayDistance < 0.0f)
+	{
+		return false;
+	}
+
+	OutMouseWorldPoint = WorldOrigin + (WorldDirection * RayDistance);
+	return true;
 }
