@@ -38,7 +38,13 @@ public:
 	void SetCombatTagActive(FGameplayTag Tag, bool bActive);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
-	bool ApplyDamageEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> DamageEffectClass, float EffectLevel = 1.0f) const;
+	bool ApplyDamageEffectToTarget(
+		AActor* TargetActor,
+		TSubclassOf<UGameplayEffect> DamageEffectClass,
+		float EffectLevel = 1.0f,
+		float BaseDamage = 0.0f,
+		float AttackCoefficient = 0.0f,
+		bool bCanCrit = false) const;
 
 protected:
 	virtual void BeginPlay() override;

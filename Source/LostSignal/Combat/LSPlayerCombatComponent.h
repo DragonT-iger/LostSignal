@@ -66,6 +66,15 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="1.0"))
 	float DamageEffectLevel = 1.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
+	float BasicAttackBaseDamage = 0.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
+	float BasicAttackAttackCoefficient = 0.15f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
+	bool bBasicAttackCanCrit = true;
+
 	FTimerHandle PredictedDashTimerHandle;
 	FTimerHandle PredictedDashCooldownTimerHandle;
 	bool bAttackHitConsumed = false;

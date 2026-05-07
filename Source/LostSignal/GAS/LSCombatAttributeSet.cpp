@@ -24,6 +24,17 @@ void ULSCombatAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCa
 	{
 		ClampCurrentHealth();
 	}
+	else if (Data.EvaluatedData.Attribute == GetDamageAttribute())
+	{
+		const float LocalDamage = FMath::Max(0.0f, GetDamage());
+		SetDamage(0.0f);
+
+		if (LocalDamage > 0.0f)
+		{
+			SetCurrentHealth(GetCurrentHealth() - LocalDamage);
+			ClampCurrentHealth();
+		}
+	}
 	else if (Data.EvaluatedData.Attribute == GetMaxHealthAttribute())
 	{
 		SetMaxHealth(FMath::Max(0.0f, GetMaxHealth()));

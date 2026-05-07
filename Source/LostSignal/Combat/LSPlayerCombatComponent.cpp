@@ -455,7 +455,13 @@ void ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection)
 			continue;
 		}
 
-		if (SharedCombatComponent->ApplyDamageEffectToTarget(HitActor, BasicAttackDamageEffectClass, DamageEffectLevel))
+		if (SharedCombatComponent->ApplyDamageEffectToTarget(
+			HitActor,
+			BasicAttackDamageEffectClass,
+			DamageEffectLevel,
+			BasicAttackBaseDamage,
+			BasicAttackAttackCoefficient,
+			bBasicAttackCanCrit))
 		{
 			UniqueTargets.Add(HitActor);
 		}

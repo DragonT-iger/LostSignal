@@ -28,6 +28,10 @@ public:
 	FGameplayAttributeData CurrentHealth = 100.0f;
 	LS_ATTRIBUTE_ACCESSORS(ULSCombatAttributeSet, CurrentHealth)
 
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
+	FGameplayAttributeData Damage = 0.0f;
+	LS_ATTRIBUTE_ACCESSORS(ULSCombatAttributeSet, Damage)
+
 private:
 	void ClampCurrentHealth();
 };

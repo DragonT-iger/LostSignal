@@ -132,6 +132,10 @@ void ULSMonsterCombatComponent::PerformMeleeHit()
 		const FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, DamageEffectLevel, EffectContext);
 		if (SpecHandle.IsValid())
 		{
+			SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_Base, MeleeBaseDamage);
+			SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_AttackCoefficient, MeleeAttackCoefficient);
+			SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_CanCrit, bMeleeCanCrit ? 1.0f : 0.0f);
+
 			const float BeforeHealth = TargetASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
 			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 			const float AfterHealth = TargetASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());

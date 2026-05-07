@@ -22,4 +22,9 @@ namespace LSGameplayTags
 	// Combat phase tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Attacking)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_AttackActive)
+
+	// SetByCaller damage data
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_Base)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_AttackCoefficient)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_CanCrit)
 }

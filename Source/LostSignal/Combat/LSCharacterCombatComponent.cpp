@@ -75,7 +75,13 @@ void ULSCharacterCombatComponent::SetCombatTagActive(FGameplayTag Tag, bool bAct
 	}
 }
 
-bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(AActor* TargetActor, TSubclassOf<UGameplayEffect> DamageEffectClass, float EffectLevel) const
+bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
+	AActor* TargetActor,
+	TSubclassOf<UGameplayEffect> DamageEffectClass,
+	float EffectLevel,
+	float BaseDamage,
+	float AttackCoefficient,
+	bool bCanCrit) const
 {
 	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponent();
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
@@ -92,6 +98,10 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(AActor* TargetActor,
 	{
 		return false;
 	}
+
+	SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_Base, BaseDamage);
+	SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_AttackCoefficient, AttackCoefficient);
+	SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_CanCrit, bCanCrit ? 1.0f : 0.0f);
 
 	SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 	return true;

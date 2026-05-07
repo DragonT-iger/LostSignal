@@ -12,4 +12,8 @@ namespace LSGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Attacking, "LS.Combat.Attacking")
 	UE_DEFINE_GAMEPLAY_TAG(Combat_AttackActive, "LS.Combat.AttackActive")
+
+	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_Base, "LS.Data.Damage.Base")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_AttackCoefficient, "LS.Data.Damage.AttackCoefficient")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_CanCrit, "LS.Data.Damage.CanCrit")
 }
