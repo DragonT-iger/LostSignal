@@ -30,6 +30,8 @@ public class LostSignal : ModuleRules
 			"Renderer",
 			"Projects",
 			"DeveloperSettings",
+			"Json",
+			"JsonUtilities",
 			"LostSignalVisionShaders"
 		});
 

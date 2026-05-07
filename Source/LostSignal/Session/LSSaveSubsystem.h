@@ -25,8 +25,10 @@ public:
 private:
 	void Load();
 	void Save();
+	void SaveDebugJson() const;
 
 	UPROPERTY() TObjectPtr<ULSSaveGame> SaveData;
 
 	static const FString SlotName;
+	static const FString DebugFileName;
 };
