@@ -87,6 +87,9 @@ protected:
 	bool bCreateDebugHpWidget = true;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Debug")
+	TSubclassOf<ULSHpDebugWidget> DebugHpWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Debug")
 	FVector2D DebugHpWidgetBasePosition = FVector2D(40.0f, 120.0f);
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Debug", meta=(ClampMin="0.0"))
@@ -100,4 +103,6 @@ private:
 	void InitializeMonsterArchetype();
 	void TryCreateDebugHpWidget();
 	void DestroyDebugHpWidget();
+
+	bool bWarnedMissingDebugHpWidgetClass = false;
 };

@@ -15,6 +15,8 @@
 #include "Gameplay/LSLootBox.h"
 #include "InputActionValue.h"
 #include "LostSignal.h"
+#include "Skills/LSPlayerSkillComponent.h"
+#include "Skills/LSSkillPreviewComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "Vision/LSMPCVisionSourceComponent.h"
@@ -45,6 +47,8 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	PlayerXRayComponent = CreateDefaultSubobject<ULSPlayerXRayComponent>(TEXT("PlayerXRayComponent"));
 	AimComponent = CreateDefaultSubobject<ULSAimComponent>(TEXT("AimComponent"));
 	PlayerCombatComponent = CreateDefaultSubobject<ULSPlayerCombatComponent>(TEXT("PlayerCombatComponent"));
+	SkillPreviewComponent = CreateDefaultSubobject<ULSSkillPreviewComponent>(TEXT("SkillPreviewComponent"));
+	PlayerSkillComponent = CreateDefaultSubobject<ULSPlayerSkillComponent>(TEXT("PlayerSkillComponent"));
 	PlayerAttributeSet = CreateDefaultSubobject<ULSCharacterAttributeSet>(TEXT("PlayerAttributeSet"));
 
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
@@ -69,6 +73,7 @@ void ALSPlayerCharacter::Tick(float DeltaSeconds)
 	}
 
 	UpdateInventoryWidgetDistance();
+	UpdateActiveSkillPreview();
 }
 
 void ALSPlayerCharacter::ApplyFacingRotation(const FRotator& NewRotation)
@@ -105,10 +110,36 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 	if (AttackAction) { EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnAttack); }
 	if (DashAction) { EnhancedInput->BindAction(DashAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnDash); }
-	if (Skill1Action) { EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill1); }
-	if (Skill2Action) { EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill2); }
-	if (Skill3Action) { EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill3); }
-	if (Skill4Action) { EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill4); }
+	if (Skill1Action)
+	{
+		EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill1);
+		EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill1Confirm);
+		EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill1Cancel);
+	}
+	if (Skill2Action)
+	{
+		EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill2);
+		EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill2Confirm);
+		EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill2Cancel);
+	}
+	if (Skill3Action)
+	{
+		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill3);
+		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill3Confirm);
+		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill3Cancel);
+	}
+	if (Skill4Action)
+	{
+		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill4);
+		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill4Confirm);
+		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill4Cancel);
+	}
+	if (Ultimatection)
+	{
+		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnUltimate);
+		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnUltimateConfirm);
+		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnUltimateCancel);
+	}
 	if (Item1Action) { EnhancedInput->BindAction(Item1Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem1); }
 	if (Item2Action) { EnhancedInput->BindAction(Item2Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem2); }
 	if (Item3Action) { EnhancedInput->BindAction(Item3Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem3); }
@@ -163,11 +194,21 @@ void ALSPlayerCharacter::OnDash()
 	PlayerCombatComponent->RequestDash(DashDirection);
 }
 
-void ALSPlayerCharacter::OnSkill1() {}
-void ALSPlayerCharacter::OnSkill2() {}
-void ALSPlayerCharacter::OnSkill3() {}
-void ALSPlayerCharacter::OnSkill4() {}
-void ALSPlayerCharacter::OnUltimate() {}
+void ALSPlayerCharacter::OnSkill1() { BeginSkillPreview(ELSPlayerSkillSlot::Skill1); }
+void ALSPlayerCharacter::OnSkill2() { BeginSkillPreview(ELSPlayerSkillSlot::Skill2); }
+void ALSPlayerCharacter::OnSkill3() { BeginSkillPreview(ELSPlayerSkillSlot::Skill3); }
+void ALSPlayerCharacter::OnSkill4() { BeginSkillPreview(ELSPlayerSkillSlot::Skill4); }
+void ALSPlayerCharacter::OnUltimate() { BeginSkillPreview(ELSPlayerSkillSlot::Ultimate); }
+void ALSPlayerCharacter::OnSkill1Confirm() { ConfirmSkillPreview(ELSPlayerSkillSlot::Skill1); }
+void ALSPlayerCharacter::OnSkill2Confirm() { ConfirmSkillPreview(ELSPlayerSkillSlot::Skill2); }
+void ALSPlayerCharacter::OnSkill3Confirm() { ConfirmSkillPreview(ELSPlayerSkillSlot::Skill3); }
+void ALSPlayerCharacter::OnSkill4Confirm() { ConfirmSkillPreview(ELSPlayerSkillSlot::Skill4); }
+void ALSPlayerCharacter::OnUltimateConfirm() { ConfirmSkillPreview(ELSPlayerSkillSlot::Ultimate); }
+void ALSPlayerCharacter::OnSkill1Cancel() { CancelSkillPreview(ELSPlayerSkillSlot::Skill1); }
+void ALSPlayerCharacter::OnSkill2Cancel() { CancelSkillPreview(ELSPlayerSkillSlot::Skill2); }
+void ALSPlayerCharacter::OnSkill3Cancel() { CancelSkillPreview(ELSPlayerSkillSlot::Skill3); }
+void ALSPlayerCharacter::OnSkill4Cancel() { CancelSkillPreview(ELSPlayerSkillSlot::Skill4); }
+void ALSPlayerCharacter::OnUltimateCancel() { CancelSkillPreview(ELSPlayerSkillSlot::Ultimate); }
 void ALSPlayerCharacter::OnItem1() {}
 void ALSPlayerCharacter::OnItem2() {}
 void ALSPlayerCharacter::OnItem3() {}
@@ -332,6 +373,76 @@ void ALSPlayerCharacter::UpdateInventoryWidgetDistance()
 bool ALSPlayerCharacter::IsInventoryWidgetOpen() const
 {
 	return InventoryWidget && InventoryWidget->IsVisible();
+}
+
+void ALSPlayerCharacter::BeginSkillPreview(ELSPlayerSkillSlot Slot)
+{
+	if (!IsLocallyControlled() || !PlayerSkillComponent)
+	{
+		return;
+	}
+
+	if (PlayerSkillComponent->BeginSkillPreview(Slot))
+	{
+		UpdateActiveSkillPreview();
+	}
+}
+
+void ALSPlayerCharacter::UpdateActiveSkillPreview()
+{
+	if (!IsLocallyControlled() || !PlayerSkillComponent || !PlayerSkillComponent->IsPreviewingSkill())
+	{
+		return;
+	}
+
+	FVector MouseWorldPoint = FVector::ZeroVector;
+	if (!ResolveMouseWorldPoint(MouseWorldPoint))
+	{
+		return;
+	}
+
+	FVector AimDirection = MouseWorldPoint - GetActorLocation();
+	AimDirection.Z = 0.0f;
+	if (AimDirection.IsNearlyZero())
+	{
+		AimDirection = GetActorForwardVector();
+	}
+
+	FLSSkillAreaPreviewSpec PreviewSpec;
+	const bool bHasPreviewSpec = PlayerSkillComponent->GetActivePreviewSpec(PreviewSpec);
+	FVector PreviewLocation =
+		bHasPreviewSpec && PreviewSpec.LocationMode == ELSSkillPreviewLocationMode::CasterOrigin
+			? GetActorLocation()
+			: MouseWorldPoint;
+
+	if (bHasPreviewSpec && !PreviewSpec.LocationOffset.IsNearlyZero())
+	{
+		const FVector Forward = AimDirection.GetSafeNormal2D();
+		const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
+		PreviewLocation += (Forward * PreviewSpec.LocationOffset.X) + (Right * PreviewSpec.LocationOffset.Y);
+	}
+
+	PlayerSkillComponent->UpdateActiveSkillPreview(PreviewLocation, AimDirection.Rotation());
+}
+
+void ALSPlayerCharacter::ConfirmSkillPreview(ELSPlayerSkillSlot Slot)
+{
+	if (!IsLocallyControlled() || !PlayerSkillComponent)
+	{
+		return;
+	}
+
+	PlayerSkillComponent->ConfirmActiveSkillPreview(Slot);
+}
+
+void ALSPlayerCharacter::CancelSkillPreview(ELSPlayerSkillSlot Slot)
+{
+	if (!IsLocallyControlled() || !PlayerSkillComponent)
+	{
+		return;
+	}
+
+	PlayerSkillComponent->CancelActiveSkillPreview(Slot);
 }
 
 void ALSPlayerCharacter::ServerRequestInteract_Implementation(AActor* Target)

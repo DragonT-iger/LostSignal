@@ -4,6 +4,7 @@
 
 #include "Characters/LSCharacterBase.h"
 #include "CoreMinimal.h"
+#include "Skills/LSSkillTypes.h"
 #include "LSPlayerCharacter.generated.h"
 
 class UCameraComponent;
@@ -12,6 +13,8 @@ class ULSAimComponent;
 class ULSMPCVisionSourceComponent;
 class ULSPlayerCombatComponent;
 class ULSPlayerXRayComponent;
+class ULSPlayerSkillComponent;
+class ULSSkillPreviewComponent;
 class ULSVisionComponent;
 class ULSCharacterAttributeSet;
 class UUserWidget;
@@ -36,6 +39,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	ULSPlayerCombatComponent* GetPlayerCombatComponent() const { return PlayerCombatComponent; }
+
+	UFUNCTION(BlueprintPure, Category="LS/Skill")
+	ULSPlayerSkillComponent* GetPlayerSkillComponent() const { return PlayerSkillComponent; }
+
+	UFUNCTION(BlueprintPure, Category="LS/Skill")
+	ULSSkillPreviewComponent* GetSkillPreviewComponent() const { return SkillPreviewComponent; }
 
 	UFUNCTION(BlueprintPure, Category="LS/GAS")
 	ULSCharacterAttributeSet* GetPlayerAttributeSet() const { return PlayerAttributeSet; }
@@ -66,6 +75,12 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Combat", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSPlayerCombatComponent> PlayerCombatComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Skill", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<ULSSkillPreviewComponent> SkillPreviewComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Skill", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<ULSPlayerSkillComponent> PlayerSkillComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/GAS", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSCharacterAttributeSet> PlayerAttributeSet;
@@ -194,6 +209,16 @@ private:
 	void OnSkill3();
 	void OnSkill4();
 	void OnUltimate();
+	void OnSkill1Confirm();
+	void OnSkill2Confirm();
+	void OnSkill3Confirm();
+	void OnSkill4Confirm();
+	void OnUltimateConfirm();
+	void OnSkill1Cancel();
+	void OnSkill2Cancel();
+	void OnSkill3Cancel();
+	void OnSkill4Cancel();
+	void OnUltimateCancel();
 	void OnItem1();
 	void OnItem2();
 	void OnItem3();
@@ -205,6 +230,11 @@ private:
 	void HideInventoryWidget();
 	void UpdateInventoryWidgetDistance();
 	bool IsInventoryWidgetOpen() const;
+
+	void BeginSkillPreview(ELSPlayerSkillSlot Slot);
+	void UpdateActiveSkillPreview();
+	void ConfirmSkillPreview(ELSPlayerSkillSlot Slot);
+	void CancelSkillPreview(ELSPlayerSkillSlot Slot);
 
 	void ApplyRunState(bool bNewIsRunning);
 	bool ShouldSyncFacingRotation(float NewYaw) const;

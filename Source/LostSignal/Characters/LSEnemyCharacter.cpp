@@ -169,13 +169,27 @@ void ALSEnemyCharacter::TryCreateDebugHpWidget()
 		return;
 	}
 
-	TSubclassOf<ULSHpDebugWidget> DebugHpWidgetClass = LocalPlayerController->GetDebugHpWidgetClass();
-	if (!DebugHpWidgetClass)
+	TSubclassOf<ULSHpDebugWidget> WidgetClassToUse = DebugHpWidgetClass;
+	if (!WidgetClassToUse && LocalPlayerController)
 	{
+		WidgetClassToUse = LocalPlayerController->GetDebugHpWidgetClass();
+	}
+
+	if (!WidgetClassToUse)
+	{
+		if (!bWarnedMissingDebugHpWidgetClass)
+		{
+			bWarnedMissingDebugHpWidgetClass = true;
+			UE_LOG(
+				LogLS,
+				Warning,
+				TEXT("%s cannot create enemy HP debug widget because DebugHpWidgetClass is not set on enemy or local player controller."),
+				*GetNameSafe(this));
+		}
 		return;
 	}
 
-	DebugHpWidgetInstance = CreateWidget<ULSHpDebugWidget>(LocalPlayerController, DebugHpWidgetClass);
+	DebugHpWidgetInstance = CreateWidget<ULSHpDebugWidget>(LocalPlayerController, WidgetClassToUse);
 	if (!DebugHpWidgetInstance)
 	{
 		return;
