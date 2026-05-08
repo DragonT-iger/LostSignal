@@ -125,6 +125,92 @@ void NormalizeSlotArray(TArray<FLSSessionItem>& Slots)
 		AddItemsToSlotArray(Slots, OldSlot.ItemRowName, OldSlot.Amount);
 	}
 }
+
+int32 FindRowOrder(UDataTable* Table, const FName RowName)
+{
+	if (!Table)
+	{
+		return MAX_int32 / 2;
+	}
+
+	const TArray<FName> RowNames = Table->GetRowNames();
+	const int32 RowIndex = RowNames.IndexOfByKey(RowName);
+	return RowIndex == INDEX_NONE ? MAX_int32 / 2 : RowIndex;
+}
+
+int32 ResolveItemSortKeyForSave(const FName ItemRowName)
+{
+	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
+	if (!Settings || ItemRowName.IsNone())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot resolve sort key. Row=%s"), *ItemRowName.ToString());
+		return MAX_int32;
+	}
+
+	const FString RowNameString = ItemRowName.ToString();
+	if (RowNameString.StartsWith(TEXT("Chip_")))
+	{
+		return FindRowOrder(Settings->ChipTable.LoadSynchronous(), ItemRowName);
+	}
+
+	if (RowNameString.StartsWith(TEXT("Weapon_")))
+	{
+		return 100000 + FindRowOrder(Settings->WeaponTable.LoadSynchronous(), ItemRowName);
+	}
+
+	if (RowNameString.StartsWith(TEXT("Armor_")))
+	{
+		return 200000 + FindRowOrder(Settings->ArmorTable.LoadSynchronous(), ItemRowName);
+	}
+
+	if (RowNameString.StartsWith(TEXT("Item_")))
+	{
+		return 300000 + FindRowOrder(Settings->ItemTable.LoadSynchronous(), ItemRowName);
+	}
+
+	UE_LOG(LogLS, Warning, TEXT("[Save] Unknown item row prefix for sort key: %s"), *ItemRowName.ToString());
+	return MAX_int32;
+}
+
+void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots)
+{
+	TMap<FName, int32> AmountByRowName;
+	for (const FLSSessionItem& Slot : Slots)
+	{
+		if (Slot.ItemRowName.IsNone() || Slot.Amount <= 0)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Save] Skipping invalid slot while sorting. Row=%s Amount=%d"), *Slot.ItemRowName.ToString(), Slot.Amount);
+			continue;
+		}
+
+		AmountByRowName.FindOrAdd(Slot.ItemRowName) += Slot.Amount;
+	}
+
+	TArray<FLSSessionItem> MergedItems;
+	MergedItems.Reserve(AmountByRowName.Num());
+	for (const TPair<FName, int32>& Pair : AmountByRowName)
+	{
+		MergedItems.Add({ Pair.Key, Pair.Value });
+	}
+
+	MergedItems.Sort([](const FLSSessionItem& Left, const FLSSessionItem& Right)
+	{
+		const int32 LeftSortKey = ResolveItemSortKeyForSave(Left.ItemRowName);
+		const int32 RightSortKey = ResolveItemSortKeyForSave(Right.ItemRowName);
+		if (LeftSortKey != RightSortKey)
+		{
+			return LeftSortKey < RightSortKey;
+		}
+
+		return Left.ItemRowName.LexicalLess(Right.ItemRowName);
+	});
+
+	Slots.Reset();
+	for (const FLSSessionItem& MergedItem : MergedItems)
+	{
+		AddItemsToSlotArray(Slots, MergedItem.ItemRowName, MergedItem.Amount);
+	}
+}
 }
 
 void ULSSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -150,10 +236,41 @@ void ULSSaveSubsystem::AddToStash(const TArray<FLSSessionItem>& Items)
 	Save();
 }
 
+void ULSSaveSubsystem::ReplaceStash(const TArray<FLSSessionItem>& Items)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace stash because SaveData is missing."));
+		return;
+	}
+
+	SaveData->Stash.Reset();
+	for (const FLSSessionItem& Item : Items)
+	{
+		AddItemsToSlotArray(SaveData->Stash, Item.ItemRowName, Item.Amount);
+	}
+
+	UE_LOG(LogLS, Log, TEXT("[Save] Stash replaced. Total slots: %d"), SaveData->Stash.Num());
+	Save();
+}
+
 const TArray<FLSSessionItem>& ULSSaveSubsystem::GetStash() const
 {
 	static TArray<FLSSessionItem> Empty;
 	return SaveData ? SaveData->Stash : Empty;
+}
+
+void ULSSaveSubsystem::SortStash()
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot sort stash because SaveData is missing."));
+		return;
+	}
+
+	SortAndCompactSlotArray(SaveData->Stash);
+	UE_LOG(LogLS, Log, TEXT("[Save] Stash sorted and compacted. Total slots: %d"), SaveData->Stash.Num());
+	Save();
 }
 
 void ULSSaveSubsystem::Load()

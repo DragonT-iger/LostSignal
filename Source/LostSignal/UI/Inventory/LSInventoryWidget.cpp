@@ -1,13 +1,8 @@
 #include "UI/Inventory/LSInventoryWidget.h"
 
 #include "LostSignal.h"
+#include "Components/Button.h"
 #include "Components/WrapBox.h"
-#include "Data/LSArmorRow.h"
-#include "Data/LSChipRow.h"
-#include "Data/LSDropSettings.h"
-#include "Data/LSItemRow.h"
-#include "Data/LSWeaponRow.h"
-#include "Engine/DataTable.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSubsystem.h"
 #include "UI/Inventory/LSInventoryItemSlotWidget.h"
@@ -27,114 +22,47 @@ void AppendSlotItems(TArray<FLSSessionItem>& Items, const TArray<FLSSessionItem>
 		Items.Add(NewItem);
 	}
 }
-
-int32 ResolveItemMaxStackForInventoryUI(const FName ItemRowName)
-{
-	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
-	if (!Settings || ItemRowName.IsNone())
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot resolve UI max stack. Row=%s"), *ItemRowName.ToString());
-		return 1;
-	}
-
-	const FString RowNameString = ItemRowName.ToString();
-	int32 MaxStack = 1;
-
-	if (RowNameString.StartsWith(TEXT("Chip_")))
-	{
-		UDataTable* Table = Settings->ChipTable.LoadSynchronous();
-		const FLSChipRow* Row = Table ? Table->FindRow<FLSChipRow>(ItemRowName, TEXT("ResolveItemMaxStackForInventoryUI")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("Cannot resolve UI max stack because chip row is missing: %s"), *ItemRowName.ToString());
-	}
-	else if (RowNameString.StartsWith(TEXT("Weapon_")))
-	{
-		UDataTable* Table = Settings->WeaponTable.LoadSynchronous();
-		const FLSWeaponRow* Row = Table ? Table->FindRow<FLSWeaponRow>(ItemRowName, TEXT("ResolveItemMaxStackForInventoryUI")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("Cannot resolve UI max stack because weapon row is missing: %s"), *ItemRowName.ToString());
-	}
-	else if (RowNameString.StartsWith(TEXT("Armor_")))
-	{
-		UDataTable* Table = Settings->ArmorTable.LoadSynchronous();
-		const FLSArmorRow* Row = Table ? Table->FindRow<FLSArmorRow>(ItemRowName, TEXT("ResolveItemMaxStackForInventoryUI")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("Cannot resolve UI max stack because armor row is missing: %s"), *ItemRowName.ToString());
-	}
-	else if (RowNameString.StartsWith(TEXT("Item_")))
-	{
-		UDataTable* Table = Settings->ItemTable.LoadSynchronous();
-		const FLSItemRow* Row = Table ? Table->FindRow<FLSItemRow>(ItemRowName, TEXT("ResolveItemMaxStackForInventoryUI")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("Cannot resolve UI max stack because item row is missing: %s"), *ItemRowName.ToString());
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot resolve UI max stack because row has unknown prefix: %s"), *ItemRowName.ToString());
-	}
-
-	if (MaxStack <= 0)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Invalid UI Item_Max for %s: %d. Falling back to 1."), *ItemRowName.ToString(), MaxStack);
-		return 1;
-	}
-
-	return MaxStack;
-}
-
-void AddSlotItemWithStackRules(TArray<FLSSessionItem>& Slots, const FLSSessionItem& NewItem)
-{
-	if (NewItem.ItemRowName.IsNone() || NewItem.Amount <= 0)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot add invalid UI slot item. Row=%s Amount=%d"), *NewItem.ItemRowName.ToString(), NewItem.Amount);
-		return;
-	}
-
-	const int32 MaxStack = ResolveItemMaxStackForInventoryUI(NewItem.ItemRowName);
-	int32 RemainingAmount = NewItem.Amount;
-
-	for (FLSSessionItem& Slot : Slots)
-	{
-		if (RemainingAmount <= 0)
-		{
-			return;
-		}
-
-		if (Slot.ItemRowName != NewItem.ItemRowName || Slot.Amount >= MaxStack)
-		{
-			continue;
-		}
-
-		const int32 AddAmount = FMath::Min(RemainingAmount, MaxStack - Slot.Amount);
-		Slot.Amount += AddAmount;
-		RemainingAmount -= AddAmount;
-	}
-
-	while (RemainingAmount > 0)
-	{
-		FLSSessionItem NewSlot;
-		NewSlot.ItemRowName = NewItem.ItemRowName;
-		NewSlot.Amount = FMath::Min(RemainingAmount, MaxStack);
-		Slots.Add(NewSlot);
-		RemainingAmount -= NewSlot.Amount;
-	}
-}
-
-void AddSlotItemsWithStackRules(TArray<FLSSessionItem>& Slots, const TArray<FLSSessionItem>& NewItems)
-{
-	for (const FLSSessionItem& NewItem : NewItems)
-	{
-		AddSlotItemWithStackRules(Slots, NewItem);
-	}
-}
 }
 
 void ULSInventoryWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	if (!StoreAllButton)
+	{
+		UE_LOG(LogLS, Warning, TEXT("StoreAllButton is not bound on %s."), *GetNameSafe(this));
+	}
+	else
+	{
+		StoreAllButton->OnClicked.AddDynamic(this, &ULSInventoryWidget::HandleStoreAllButtonClicked);
+	}
+
+	if (!SortButton)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SortButton is not bound on %s."), *GetNameSafe(this));
+	}
+	else
+	{
+		SortButton->OnClicked.AddDynamic(this, &ULSInventoryWidget::HandleSortButtonClicked);
+	}
+
 	RebuildInventorySlots();
 	RebuildConfirmedStorageSlots();
+}
+
+void ULSInventoryWidget::NativeDestruct()
+{
+	if (StoreAllButton)
+	{
+		StoreAllButton->OnClicked.RemoveDynamic(this, &ULSInventoryWidget::HandleStoreAllButtonClicked);
+	}
+
+	if (SortButton)
+	{
+		SortButton->OnClicked.RemoveDynamic(this, &ULSInventoryWidget::HandleSortButtonClicked);
+	}
+
+	Super::NativeDestruct();
 }
 
 void ULSInventoryWidget::SetInventorySlotCount(const int32 NewInventorySlotCount)
@@ -176,22 +104,28 @@ void ULSInventoryWidget::RebuildInventorySlots()
 	TArray<FLSSessionItem> InventoryItems;
 	if (UGameInstance* GameInstance = GetGameInstance())
 	{
-		if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
-		{
-			AppendSlotItems(InventoryItems, SaveSubsystem->GetStash());
-		}
-		else
-		{
-			UE_LOG(LogLS, Warning, TEXT("SaveSubsystem is missing on %s."), *GetNameSafe(this));
-		}
-
 		if (ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>())
 		{
-			AddSlotItemsWithStackRules(InventoryItems, SessionSubsystem->GetSessionInventory());
+			if (SessionSubsystem->IsRaidActive())
+			{
+				AppendSlotItems(InventoryItems, SessionSubsystem->GetSessionInventory());
+			}
+			else if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
+			{
+				AppendSlotItems(InventoryItems, SaveSubsystem->GetStash());
+			}
+			else
+			{
+				UE_LOG(LogLS, Warning, TEXT("SaveSubsystem is missing on %s."), *GetNameSafe(this));
+			}
 		}
 		else
 		{
 			UE_LOG(LogLS, Warning, TEXT("SessionSubsystem is missing on %s."), *GetNameSafe(this));
+			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
+			{
+				AppendSlotItems(InventoryItems, SaveSubsystem->GetStash());
+			}
 		}
 
 		UE_LOG(LogLS, Log, TEXT("InventoryWidget rebuilt with %d slot items on %s."), InventoryItems.Num(), *GetNameSafe(this));
@@ -210,6 +144,8 @@ void ULSInventoryWidget::RebuildInventorySlots()
 
 		if (SlotWidget)
 		{
+			SlotWidget->SetSlotContext(this, SlotIndex, InventoryItems.IsValidIndex(SlotIndex));
+
 			if (InventoryItems.IsValidIndex(SlotIndex))
 			{
 				SlotWidget->SetItem(InventoryItems[SlotIndex].ItemRowName, InventoryItems[SlotIndex].Amount);
@@ -226,6 +162,53 @@ void ULSInventoryWidget::RebuildInventorySlots()
 			UE_LOG(LogLS, Warning, TEXT("Failed to create inventory slot widget at index %d on %s."), SlotIndex, *GetNameSafe(this));
 		}
 	}
+}
+
+bool ULSInventoryWidget::HandleInventorySlotDrop(const int32 FromSlotIndex, const int32 ToSlotIndex, const bool bMoveOperation)
+{
+	if (FromSlotIndex == INDEX_NONE || ToSlotIndex == INDEX_NONE)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle inventory slot drop because an index is invalid. From=%d To=%d"), FromSlotIndex, ToSlotIndex);
+		return false;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	if (!GameInstance)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle inventory slot drop because GameInstance is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>();
+	if (!SessionSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle inventory slot drop because SessionSubsystem is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	if (!SessionSubsystem->IsRaidActive())
+	{
+		UE_LOG(LogLS, Warning, TEXT("Inventory slot drag/drop is only supported during an active raid on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const bool bChanged = bMoveOperation
+		? SessionSubsystem->MoveSessionInventorySlot(FromSlotIndex, ToSlotIndex)
+		: SessionSubsystem->SwapSessionInventorySlots(FromSlotIndex, ToSlotIndex);
+
+	UE_LOG(LogLS, Log, TEXT("Inventory slot drop handled on %s. Mode=%s From=%d To=%d Changed=%s"),
+		*GetNameSafe(this),
+		bMoveOperation ? TEXT("Move") : TEXT("Swap"),
+		FromSlotIndex,
+		ToSlotIndex,
+		bChanged ? TEXT("true") : TEXT("false"));
+
+	if (bChanged)
+	{
+		RebuildInventorySlots();
+	}
+
+	return bChanged;
 }
 
 void ULSInventoryWidget::RebuildConfirmedStorageSlots()
@@ -260,6 +243,7 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 
 		if (SlotWidget)
 		{
+			SlotWidget->SetSlotContext(this, INDEX_NONE, false);
 			SlotWidget->ClearItem();
 			ConfirmedStorageSlotWrapBox->AddChildToWrapBox(SlotWidget);
 		}
@@ -268,4 +252,42 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 			UE_LOG(LogLS, Warning, TEXT("Failed to create confirmed storage slot widget at index %d on %s."), SlotIndex, *GetNameSafe(this));
 		}
 	}
+}
+
+void ULSInventoryWidget::HandleStoreAllButtonClicked()
+{
+	UE_LOG(LogLS, Warning, TEXT("StoreAllButton clicked on %s, but store-all behavior is not implemented yet."), *GetNameSafe(this));
+}
+
+void ULSInventoryWidget::HandleSortButtonClicked()
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	if (!GameInstance)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot sort inventory because GameInstance is missing on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>())
+	{
+		if (SessionSubsystem->IsRaidActive())
+		{
+			SessionSubsystem->SortSessionInventory();
+		}
+		else if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
+		{
+			SaveSubsystem->SortStash();
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("Cannot sort stash because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		}
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot sort session inventory because SessionSubsystem is missing on %s."), *GetNameSafe(this));
+	}
+
+	RebuildInventorySlots();
+	RebuildConfirmedStorageSlots();
 }

@@ -1,5 +1,6 @@
 #include "UI/Inventory/LSInventoryItemSlotWidget.h"
 
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Data/LSArmorRow.h"
@@ -9,7 +10,10 @@
 #include "Data/LSWeaponRow.h"
 #include "Engine/DataTable.h"
 #include "Engine/Texture2D.h"
+#include "InputCoreTypes.h"
 #include "LostSignal.h"
+#include "UI/Inventory/LSInventoryDragDropOperation.h"
+#include "UI/Inventory/LSInventoryWidget.h"
 
 void ULSInventoryItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount)
 {
@@ -43,6 +47,7 @@ void ULSInventoryItemSlotWidget::SetItem(const FName ItemRowName, const int32 Am
 	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
 	AmountText->SetText(FText::AsNumber(Amount));
 	AmountText->SetVisibility(Amount > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	bHasItem = true;
 }
 
 void ULSInventoryItemSlotWidget::ClearItem()
@@ -63,6 +68,79 @@ void ULSInventoryItemSlotWidget::ClearItem()
 	ItemIconImage->SetVisibility(ESlateVisibility::Hidden);
 	AmountText->SetText(FText::GetEmpty());
 	AmountText->SetVisibility(ESlateVisibility::Collapsed);
+	bHasItem = false;
+}
+
+void ULSInventoryItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const int32 InSlotIndex, const bool bInHasItem)
+{
+	InventoryWidget = InInventoryWidget;
+	SlotIndex = InSlotIndex;
+	bHasItem = bInHasItem;
+}
+
+FReply ULSInventoryItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (!bHasItem)
+	{
+		return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+	}
+
+	return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, EKeys::LeftMouseButton).NativeReply;
+}
+
+void ULSInventoryItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
+{
+	if (!bHasItem || !InventoryWidget.IsValid() || SlotIndex == INDEX_NONE)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot start inventory drag. Widget=%s SlotIndex=%d HasItem=%s"),
+			*GetNameSafe(this), SlotIndex, bHasItem ? TEXT("true") : TEXT("false"));
+		return;
+	}
+
+	ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(
+		UWidgetBlueprintLibrary::CreateDragDropOperation(ULSInventoryDragDropOperation::StaticClass()));
+	if (!DragOperation)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Failed to create inventory drag operation on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	DragOperation->SourceInventoryWidget = InventoryWidget.Get();
+	DragOperation->SourceSlotWidget = this;
+	DragOperation->SourceSlotIndex = SlotIndex;
+	DragOperation->bMoveOperation = InMouseEvent.IsShiftDown();
+	DragOperation->DefaultDragVisual = this;
+	DragOperation->Pivot = EDragPivot::MouseDown;
+	SetVisibility(ESlateVisibility::HitTestInvisible);
+	SetRenderOpacity(0.25f);
+	OutOperation = DragOperation;
+}
+
+bool ULSInventoryItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
+	if (!DragOperation)
+	{
+		return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
+	}
+
+	ULSInventoryWidget* TargetInventoryWidget = InventoryWidget.Get();
+	if (!TargetInventoryWidget || DragOperation->SourceInventoryWidget != TargetInventoryWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot because source/target inventory widget does not match."));
+		return false;
+	}
+
+	return TargetInventoryWidget->HandleInventorySlotDrop(
+		DragOperation->SourceSlotIndex,
+		SlotIndex,
+		DragOperation->bMoveOperation);
+}
+
+void ULSInventoryItemSlotWidget::RestoreDragSourceVisual()
+{
+	SetVisibility(ESlateVisibility::Visible);
+	SetRenderOpacity(1.0f);
 }
 
 UTexture2D* ULSInventoryItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName) const

@@ -101,27 +101,116 @@ void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName,
 		Amount -= NewSlot.Amount;
 	}
 }
+
+int32 FindRowOrder(UDataTable* Table, const FName RowName)
+{
+	if (!Table)
+	{
+		return MAX_int32 / 2;
+	}
+
+	const TArray<FName> RowNames = Table->GetRowNames();
+	const int32 RowIndex = RowNames.IndexOfByKey(RowName);
+	return RowIndex == INDEX_NONE ? MAX_int32 / 2 : RowIndex;
+}
+
+int32 ResolveItemSortKeyForSession(const FName ItemRowName)
+{
+	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
+	if (!Settings || ItemRowName.IsNone())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot resolve sort key. Row=%s"), *ItemRowName.ToString());
+		return MAX_int32;
+	}
+
+	const FString RowNameString = ItemRowName.ToString();
+	if (RowNameString.StartsWith(TEXT("Chip_")))
+	{
+		return FindRowOrder(Settings->ChipTable.LoadSynchronous(), ItemRowName);
+	}
+
+	if (RowNameString.StartsWith(TEXT("Weapon_")))
+	{
+		return 100000 + FindRowOrder(Settings->WeaponTable.LoadSynchronous(), ItemRowName);
+	}
+
+	if (RowNameString.StartsWith(TEXT("Armor_")))
+	{
+		return 200000 + FindRowOrder(Settings->ArmorTable.LoadSynchronous(), ItemRowName);
+	}
+
+	if (RowNameString.StartsWith(TEXT("Item_")))
+	{
+		return 300000 + FindRowOrder(Settings->ItemTable.LoadSynchronous(), ItemRowName);
+	}
+
+	UE_LOG(LogLS, Warning, TEXT("[Session] Unknown item row prefix for sort key: %s"), *ItemRowName.ToString());
+	return MAX_int32;
+}
+
+void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots)
+{
+	TMap<FName, int32> AmountByRowName;
+	for (const FLSSessionItem& Slot : Slots)
+	{
+		if (Slot.ItemRowName.IsNone() || Slot.Amount <= 0)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Session] Skipping invalid slot while sorting. Row=%s Amount=%d"), *Slot.ItemRowName.ToString(), Slot.Amount);
+			continue;
+		}
+
+		AmountByRowName.FindOrAdd(Slot.ItemRowName) += Slot.Amount;
+	}
+
+	TArray<FLSSessionItem> MergedItems;
+	MergedItems.Reserve(AmountByRowName.Num());
+	for (const TPair<FName, int32>& Pair : AmountByRowName)
+	{
+		MergedItems.Add({ Pair.Key, Pair.Value });
+	}
+
+	MergedItems.Sort([](const FLSSessionItem& Left, const FLSSessionItem& Right)
+	{
+		const int32 LeftSortKey = ResolveItemSortKeyForSession(Left.ItemRowName);
+		const int32 RightSortKey = ResolveItemSortKeyForSession(Right.ItemRowName);
+		if (LeftSortKey != RightSortKey)
+		{
+			return LeftSortKey < RightSortKey;
+		}
+
+		return Left.ItemRowName.LexicalLess(Right.ItemRowName);
+	});
+
+	Slots.Reset();
+	for (const FLSSessionItem& MergedItem : MergedItems)
+	{
+		AddItemsToSlotArray(Slots, MergedItem.ItemRowName, MergedItem.Amount);
+	}
+}
 }
 
 void ULSSessionSubsystem::StartRaid(const TArray<FLSSessionItem>& Loadout)
 {
 	LoadoutSnapshot.Items = Loadout;
-	SessionInventory.Empty();
+	SessionInventory = Loadout;
 	ConsumedItems.Empty();
 	ResolvedItems.Empty();
+	bRaidActive = true;
 
-	UE_LOG(LogLS, Log, TEXT("[Session] 레이드 시작 - 출발 장비 %d종"), Loadout.Num());
+	UE_LOG(LogLS, Log, TEXT("[Session] Raid started with %d inventory slots."), SessionInventory.Num());
 }
 
 void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
 {
 	LastRaidResult = Result;
 	ResolvedItems.Empty();
+	bool bShouldSaveResolvedItems = false;
 
 	switch (Result)
 	{
 	case ELSRaidResult::Extracted:
 		ResolvedItems = SessionInventory;
+		bShouldSaveResolvedItems = true;
 		UE_LOG(LogLS, Log, TEXT("[Session] 탈출 성공 - 획득 아이템 %d종 보관"), ResolvedItems.Num());
 		break;
 
@@ -129,6 +218,7 @@ void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
 		if (bAllowQuitRecovery)
 		{
 			ResolvedItems = BuildQuitRecovery();
+			bShouldSaveResolvedItems = true;
 			UE_LOG(LogLS, Log, TEXT("[Session] 탈주 - 장비 복구 %d종"), ResolvedItems.Num());
 		}
 		else
@@ -143,13 +233,15 @@ void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
 	}
 
 	// 스태시에 저장 (레벨 전환 전에 처리)
-	if (!ResolvedItems.IsEmpty())
+	if (bShouldSaveResolvedItems)
 	{
 		if (ULSSaveSubsystem* SaveSub = GetGameInstance()->GetSubsystem<ULSSaveSubsystem>())
 		{
-			SaveSub->AddToStash(ResolvedItems);
+			SaveSub->ReplaceStash(ResolvedItems);
 		}
 	}
+
+	bRaidActive = false;
 
 	// 결과 레벨로 전환
 	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
@@ -166,6 +258,67 @@ void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
 void ULSSessionSubsystem::AddSessionItem(FName ItemRowName, int32 Amount)
 {
 	AddItemsToSlotArray(SessionInventory, ItemRowName, Amount);
+}
+
+void ULSSessionSubsystem::SortSessionInventory()
+{
+	SortAndCompactSlotArray(SessionInventory);
+	UE_LOG(LogLS, Log, TEXT("[Session] Session inventory sorted and compacted. Total slots: %d"), SessionInventory.Num());
+}
+
+bool ULSSessionSubsystem::SwapSessionInventorySlots(const int32 FromIndex, const int32 ToIndex)
+{
+	if (!SessionInventory.IsValidIndex(FromIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot swap inventory slots because FromIndex is invalid: %d"), FromIndex);
+		return false;
+	}
+
+	if (FromIndex == ToIndex)
+	{
+		return true;
+	}
+
+	if (SessionInventory.IsValidIndex(ToIndex))
+	{
+		const FName FromItemRowName = SessionInventory[FromIndex].ItemRowName;
+		const FName ToItemRowName = SessionInventory[ToIndex].ItemRowName;
+		SessionInventory.Swap(FromIndex, ToIndex);
+		UE_LOG(LogLS, Log, TEXT("[Session] Swapped inventory slots %d(%s) <-> %d(%s)"),
+			FromIndex,
+			*FromItemRowName.ToString(),
+			ToIndex,
+			*ToItemRowName.ToString());
+		return true;
+	}
+
+	return MoveSessionInventorySlot(FromIndex, ToIndex);
+}
+
+bool ULSSessionSubsystem::MoveSessionInventorySlot(const int32 FromIndex, const int32 ToIndex)
+{
+	if (!SessionInventory.IsValidIndex(FromIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot move inventory slot because FromIndex is invalid: %d"), FromIndex);
+		return false;
+	}
+
+	if (FromIndex == ToIndex)
+	{
+		return true;
+	}
+
+	FLSSessionItem MovingItem = SessionInventory[FromIndex];
+	SessionInventory.RemoveAt(FromIndex);
+
+	const int32 ClampedTargetIndex = FMath::Clamp(ToIndex, 0, SessionInventory.Num());
+	SessionInventory.Insert(MovingItem, ClampedTargetIndex);
+
+	UE_LOG(LogLS, Log, TEXT("[Session] Moved inventory slot %d(%s) -> %d"),
+		FromIndex,
+		*MovingItem.ItemRowName.ToString(),
+		ClampedTargetIndex);
+	return true;
 }
 
 void ULSSessionSubsystem::ConsumeItem(FName ItemRowName, int32 Amount)

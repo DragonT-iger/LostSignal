@@ -19,6 +19,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void AddToStash(const TArray<FLSSessionItem>& Items);
 
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	void ReplaceStash(const TArray<FLSSessionItem>& Items);
+
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	void SortStash();
+
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	const TArray<FLSSessionItem>& GetStash() const;
 

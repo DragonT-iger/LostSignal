@@ -53,6 +53,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void AddSessionItem(FName ItemRowName, int32 Amount);
 
+	UFUNCTION(BlueprintCallable, Category="LS/Session")
+	void SortSessionInventory();
+
+	UFUNCTION(BlueprintCallable, Category="LS/Session")
+	bool SwapSessionInventorySlots(int32 FromIndex, int32 ToIndex);
+
+	UFUNCTION(BlueprintCallable, Category="LS/Session")
+	bool MoveSessionInventorySlot(int32 FromIndex, int32 ToIndex);
+
 	// 레이드 중 소모한 아이템 기록
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void ConsumeItem(FName ItemRowName, int32 Amount);
@@ -63,11 +72,15 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Session")
 	const TArray<FLSSessionItem>& GetSessionInventory() const { return SessionInventory; }
 
+	UFUNCTION(BlueprintPure, Category="LS/Session")
+	bool IsRaidActive() const { return bRaidActive; }
+
 	// 결과 레벨에서 최종 확정된 아이템 목록 조회 (EndRaid 이후 유효)
 	UFUNCTION(BlueprintPure, Category="LS/Session")
 	const TArray<FLSSessionItem>& GetResolvedItems() const { return ResolvedItems; }
 
 private:
+	bool bRaidActive = false;
 	FLSLoadoutSnapshot LoadoutSnapshot;
 	TArray<FLSSessionItem> SessionInventory;
 	TArray<FLSSessionItem> ConsumedItems;
