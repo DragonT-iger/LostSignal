@@ -14,6 +14,7 @@ class ULSPlayerCombatComponent;
 class ULSPlayerXRayComponent;
 class ULSVisionComponent;
 class ULSCharacterAttributeSet;
+class UUserWidget;
 class USpringArmComponent;
 struct FInputActionValue;
 
@@ -125,6 +126,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category="LS/Interact", meta=(ClampMin="0.0"))
 	float InteractScoreThreshold = 0.25f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TSubclassOf<UUserWidget> InventoryWidgetClass;
+
 	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
 	float WalkSpeed = 300.0f;
 
@@ -158,12 +162,16 @@ protected:
 private:
 	bool bIsRunning = false;
 	bool bHasSentFacingRotation = false;
+	TWeakObjectPtr<AActor> ActiveInventoryTarget;
 
 	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
 	float FacingSyncInterval = 0.05f;
 
 	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
 	float FacingSyncYawTolerance = 1.0f;
+
+	UPROPERTY(VisibleInstanceOnly, Transient, Category="LS/UI")
+	TObjectPtr<UUserWidget> InventoryWidget;
 
 	float LastSentFacingYaw = 0.0f;
 	float LastFacingSyncTime = 0.0f;
@@ -185,6 +193,10 @@ private:
 	void OnItem5();
 	void OnItem6();
 	void OnInteract();
+	void ShowInventoryWidgetForTarget(AActor* Target);
+	void HideInventoryWidget();
+	void UpdateInventoryWidgetDistance();
+	bool IsInventoryWidgetOpen() const;
 
 	void ApplyRunState(bool bNewIsRunning);
 	bool ShouldSyncFacingRotation(float NewYaw) const;

@@ -12,8 +12,10 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "EngineUtils.h"
 #include "Gameplay/LSInteractable.h"
+#include "Gameplay/LSLootBox.h"
 #include "InputActionValue.h"
 #include "LostSignal.h"
+#include "Blueprint/UserWidget.h"
 #include "Vision/LSMPCVisionSourceComponent.h"
 #include "Vision/LSPlayerXRayComponent.h"
 #include "Vision/LSVisionComponent.h"
@@ -64,6 +66,8 @@ void ALSPlayerCharacter::Tick(float DeltaSeconds)
 	{
 		AimComponent->UpdateFacing(DeltaSeconds);
 	}
+
+	UpdateInventoryWidgetDistance();
 }
 
 void ALSPlayerCharacter::ApplyFacingRotation(const FRotator& NewRotation)
@@ -170,6 +174,12 @@ void ALSPlayerCharacter::OnInteract()
 {
 	if (!IsLocallyControlled()) return;
 
+	if (IsInventoryWidgetOpen())
+	{
+		HideInventoryWidget();
+		return;
+	}
+
 	const FVector MyLocation = GetActorLocation();
 
 	FVector MouseWorldPoint = FVector::ZeroVector;
@@ -219,7 +229,94 @@ void ALSPlayerCharacter::OnInteract()
 	if (BestTarget)
 	{
 		ServerRequestInteract(BestTarget);
+
+		if (BestTarget->IsA<ALSLootBox>())
+		{
+			ShowInventoryWidgetForTarget(BestTarget);
+		}
 	}
+}
+
+void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (!Target)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot show inventory widget because target is missing on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (!InventoryWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("InventoryWidgetClass is not set on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (!PlayerController)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot show inventory widget because player controller is missing on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (!InventoryWidget)
+	{
+		InventoryWidget = CreateWidget<UUserWidget>(PlayerController, InventoryWidgetClass);
+		if (!InventoryWidget)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Failed to create inventory widget on %s."), *GetNameSafe(this));
+			return;
+		}
+	}
+
+	if (!InventoryWidget->IsInViewport())
+	{
+		InventoryWidget->AddToViewport();
+	}
+
+	InventoryWidget->SetVisibility(ESlateVisibility::Visible);
+	ActiveInventoryTarget = Target;
+}
+
+void ALSPlayerCharacter::HideInventoryWidget()
+{
+	if (InventoryWidget)
+	{
+		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	ActiveInventoryTarget.Reset();
+}
+
+void ALSPlayerCharacter::UpdateInventoryWidgetDistance()
+{
+	if (!IsInventoryWidgetOpen())
+	{
+		return;
+	}
+
+	AActor* Target = ActiveInventoryTarget.Get();
+	if (!Target)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Closing inventory widget because active inventory target is missing on %s."), *GetNameSafe(this));
+		HideInventoryWidget();
+		return;
+	}
+
+	const float Distance = FVector::Dist(GetActorLocation(), Target->GetActorLocation());
+	if (Distance > MaxInteractRange)
+	{
+		HideInventoryWidget();
+	}
+}
+
+bool ALSPlayerCharacter::IsInventoryWidgetOpen() const
+{
+	return InventoryWidget && InventoryWidget->IsVisible();
 }
 
 void ALSPlayerCharacter::ServerRequestInteract_Implementation(AActor* Target)
