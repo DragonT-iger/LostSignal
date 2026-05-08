@@ -42,7 +42,7 @@ void ULSInventoryItemSlotWidget::SetItem(const FName ItemRowName, const int32 Am
 	ItemIconImage->SetBrushFromTexture(IconTexture);
 	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
 	AmountText->SetText(FText::AsNumber(Amount));
-	AmountText->SetVisibility(Amount > 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	AmountText->SetVisibility(Amount > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 }
 
 void ULSInventoryItemSlotWidget::ClearItem()

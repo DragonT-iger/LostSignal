@@ -1,8 +1,107 @@
 #include "Session/LSSessionSubsystem.h"
 #include "Session/LSSessionSettings.h"
 #include "Session/LSSaveSubsystem.h"
+#include "Data/LSArmorRow.h"
+#include "Data/LSChipRow.h"
+#include "Data/LSDropSettings.h"
+#include "Data/LSItemRow.h"
+#include "Data/LSWeaponRow.h"
+#include "Engine/DataTable.h"
 #include "LostSignal.h"
 #include "Kismet/GameplayStatics.h"
+
+namespace
+{
+int32 ResolveItemMaxStackForSession(const FName ItemRowName)
+{
+	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
+	if (!Settings || ItemRowName.IsNone())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot resolve max stack. Row=%s"), *ItemRowName.ToString());
+		return 1;
+	}
+
+	const FString RowNameString = ItemRowName.ToString();
+	int32 MaxStack = 1;
+
+	if (RowNameString.StartsWith(TEXT("Chip_")))
+	{
+		UDataTable* Table = Settings->ChipTable.LoadSynchronous();
+		const FLSChipRow* Row = Table ? Table->FindRow<FLSChipRow>(ItemRowName, TEXT("ResolveItemMaxStackForSession")) : nullptr;
+		MaxStack = Row ? Row->Item_Max : 1;
+		if (!Row) UE_LOG(LogLS, Warning, TEXT("[Session] Chip row missing for max stack: %s"), *ItemRowName.ToString());
+	}
+	else if (RowNameString.StartsWith(TEXT("Weapon_")))
+	{
+		UDataTable* Table = Settings->WeaponTable.LoadSynchronous();
+		const FLSWeaponRow* Row = Table ? Table->FindRow<FLSWeaponRow>(ItemRowName, TEXT("ResolveItemMaxStackForSession")) : nullptr;
+		MaxStack = Row ? Row->Item_Max : 1;
+		if (!Row) UE_LOG(LogLS, Warning, TEXT("[Session] Weapon row missing for max stack: %s"), *ItemRowName.ToString());
+	}
+	else if (RowNameString.StartsWith(TEXT("Armor_")))
+	{
+		UDataTable* Table = Settings->ArmorTable.LoadSynchronous();
+		const FLSArmorRow* Row = Table ? Table->FindRow<FLSArmorRow>(ItemRowName, TEXT("ResolveItemMaxStackForSession")) : nullptr;
+		MaxStack = Row ? Row->Item_Max : 1;
+		if (!Row) UE_LOG(LogLS, Warning, TEXT("[Session] Armor row missing for max stack: %s"), *ItemRowName.ToString());
+	}
+	else if (RowNameString.StartsWith(TEXT("Item_")))
+	{
+		UDataTable* Table = Settings->ItemTable.LoadSynchronous();
+		const FLSItemRow* Row = Table ? Table->FindRow<FLSItemRow>(ItemRowName, TEXT("ResolveItemMaxStackForSession")) : nullptr;
+		MaxStack = Row ? Row->Item_Max : 1;
+		if (!Row) UE_LOG(LogLS, Warning, TEXT("[Session] Item row missing for max stack: %s"), *ItemRowName.ToString());
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Unknown item row prefix for max stack: %s"), *ItemRowName.ToString());
+	}
+
+	if (MaxStack <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Invalid Item_Max for %s: %d. Falling back to 1."), *ItemRowName.ToString(), MaxStack);
+		return 1;
+	}
+
+	return MaxStack;
+}
+
+void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount)
+{
+	if (ItemRowName.IsNone() || Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot add invalid session item. Row=%s Amount=%d"), *ItemRowName.ToString(), Amount);
+		return;
+	}
+
+	const int32 MaxStack = ResolveItemMaxStackForSession(ItemRowName);
+	for (FLSSessionItem& Slot : Slots)
+	{
+		if (Amount <= 0)
+		{
+			return;
+		}
+
+		if (Slot.ItemRowName != ItemRowName || Slot.Amount >= MaxStack)
+		{
+			continue;
+		}
+
+		const int32 AddAmount = FMath::Min(Amount, MaxStack - Slot.Amount);
+		Slot.Amount += AddAmount;
+		Amount -= AddAmount;
+	}
+
+	while (Amount > 0)
+	{
+		FLSSessionItem NewSlot;
+		NewSlot.ItemRowName = ItemRowName;
+		NewSlot.Amount = FMath::Min(Amount, MaxStack);
+		Slots.Add(NewSlot);
+		Amount -= NewSlot.Amount;
+	}
+}
+}
 
 void ULSSessionSubsystem::StartRaid(const TArray<FLSSessionItem>& Loadout)
 {
@@ -66,18 +165,7 @@ void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
 
 void ULSSessionSubsystem::AddSessionItem(FName ItemRowName, int32 Amount)
 {
-	if (ItemRowName.IsNone() || Amount <= 0) return;
-
-	for (FLSSessionItem& Item : SessionInventory)
-	{
-		if (Item.ItemRowName == ItemRowName)
-		{
-			Item.Amount += Amount;
-			return;
-		}
-	}
-
-	SessionInventory.Add({ ItemRowName, Amount });
+	AddItemsToSlotArray(SessionInventory, ItemRowName, Amount);
 }
 
 void ULSSessionSubsystem::ConsumeItem(FName ItemRowName, int32 Amount)
