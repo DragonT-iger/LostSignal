@@ -47,6 +47,37 @@ bool ULSCharacterCombatComponent::CanStartAttack() const
 	return !IsDead() && !HasCombatTag(LSGameplayTags::Combat_Attacking);
 }
 
+ELSTenacityTier ULSCharacterCombatComponent::GetCurrentTenacityTier() const
+{
+	if (HasCombatTag(LSGameplayTags::State_Invincible))
+	{
+		return ELSTenacityTier::Invincible;
+	}
+
+	if (HasCombatTag(LSGameplayTags::State_SuperArmor))
+	{
+		return ELSTenacityTier::SuperArmor;
+	}
+
+	return ELSTenacityTier::Normal;
+}
+
+FLSImpactResolution ULSCharacterCombatComponent::ResolveIncomingImpact(ELSBreakPowerTier BreakPowerTier) const
+{
+	FLSImpactResolution Resolution;
+	Resolution.TargetTenacity = GetCurrentTenacityTier();
+	Resolution.IncomingBreakPower = BreakPowerTier;
+	Resolution.bDamageBlocked = Resolution.TargetTenacity == ELSTenacityTier::Invincible;
+	Resolution.bCrowdControlBlocked = static_cast<int32>(BreakPowerTier) < static_cast<int32>(Resolution.TargetTenacity);
+	Resolution.bImpactAllowed = !Resolution.bDamageBlocked && !Resolution.bCrowdControlBlocked;
+	return Resolution;
+}
+
+bool ULSCharacterCombatComponent::CanApplyCrowdControl(ELSBreakPowerTier BreakPowerTier) const
+{
+	return !ResolveIncomingImpact(BreakPowerTier).bCrowdControlBlocked;
+}
+
 void ULSCharacterCombatComponent::SetCombatTagActive(FGameplayTag Tag, bool bActive)
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
@@ -88,12 +119,31 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 	float EffectLevel,
 	float BaseDamage,
 	float AttackCoefficient,
-	bool bCanCrit) const
+	bool bCanCrit,
+	ELSBreakPowerTier BreakPowerTier) const
 {
 	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponent();
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
 	if (!SourceASC || !TargetASC || !DamageEffectClass || !CanDamageTarget(TargetActor))
 	{
+		return false;
+	}
+
+	const ULSCharacterCombatComponent* TargetCombatComponent = TargetActor->FindComponentByClass<ULSCharacterCombatComponent>();
+	const FLSImpactResolution ImpactResolution = TargetCombatComponent
+		? TargetCombatComponent->ResolveIncomingImpact(BreakPowerTier)
+		: FLSImpactResolution();
+
+	if (ImpactResolution.bDamageBlocked)
+	{
+		UE_LOG(
+			LogLS,
+			Log,
+			TEXT("DamageBlocked %s -> %s | BreakPower=%d TargetTenacity=%d"),
+			*GetNameSafe(GetOwner()),
+			*GetNameSafe(TargetActor),
+			static_cast<int32>(BreakPowerTier),
+			static_cast<int32>(ImpactResolution.TargetTenacity));
 		return false;
 	}
 
@@ -117,7 +167,7 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 	UE_LOG(
 		LogLS,
 		Log,
-		TEXT("DamageApply %s -> %s | GE=%s Level=%.1f Base=%.2f Coef=%.2f CanCrit=%d | HP %.1f -> %.1f (Delta %.1f)"),
+		TEXT("DamageApply %s -> %s | GE=%s Level=%.1f Base=%.2f Coef=%.2f CanCrit=%d BreakPower=%d TargetTenacity=%d CCBlocked=%d | HP %.1f -> %.1f (Delta %.1f)"),
 		*GetNameSafe(GetOwner()),
 		*GetNameSafe(TargetActor),
 		*GetNameSafe(DamageEffectClass),
@@ -125,6 +175,9 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 		BaseDamage,
 		AttackCoefficient,
 		bCanCrit ? 1 : 0,
+		static_cast<int32>(BreakPowerTier),
+		static_cast<int32>(ImpactResolution.TargetTenacity),
+		ImpactResolution.bCrowdControlBlocked ? 1 : 0,
 		BeforeHealth,
 		AfterHealth,
 		AfterHealth - BeforeHealth);
@@ -245,8 +298,7 @@ bool ULSCharacterCombatComponent::CanDamageTarget(AActor* TargetActor) const
 
 	if (const UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor))
 	{
-		return !TargetASC->HasMatchingGameplayTag(LSGameplayTags::State_Dead) &&
-			!TargetASC->HasMatchingGameplayTag(LSGameplayTags::State_Invincible);
+		return !TargetASC->HasMatchingGameplayTag(LSGameplayTags::State_Dead);
 	}
 
 	return false;

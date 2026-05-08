@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Combat/LSCombatTypes.h"
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayTagContainer.h"
@@ -72,4 +73,7 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	bool bMeleeCanCrit = false;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
+	ELSBreakPowerTier MeleeBreakPower = ELSBreakPowerTier::NormalAttack;
 };

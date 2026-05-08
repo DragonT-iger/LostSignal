@@ -36,6 +36,24 @@ enum class ELSCombatCommandType : uint8
 	Interact
 };
 
+UENUM(BlueprintType)
+enum class ELSTenacityTier : uint8
+{
+	None = 0 UMETA(Hidden),
+	Normal = 2,
+	SuperArmor = 4,
+	Invincible = 6
+};
+
+UENUM(BlueprintType)
+enum class ELSBreakPowerTier : uint8
+{
+	None = 0 UMETA(Hidden),
+	NormalAttack = 2,
+	SpecialAttack = 3,
+	HardCrowdControl = 5
+};
+
 USTRUCT(BlueprintType)
 struct FLSBufferedCombatCommand
 {
@@ -51,4 +69,25 @@ struct FLSBufferedCombatCommand
 	{
 		return ExpireTime > CurrentTime;
 	}
+};
+
+USTRUCT(BlueprintType)
+struct FLSImpactResolution
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Combat")
+	ELSTenacityTier TargetTenacity = ELSTenacityTier::Normal;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Combat")
+	ELSBreakPowerTier IncomingBreakPower = ELSBreakPowerTier::NormalAttack;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Combat")
+	bool bDamageBlocked = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Combat")
+	bool bCrowdControlBlocked = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Combat")
+	bool bImpactAllowed = true;
 };

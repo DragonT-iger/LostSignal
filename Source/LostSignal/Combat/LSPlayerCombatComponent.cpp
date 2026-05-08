@@ -461,7 +461,8 @@ void ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection)
 			DamageEffectLevel,
 			BasicAttackBaseDamage,
 			BasicAttackAttackCoefficient,
-			bBasicAttackCanCrit))
+			bBasicAttackCanCrit,
+			BasicAttackBreakPower))
 		{
 			UniqueTargets.Add(HitActor);
 		}

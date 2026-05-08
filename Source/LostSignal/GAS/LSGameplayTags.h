@@ -9,6 +9,7 @@
 namespace LSGameplayTags
 {
 	// Shared state tags
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_SuperArmor)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Invincible)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dead)
 

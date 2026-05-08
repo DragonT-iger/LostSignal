@@ -115,7 +115,8 @@ void ULSMonsterCombatComponent::PerformMeleeHit()
 			DamageEffectLevel,
 			MeleeBaseDamage,
 			MeleeAttackCoefficient,
-			bMeleeCanCrit))
+			bMeleeCanCrit,
+			MeleeBreakPower))
 		{
 			UE_LOG(
 				LogLS,

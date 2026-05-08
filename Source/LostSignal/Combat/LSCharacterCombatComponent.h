@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Combat/LSCombatTypes.h"
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayTagContainer.h"
@@ -34,6 +35,15 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	bool CanStartAttack() const;
 
+	UFUNCTION(BlueprintPure, Category="LS/Combat")
+	ELSTenacityTier GetCurrentTenacityTier() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Combat")
+	FLSImpactResolution ResolveIncomingImpact(ELSBreakPowerTier BreakPowerTier) const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Combat")
+	bool CanApplyCrowdControl(ELSBreakPowerTier BreakPowerTier) const;
+
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void SetCombatTagActive(FGameplayTag Tag, bool bActive);
 
@@ -44,7 +54,8 @@ public:
 		float EffectLevel = 1.0f,
 		float BaseDamage = 0.0f,
 		float AttackCoefficient = 0.0f,
-		bool bCanCrit = false) const;
+		bool bCanCrit = false,
+		ELSBreakPowerTier BreakPowerTier = ELSBreakPowerTier::NormalAttack) const;
 
 protected:
 	virtual void BeginPlay() override;

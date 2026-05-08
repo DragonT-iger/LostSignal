@@ -75,6 +75,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	bool bBasicAttackCanCrit = true;
 
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
+	ELSBreakPowerTier BasicAttackBreakPower = ELSBreakPowerTier::NormalAttack;
+
 	FTimerHandle PredictedDashTimerHandle;
 	FTimerHandle PredictedDashCooldownTimerHandle;
 	bool bAttackHitConsumed = false;
