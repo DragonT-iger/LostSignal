@@ -39,11 +39,16 @@ void ULSInventoryItemSlotWidget::SetItem(const FName ItemRowName, const int32 Am
 	UTexture2D* IconTexture = LoadIconTextureByRowName(ItemRowName);
 	if (!IconTexture)
 	{
-		ItemIconImage->SetVisibility(ESlateVisibility::Hidden);
-		return;
+		IconTexture = LoadDefaultIconTexture();
+		UE_LOG(LogLS, Warning, TEXT("Using default inventory icon for row '%s' on %s."), *ItemRowName.ToString(), *GetNameSafe(this));
 	}
 
-	ItemIconImage->SetBrushFromTexture(IconTexture);
+	if (IconTexture)
+	{
+		ItemIconImage->SetBrushFromTexture(IconTexture);
+	}
+
+	ItemIconImage->SetColorAndOpacity(FLinearColor::White);
 	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
 	AmountText->SetText(FText::AsNumber(Amount));
 	AmountText->SetVisibility(Amount > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -65,6 +70,7 @@ void ULSInventoryItemSlotWidget::ClearItem()
 	}
 
 	ItemIconImage->SetBrushFromTexture(nullptr);
+	ItemIconImage->SetColorAndOpacity(FLinearColor::White);
 	ItemIconImage->SetVisibility(ESlateVisibility::Hidden);
 	AmountText->SetText(FText::GetEmpty());
 	AmountText->SetVisibility(ESlateVisibility::Collapsed);
@@ -247,6 +253,18 @@ UTexture2D* ULSInventoryItemSlotWidget::LoadIconTextureByRowName(const FName Ite
 	}
 
 	return IconTexture;
+}
+
+UTexture2D* ULSInventoryItemSlotWidget::LoadDefaultIconTexture() const
+{
+	static const TCHAR* DefaultIconObjectPath = TEXT("/Engine/EngineResources/DefaultTexture.DefaultTexture");
+	UTexture2D* DefaultIconTexture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, DefaultIconObjectPath));
+	if (!DefaultIconTexture)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Failed to load default inventory icon '%s'."), DefaultIconObjectPath);
+	}
+
+	return DefaultIconTexture;
 }
 
 FString ULSInventoryItemSlotWidget::BuildIconObjectPath(const FString& IconNameOrPath, const FString& BaseFolder)
