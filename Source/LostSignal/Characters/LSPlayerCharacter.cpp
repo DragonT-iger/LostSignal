@@ -108,6 +108,7 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	if (Skill1Action) { EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill1); }
 	if (Skill2Action) { EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill2); }
 	if (Skill3Action) { EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill3); }
+	if (Skill4Action) { EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill4); }
 	if (Item1Action) { EnhancedInput->BindAction(Item1Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem1); }
 	if (Item2Action) { EnhancedInput->BindAction(Item2Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem2); }
 	if (Item3Action) { EnhancedInput->BindAction(Item3Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem3); }
@@ -165,12 +166,15 @@ void ALSPlayerCharacter::OnDash()
 void ALSPlayerCharacter::OnSkill1() {}
 void ALSPlayerCharacter::OnSkill2() {}
 void ALSPlayerCharacter::OnSkill3() {}
+void ALSPlayerCharacter::OnSkill4() {}
+void ALSPlayerCharacter::OnUltimate() {}
 void ALSPlayerCharacter::OnItem1() {}
 void ALSPlayerCharacter::OnItem2() {}
 void ALSPlayerCharacter::OnItem3() {}
 void ALSPlayerCharacter::OnItem4() {}
 void ALSPlayerCharacter::OnItem5() {}
 void ALSPlayerCharacter::OnItem6() {}
+
 void ALSPlayerCharacter::OnInteract()
 {
 	if (!IsLocallyControlled()) return;

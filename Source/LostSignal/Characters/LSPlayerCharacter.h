@@ -88,6 +88,12 @@ protected:
 	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TObjectPtr<UInputAction> Skill3Action;
 
+	UPROPERTY(EditAnywhere, Category = "LS/Input")
+	TObjectPtr<UInputAction> Skill4Action;
+
+	UPROPERTY(EditAnywhere, Category = "LS/Input")
+	TObjectPtr<UInputAction> Ultimatection;
+
 	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TObjectPtr<UInputAction> Item1Action;
 
@@ -186,6 +192,8 @@ private:
 	void OnSkill1();
 	void OnSkill2();
 	void OnSkill3();
+	void OnSkill4();
+	void OnUltimate();
 	void OnItem1();
 	void OnItem2();
 	void OnItem3();
