@@ -66,7 +66,7 @@ int32 ResolveItemMaxStackForSession(const FName ItemRowName)
 	return MaxStack;
 }
 
-void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount)
+void AddItemsToSlotArraySession(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount)
 {
 	if (ItemRowName.IsNone() || Amount <= 0)
 	{
@@ -102,7 +102,7 @@ void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName,
 	}
 }
 
-int32 FindRowOrder(UDataTable* Table, const FName RowName)
+int32 FindRowOrderSession(UDataTable* Table, const FName RowName)
 {
 	if (!Table)
 	{
@@ -126,29 +126,29 @@ int32 ResolveItemSortKeyForSession(const FName ItemRowName)
 	const FString RowNameString = ItemRowName.ToString();
 	if (RowNameString.StartsWith(TEXT("Chip_")))
 	{
-		return FindRowOrder(Settings->ChipTable.LoadSynchronous(), ItemRowName);
+		return FindRowOrderSession(Settings->ChipTable.LoadSynchronous(), ItemRowName);
 	}
 
 	if (RowNameString.StartsWith(TEXT("Weapon_")))
 	{
-		return 100000 + FindRowOrder(Settings->WeaponTable.LoadSynchronous(), ItemRowName);
+		return 100000 + FindRowOrderSession(Settings->WeaponTable.LoadSynchronous(), ItemRowName);
 	}
 
 	if (RowNameString.StartsWith(TEXT("Armor_")))
 	{
-		return 200000 + FindRowOrder(Settings->ArmorTable.LoadSynchronous(), ItemRowName);
+		return 200000 + FindRowOrderSession(Settings->ArmorTable.LoadSynchronous(), ItemRowName);
 	}
 
 	if (RowNameString.StartsWith(TEXT("Item_")))
 	{
-		return 300000 + FindRowOrder(Settings->ItemTable.LoadSynchronous(), ItemRowName);
+		return 300000 + FindRowOrderSession(Settings->ItemTable.LoadSynchronous(), ItemRowName);
 	}
 
 	UE_LOG(LogLS, Warning, TEXT("[Session] Unknown item row prefix for sort key: %s"), *ItemRowName.ToString());
 	return MAX_int32;
 }
 
-void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots)
+void SortAndCompactSlotArraySession(TArray<FLSSessionItem>& Slots)
 {
 	TMap<FName, int32> AmountByRowName;
 	for (const FLSSessionItem& Slot : Slots)
@@ -184,7 +184,7 @@ void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots)
 	Slots.Reset();
 	for (const FLSSessionItem& MergedItem : MergedItems)
 	{
-		AddItemsToSlotArray(Slots, MergedItem.ItemRowName, MergedItem.Amount);
+		AddItemsToSlotArraySession(Slots, MergedItem.ItemRowName, MergedItem.Amount);
 	}
 }
 }
@@ -257,12 +257,12 @@ void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
 
 void ULSSessionSubsystem::AddSessionItem(FName ItemRowName, int32 Amount)
 {
-	AddItemsToSlotArray(SessionInventory, ItemRowName, Amount);
+	AddItemsToSlotArraySession(SessionInventory, ItemRowName, Amount);
 }
 
 void ULSSessionSubsystem::SortSessionInventory()
 {
-	SortAndCompactSlotArray(SessionInventory);
+	SortAndCompactSlotArraySession(SessionInventory);
 	UE_LOG(LogLS, Log, TEXT("[Session] Session inventory sorted and compacted. Total slots: %d"), SessionInventory.Num());
 }
 
