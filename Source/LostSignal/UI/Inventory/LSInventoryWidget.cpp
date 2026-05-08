@@ -2,6 +2,39 @@
 
 #include "LostSignal.h"
 #include "Components/WrapBox.h"
+#include "Session/LSSaveSubsystem.h"
+#include "Session/LSSessionSubsystem.h"
+#include "UI/Inventory/LSInventoryItemSlotWidget.h"
+
+namespace
+{
+void MergeInventoryItem(TArray<FLSSessionItem>& Items, const FLSSessionItem& NewItem)
+{
+	if (NewItem.ItemRowName.IsNone() || NewItem.Amount <= 0)
+	{
+		return;
+	}
+
+	for (FLSSessionItem& ExistingItem : Items)
+	{
+		if (ExistingItem.ItemRowName == NewItem.ItemRowName)
+		{
+			ExistingItem.Amount += NewItem.Amount;
+			return;
+		}
+	}
+
+	Items.Add(NewItem);
+}
+
+void MergeInventoryItems(TArray<FLSSessionItem>& Items, const TArray<FLSSessionItem>& NewItems)
+{
+	for (const FLSSessionItem& NewItem : NewItems)
+	{
+		MergeInventoryItem(Items, NewItem);
+	}
+}
+}
 
 void ULSInventoryWidget::NativeConstruct()
 {
@@ -47,14 +80,52 @@ void ULSInventoryWidget::RebuildInventorySlots()
 		return;
 	}
 
-	for (int32 SlotIndex = 0; SlotIndex < InventorySlotCount; ++SlotIndex)
+	TArray<FLSSessionItem> InventoryItems;
+	if (UGameInstance* GameInstance = GetGameInstance())
 	{
-		UUserWidget* SlotWidget = OwningPlayer
-			? CreateWidget<UUserWidget>(OwningPlayer, InventoryItemSlotWidgetClass)
-			: CreateWidget<UUserWidget>(World, InventoryItemSlotWidgetClass);
+		if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
+		{
+			MergeInventoryItems(InventoryItems, SaveSubsystem->GetStash());
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		}
+
+		if (ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>())
+		{
+			MergeInventoryItems(InventoryItems, SessionSubsystem->GetSessionInventory());
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("SessionSubsystem is missing on %s."), *GetNameSafe(this));
+		}
+
+		UE_LOG(LogLS, Log, TEXT("InventoryWidget rebuilt with %d merged items on %s."), InventoryItems.Num(), *GetNameSafe(this));
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("GameInstance is missing on %s."), *GetNameSafe(this));
+	}
+
+	const int32 SlotCountToBuild = FMath::Max(InventorySlotCount, InventoryItems.Num());
+	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
+	{
+		ULSInventoryItemSlotWidget* SlotWidget = OwningPlayer
+			? CreateWidget<ULSInventoryItemSlotWidget>(OwningPlayer, InventoryItemSlotWidgetClass)
+			: CreateWidget<ULSInventoryItemSlotWidget>(World, InventoryItemSlotWidgetClass);
 
 		if (SlotWidget)
 		{
+			if (InventoryItems.IsValidIndex(SlotIndex))
+			{
+				SlotWidget->SetItem(InventoryItems[SlotIndex].ItemRowName, InventoryItems[SlotIndex].Amount);
+			}
+			else
+			{
+				SlotWidget->ClearItem();
+			}
+
 			InventoryWrapBox->AddChildToWrapBox(SlotWidget);
 		}
 		else
@@ -90,12 +161,13 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 
 	for (int32 SlotIndex = 0; SlotIndex < ConfirmedStorageSlotCount; ++SlotIndex)
 	{
-		UUserWidget* SlotWidget = OwningPlayer
-			? CreateWidget<UUserWidget>(OwningPlayer, InventoryItemSlotWidgetClass)
-			: CreateWidget<UUserWidget>(World, InventoryItemSlotWidgetClass);
+		ULSInventoryItemSlotWidget* SlotWidget = OwningPlayer
+			? CreateWidget<ULSInventoryItemSlotWidget>(OwningPlayer, InventoryItemSlotWidgetClass)
+			: CreateWidget<ULSInventoryItemSlotWidget>(World, InventoryItemSlotWidgetClass);
 
 		if (SlotWidget)
 		{
+			SlotWidget->ClearItem();
 			ConfirmedStorageSlotWrapBox->AddChildToWrapBox(SlotWidget);
 		}
 		else

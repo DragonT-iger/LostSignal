@@ -16,6 +16,7 @@
 #include "InputActionValue.h"
 #include "LostSignal.h"
 #include "Blueprint/UserWidget.h"
+#include "UI/Inventory/LSInventoryWidget.h"
 #include "Vision/LSMPCVisionSourceComponent.h"
 #include "Vision/LSPlayerXRayComponent.h"
 #include "Vision/LSVisionComponent.h"
@@ -276,6 +277,16 @@ void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
 	if (!InventoryWidget->IsInViewport())
 	{
 		InventoryWidget->AddToViewport();
+	}
+
+	if (ULSInventoryWidget* LSInventoryWidget = Cast<ULSInventoryWidget>(InventoryWidget))
+	{
+		LSInventoryWidget->RebuildInventorySlots();
+		LSInventoryWidget->RebuildConfirmedStorageSlots();
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("InventoryWidgetClass is not derived from ULSInventoryWidget on %s."), *GetNameSafe(this));
 	}
 
 	InventoryWidget->SetVisibility(ESlateVisibility::Visible);

@@ -5,6 +5,7 @@
 #include "LSInventoryWidget.generated.h"
 
 class UWrapBox;
+class ULSInventoryItemSlotWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSInventoryWidget : public UUserWidget
@@ -34,7 +35,7 @@ protected:
 	TObjectPtr<UWrapBox> ConfirmedStorageSlotWrapBox;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
-	TSubclassOf<UUserWidget> InventoryItemSlotWidgetClass;
+	TSubclassOf<ULSInventoryItemSlotWidget> InventoryItemSlotWidgetClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI", meta=(ClampMin="0"))
 	int32 InventorySlotCount = 10;
