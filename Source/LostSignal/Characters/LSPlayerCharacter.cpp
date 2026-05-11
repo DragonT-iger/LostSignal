@@ -110,35 +110,26 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 	if (AttackAction) { EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnAttack); }
 	if (DashAction) { EnhancedInput->BindAction(DashAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnDash); }
+	if (SkillCancelAction) { EnhancedInput->BindAction(SkillCancelAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkillPreviewCancelInput); }
 	if (Skill1Action)
 	{
 		EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill1);
-		EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill1Confirm);
-		EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill1Cancel);
 	}
 	if (Skill2Action)
 	{
 		EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill2);
-		EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill2Confirm);
-		EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill2Cancel);
 	}
 	if (Skill3Action)
 	{
 		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill3);
-		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill3Confirm);
-		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill3Cancel);
 	}
 	if (Skill4Action)
 	{
 		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill4);
-		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill4Confirm);
-		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill4Cancel);
 	}
 	if (Ultimatection)
 	{
 		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnUltimate);
-		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnUltimateConfirm);
-		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnUltimateCancel);
 	}
 	if (Item1Action) { EnhancedInput->BindAction(Item1Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem1); }
 	if (Item2Action) { EnhancedInput->BindAction(Item2Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem2); }
@@ -151,6 +142,11 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 void ALSPlayerCharacter::OnAttack()
 {
+	if (ConfirmActiveSkillPreview())
+	{
+		return;
+	}
+
 	if (!PlayerCombatComponent)
 	{
 		return;
@@ -168,6 +164,11 @@ void ALSPlayerCharacter::OnAttack()
 
 void ALSPlayerCharacter::OnDash()
 {
+	if (CancelActiveSkillPreview())
+	{
+		return;
+	}
+
 	if (!PlayerCombatComponent)
 	{
 		return;
@@ -194,21 +195,16 @@ void ALSPlayerCharacter::OnDash()
 	PlayerCombatComponent->RequestDash(DashDirection);
 }
 
+void ALSPlayerCharacter::OnSkillPreviewCancelInput()
+{
+	CancelActiveSkillPreview();
+}
+
 void ALSPlayerCharacter::OnSkill1() { BeginSkillPreview(ELSPlayerSkillSlot::Skill1); }
 void ALSPlayerCharacter::OnSkill2() { BeginSkillPreview(ELSPlayerSkillSlot::Skill2); }
 void ALSPlayerCharacter::OnSkill3() { BeginSkillPreview(ELSPlayerSkillSlot::Skill3); }
 void ALSPlayerCharacter::OnSkill4() { BeginSkillPreview(ELSPlayerSkillSlot::Skill4); }
 void ALSPlayerCharacter::OnUltimate() { BeginSkillPreview(ELSPlayerSkillSlot::Ultimate); }
-void ALSPlayerCharacter::OnSkill1Confirm() { ConfirmSkillPreview(ELSPlayerSkillSlot::Skill1); }
-void ALSPlayerCharacter::OnSkill2Confirm() { ConfirmSkillPreview(ELSPlayerSkillSlot::Skill2); }
-void ALSPlayerCharacter::OnSkill3Confirm() { ConfirmSkillPreview(ELSPlayerSkillSlot::Skill3); }
-void ALSPlayerCharacter::OnSkill4Confirm() { ConfirmSkillPreview(ELSPlayerSkillSlot::Skill4); }
-void ALSPlayerCharacter::OnUltimateConfirm() { ConfirmSkillPreview(ELSPlayerSkillSlot::Ultimate); }
-void ALSPlayerCharacter::OnSkill1Cancel() { CancelSkillPreview(ELSPlayerSkillSlot::Skill1); }
-void ALSPlayerCharacter::OnSkill2Cancel() { CancelSkillPreview(ELSPlayerSkillSlot::Skill2); }
-void ALSPlayerCharacter::OnSkill3Cancel() { CancelSkillPreview(ELSPlayerSkillSlot::Skill3); }
-void ALSPlayerCharacter::OnSkill4Cancel() { CancelSkillPreview(ELSPlayerSkillSlot::Skill4); }
-void ALSPlayerCharacter::OnUltimateCancel() { CancelSkillPreview(ELSPlayerSkillSlot::Ultimate); }
 void ALSPlayerCharacter::OnItem1() {}
 void ALSPlayerCharacter::OnItem2() {}
 void ALSPlayerCharacter::OnItem3() {}
@@ -425,24 +421,25 @@ void ALSPlayerCharacter::UpdateActiveSkillPreview()
 	PlayerSkillComponent->UpdateActiveSkillPreview(PreviewLocation, AimDirection.Rotation());
 }
 
-void ALSPlayerCharacter::ConfirmSkillPreview(ELSPlayerSkillSlot Slot)
+bool ALSPlayerCharacter::ConfirmActiveSkillPreview()
 {
-	if (!IsLocallyControlled() || !PlayerSkillComponent)
+	if (!IsLocallyControlled() || !PlayerSkillComponent || !PlayerSkillComponent->IsPreviewingSkill())
 	{
-		return;
+		return false;
 	}
 
-	PlayerSkillComponent->ConfirmActiveSkillPreview(Slot);
+	return PlayerSkillComponent->ConfirmAnyActiveSkillPreview();
 }
 
-void ALSPlayerCharacter::CancelSkillPreview(ELSPlayerSkillSlot Slot)
+bool ALSPlayerCharacter::CancelActiveSkillPreview()
 {
-	if (!IsLocallyControlled() || !PlayerSkillComponent)
+	if (!IsLocallyControlled() || !PlayerSkillComponent || !PlayerSkillComponent->IsPreviewingSkill())
 	{
-		return;
+		return false;
 	}
 
-	PlayerSkillComponent->CancelActiveSkillPreview(Slot);
+	PlayerSkillComponent->CancelAnyActiveSkillPreview();
+	return true;
 }
 
 void ALSPlayerCharacter::ServerRequestInteract_Implementation(AActor* Target)

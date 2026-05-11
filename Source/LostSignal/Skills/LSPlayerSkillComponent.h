@@ -27,6 +27,9 @@ public:
 	bool ConfirmActiveSkillPreview(ELSPlayerSkillSlot Slot);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Skill")
+	bool ConfirmAnyActiveSkillPreview();
+
+	UFUNCTION(BlueprintCallable, Category="LS/Skill")
 	void CancelActiveSkillPreview(ELSPlayerSkillSlot Slot);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Skill")

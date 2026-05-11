@@ -67,6 +67,16 @@ bool ULSPlayerSkillComponent::ConfirmActiveSkillPreview(ELSPlayerSkillSlot Slot)
 	return true;
 }
 
+bool ULSPlayerSkillComponent::ConfirmAnyActiveSkillPreview()
+{
+	if (!ActiveSkillData)
+	{
+		return false;
+	}
+
+	return ConfirmActiveSkillPreview(ActiveSlot);
+}
+
 void ULSPlayerSkillComponent::CancelActiveSkillPreview(ELSPlayerSkillSlot Slot)
 {
 	if (!ActiveSkillData || ActiveSlot != Slot)

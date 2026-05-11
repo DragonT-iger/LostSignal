@@ -95,6 +95,9 @@ protected:
 	TObjectPtr<UInputAction> DashAction;
 
 	UPROPERTY(EditAnywhere, Category="LS/Input")
+	TObjectPtr<UInputAction> SkillCancelAction;
+
+	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TObjectPtr<UInputAction> Skill1Action;
 
 	UPROPERTY(EditAnywhere, Category="LS/Input")
@@ -202,6 +205,7 @@ private:
 	void FaceMovementDirection(float DeltaSeconds);
 	void OnAttack();
 	void OnDash();
+	void OnSkillPreviewCancelInput();
 	void OnRunStart();
 	void OnRunEnd();
 	void OnSkill1();
@@ -209,16 +213,6 @@ private:
 	void OnSkill3();
 	void OnSkill4();
 	void OnUltimate();
-	void OnSkill1Confirm();
-	void OnSkill2Confirm();
-	void OnSkill3Confirm();
-	void OnSkill4Confirm();
-	void OnUltimateConfirm();
-	void OnSkill1Cancel();
-	void OnSkill2Cancel();
-	void OnSkill3Cancel();
-	void OnSkill4Cancel();
-	void OnUltimateCancel();
 	void OnItem1();
 	void OnItem2();
 	void OnItem3();
@@ -233,8 +227,8 @@ private:
 
 	void BeginSkillPreview(ELSPlayerSkillSlot Slot);
 	void UpdateActiveSkillPreview();
-	void ConfirmSkillPreview(ELSPlayerSkillSlot Slot);
-	void CancelSkillPreview(ELSPlayerSkillSlot Slot);
+	bool ConfirmActiveSkillPreview();
+	bool CancelActiveSkillPreview();
 
 	void ApplyRunState(bool bNewIsRunning);
 	bool ShouldSyncFacingRotation(float NewYaw) const;
