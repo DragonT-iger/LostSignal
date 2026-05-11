@@ -1,10 +1,14 @@
 #include "UI/Inventory/LSInventoryWidget.h"
 
+#include "Camera/PlayerCameraManager.h"
+#include "Components/CapsuleComponent.h"
 #include "LostSignal.h"
 #include "Components/Button.h"
 #include "Components/WrapBox.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSubsystem.h"
+#include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSInventoryItemSlotWidget.h"
 
 namespace
@@ -57,6 +61,16 @@ void ULSInventoryWidget::NativeDestruct()
 	}
 
 	Super::NativeDestruct();
+}
+
+bool ULSInventoryWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	if (HandleInventoryBackgroundDrop(InGeometry, InDragDropEvent, InOperation))
+	{
+		return true;
+	}
+
+	return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 }
 
 void ULSInventoryWidget::SetInventorySlotCount(const int32 NewInventorySlotCount)
@@ -312,4 +326,102 @@ void ULSInventoryWidget::HandleSortButtonClicked()
 
 	RebuildInventorySlots();
 	RebuildConfirmedStorageSlots();
+}
+
+bool ULSInventoryWidget::HandleInventoryBackgroundDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
+	if (!DragOperation)
+	{
+		return false;
+	}
+
+	if (DragOperation->SourceInventoryWidget != this)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source inventory widget does not match."));
+		return false;
+	}
+
+	if (DragOperation->SourceSlotIndex == INDEX_NONE)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source slot index is invalid."));
+		return false;
+	}
+
+	const FVector2D LocalDropPosition = InGeometry.AbsoluteToLocal(InDragDropEvent.GetScreenSpacePosition());
+	if (LocalDropPosition.X >= 0.0f &&
+		LocalDropPosition.Y >= 0.0f &&
+		LocalDropPosition.X <= InGeometry.GetLocalSize().X &&
+		LocalDropPosition.Y <= InGeometry.GetLocalSize().Y)
+	{
+		return false;
+	}
+
+	FVector DropLocation = FVector::ZeroVector;
+	if (!ResolveDroppedItemLocation(DropLocation))
+	{
+		return false;
+	}
+
+	float DropYaw = 0.0f;
+	if (!ResolveDroppedItemYaw(DropYaw))
+	{
+		return false;
+	}
+
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because owning player controller is invalid on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const bool bDropped = PlayerController->DropSessionSlotToWorld(
+		DragOperation->SourceSlotArea,
+		DragOperation->SourceSlotIndex,
+		DroppedItemActorClass,
+		DropLocation,
+		DropYaw);
+
+	if (bDropped)
+	{
+		RebuildInventorySlots();
+		RebuildConfirmedStorageSlots();
+	}
+
+	return bDropped;
+}
+
+bool ULSInventoryWidget::ResolveDroppedItemLocation(FVector& OutDropLocation) const
+{
+	const APlayerController* PlayerController = GetOwningPlayer();
+	const APawn* Pawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+	if (!Pawn)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot resolve dropped item location because owning pawn is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	OutDropLocation = Pawn->GetActorLocation();
+	if (const UCapsuleComponent* CapsuleComponent = Pawn->FindComponentByClass<UCapsuleComponent>())
+	{
+		OutDropLocation.Z -= CapsuleComponent->GetScaledCapsuleHalfHeight();
+	}
+
+	constexpr float DropZRandomRange = 3.0f;
+	OutDropLocation.Z += FMath::FRandRange(0.0f, DropZRandomRange);
+	return true;
+}
+
+bool ULSInventoryWidget::ResolveDroppedItemYaw(float& OutDropYaw) const
+{
+	const APlayerController* PlayerController = GetOwningPlayer();
+	if (!PlayerController || !PlayerController->PlayerCameraManager)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot resolve dropped item yaw because player camera manager is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	OutDropYaw = PlayerController->PlayerCameraManager->GetCameraRotation().Yaw + 180.0f;
+	return true;
 }

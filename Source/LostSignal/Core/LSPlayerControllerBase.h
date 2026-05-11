@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Session/LSSessionSubsystem.h"
 #include "LSPlayerControllerBase.generated.h"
 
+class ALSWorldDroppedItem;
 class UInputMappingContext;
 class ULSHpDebugWidget;
 
@@ -17,6 +19,8 @@ class LOSTSIGNAL_API ALSPlayerControllerBase : public APlayerController
 public:
 	UFUNCTION(BlueprintPure, Category="LS/UI")
 	TSubclassOf<ULSHpDebugWidget> GetDebugHpWidgetClass() const { return DebugHpWidgetClass; }
+
+	bool DropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector& DropLocation, float DropYaw);
 
 protected:
 	UPROPERTY(EditAnywhere, Category="LS/Input")
@@ -34,4 +38,10 @@ protected:
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
+
+private:
+	UFUNCTION(Server, Reliable)
+	void ServerDropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector_NetQuantize DropLocation, float DropYaw);
+
+	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector& DropLocation, float DropYaw);
 };

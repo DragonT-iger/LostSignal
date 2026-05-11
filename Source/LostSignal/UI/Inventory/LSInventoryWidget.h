@@ -5,7 +5,9 @@
 #include "Session/LSSessionSubsystem.h"
 #include "LSInventoryWidget.generated.h"
 
+class ALSWorldDroppedItem;
 class UButton;
+class UDragDropOperation;
 class UWrapBox;
 class ULSInventoryItemSlotWidget;
 
@@ -33,6 +35,7 @@ public:
 
 protected:
 	virtual void NativeDestruct() override;
+	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UWrapBox> InventoryWrapBox;
@@ -55,10 +58,17 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI", meta=(ClampMin="0"))
 	int32 ConfirmedStorageSlotCount = 4;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TSubclassOf<ALSWorldDroppedItem> DroppedItemActorClass;
+
 private:
 	UFUNCTION()
 	void HandleStoreAllButtonClicked();
 
 	UFUNCTION()
 	void HandleSortButtonClicked();
+
+	bool HandleInventoryBackgroundDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation);
+	bool ResolveDroppedItemLocation(FVector& OutDropLocation) const;
+	bool ResolveDroppedItemYaw(float& OutDropYaw) const;
 };

@@ -6,7 +6,6 @@
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
-#include "LostSignal.h"
 #include "UI/LSInteractHintWidget.h"
 
 ALSInteractableObject::ALSInteractableObject()
@@ -77,8 +76,6 @@ void ALSInteractableObject::RefreshWidgetVisibility()
 void ALSInteractableObject::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	UE_LOG(LogLS, Log, TEXT("[InteractHint] BeginOverlap: %s"), *GetNameSafe(OtherActor));
-
 	APawn* Pawn = Cast<APawn>(OtherActor);
 	if (!Pawn || !Pawn->IsLocallyControlled()) return;
 	if (!CanInteract_Implementation(Pawn)) return;
@@ -187,9 +184,6 @@ bool ALSInteractableObject::ResolveMouseWorldPoint(APawn* Pawn, FVector& OutMous
 
 void ALSInteractableObject::UpdateHintWidget(APawn* Pawn)
 {
-	UE_LOG(LogLS, Log, TEXT("[InteractHint] Update widget - WidgetClass: %s"),
-		*GetNameSafe(InteractWidget->GetWidgetClass()));
-
 	FText KeyName = FText::FromString(TEXT("?"));
 
 	ALSPlayerCharacter* LSChar = Cast<ALSPlayerCharacter>(Pawn);

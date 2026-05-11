@@ -474,6 +474,32 @@ bool ULSSessionSubsystem::DropSessionSlot(const ELSInventorySlotArea FromArea, c
 	return true;
 }
 
+bool ULSSessionSubsystem::GetSessionSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, FLSSessionItem& OutItem) const
+{
+	const TArray<FLSSessionItem>& Slots = SlotArea == ELSInventorySlotArea::Safe ? SessionSafeInventory : SessionInventory;
+	if (!Slots.IsValidIndex(SlotIndex) || !IsFilledSessionSlot(Slots[SlotIndex]))
+	{
+		return false;
+	}
+
+	OutItem = Slots[SlotIndex];
+	return true;
+}
+
+bool ULSSessionSubsystem::ClearSessionSlot(const ELSInventorySlotArea SlotArea, const int32 SlotIndex)
+{
+	TArray<FLSSessionItem>& Slots = SlotArea == ELSInventorySlotArea::Safe ? SessionSafeInventory : SessionInventory;
+	if (!Slots.IsValidIndex(SlotIndex) || !IsFilledSessionSlot(Slots[SlotIndex]))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot clear slot. Area=%d Index=%d"),
+			static_cast<int32>(SlotArea), SlotIndex);
+		return false;
+	}
+
+	Slots[SlotIndex] = MakeEmptySessionSlot();
+	return true;
+}
+
 void ULSSessionSubsystem::ConsumeItem(FName ItemRowName, int32 Amount)
 {
 	if (ItemRowName.IsNone() || Amount <= 0) return;
