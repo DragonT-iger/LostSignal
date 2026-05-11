@@ -71,7 +71,7 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 
 	for (const FVector2D& Vertex : UniqueVertices)
 	{
-		const float AngleDeg = FMath::RadiansToDegrees(FMath::Atan2(Vertex.Y - SolverInfo.OriginPos.Y, Vertex.X - SolverInfo.OriginPos.X));
+		const float AngleDeg = FMath::RadiansToDegrees(FMath::Atan2(Vertex.Y - SolverInfo.RayOriginPos.Y, Vertex.X - SolverInfo.RayOriginPos.X));
 		if (!IsAngleInsideFov(AngleDeg))
 		{
 			continue;
@@ -154,11 +154,12 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 
 	FLSVisionPolygonData PolygonData;
 	PolygonData.Origin = SolverInfo.OriginPos;
+	PolygonData.RayOrigin = SolverInfo.RayOriginPos;
 	PolygonData.VisionRadius = SolverInfo.VisionRadius;
 	PolygonData.Extent = SolverInfo.MaxRayDistance;
 	PolygonData.Points.Reserve(FinalAngles.Num() + 1);
 	PolygonData.DebugRayHitPoints.Reserve(FinalAngles.Num());
-	PolygonData.Points.Add(SolverInfo.OriginPos);
+	PolygonData.Points.Add(SolverInfo.RayOriginPos);
 
 	for (const float AngleDeg : FinalAngles)
 	{
@@ -175,7 +176,7 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 				continue;
 			}
 
-			const FLSVisionRayHit Hit = CastRay(SolverInfo.OriginPos, RayDir, Segment->Start, Segment->End, SolverInfo.MaxRayDistance);
+			const FLSVisionRayHit Hit = CastRay(SolverInfo.RayOriginPos, RayDir, Segment->Start, Segment->End, SolverInfo.MaxRayDistance);
 			if (Hit.bHit && Hit.Distance < ClosestHit.Distance)
 			{
 				ClosestHit = Hit;
@@ -184,7 +185,7 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 
 		if (!ClosestHit.bHit)
 		{
-			ClosestHit.HitPoint = SolverInfo.OriginPos + (RayDir * SolverInfo.MaxRayDistance);
+			ClosestHit.HitPoint = SolverInfo.RayOriginPos + (RayDir * SolverInfo.MaxRayDistance);
 			ClosestHit.Distance = SolverInfo.MaxRayDistance;
 			ClosestHit.bHit = true;
 		}

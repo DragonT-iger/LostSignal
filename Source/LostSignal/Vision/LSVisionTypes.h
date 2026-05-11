@@ -47,6 +47,9 @@ struct LOSTSIGNAL_API FLSVisionPolygonData
 	FVector2D Origin = FVector2D::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
+	FVector2D RayOrigin = FVector2D::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	TArray<FVector2D> Points;
 
 	// Stores the exact ray hit points used while solving visibility so debug drawing can show
@@ -61,6 +64,7 @@ struct LOSTSIGNAL_API FLSVisionSolverInfo
 	GENERATED_BODY()
 
 	FVector2D OriginPos = FVector2D::ZeroVector;
+	FVector2D RayOriginPos = FVector2D::ZeroVector;
 	FVector2D OriginForward = FVector2D::UnitX();
 	TArray<FLSVisionSegment2D*> Segments;
 	float HalfFovDegrees = 45.0f;

@@ -139,11 +139,13 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	const FVector2D ActorLocation2D(ActorLocation.X, ActorLocation.Y);
 
 	const FVector ActorForward = GetOwner()->GetActorForwardVector();
-	const FVector2D ActorForward2D(ActorForward.X, ActorForward.Y);
+	const FVector2D ActorForward2D = FVector2D(ActorForward.X, ActorForward.Y).GetSafeNormal();
+	const FVector2D RayOrigin2D = ActorLocation2D - (ActorForward2D * (VisionRadius - 50));
 
 	FLSVisionSolverInfo SolverInfo;
 	SolverInfo.OriginPos = ActorLocation2D;
-	SolverInfo.OriginForward = ActorForward2D.GetSafeNormal();
+	SolverInfo.RayOriginPos = RayOrigin2D;
+	SolverInfo.OriginForward = ActorForward2D;
 	SolverInfo.HalfFovDegrees = HalfFOVDegrees;
 	SolverInfo.VisionRadius = VisionRadius;
 	SolverInfo.AngleEpsilon = 0.01f;
@@ -151,7 +153,7 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	SolverInfo.MaxRayDistance = MaxRayDistance;
 	SolverInfo.World = World;
 
-	VisionSubsystem->QuerySegmentsInRadius(ActorLocation2D, MaxRayDistance, SolverInfo.Segments);
+	VisionSubsystem->QuerySegmentsInRadius(RayOrigin2D, MaxRayDistance, SolverInfo.Segments);
 
 	CurrentPolygon = FLSVisionSolver::Solve(SolverInfo);
 
@@ -199,7 +201,7 @@ void ULSVisionComponent::DrawDebugVisionRays() const
 		return;
 	}
 
-	const FVector RayOrigin(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, DebugRayZOffset);
+	const FVector RayOrigin(CurrentPolygon.RayOrigin.X, CurrentPolygon.RayOrigin.Y, DebugRayZOffset);
 	const bool bPersistentLines = DebugRayDuration > 0.0f;
 
 	for (const FVector2D& Point2D : CurrentPolygon.DebugRayHitPoints)
