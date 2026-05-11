@@ -16,7 +16,7 @@
 #include "InputActionValue.h"
 #include "LostSignal.h"
 #include "Skills/LSPlayerSkillComponent.h"
-#include "Skills/LSSkillPreviewComponent.h"
+#include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "Vision/LSMPCVisionSourceComponent.h"
@@ -428,7 +428,20 @@ bool ALSPlayerCharacter::ConfirmActiveSkillPreview()
 		return false;
 	}
 
-	return PlayerSkillComponent->ConfirmAnyActiveSkillPreview();
+	FVector MouseWorldPoint = FVector::ZeroVector;
+	if (!ResolveMouseWorldPoint(MouseWorldPoint))
+	{
+		return false;
+	}
+
+	FVector AimDirection = MouseWorldPoint - GetActorLocation();
+	AimDirection.Z = 0.0f;
+	if (AimDirection.IsNearlyZero())
+	{
+		AimDirection = GetActorForwardVector();
+	}
+
+	return PlayerSkillComponent->ConfirmAnyActiveSkillPreview(MouseWorldPoint, AimDirection.Rotation());
 }
 
 bool ALSPlayerCharacter::CancelActiveSkillPreview()

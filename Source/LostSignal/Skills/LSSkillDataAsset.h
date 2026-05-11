@@ -3,7 +3,11 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Skills/LSSkillAreaTypes.h"
+#include "Skills/LSSkillTypes.h"
 #include "LSSkillDataAsset.generated.h"
+
+class ULSSkill;
+struct FLSCharacterSkillRow;
 
 UCLASS(BlueprintType)
 class LOSTSIGNAL_API ULSSkillDataAsset : public UDataAsset
@@ -12,14 +16,16 @@ class LOSTSIGNAL_API ULSSkillDataAsset : public UDataAsset
 
 public:
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
-	const FLSSkillAreaPreviewSpec& GetPreviewSpec() const { return PreviewSpec; }
+	FLSSkillAreaPreviewSpec BuildPreviewSpec() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Skill")
+	bool TryGetSkillRow(FLSCharacterSkillRow& OutRow) const;
+
+	bool ActivateSkill(const FLSSkillActivationContext& Context) const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
-	FName SkillId;
+	TSubclassOf<ULSSkill> SkillClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
-	FText DisplayName;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
-	FLSSkillAreaPreviewSpec PreviewSpec;
+private:
+	ULSSkill* GetSkillDefaultObject() const;
 };

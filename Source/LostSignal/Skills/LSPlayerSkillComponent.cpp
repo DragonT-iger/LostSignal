@@ -2,11 +2,12 @@
 
 #include "GameFramework/Pawn.h"
 #include "Skills/LSSkillDataAsset.h"
-#include "Skills/LSSkillPreviewComponent.h"
+#include "Skills/Preview/LSSkillPreviewComponent.h"
 
 ULSPlayerSkillComponent::ULSPlayerSkillComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 }
 
 bool ULSPlayerSkillComponent::BeginSkillPreview(ELSPlayerSkillSlot Slot)
@@ -28,12 +29,14 @@ bool ULSPlayerSkillComponent::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 		PreviewComponent->EndAreaPreview();
 	}
 
-	if (!PreviewComponent->BeginAreaPreview(SkillData->GetPreviewSpec()))
+	ActiveSkillData = nullptr;
+	ActiveSlot = Slot;
+
+	if (!PreviewComponent->BeginAreaPreview(SkillData->BuildPreviewSpec()))
 	{
 		return false;
 	}
 
-	ActiveSlot = Slot;
 	ActiveSkillData = SkillData;
 	return true;
 }
@@ -67,14 +70,33 @@ bool ULSPlayerSkillComponent::ConfirmActiveSkillPreview(ELSPlayerSkillSlot Slot)
 	return true;
 }
 
-bool ULSPlayerSkillComponent::ConfirmAnyActiveSkillPreview()
+bool ULSPlayerSkillComponent::ConfirmAnyActiveSkillPreview(const FVector& TargetLocation, const FRotator& AimRotation)
 {
 	if (!ActiveSkillData)
 	{
 		return false;
 	}
 
-	return ConfirmActiveSkillPreview(ActiveSlot);
+	const ELSPlayerSkillSlot SlotToActivate = ActiveSlot;
+	const bool bConfirmed = ConfirmActiveSkillPreview(SlotToActivate);
+	if (!bConfirmed)
+	{
+		return false;
+	}
+
+	if (const AActor* OwnerActor = GetOwner())
+	{
+		if (OwnerActor->HasAuthority())
+		{
+			ActivateSkillOnServer(SlotToActivate, TargetLocation, AimRotation.Yaw);
+		}
+		else
+		{
+			ServerRequestActivateSkill(SlotToActivate, TargetLocation, AimRotation.Yaw);
+		}
+	}
+
+	return true;
 }
 
 void ULSPlayerSkillComponent::CancelActiveSkillPreview(ELSPlayerSkillSlot Slot)
@@ -110,7 +132,7 @@ bool ULSPlayerSkillComponent::GetActivePreviewSpec(FLSSkillAreaPreviewSpec& OutP
 		return false;
 	}
 
-	OutPreviewSpec = ActiveSkillData->GetPreviewSpec();
+	OutPreviewSpec = ActiveSkillData->BuildPreviewSpec();
 	return true;
 }
 
@@ -128,4 +150,31 @@ bool ULSPlayerSkillComponent::CanUseLocalPreview() const
 ULSSkillPreviewComponent* ULSPlayerSkillComponent::ResolvePreviewComponent() const
 {
 	return GetOwner() ? GetOwner()->FindComponentByClass<ULSSkillPreviewComponent>() : nullptr;
+}
+
+void ULSPlayerSkillComponent::ServerRequestActivateSkill_Implementation(ELSPlayerSkillSlot Slot, FVector_NetQuantize TargetLocation, float AimYaw)
+{
+	ActivateSkillOnServer(Slot, FVector(TargetLocation), AimYaw);
+}
+
+bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, const FVector& TargetLocation, float AimYaw)
+{
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor || !OwnerActor->HasAuthority())
+	{
+		return false;
+	}
+
+	ULSSkillDataAsset* SkillData = GetSkillData(Slot);
+	if (!SkillData)
+	{
+		return false;
+	}
+
+	FLSSkillActivationContext Context;
+	Context.SourceActor = OwnerActor;
+	Context.SkillData = SkillData;
+	Context.TargetLocation = TargetLocation;
+	Context.AimYaw = AimYaw;
+	return SkillData->ActivateSkill(Context);
 }

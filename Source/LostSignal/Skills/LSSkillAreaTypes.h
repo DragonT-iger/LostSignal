@@ -63,6 +63,9 @@ struct FLSSkillAreaPreviewSpec
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
 	float WorldZOffset = 2.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview", meta=(ClampMin="1.0"))
+	float DecalProjectionDepth = 256.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
 	TObjectPtr<UMaterialInterface> Material = nullptr;
 };

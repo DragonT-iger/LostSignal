@@ -27,7 +27,7 @@ public:
 	bool ConfirmActiveSkillPreview(ELSPlayerSkillSlot Slot);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Skill")
-	bool ConfirmAnyActiveSkillPreview();
+	bool ConfirmAnyActiveSkillPreview(const FVector& TargetLocation, const FRotator& AimRotation);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Skill")
 	void CancelActiveSkillPreview(ELSPlayerSkillSlot Slot);
@@ -58,6 +58,10 @@ protected:
 	ELSPlayerSkillSlot ActiveSlot = ELSPlayerSkillSlot::Skill1;
 
 private:
+	UFUNCTION(Server, Reliable)
+	void ServerRequestActivateSkill(ELSPlayerSkillSlot Slot, FVector_NetQuantize TargetLocation, float AimYaw);
+
 	bool CanUseLocalPreview() const;
+	bool ActivateSkillOnServer(ELSPlayerSkillSlot Slot, const FVector& TargetLocation, float AimYaw);
 	ULSSkillPreviewComponent* ResolvePreviewComponent() const;
 };
