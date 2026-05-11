@@ -423,6 +423,57 @@ bool ULSSessionSubsystem::MoveSessionSlot(const ELSInventorySlotArea FromArea, c
 	return true;
 }
 
+bool ULSSessionSubsystem::DropSessionSlot(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
+{
+	TArray<FLSSessionItem>* FromSlots = FromArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
+	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
+
+	if (!FromSlots->IsValidIndex(FromIndex) || !IsFilledSessionSlot((*FromSlots)[FromIndex]) || ToIndex < 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot drop slot. FromArea=%d From=%d ToArea=%d To=%d"),
+			static_cast<int32>(FromArea), FromIndex, static_cast<int32>(ToArea), ToIndex);
+		return false;
+	}
+
+	if (FromSlots == ToSlots && FromIndex == ToIndex)
+	{
+		return true;
+	}
+
+	EnsureSlotIndex(*ToSlots, ToIndex);
+
+	FLSSessionItem& FromSlot = (*FromSlots)[FromIndex];
+	FLSSessionItem& ToSlot = (*ToSlots)[ToIndex];
+
+	if (!IsFilledSessionSlot(ToSlot))
+	{
+		ToSlot = FromSlot;
+		FromSlot = MakeEmptySessionSlot();
+		return true;
+	}
+
+	if (FromSlot.ItemRowName == ToSlot.ItemRowName)
+	{
+		const int32 MaxStack = ResolveItemMaxStackForSession(FromSlot.ItemRowName);
+		const int32 AddAmount = FMath::Min(FromSlot.Amount, MaxStack - ToSlot.Amount);
+		if (AddAmount <= 0)
+		{
+			return false;
+		}
+
+		ToSlot.Amount += AddAmount;
+		FromSlot.Amount -= AddAmount;
+		if (FromSlot.Amount <= 0)
+		{
+			FromSlot = MakeEmptySessionSlot();
+		}
+		return true;
+	}
+
+	Swap(FromSlot, ToSlot);
+	return true;
+}
+
 void ULSSessionSubsystem::ConsumeItem(FName ItemRowName, int32 Amount)
 {
 	if (ItemRowName.IsNone() || Amount <= 0) return;

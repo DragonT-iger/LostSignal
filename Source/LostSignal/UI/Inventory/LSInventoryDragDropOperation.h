@@ -26,9 +26,6 @@ public:
 	UPROPERTY()
 	ELSInventorySlotArea SourceSlotArea = ELSInventorySlotArea::Inventory;
 
-	UPROPERTY()
-	bool bMoveOperation = false;
-
 	virtual void DragCancelled_Implementation(const FPointerEvent& PointerEvent) override;
 	virtual void Drop_Implementation(const FPointerEvent& PointerEvent) override;
 };

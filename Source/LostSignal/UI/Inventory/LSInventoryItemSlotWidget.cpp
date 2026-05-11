@@ -124,7 +124,6 @@ void ULSInventoryItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometr
 	DragOperation->SourceSlotWidget = this;
 	DragOperation->SourceSlotIndex = SlotIndex;
 	DragOperation->SourceSlotArea = SlotArea;
-	DragOperation->bMoveOperation = InMouseEvent.IsShiftDown();
 	DragOperation->DefaultDragVisual = this;
 	DragOperation->Pivot = EDragPivot::MouseDown;
 	SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -151,8 +150,7 @@ bool ULSInventoryItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const
 		DragOperation->SourceSlotArea,
 		DragOperation->SourceSlotIndex,
 		SlotArea,
-		SlotIndex,
-		DragOperation->bMoveOperation);
+		SlotIndex);
 }
 
 void ULSInventoryItemSlotWidget::RestoreDragSourceVisual()

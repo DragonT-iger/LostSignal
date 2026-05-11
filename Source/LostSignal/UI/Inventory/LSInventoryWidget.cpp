@@ -161,7 +161,7 @@ void ULSInventoryWidget::RebuildInventorySlots()
 	}
 }
 
-bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, const bool bMoveOperation)
+bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex)
 {
 	if (FromSlotIndex == INDEX_NONE || ToSlotIndex == INDEX_NONE)
 	{
@@ -189,13 +189,10 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 		return false;
 	}
 
-	const bool bChanged = bMoveOperation
-		? SessionSubsystem->MoveSessionSlot(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex)
-		: SessionSubsystem->SwapSessionSlots(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
+	const bool bChanged = SessionSubsystem->DropSessionSlot(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
 
-	UE_LOG(LogLS, Log, TEXT("Inventory slot drop handled on %s. Mode=%s From=%d To=%d Changed=%s"),
+	UE_LOG(LogLS, Log, TEXT("Inventory slot drop handled on %s. From=%d To=%d Changed=%s"),
 		*GetNameSafe(this),
-		bMoveOperation ? TEXT("Move") : TEXT("Swap"),
 		FromSlotIndex,
 		ToSlotIndex,
 		bChanged ? TEXT("true") : TEXT("false"));

@@ -29,7 +29,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void RebuildConfirmedStorageSlots();
 
-	bool HandleInventorySlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, bool bMoveOperation);
+	bool HandleInventorySlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 
 protected:
 	virtual void NativeDestruct() override;
