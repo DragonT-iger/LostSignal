@@ -69,17 +69,26 @@ void ULSInventoryItemSlotWidget::ClearItem()
 		return;
 	}
 
-	ItemIconImage->SetBrushFromTexture(nullptr);
+	if (UTexture2D* DefaultIconTexture = LoadDefaultIconTexture())
+	{
+		ItemIconImage->SetBrushFromTexture(DefaultIconTexture);
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("ClearItem could not load default icon on %s."), *GetNameSafe(this));
+	}
+
 	ItemIconImage->SetColorAndOpacity(FLinearColor::White);
-	ItemIconImage->SetVisibility(ESlateVisibility::Hidden);
+	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
 	AmountText->SetText(FText::GetEmpty());
 	AmountText->SetVisibility(ESlateVisibility::Collapsed);
 	bHasItem = false;
 }
 
-void ULSInventoryItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const int32 InSlotIndex, const bool bInHasItem)
+void ULSInventoryItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)
 {
 	InventoryWidget = InInventoryWidget;
+	SlotArea = InSlotArea;
 	SlotIndex = InSlotIndex;
 	bHasItem = bInHasItem;
 }
@@ -114,6 +123,7 @@ void ULSInventoryItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometr
 	DragOperation->SourceInventoryWidget = InventoryWidget.Get();
 	DragOperation->SourceSlotWidget = this;
 	DragOperation->SourceSlotIndex = SlotIndex;
+	DragOperation->SourceSlotArea = SlotArea;
 	DragOperation->bMoveOperation = InMouseEvent.IsShiftDown();
 	DragOperation->DefaultDragVisual = this;
 	DragOperation->Pivot = EDragPivot::MouseDown;
@@ -138,7 +148,9 @@ bool ULSInventoryItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const
 	}
 
 	return TargetInventoryWidget->HandleInventorySlotDrop(
+		DragOperation->SourceSlotArea,
 		DragOperation->SourceSlotIndex,
+		SlotArea,
 		SlotIndex,
 		DragOperation->bMoveOperation);
 }

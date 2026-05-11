@@ -12,6 +12,16 @@
 
 namespace
 {
+bool IsFilledSessionSlot(const FLSSessionItem& Item)
+{
+	return !Item.ItemRowName.IsNone() && Item.Amount > 0;
+}
+
+FLSSessionItem MakeEmptySessionSlot()
+{
+	return FLSSessionItem();
+}
+
 int32 ResolveItemMaxStackForSession(const FName ItemRowName)
 {
 	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
@@ -92,6 +102,23 @@ void AddItemsToSlotArraySession(TArray<FLSSessionItem>& Slots, const FName ItemR
 		Amount -= AddAmount;
 	}
 
+	for (FLSSessionItem& Slot : Slots)
+	{
+		if (Amount <= 0)
+		{
+			return;
+		}
+
+		if (IsFilledSessionSlot(Slot))
+		{
+			continue;
+		}
+
+		Slot.ItemRowName = ItemRowName;
+		Slot.Amount = FMath::Min(Amount, MaxStack);
+		Amount -= Slot.Amount;
+	}
+
 	while (Amount > 0)
 	{
 		FLSSessionItem NewSlot;
@@ -150,12 +177,12 @@ int32 ResolveItemSortKeyForSession(const FName ItemRowName)
 
 void SortAndCompactSlotArraySession(TArray<FLSSessionItem>& Slots)
 {
+	const int32 OriginalSlotCount = Slots.Num();
 	TMap<FName, int32> AmountByRowName;
 	for (const FLSSessionItem& Slot : Slots)
 	{
-		if (Slot.ItemRowName.IsNone() || Slot.Amount <= 0)
+		if (!IsFilledSessionSlot(Slot))
 		{
-			UE_LOG(LogLS, Warning, TEXT("[Session] Skipping invalid slot while sorting. Row=%s Amount=%d"), *Slot.ItemRowName.ToString(), Slot.Amount);
 			continue;
 		}
 
@@ -186,6 +213,48 @@ void SortAndCompactSlotArraySession(TArray<FLSSessionItem>& Slots)
 	{
 		AddItemsToSlotArraySession(Slots, MergedItem.ItemRowName, MergedItem.Amount);
 	}
+
+	while (Slots.Num() < OriginalSlotCount)
+	{
+		Slots.Add(MakeEmptySessionSlot());
+	}
+}
+
+void RemoveItemsFromSlotArraySession(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount)
+{
+	if (ItemRowName.IsNone() || Amount <= 0)
+	{
+		return;
+	}
+
+	for (FLSSessionItem& Slot : Slots)
+	{
+		if (Amount <= 0)
+		{
+			break;
+		}
+
+		if (Slot.ItemRowName != ItemRowName || Slot.Amount <= 0)
+		{
+			continue;
+		}
+
+		const int32 RemoveAmount = FMath::Min(Amount, Slot.Amount);
+		Slot.Amount -= RemoveAmount;
+		Amount -= RemoveAmount;
+		if (Slot.Amount <= 0)
+		{
+			Slot = MakeEmptySessionSlot();
+		}
+	}
+}
+
+void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, const int32 SlotIndex)
+{
+	while (Slots.Num() <= SlotIndex)
+	{
+		Slots.Add(MakeEmptySessionSlot());
+	}
 }
 }
 
@@ -193,9 +262,16 @@ void ULSSessionSubsystem::StartRaid(const TArray<FLSSessionItem>& Loadout)
 {
 	LoadoutSnapshot.Items = Loadout;
 	SessionInventory = Loadout;
+	SessionSafeInventory.Empty();
 	ConsumedItems.Empty();
 	ResolvedItems.Empty();
 	bRaidActive = true;
+
+	if (ULSSaveSubsystem* SaveSub = GetGameInstance()->GetSubsystem<ULSSaveSubsystem>())
+	{
+		SessionSafeInventory = SaveSub->GetSafeStash();
+		SaveSub->BeginRaidSave(LoadoutSnapshot.Items);
+	}
 
 	UE_LOG(LogLS, Log, TEXT("[Session] Raid started with %d inventory slots."), SessionInventory.Num());
 }
@@ -233,12 +309,29 @@ void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
 	}
 
 	// 스태시에 저장 (레벨 전환 전에 처리)
-	if (bShouldSaveResolvedItems)
+	if (ULSSaveSubsystem* SaveSub = GetGameInstance()->GetSubsystem<ULSSaveSubsystem>())
 	{
-		if (ULSSaveSubsystem* SaveSub = GetGameInstance()->GetSubsystem<ULSSaveSubsystem>())
+		if (Result == ELSRaidResult::Quit)
+		{
+			ResolvedItems = BuildQuitRecovery();
+			bShouldSaveResolvedItems = true;
+		}
+		else if (Result == ELSRaidResult::Dead)
+		{
+			ResolvedItems.Empty();
+			bShouldSaveResolvedItems = true;
+		}
+
+		if (bShouldSaveResolvedItems)
 		{
 			SaveSub->ReplaceStash(ResolvedItems);
+			if (Result == ELSRaidResult::Extracted || Result == ELSRaidResult::Dead)
+			{
+				SaveSub->ReplaceSafeStash(SessionSafeInventory);
+			}
 		}
+
+		SaveSub->ClearRaidSave();
 	}
 
 	bRaidActive = false;
@@ -268,36 +361,45 @@ void ULSSessionSubsystem::SortSessionInventory()
 
 bool ULSSessionSubsystem::SwapSessionInventorySlots(const int32 FromIndex, const int32 ToIndex)
 {
-	if (!SessionInventory.IsValidIndex(FromIndex))
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot swap inventory slots because FromIndex is invalid: %d"), FromIndex);
-		return false;
-	}
-
-	if (FromIndex == ToIndex)
-	{
-		return true;
-	}
-
-	if (SessionInventory.IsValidIndex(ToIndex))
-	{
-		const FName FromItemRowName = SessionInventory[FromIndex].ItemRowName;
-		const FName ToItemRowName = SessionInventory[ToIndex].ItemRowName;
-		SessionInventory.Swap(FromIndex, ToIndex);
-		UE_LOG(LogLS, Log, TEXT("[Session] Swapped inventory slots %d(%s) <-> %d(%s)"),
-			FromIndex,
-			*FromItemRowName.ToString(),
-			ToIndex,
-			*ToItemRowName.ToString());
-		return true;
-	}
-
-	return MoveSessionInventorySlot(FromIndex, ToIndex);
+	return SwapSessionSlots(ELSInventorySlotArea::Inventory, FromIndex, ELSInventorySlotArea::Inventory, ToIndex);
 }
 
 bool ULSSessionSubsystem::MoveSessionInventorySlot(const int32 FromIndex, const int32 ToIndex)
 {
-	if (!SessionInventory.IsValidIndex(FromIndex))
+	return MoveSessionSlot(ELSInventorySlotArea::Inventory, FromIndex, ELSInventorySlotArea::Inventory, ToIndex);
+}
+
+bool ULSSessionSubsystem::SwapSessionSlots(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
+{
+	TArray<FLSSessionItem>* FromSlots = FromArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
+	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
+
+	if (!FromSlots->IsValidIndex(FromIndex) || !IsFilledSessionSlot((*FromSlots)[FromIndex]) || ToIndex < 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot swap slots. FromArea=%d From=%d ToArea=%d To=%d"),
+			static_cast<int32>(FromArea), FromIndex, static_cast<int32>(ToArea), ToIndex);
+		return false;
+	}
+
+	if (FromSlots == ToSlots && FromIndex == ToIndex)
+	{
+		return true;
+	}
+
+	EnsureSlotIndex(*ToSlots, ToIndex);
+	Swap((*FromSlots)[FromIndex], (*ToSlots)[ToIndex]);
+	return true;
+}
+
+bool ULSSessionSubsystem::MoveSessionSlot(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
+{
+	if (FromArea != ToArea)
+	{
+		return SwapSessionSlots(FromArea, FromIndex, ToArea, ToIndex);
+	}
+
+	TArray<FLSSessionItem>& Slots = FromArea == ELSInventorySlotArea::Safe ? SessionSafeInventory : SessionInventory;
+	if (!Slots.IsValidIndex(FromIndex) || !IsFilledSessionSlot(Slots[FromIndex]))
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot move inventory slot because FromIndex is invalid: %d"), FromIndex);
 		return false;
@@ -308,11 +410,11 @@ bool ULSSessionSubsystem::MoveSessionInventorySlot(const int32 FromIndex, const 
 		return true;
 	}
 
-	FLSSessionItem MovingItem = SessionInventory[FromIndex];
-	SessionInventory.RemoveAt(FromIndex);
+	FLSSessionItem MovingItem = Slots[FromIndex];
+	Slots.RemoveAt(FromIndex);
 
-	const int32 ClampedTargetIndex = FMath::Clamp(ToIndex, 0, SessionInventory.Num());
-	SessionInventory.Insert(MovingItem, ClampedTargetIndex);
+	const int32 ClampedTargetIndex = FMath::Clamp(ToIndex, 0, Slots.Num());
+	Slots.Insert(MovingItem, ClampedTargetIndex);
 
 	UE_LOG(LogLS, Log, TEXT("[Session] Moved inventory slot %d(%s) -> %d"),
 		FromIndex,
@@ -330,11 +432,19 @@ void ULSSessionSubsystem::ConsumeItem(FName ItemRowName, int32 Amount)
 		if (Item.ItemRowName == ItemRowName)
 		{
 			Item.Amount += Amount;
+			if (ULSSaveSubsystem* SaveSub = GetGameInstance()->GetSubsystem<ULSSaveSubsystem>())
+			{
+				SaveSub->UpdateRaidConsumedItems(ConsumedItems);
+			}
 			return;
 		}
 	}
 
 	ConsumedItems.Add({ ItemRowName, Amount });
+	if (ULSSaveSubsystem* SaveSub = GetGameInstance()->GetSubsystem<ULSSaveSubsystem>())
+	{
+		SaveSub->UpdateRaidConsumedItems(ConsumedItems);
+	}
 }
 
 TArray<FLSSessionItem> ULSSessionSubsystem::BuildQuitRecovery() const
@@ -344,17 +454,9 @@ TArray<FLSSessionItem> ULSSessionSubsystem::BuildQuitRecovery() const
 
 	for (const FLSSessionItem& Consumed : ConsumedItems)
 	{
-		for (FLSSessionItem& Item : Recovery)
-		{
-			if (Item.ItemRowName != Consumed.ItemRowName) continue;
-
-			Item.Amount = FMath::Max(0, Item.Amount - Consumed.Amount);
-			break;
-		}
+		RemoveItemsFromSlotArraySession(Recovery, Consumed.ItemRowName, Consumed.Amount);
 	}
 
 	// 수량이 0이 된 항목 제거
-	Recovery.RemoveAll([](const FLSSessionItem& Item) { return Item.Amount <= 0; });
-
 	return Recovery;
 }

@@ -23,15 +23,26 @@ public:
 	void ReplaceStash(const TArray<FLSSessionItem>& Items);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	void ReplaceSafeStash(const TArray<FLSSessionItem>& Items);
+
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void SortStash();
+
+	void BeginRaidSave(const TArray<FLSSessionItem>& Loadout);
+	void UpdateRaidConsumedItems(const TArray<FLSSessionItem>& ConsumedItems);
+	void ClearRaidSave();
 
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	const TArray<FLSSessionItem>& GetStash() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	const TArray<FLSSessionItem>& GetSafeStash() const;
 
 private:
 	void Load();
 	void Save();
 	void SaveDebugJson() const;
+	void ResolveInterruptedRaid();
 
 	UPROPERTY() TObjectPtr<ULSSaveGame> SaveData;
 

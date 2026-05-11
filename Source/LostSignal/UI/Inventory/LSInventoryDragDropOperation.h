@@ -2,6 +2,7 @@
 
 #include "Blueprint/DragDropOperation.h"
 #include "CoreMinimal.h"
+#include "Session/LSSessionSubsystem.h"
 #include "LSInventoryDragDropOperation.generated.h"
 
 class ULSInventoryWidget;
@@ -21,6 +22,9 @@ public:
 
 	UPROPERTY()
 	int32 SourceSlotIndex = INDEX_NONE;
+
+	UPROPERTY()
+	ELSInventorySlotArea SourceSlotArea = ELSInventorySlotArea::Inventory;
 
 	UPROPERTY()
 	bool bMoveOperation = false;

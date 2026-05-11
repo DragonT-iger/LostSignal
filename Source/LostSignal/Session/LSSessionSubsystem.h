@@ -13,6 +13,13 @@ enum class ELSRaidResult : uint8
 };
 
 // 레이드 중 아이템 단위 (파밍 획득 / 소모 / 출발 장비 공용)
+UENUM(BlueprintType)
+enum class ELSInventorySlotArea : uint8
+{
+	Inventory,
+	Safe,
+};
+
 USTRUCT(BlueprintType)
 struct FLSSessionItem
 {
@@ -62,6 +69,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	bool MoveSessionInventorySlot(int32 FromIndex, int32 ToIndex);
 
+	bool SwapSessionSlots(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
+	bool MoveSessionSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
+
 	// 레이드 중 소모한 아이템 기록
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void ConsumeItem(FName ItemRowName, int32 Amount);
@@ -71,6 +81,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/Session")
 	const TArray<FLSSessionItem>& GetSessionInventory() const { return SessionInventory; }
+
+	UFUNCTION(BlueprintPure, Category="LS/Session")
+	const TArray<FLSSessionItem>& GetSessionSafeInventory() const { return SessionSafeInventory; }
 
 	UFUNCTION(BlueprintPure, Category="LS/Session")
 	bool IsRaidActive() const { return bRaidActive; }
@@ -83,6 +96,7 @@ private:
 	bool bRaidActive = false;
 	FLSLoadoutSnapshot LoadoutSnapshot;
 	TArray<FLSSessionItem> SessionInventory;
+	TArray<FLSSessionItem> SessionSafeInventory;
 	TArray<FLSSessionItem> ConsumedItems;
 	TArray<FLSSessionItem> ResolvedItems;
 	ELSRaidResult LastRaidResult = ELSRaidResult::Dead;

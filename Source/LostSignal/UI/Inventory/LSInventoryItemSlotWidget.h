@@ -2,6 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
+#include "Session/LSSessionSubsystem.h"
 #include "LSInventoryItemSlotWidget.generated.h"
 
 class UImage;
@@ -22,7 +23,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void ClearItem();
 
-	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, int32 InSlotIndex, bool bInHasItem);
+	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem);
 	void RestoreDragSourceVisual();
 
 protected:
@@ -38,6 +39,7 @@ protected:
 
 private:
 	TWeakObjectPtr<ULSInventoryWidget> InventoryWidget;
+	ELSInventorySlotArea SlotArea = ELSInventorySlotArea::Inventory;
 	int32 SlotIndex = INDEX_NONE;
 	bool bHasItem = false;
 

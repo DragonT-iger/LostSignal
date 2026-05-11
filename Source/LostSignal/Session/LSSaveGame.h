@@ -13,4 +13,9 @@ class LOSTSIGNAL_API ULSSaveGame : public USaveGame
 public:
 	// Slot-based stash. Duplicate ItemRowName entries are valid when an item exceeds Item_Max.
 	UPROPERTY() TArray<FLSSessionItem> Stash;
+	UPROPERTY() TArray<FLSSessionItem> SafeStash;
+
+	UPROPERTY() bool bRaidSaveActive = false;
+	UPROPERTY() TArray<FLSSessionItem> ActiveRaidLoadout;
+	UPROPERTY() TArray<FLSSessionItem> ActiveRaidConsumedItems;
 };

@@ -13,12 +13,6 @@ void AppendSlotItems(TArray<FLSSessionItem>& Items, const TArray<FLSSessionItem>
 {
 	for (const FLSSessionItem& NewItem : NewItems)
 	{
-		if (NewItem.ItemRowName.IsNone() || NewItem.Amount <= 0)
-		{
-			UE_LOG(LogLS, Warning, TEXT("Skipping invalid inventory slot item. Row=%s Amount=%d"), *NewItem.ItemRowName.ToString(), NewItem.Amount);
-			continue;
-		}
-
 		Items.Add(NewItem);
 	}
 }
@@ -144,9 +138,12 @@ void ULSInventoryWidget::RebuildInventorySlots()
 
 		if (SlotWidget)
 		{
-			SlotWidget->SetSlotContext(this, SlotIndex, InventoryItems.IsValidIndex(SlotIndex));
+			const bool bHasSlotItem = InventoryItems.IsValidIndex(SlotIndex) &&
+				!InventoryItems[SlotIndex].ItemRowName.IsNone() &&
+				InventoryItems[SlotIndex].Amount > 0;
+			SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Inventory, SlotIndex, bHasSlotItem);
 
-			if (InventoryItems.IsValidIndex(SlotIndex))
+			if (bHasSlotItem)
 			{
 				SlotWidget->SetItem(InventoryItems[SlotIndex].ItemRowName, InventoryItems[SlotIndex].Amount);
 			}
@@ -164,7 +161,7 @@ void ULSInventoryWidget::RebuildInventorySlots()
 	}
 }
 
-bool ULSInventoryWidget::HandleInventorySlotDrop(const int32 FromSlotIndex, const int32 ToSlotIndex, const bool bMoveOperation)
+bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, const bool bMoveOperation)
 {
 	if (FromSlotIndex == INDEX_NONE || ToSlotIndex == INDEX_NONE)
 	{
@@ -193,8 +190,8 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const int32 FromSlotIndex, cons
 	}
 
 	const bool bChanged = bMoveOperation
-		? SessionSubsystem->MoveSessionInventorySlot(FromSlotIndex, ToSlotIndex)
-		: SessionSubsystem->SwapSessionInventorySlots(FromSlotIndex, ToSlotIndex);
+		? SessionSubsystem->MoveSessionSlot(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex)
+		: SessionSubsystem->SwapSessionSlots(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
 
 	UE_LOG(LogLS, Log, TEXT("Inventory slot drop handled on %s. Mode=%s From=%d To=%d Changed=%s"),
 		*GetNameSafe(this),
@@ -206,6 +203,7 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const int32 FromSlotIndex, cons
 	if (bChanged)
 	{
 		RebuildInventorySlots();
+		RebuildConfirmedStorageSlots();
 	}
 
 	return bChanged;
@@ -235,7 +233,24 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 		return;
 	}
 
-	for (int32 SlotIndex = 0; SlotIndex < ConfirmedStorageSlotCount; ++SlotIndex)
+	TArray<FLSSessionItem> SafeItems;
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>())
+		{
+			if (SessionSubsystem->IsRaidActive())
+			{
+				AppendSlotItems(SafeItems, SessionSubsystem->GetSessionSafeInventory());
+			}
+			else if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
+			{
+				AppendSlotItems(SafeItems, SaveSubsystem->GetSafeStash());
+			}
+		}
+	}
+
+	const int32 SlotCountToBuild = FMath::Max(ConfirmedStorageSlotCount, SafeItems.Num());
+	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
 	{
 		ULSInventoryItemSlotWidget* SlotWidget = OwningPlayer
 			? CreateWidget<ULSInventoryItemSlotWidget>(OwningPlayer, InventoryItemSlotWidgetClass)
@@ -243,8 +258,18 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 
 		if (SlotWidget)
 		{
-			SlotWidget->SetSlotContext(this, INDEX_NONE, false);
-			SlotWidget->ClearItem();
+			const bool bHasSlotItem = SafeItems.IsValidIndex(SlotIndex) &&
+				!SafeItems[SlotIndex].ItemRowName.IsNone() &&
+				SafeItems[SlotIndex].Amount > 0;
+			SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Safe, SlotIndex, bHasSlotItem);
+			if (bHasSlotItem)
+			{
+				SlotWidget->SetItem(SafeItems[SlotIndex].ItemRowName, SafeItems[SlotIndex].Amount);
+			}
+			else
+			{
+				SlotWidget->ClearItem();
+			}
 			ConfirmedStorageSlotWrapBox->AddChildToWrapBox(SlotWidget);
 		}
 		else
