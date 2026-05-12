@@ -70,31 +70,43 @@ def register_umg_tools(mcp: FastMCP):
         position: List[float] = [0.0, 0.0],
         size: List[float] = [200.0, 50.0],
         font_size: int = 12,
-        color: List[float] = [1.0, 1.0, 1.0, 1.0]
+        color: List[float] = [1.0, 1.0, 1.0, 1.0],
+        parent_name: str = "",
+        auto_wrap_text: bool = False,
+        justification: str = "left",
+        size_rule: str = "",
+        fill_value: float = 1.0,
+        h_align: str = "",
+        v_align: str = "",
+        padding: List[float] = []
     ) -> Dict[str, Any]:
         """
         Add a Text Block widget to a UMG Widget Blueprint.
-        
+
         Args:
             widget_name: Name of the target Widget Blueprint
             text_block_name: Name to give the new Text Block
             text: Initial text content
-            position: [X, Y] position in the canvas panel
-            size: [Width, Height] of the text block
+            position: [X, Y] position (Canvas Panel only)
+            size: [Width, Height] (Canvas Panel only)
             font_size: Font size in points
             color: [R, G, B, A] color values (0.0 to 1.0)
-            
-        Returns:
-            Dict containing success status and text block properties
+            parent_name: Name of parent widget to attach to (empty = root)
+            auto_wrap_text: Enable automatic text wrapping
+            justification: Text alignment - "left", "center", "right"
+            size_rule: Slot size rule - "fill" or "" (auto)
+            fill_value: Fill coefficient when size_rule is "fill"
+            h_align: Horizontal alignment - "fill", "left", "center", "right"
+            v_align: Vertical alignment - "fill", "top", "center", "bottom"
+            padding: [L, T, R, B] slot padding
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             unreal = get_unreal_connection()
             if not unreal:
-                logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
+
             params = {
                 "blueprint_name": widget_name,
                 "widget_name": text_block_name,
@@ -102,23 +114,29 @@ def register_umg_tools(mcp: FastMCP):
                 "position": position,
                 "size": size,
                 "font_size": font_size,
-                "color": color
+                "color": color,
+                "auto_wrap_text": auto_wrap_text,
+                "justification": justification,
             }
-            
-            logger.info(f"Adding Text Block to widget with params: {params}")
+            if parent_name:
+                params["parent_name"] = parent_name
+            if size_rule:
+                params["size_rule"] = size_rule
+                params["fill_value"] = fill_value
+            if h_align:
+                params["h_align"] = h_align
+            if v_align:
+                params["v_align"] = v_align
+            if padding:
+                params["padding"] = padding
+
             response = unreal.send_command("add_text_block_to_widget", params)
-            
             if not response:
-                logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
-            logger.info(f"Add Text Block response: {response}")
             return response
-            
+
         except Exception as e:
-            error_msg = f"Error adding Text Block to widget: {e}"
-            logger.error(error_msg)
-            return {"success": False, "message": error_msg}
+            return {"success": False, "message": f"Error adding Text Block: {e}"}
 
     @mcp.tool()
     def add_button_to_widget(
@@ -130,32 +148,40 @@ def register_umg_tools(mcp: FastMCP):
         size: List[float] = [200.0, 50.0],
         font_size: int = 12,
         color: List[float] = [1.0, 1.0, 1.0, 1.0],
-        background_color: List[float] = [0.1, 0.1, 0.1, 1.0]
+        background_color: List[float] = [0.1, 0.1, 0.1, 1.0],
+        parent_name: str = "",
+        size_rule: str = "",
+        fill_value: float = 1.0,
+        h_align: str = "",
+        v_align: str = "",
+        padding: List[float] = []
     ) -> Dict[str, Any]:
         """
         Add a Button widget to a UMG Widget Blueprint.
-        
+
         Args:
             widget_name: Name of the target Widget Blueprint
             button_name: Name to give the new Button
             text: Text to display on the button
-            position: [X, Y] position in the canvas panel
-            size: [Width, Height] of the button
+            position: [X, Y] position (Canvas Panel only)
+            size: [Width, Height] (Canvas Panel only)
             font_size: Font size for button text
             color: [R, G, B, A] text color values (0.0 to 1.0)
             background_color: [R, G, B, A] button background color values (0.0 to 1.0)
-            
-        Returns:
-            Dict containing success status and button properties
+            parent_name: Name of parent widget (empty = root)
+            size_rule: Slot size rule - "fill" or "" (auto)
+            fill_value: Fill coefficient when size_rule is "fill"
+            h_align: Horizontal alignment - "fill", "left", "center", "right"
+            v_align: Vertical alignment - "fill", "top", "center", "bottom"
+            padding: [L, T, R, B] slot padding
         """
         from unreal_mcp_server import get_unreal_connection
-        
+
         try:
             unreal = get_unreal_connection()
             if not unreal:
-                logger.error("Failed to connect to Unreal Engine")
                 return {"success": False, "message": "Failed to connect to Unreal Engine"}
-            
+
             params = {
                 "blueprint_name": widget_name,
                 "widget_name": button_name,
@@ -164,23 +190,27 @@ def register_umg_tools(mcp: FastMCP):
                 "size": size,
                 "font_size": font_size,
                 "color": color,
-                "background_color": background_color
+                "background_color": background_color,
             }
-            
-            logger.info(f"Adding Button to widget with params: {params}")
+            if parent_name:
+                params["parent_name"] = parent_name
+            if size_rule:
+                params["size_rule"] = size_rule
+                params["fill_value"] = fill_value
+            if h_align:
+                params["h_align"] = h_align
+            if v_align:
+                params["v_align"] = v_align
+            if padding:
+                params["padding"] = padding
+
             response = unreal.send_command("add_button_to_widget", params)
-            
             if not response:
-                logger.error("No response from Unreal Engine")
                 return {"success": False, "message": "No response from Unreal Engine"}
-            
-            logger.info(f"Add Button response: {response}")
             return response
-            
+
         except Exception as e:
-            error_msg = f"Error adding Button to widget: {e}"
-            logger.error(error_msg)
-            return {"success": False, "message": error_msg}
+            return {"success": False, "message": f"Error adding Button: {e}"}
 
     @mcp.tool()
     def bind_widget_event(
@@ -330,4 +360,296 @@ def register_umg_tools(mcp: FastMCP):
             logger.error(error_msg)
             return {"success": False, "message": error_msg}
 
-    logger.info("UMG tools registered successfully") 
+    @mcp.tool()
+    def add_vertical_box_to_widget(
+        ctx: Context,
+        widget_name: str,
+        vbox_name: str,
+        parent_name: str = "",
+        size_rule: str = "",
+        fill_value: float = 1.0,
+        h_align: str = "",
+        v_align: str = "",
+        padding: List[float] = []
+    ) -> Dict[str, Any]:
+        """
+        Add a Vertical Box layout widget to a UMG Widget Blueprint.
+
+        Args:
+            widget_name: Name of the target Widget Blueprint
+            vbox_name: Name to give the new Vertical Box
+            parent_name: Name of parent widget (empty = root)
+            size_rule: Slot size rule - "fill" or "" (auto)
+            fill_value: Fill coefficient when size_rule is "fill"
+            h_align: Horizontal alignment in parent slot
+            v_align: Vertical alignment in parent slot
+            padding: [L, T, R, B] slot padding
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {"blueprint_name": widget_name, "widget_name": vbox_name}
+            if parent_name:
+                params["parent_name"] = parent_name
+            if size_rule:
+                params["size_rule"] = size_rule
+                params["fill_value"] = fill_value
+            if h_align:
+                params["h_align"] = h_align
+            if v_align:
+                params["v_align"] = v_align
+            if padding:
+                params["padding"] = padding
+
+            response = unreal.send_command("add_vertical_box_to_widget", params)
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+            return response
+
+        except Exception as e:
+            return {"success": False, "message": f"Error adding Vertical Box: {e}"}
+
+    @mcp.tool()
+    def add_horizontal_box_to_widget(
+        ctx: Context,
+        widget_name: str,
+        hbox_name: str,
+        parent_name: str = "",
+        size_rule: str = "",
+        fill_value: float = 1.0,
+        h_align: str = "",
+        v_align: str = "",
+        padding: List[float] = []
+    ) -> Dict[str, Any]:
+        """
+        Add a Horizontal Box layout widget to a UMG Widget Blueprint.
+
+        Args:
+            widget_name: Name of the target Widget Blueprint
+            hbox_name: Name to give the new Horizontal Box
+            parent_name: Name of parent widget (empty = root)
+            size_rule: Slot size rule - "fill" or "" (auto)
+            fill_value: Fill coefficient when size_rule is "fill"
+            h_align: Horizontal alignment in parent slot
+            v_align: Vertical alignment in parent slot
+            padding: [L, T, R, B] slot padding
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {"blueprint_name": widget_name, "widget_name": hbox_name}
+            if parent_name:
+                params["parent_name"] = parent_name
+            if size_rule:
+                params["size_rule"] = size_rule
+                params["fill_value"] = fill_value
+            if h_align:
+                params["h_align"] = h_align
+            if v_align:
+                params["v_align"] = v_align
+            if padding:
+                params["padding"] = padding
+
+            response = unreal.send_command("add_horizontal_box_to_widget", params)
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+            return response
+
+        except Exception as e:
+            return {"success": False, "message": f"Error adding Horizontal Box: {e}"}
+
+    @mcp.tool()
+    def add_border_to_widget(
+        ctx: Context,
+        widget_name: str,
+        border_name: str,
+        parent_name: str = "",
+        background_color: List[float] = [0.08, 0.08, 0.08, 0.95],
+        content_padding: List[float] = [8.0, 8.0, 8.0, 8.0],
+        size_rule: str = "",
+        fill_value: float = 1.0,
+        h_align: str = "",
+        v_align: str = "",
+        padding: List[float] = [],
+        position: List[float] = [0.0, 0.0],
+        size: List[float] = [],
+        auto_size: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Add a Border widget (background + padding container) to a UMG Widget Blueprint.
+
+        Args:
+            widget_name: Name of the target Widget Blueprint
+            border_name: Name to give the new Border
+            parent_name: Name of parent widget (empty = root canvas panel)
+            background_color: [R, G, B, A] background brush color
+            content_padding: [L, T, R, B] inner content padding
+            size_rule: Slot size rule for VBox/HBox - "fill" or "" (auto)
+            fill_value: Fill coefficient when size_rule is "fill"
+            h_align: Horizontal alignment in parent slot
+            v_align: Vertical alignment in parent slot
+            padding: [L, T, R, B] slot padding
+            position: [X, Y] position (Canvas Panel only)
+            size: [W, H] size (Canvas Panel only, ignored when auto_size=True)
+            auto_size: Auto-size to content (Canvas Panel only)
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {
+                "blueprint_name": widget_name,
+                "widget_name": border_name,
+                "background_color": background_color,
+                "content_padding": content_padding,
+                "position": position,
+                "auto_size": auto_size,
+            }
+            if size:
+                params["size"] = size
+            if parent_name:
+                params["parent_name"] = parent_name
+            if size_rule:
+                params["size_rule"] = size_rule
+                params["fill_value"] = fill_value
+            if h_align:
+                params["h_align"] = h_align
+            if v_align:
+                params["v_align"] = v_align
+            if padding:
+                params["padding"] = padding
+
+            response = unreal.send_command("add_border_to_widget", params)
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+            return response
+
+        except Exception as e:
+            return {"success": False, "message": f"Error adding Border: {e}"}
+
+    @mcp.tool()
+    def add_size_box_to_widget(
+        ctx: Context,
+        widget_name: str,
+        size_box_name: str,
+        parent_name: str = "",
+        width_override: float = 0.0,
+        height_override: float = 0.0,
+        size_rule: str = "",
+        fill_value: float = 1.0,
+        h_align: str = "",
+        v_align: str = "",
+        padding: List[float] = []
+    ) -> Dict[str, Any]:
+        """
+        Add a Size Box widget to a UMG Widget Blueprint.
+
+        Args:
+            widget_name: Name of the target Widget Blueprint
+            size_box_name: Name to give the new Size Box
+            parent_name: Name of parent widget (empty = root)
+            width_override: Fixed width override (0 = disabled)
+            height_override: Fixed height override (0 = disabled)
+            size_rule: Slot size rule - "fill" or "" (auto)
+            fill_value: Fill coefficient when size_rule is "fill"
+            h_align: Horizontal alignment in parent slot
+            v_align: Vertical alignment in parent slot
+            padding: [L, T, R, B] slot padding
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {"blueprint_name": widget_name, "widget_name": size_box_name}
+            if width_override > 0:
+                params["width_override"] = width_override
+            if height_override > 0:
+                params["height_override"] = height_override
+            if parent_name:
+                params["parent_name"] = parent_name
+            if size_rule:
+                params["size_rule"] = size_rule
+                params["fill_value"] = fill_value
+            if h_align:
+                params["h_align"] = h_align
+            if v_align:
+                params["v_align"] = v_align
+            if padding:
+                params["padding"] = padding
+
+            response = unreal.send_command("add_size_box_to_widget", params)
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+            return response
+
+        except Exception as e:
+            return {"success": False, "message": f"Error adding Size Box: {e}"}
+
+    @mcp.tool()
+    def add_overlay_to_widget(
+        ctx: Context,
+        widget_name: str,
+        overlay_name: str,
+        parent_name: str = "",
+        size_rule: str = "",
+        fill_value: float = 1.0,
+        h_align: str = "",
+        v_align: str = "",
+        padding: List[float] = []
+    ) -> Dict[str, Any]:
+        """
+        Add an Overlay widget (z-stack children) to a UMG Widget Blueprint.
+
+        Args:
+            widget_name: Name of the target Widget Blueprint
+            overlay_name: Name to give the new Overlay
+            parent_name: Name of parent widget (empty = root)
+            size_rule: Slot size rule - "fill" or "" (auto)
+            fill_value: Fill coefficient when size_rule is "fill"
+            h_align: Horizontal alignment in parent slot
+            v_align: Vertical alignment in parent slot
+            padding: [L, T, R, B] slot padding
+        """
+        from unreal_mcp_server import get_unreal_connection
+
+        try:
+            unreal = get_unreal_connection()
+            if not unreal:
+                return {"success": False, "message": "Failed to connect to Unreal Engine"}
+
+            params = {"blueprint_name": widget_name, "widget_name": overlay_name}
+            if parent_name:
+                params["parent_name"] = parent_name
+            if size_rule:
+                params["size_rule"] = size_rule
+                params["fill_value"] = fill_value
+            if h_align:
+                params["h_align"] = h_align
+            if v_align:
+                params["v_align"] = v_align
+            if padding:
+                params["padding"] = padding
+
+            response = unreal.send_command("add_overlay_to_widget", params)
+            if not response:
+                return {"success": False, "message": "No response from Unreal Engine"}
+            return response
+
+        except Exception as e:
+            return {"success": False, "message": f"Error adding Overlay: {e}"}
+
+    logger.info("UMG tools registered successfully")
