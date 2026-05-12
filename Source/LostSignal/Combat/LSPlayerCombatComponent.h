@@ -8,6 +8,7 @@
 class UAnimMontage;
 class UGameplayAbility;
 class UGameplayEffect;
+class ULSGA_PlayerBasicAttack;
 class ULSAimComponent;
 class ULSCharacterCombatComponent;
 class ULSCombatStateComponent;
@@ -22,6 +23,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	bool RequestBasicAttack();
+
+	UFUNCTION(BlueprintPure, Category="LS/Combat")
+	UAnimMontage* GetBasicAttackMontage() const { return AttackMontage; }
+
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void ResetBasicAttackHit();
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	bool RequestDash();
@@ -47,6 +54,9 @@ protected:
 private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TObjectPtr<UAnimMontage> AttackMontage;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
+	TSubclassOf<UGameplayAbility> BasicAttackAbilityClass;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TSubclassOf<UGameplayAbility> DashAbilityClass;
@@ -96,6 +106,7 @@ private:
 	void FinishPredictedDash();
 	void FinishPredictedDashCooldown();
 	void ExecuteMeleeHit(const FVector& AttackDirection);
+	ULSGA_PlayerBasicAttack* FindActiveBasicAttackAbility() const;
 	bool ApplyDashRootMotion(const FVector& DashDirection, uint16& OutRootMotionSourceID) const;
 	float GetDashDuration() const;
 	float GetDashCooldown() const;

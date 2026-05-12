@@ -2,6 +2,8 @@
 
 #include "Abilities/GameplayAbility.h"
 #include "AbilitySystemComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Combat/LSCombatStateComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -36,6 +38,75 @@ ALSCharacterBase::ALSCharacterBase()
 UAbilitySystemComponent* ALSCharacterBase::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
+}
+
+void ALSCharacterBase::MulticastPlayLSMontage_Implementation(UAnimMontage* Montage, FName StartSection)
+{
+	if (!Montage)
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance)
+	{
+		return;
+	}
+
+	AnimInstance->Montage_Play(Montage);
+	if (!StartSection.IsNone())
+	{
+		AnimInstance->Montage_JumpToSection(StartSection, Montage);
+		AnimInstance->Montage_SetNextSection(StartSection, NAME_None, Montage);
+	}
+}
+
+void ALSCharacterBase::MulticastJumpLSMontageSection_Implementation(UAnimMontage* Montage, FName SectionName)
+{
+	if (!Montage || SectionName.IsNone())
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance || !AnimInstance->Montage_IsPlaying(Montage))
+	{
+		return;
+	}
+
+	AnimInstance->Montage_JumpToSection(SectionName, Montage);
+}
+
+void ALSCharacterBase::MulticastSetLSMontageNextSection_Implementation(UAnimMontage* Montage, FName SectionNameToChange, FName NextSection)
+{
+	if (!Montage || SectionNameToChange.IsNone())
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance || !AnimInstance->Montage_IsPlaying(Montage))
+	{
+		return;
+	}
+
+	AnimInstance->Montage_SetNextSection(SectionNameToChange, NextSection, Montage);
+}
+
+void ALSCharacterBase::MulticastStopLSMontage_Implementation(UAnimMontage* Montage, float BlendOutTime)
+{
+	if (!Montage)
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance || !AnimInstance->Montage_IsPlaying(Montage))
+	{
+		return;
+	}
+
+	AnimInstance->Montage_Stop(BlendOutTime, Montage);
 }
 
 void ALSCharacterBase::BeginPlay()

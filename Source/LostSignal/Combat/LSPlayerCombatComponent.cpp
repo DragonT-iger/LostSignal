@@ -10,6 +10,7 @@
 #include "Engine/EngineTypes.h"
 #include "Engine/World.h"
 #include "GAS/Abilities/LSGA_Dash.h"
+#include "GAS/Abilities/LSGA_PlayerBasicAttack.h"
 #include "GAS/Effects/LSGE_PlayerBasicDamage.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
@@ -22,6 +23,7 @@
 ULSPlayerCombatComponent::ULSPlayerCombatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	BasicAttackAbilityClass = ULSGA_PlayerBasicAttack::StaticClass();
 	DashAbilityClass = ULSGA_Dash::StaticClass();
 	BasicAttackDamageEffectClass = ULSGE_PlayerBasicDamage::StaticClass();
 }
@@ -50,23 +52,38 @@ bool ULSPlayerCombatComponent::RequestBasicAttack()
 		return false;
 	}
 
+	if (!OwnerCharacter->HasAuthority())
+	{
+		return true;
+	}
+
+	if (ULSGA_PlayerBasicAttack* ActiveAttackAbility = FindActiveBasicAttackAbility())
+	{
+		CombatStateComponent->ClearBufferedCommand();
+		ActiveAttackAbility->QueueComboInput();
+		return true;
+	}
+
 	if (!CombatStateComponent->TrySubmitCommand(ELSCombatCommandType::BasicAttack))
 	{
 		return false;
 	}
 
-	const float AttackDuration = OwnerCharacter->PlayAnimMontage(AttackMontage);
-	if (AttackDuration <= 0.0f)
+	UAbilitySystemComponent* ASC = SharedCombatComponent->GetAbilitySystemComponent();
+	if (!ASC)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s basic attack rejected: failed to play montage %s."), *GetNameSafe(OwnerCharacter), *GetNameSafe(AttackMontage));
 		return false;
 	}
 
-	bAttackHitConsumed = false;
-	CombatStateComponent->BeginAction(ELSCombatActionState::BasicAttack, ELSCombatActionPhase::Startup);
-	SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_Attacking, true);
+	FGameplayTagContainer AbilityTags;
+	AbilityTags.AddTag(LSGameplayTags::Ability_PlayerBasicAttack);
+	const bool bActivated = ASC->TryActivateAbilitiesByTag(AbilityTags);
+	if (!bActivated)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s basic attack ability activation failed."), *GetNameSafe(OwnerCharacter));
+	}
 
-	return true;
+	return bActivated;
 }
 
 bool ULSPlayerCombatComponent::RequestDash()
@@ -220,7 +237,7 @@ void ULSPlayerCombatComponent::PerformMeleeHit()
 
 	ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent();
 	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
-	if (!SharedCombatComponent || !OwnerCharacter)
+	if (!SharedCombatComponent || !OwnerCharacter || SharedCombatComponent->IsDead())
 	{
 		return;
 	}
@@ -268,13 +285,26 @@ bool ULSPlayerCombatComponent::IsAttackInProgress() const
 	return SharedCombatComponent && SharedCombatComponent->HasCombatTag(LSGameplayTags::Combat_Attacking);
 }
 
+void ULSPlayerCombatComponent::ResetBasicAttackHit()
+{
+	bAttackHitConsumed = false;
+}
+
 void ULSPlayerCombatComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter(); OwnerCharacter && OwnerCharacter->HasAuthority() && DashAbilityClass)
+	if (ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter(); OwnerCharacter && OwnerCharacter->HasAuthority())
 	{
-		OwnerCharacter->GrantAbility(DashAbilityClass);
+		if (BasicAttackAbilityClass)
+		{
+			OwnerCharacter->GrantAbility(BasicAttackAbilityClass);
+		}
+
+		if (DashAbilityClass)
+		{
+			OwnerCharacter->GrantAbility(DashAbilityClass);
+		}
 	}
 }
 
@@ -339,6 +369,13 @@ void ULSPlayerCombatComponent::CancelAttackForDash()
 	bAttackHitConsumed = true;
 }
 
+ULSGA_PlayerBasicAttack* ULSPlayerCombatComponent::FindActiveBasicAttackAbility() const
+{
+	const ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent();
+	UAbilitySystemComponent* ASC = SharedCombatComponent ? SharedCombatComponent->GetAbilitySystemComponent() : nullptr;
+	return ULSGA_PlayerBasicAttack::FindActiveBasicAttackAbility(ASC);
+}
+
 void ULSPlayerCombatComponent::TryExecuteBufferedCommand()
 {
 	ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent();
@@ -357,7 +394,8 @@ void ULSPlayerCombatComponent::TryExecuteBufferedCommand()
 	switch (BufferedCommand)
 	{
 	case ELSCombatCommandType::BasicAttack:
-		RequestBasicAttack();
+		// Basic-attack combo chaining is handled inside ULSGA_PlayerBasicAttack.
+		// Replaying a buffered BasicAttack here restarts the combo from Attack_1.
 		break;
 
 	case ELSCombatCommandType::Dash:

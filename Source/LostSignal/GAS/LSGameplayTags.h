@@ -15,6 +15,7 @@ namespace LSGameplayTags
 
 	// Ability tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Dash)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_PlayerBasicAttack)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_MonsterMelee)
 
 	// Cooldown tags
@@ -23,6 +24,7 @@ namespace LSGameplayTags
 	// Combat phase tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Attacking)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_AttackActive)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_ComboWindow)
 
 	// SetByCaller damage data
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_Base)

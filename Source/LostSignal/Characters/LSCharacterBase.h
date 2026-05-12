@@ -8,6 +8,7 @@
 class UAbilitySystemComponent;
 class ULSCombatAttributeSet;
 class UGameplayAbility;
+class UAnimMontage;
 class ULSCharacterCombatComponent;
 class ULSCombatStateComponent;
 
@@ -29,6 +30,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	ULSCombatStateComponent* GetCombatStateComponent() const { return CombatStateComponent; }
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayLSMontage(UAnimMontage* Montage, FName StartSection = NAME_None);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastJumpLSMontageSection(UAnimMontage* Montage, FName SectionName);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastSetLSMontageNextSection(UAnimMontage* Montage, FName SectionNameToChange, FName NextSection);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastStopLSMontage(UAnimMontage* Montage, float BlendOutTime);
 
 	void GrantAbility(TSubclassOf<UGameplayAbility> AbilityClass);
 

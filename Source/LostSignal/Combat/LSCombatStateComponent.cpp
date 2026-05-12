@@ -68,6 +68,12 @@ bool ULSCombatStateComponent::ConsumeBufferedCommand(ELSCombatCommandType& OutCo
 	return true;
 }
 
+void ULSCombatStateComponent::ClearBufferedCommand()
+{
+	bHasBufferedCommand = false;
+	BufferedCommand = FLSBufferedCombatCommand();
+}
+
 bool ULSCombatStateComponent::PeekBufferedCommand(ELSCombatCommandType& OutCommandType) const
 {
 	if (!HasBufferedCommand())

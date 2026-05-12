@@ -31,6 +31,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	bool ConsumeBufferedCommand(ELSCombatCommandType& OutCommandType);
 
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void ClearBufferedCommand();
+
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	bool PeekBufferedCommand(ELSCombatCommandType& OutCommandType) const;
 
