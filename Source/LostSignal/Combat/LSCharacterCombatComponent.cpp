@@ -1,9 +1,7 @@
 #include "Combat/LSCharacterCombatComponent.h"
 
-#include "AIController.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
-#include "BrainComponent.h"
 #include "Characters/LSCharacterBase.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Characters/LSPlayerCharacter.h"
@@ -272,14 +270,6 @@ void ULSCharacterCombatComponent::HandleDeathStateChanged(bool bIsDead)
 		if (AController* Controller = OwnerCharacter->GetController())
 		{
 			Controller->StopMovement();
-
-			if (AAIController* AIController = Cast<AAIController>(Controller))
-			{
-				if (AIController->BrainComponent)
-				{
-					AIController->BrainComponent->StopLogic(TEXT("Dead"));
-				}
-			}
 		}
 	}
 }

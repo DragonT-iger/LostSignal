@@ -54,6 +54,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	UAnimMontage* GetAbilityMontage(FGameplayTag AbilityTag) const;
 
+	/** Returns the death montage authored for this enemy. */
+	UFUNCTION(BlueprintPure, Category="LS/Combat")
+	UAnimMontage* GetDeathMontage() const { return DeathMontage; }
+
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastPlayAbilityMontage(UAnimMontage* Montage);
 
@@ -70,6 +74,10 @@ protected:
 	/** Character-owned montage map read by monster abilities at runtime. */
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TArray<FLSMonsterAbilityMontageEntry> AbilityMontages;
+
+	/** Death animation authored per enemy BP and played by the Dead state before AI logic stops. */
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
+	TObjectPtr<UAnimMontage> DeathMontage = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/AI|DataTable")
 	TObjectPtr<UDataTable> MonsterArchetypeTable;

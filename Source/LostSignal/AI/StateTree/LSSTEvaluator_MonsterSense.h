@@ -6,6 +6,7 @@
 
 class AAIController;
 class ALSEnemyCharacter;
+class UAbilitySystemComponent;
 class ULSMonsterCombatComponent;
 class ULSMonsterSenseComponent;
 
@@ -53,6 +54,10 @@ struct FLSSTEvaluator_MonsterSenseInstanceData
 
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bHasInterestLocation = false;
+
+	/** Mirrors the monster ASC dead tag so every state can transition into Dead with one shared bool. */
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	bool bIsDead = false;
 };
 
 /** StateTree evaluator that exposes monster sensing data to transitions and tasks. */

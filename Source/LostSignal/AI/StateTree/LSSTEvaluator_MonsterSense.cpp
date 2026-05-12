@@ -2,8 +2,10 @@
 
 #include "AI/LSMonsterCombatComponent.h"
 #include "AI/LSMonsterSenseComponent.h"
+#include "AbilitySystemComponent.h"
 #include "AIController.h"
 #include "Characters/LSEnemyCharacter.h"
+#include "GAS/LSGameplayTags.h"
 #include "StateTreeExecutionContext.h"
 #include "LostSignal.h"
 
@@ -43,6 +45,7 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 		InstanceData.bHasVisualTarget = false;
 		InstanceData.bHasInterestLocation = false;
 		InstanceData.DistanceToTarget = 0.0f;
+		InstanceData.bIsDead = false;
 		return;
 	}
 
@@ -54,6 +57,16 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 	InstanceData.AlertMoveSpeedMultiplier = InstanceData.SenseComponent->GetAlertMoveSpeedMultiplier();
 	InstanceData.bHasVisualTarget = InstanceData.SenseComponent->HasVisualTarget();
 	InstanceData.bHasInterestLocation = InstanceData.SenseComponent->HasInterestLocation();
+	InstanceData.bIsDead = false;
+
+	if (InstanceData.EnemyCharacter)
+	{
+		if (UAbilitySystemComponent* ASC = InstanceData.EnemyCharacter->GetAbilitySystemComponent())
+		{
+			// StateTree does not decide death itself; it only mirrors the final GAS state tag for transitions.
+			InstanceData.bIsDead = ASC->HasMatchingGameplayTag(LSGameplayTags::State_Dead);
+		}
+	}
 
 	if (InstanceData.EnemyCharacter && InstanceData.CurrentTarget)
 	{
