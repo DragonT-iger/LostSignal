@@ -52,6 +52,7 @@ void ULSInventoryItemSlotWidget::SetItem(const FName ItemRowName, const int32 Am
 	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
 	AmountText->SetText(FText::AsNumber(Amount));
 	AmountText->SetVisibility(Amount > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	SetTooltipItem(ItemRowName, Amount);
 	bHasItem = true;
 }
 
@@ -83,6 +84,7 @@ void ULSInventoryItemSlotWidget::ClearItem()
 	AmountText->SetText(FText::GetEmpty());
 	AmountText->SetVisibility(ESlateVisibility::Collapsed);
 	bHasItem = false;
+	ClearTooltipItem();
 }
 
 void ULSInventoryItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)

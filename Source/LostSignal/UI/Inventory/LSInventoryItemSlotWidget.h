@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
 #include "Session/LSSessionSubsystem.h"
+#include "UI/Inventory/LSItemTooltipSlotWidget.h"
 #include "LSInventoryItemSlotWidget.generated.h"
 
 class UImage;
@@ -12,7 +12,7 @@ class UTexture2D;
 class UDragDropOperation;
 
 UCLASS(BlueprintType, Blueprintable)
-class LOSTSIGNAL_API ULSInventoryItemSlotWidget : public UUserWidget
+class LOSTSIGNAL_API ULSInventoryItemSlotWidget : public ULSItemTooltipSlotWidget
 {
 	GENERATED_BODY()
 

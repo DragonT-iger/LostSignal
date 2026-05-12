@@ -53,4 +53,7 @@ struct LOSTSIGNAL_API FLSChipRow : public FTableRowBase
 	// 이 칩이 가진 전투 스탯 개수 (Chip_Stat 테이블에서 해당 등급 범위로 스탯 생성)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item|Chip")
 	int32 Item_Chip_Status_Count = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item|Chip")
+	int32 Item_MemoryCost = 1;
 };
