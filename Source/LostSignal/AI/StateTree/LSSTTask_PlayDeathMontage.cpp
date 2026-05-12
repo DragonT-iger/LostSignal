@@ -26,6 +26,17 @@ EStateTreeRunStatus FLSSTTask_PlayDeathMontage::EnterState(FStateTreeExecutionCo
 		return EStateTreeRunStatus::Failed;
 	}
 
+	if (InstanceData.EnemyCharacter->GetMesh())
+	{
+		if (UAnimInstance* AnimInstance = InstanceData.EnemyCharacter->GetMesh()->GetAnimInstance())
+		{
+			if (AnimInstance->Montage_IsPlaying(DeathMontage))
+			{
+				return EStateTreeRunStatus::Running;
+			}
+		}
+	}
+
 	const float PlayedDuration = InstanceData.EnemyCharacter->PlayAnimMontage(DeathMontage);
 	if (PlayedDuration <= 0.0f)
 	{
@@ -34,5 +45,5 @@ EStateTreeRunStatus FLSSTTask_PlayDeathMontage::EnterState(FStateTreeExecutionCo
 	}
 
 	UE_LOG(LogLS, Log, TEXT("%s started death montage %s."), *GetNameSafe(InstanceData.EnemyCharacter), *GetNameSafe(DeathMontage));
-	return EStateTreeRunStatus::Succeeded;
+	return EStateTreeRunStatus::Running;
 }

@@ -7,6 +7,11 @@ namespace
 	{
 		return (A.X * B.Y) - (A.Y * B.X);
 	}
+
+	bool IsPointBehindViewer(const FVector2D& ViewerOrigin, const FVector2D& ViewerForward, const FVector2D& Point)
+	{
+		return FVector2D::DotProduct(Point - ViewerOrigin, ViewerForward) < -KINDA_SMALL_NUMBER;
+	}
 }
 
 // Builds the final 2D visibility polygon from the viewer pose and registered occluder segments.
@@ -44,8 +49,13 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 	TArray<FVector2D> UniqueVertices;
 	UniqueVertices.Reserve(SolverInfo.Segments.Num() * 2);
 
-	const auto AddUniqueVertex = [&UniqueVertices](const FVector2D& Vertex)
+	const auto AddUniqueVertex = [&UniqueVertices, &SolverInfo](const FVector2D& Vertex)
 	{
+		if (IsPointBehindViewer(SolverInfo.OriginPos, SolverInfo.OriginForward, Vertex))
+		{
+			return;
+		}
+
 		const bool bAlreadyAdded = UniqueVertices.ContainsByPredicate(
 			[&Vertex](const FVector2D& ExistingVertex)
 			{
@@ -177,7 +187,12 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 			}
 
 			const FLSVisionRayHit Hit = CastRay(SolverInfo.RayOriginPos, RayDir, Segment->Start, Segment->End, SolverInfo.MaxRayDistance);
-			if (Hit.bHit && Hit.Distance < ClosestHit.Distance)
+			if (!Hit.bHit || IsPointBehindViewer(SolverInfo.OriginPos, SolverInfo.OriginForward, Hit.HitPoint))
+			{
+				continue;
+			}
+
+			if (Hit.Distance < ClosestHit.Distance)
 			{
 				ClosestHit = Hit;
 			}
