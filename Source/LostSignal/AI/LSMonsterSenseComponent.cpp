@@ -1,8 +1,11 @@
 #include "AI/LSMonsterSenseComponent.h"
 
+#include "AbilitySystemComponent.h"
+#include "Characters/LSCharacterBase.h"
 #include "Data/LSMonsterArchetypeRow.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
+#include "GAS/LSGameplayTags.h"
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
 
@@ -29,6 +32,13 @@ void ULSMonsterSenseComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 	const AActor* OwnerActor = GetOwner();
 	if (!OwnerActor)
 	{
+		return;
+	}
+
+	if (IsOwnerDead())
+	{
+		ClearInterest();
+		SetComponentTickEnabled(false);
 		return;
 	}
 
@@ -240,6 +250,13 @@ AActor* ULSMonsterSenseComponent::FindBestVisibleTarget() const
 bool ULSMonsterSenseComponent::IsNoiseFresh() const
 {
 	return LastHeardTime >= 0.0f && (GetWorld()->GetTimeSeconds() - LastHeardTime) <= InterestMemorySeconds;
+}
+
+bool ULSMonsterSenseComponent::IsOwnerDead() const
+{
+	const ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner());
+	const UAbilitySystemComponent* ASC = OwnerCharacter ? OwnerCharacter->GetAbilitySystemComponent() : nullptr;
+	return ASC && ASC->HasMatchingGameplayTag(LSGameplayTags::State_Dead);
 }
 
 void ULSMonsterSenseComponent::DrawSenseDebug() const

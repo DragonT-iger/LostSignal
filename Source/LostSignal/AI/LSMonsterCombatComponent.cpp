@@ -42,6 +42,11 @@ bool ULSMonsterCombatComponent::RequestAbilityByTag(FGameplayTag AbilityTag) con
 		return false;
 	}
 
+	if (ASC->HasMatchingGameplayTag(LSGameplayTags::State_Dead))
+	{
+		return false;
+	}
+
 	FGameplayTagContainer AbilityTags;
 	AbilityTags.AddTag(AbilityTag);
 	return ASC->TryActivateAbilitiesByTag(AbilityTags);
@@ -60,6 +65,12 @@ void ULSMonsterCombatComponent::PerformMeleeHit()
 	if (!SharedCombatComponent || !DamageEffectClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s: PerformMeleeHit skipped, combat component or DamageEffectClass missing."), *GetNameSafe(GetOwner()));
+		return;
+	}
+
+	if (SharedCombatComponent->IsDead())
+	{
+		UE_LOG(LogLS, Log, TEXT("%s: PerformMeleeHit skipped because owner is dead."), *GetNameSafe(OwnerCharacter));
 		return;
 	}
 

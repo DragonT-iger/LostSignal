@@ -62,6 +62,7 @@ private:
 	void UpdateSensing(float DeltaTime);
 	AActor* FindBestVisibleTarget() const;
 	bool IsNoiseFresh() const;
+	bool IsOwnerDead() const;
 	void DrawSenseDebug() const;
 
 	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
