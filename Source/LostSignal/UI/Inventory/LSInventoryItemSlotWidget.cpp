@@ -48,7 +48,7 @@ void ULSInventoryItemSlotWidget::SetItem(const FName ItemRowName, const int32 Am
 		ItemIconImage->SetBrushFromTexture(IconTexture);
 	}
 
-	ItemIconImage->SetColorAndOpacity(FLinearColor::White);
+	ApplyHoverVisual();
 	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
 	AmountText->SetText(FText::AsNumber(Amount));
 	AmountText->SetVisibility(Amount > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -79,7 +79,7 @@ void ULSInventoryItemSlotWidget::ClearItem()
 		UE_LOG(LogLS, Warning, TEXT("ClearItem could not load default icon on %s."), *GetNameSafe(this));
 	}
 
-	ItemIconImage->SetColorAndOpacity(FLinearColor::White);
+	ApplyHoverVisual();
 	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
 	AmountText->SetText(FText::GetEmpty());
 	AmountText->SetVisibility(ESlateVisibility::Collapsed);
@@ -95,6 +95,22 @@ void ULSInventoryItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryW
 	bHasItem = bInHasItem;
 }
 
+void ULSInventoryItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
+
+	bIsHovered = true;
+	ApplyHoverVisual();
+}
+
+void ULSInventoryItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseLeave(InMouseEvent);
+
+	bIsHovered = false;
+	ApplyHoverVisual();
+}
+
 FReply ULSInventoryItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
 	if (!bHasItem)
@@ -103,6 +119,22 @@ FReply ULSInventoryItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGe
 	}
 
 	return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, EKeys::LeftMouseButton).NativeReply;
+}
+
+void ULSInventoryItemSlotWidget::NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	Super::NativeOnDragEnter(InGeometry, InDragDropEvent, InOperation);
+
+	bIsDragTarget = IsValidInventoryDropTarget(InOperation);
+	ApplyHoverVisual();
+}
+
+void ULSInventoryItemSlotWidget::NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	Super::NativeOnDragLeave(InDragDropEvent, InOperation);
+
+	bIsDragTarget = false;
+	ApplyHoverVisual();
 }
 
 void ULSInventoryItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
@@ -141,6 +173,9 @@ bool ULSInventoryItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const
 		return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 	}
 
+	bIsDragTarget = false;
+	ApplyHoverVisual();
+
 	ULSInventoryWidget* TargetInventoryWidget = InventoryWidget.Get();
 	if (!TargetInventoryWidget || DragOperation->SourceInventoryWidget != TargetInventoryWidget)
 	{
@@ -159,6 +194,39 @@ void ULSInventoryItemSlotWidget::RestoreDragSourceVisual()
 {
 	SetVisibility(ESlateVisibility::Visible);
 	SetRenderOpacity(1.0f);
+	ApplyHoverVisual();
+}
+
+void ULSInventoryItemSlotWidget::ApplyHoverVisual()
+{
+	if (!ItemIconImage)
+	{
+		return;
+	}
+
+	if (bIsDragTarget)
+	{
+		ItemIconImage->SetColorAndOpacity(DragTargetIconTint);
+		return;
+	}
+
+	ItemIconImage->SetColorAndOpacity(bIsHovered ? HoveredIconTint : NormalIconTint);
+}
+
+bool ULSInventoryItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const
+{
+	const ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
+	if (!DragOperation || !InventoryWidget.IsValid() || SlotIndex == INDEX_NONE || DragOperation->SourceSlotIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	if (DragOperation->SourceInventoryWidget != InventoryWidget.Get())
+	{
+		return false;
+	}
+
+	return DragOperation->SourceSlotArea != SlotArea || DragOperation->SourceSlotIndex != SlotIndex;
 }
 
 UTexture2D* ULSInventoryItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName) const
