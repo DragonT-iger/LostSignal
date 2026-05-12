@@ -19,9 +19,6 @@ public:
 	void ClearTooltipItem();
 
 protected:
-	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TSubclassOf<ULSItemTooltipWidget> ItemTooltipWidgetClass;
 
@@ -33,6 +30,5 @@ private:
 	int32 CurrentTooltipAmount = 0;
 	bool bHasTooltipItem = false;
 
-	void ShowItemTooltip();
-	void HideItemTooltip();
+	void RefreshItemTooltip();
 };

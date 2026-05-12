@@ -9,7 +9,6 @@
 #include "Data/LSWeaponRow.h"
 #include "Engine/DataTable.h"
 #include "LostSignal.h"
-#include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSubsystem.h"
 #include "UI/Inventory/LSItemTooltipExtraInfoRowWidget.h"
 #include "UI/Inventory/LSItemTooltipStatRowWidget.h"
@@ -190,7 +189,7 @@ void ULSItemTooltipWidget::SetCommonTexts(const FText& TooltipType, const FText&
 	}
 	else
 	{
-		PriceText->SetText(FText::Format(LOCTEXT("PriceFormat", "가격: {0}"), FText::AsNumber(ItemCost)));
+		PriceText->SetText(FText::Format(LOCTEXT("PriceFormat", "C{0}"), FText::AsNumber(ItemCost)));
 	}
 }
 
@@ -295,14 +294,16 @@ void ULSItemTooltipWidget::PopulateItemTooltip(const FName ItemRowName, const in
 
 	UGameInstance* GameInstance = GetGameInstance();
 	const ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
-	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-
-	const int32 CurrentCount = SessionSubsystem ? CountItems(SessionSubsystem->GetSessionInventory(), ItemRowName) : HoveredSlotAmount;
-	const int32 StashCount = SaveSubsystem ? CountItems(SaveSubsystem->GetStash(), ItemRowName) : 0;
+	int32 CurrentCount = HoveredSlotAmount;
+	if (SessionSubsystem)
+	{
+		CurrentCount = CountItems(SessionSubsystem->GetSessionInventory(), ItemRowName);
+		CurrentCount += CountItems(SessionSubsystem->GetSessionSafeInventory(), ItemRowName);
+	}
 
 	SetCommonTexts(LOCTEXT("ItemTooltipType", "일반 아이템 설명창"), Row->Item_Text, Row->Item_Grade, Row->Item_Description, Row->Item_Cost);
 	AddExtraInfo(LOCTEXT("CurrentItemCountExtraInfo", "현재 아이템 개수"), FText::AsNumber(CurrentCount));
-	AddExtraInfo(LOCTEXT("StashItemCountExtraInfo", "창고 아이템 개수"), FText::AsNumber(StashCount));
+	AddExtraInfo(LOCTEXT("StashItemCountExtraInfo", "창고 아이템 개수"), FText::AsNumber(0));
 }
 
 FText ULSItemTooltipWidget::GetGradeText(const int32 ItemGrade)

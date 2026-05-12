@@ -8,6 +8,7 @@ void ULSItemTooltipSlotWidget::SetTooltipItem(const FName ItemRowName, const int
 	CurrentTooltipItemRowName = ItemRowName;
 	CurrentTooltipAmount = Amount;
 	bHasTooltipItem = !ItemRowName.IsNone();
+	RefreshItemTooltip();
 }
 
 void ULSItemTooltipSlotWidget::ClearTooltipItem()
@@ -15,36 +16,25 @@ void ULSItemTooltipSlotWidget::ClearTooltipItem()
 	CurrentTooltipItemRowName = NAME_None;
 	CurrentTooltipAmount = 0;
 	bHasTooltipItem = false;
-	HideItemTooltip();
+	SetToolTip(nullptr);
 }
 
-void ULSItemTooltipSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
-	ShowItemTooltip();
-}
-
-void ULSItemTooltipSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
-{
-	HideItemTooltip();
-	Super::NativeOnMouseLeave(InMouseEvent);
-}
-
-void ULSItemTooltipSlotWidget::ShowItemTooltip()
+void ULSItemTooltipSlotWidget::RefreshItemTooltip()
 {
 	if (!HasTooltipItem())
 	{
-		return;
-	}
-
-	if (!ItemTooltipWidgetClass)
-	{
-		UE_LOG(LogLS, Warning, TEXT("ItemTooltipWidgetClass is not set on %s."), *GetNameSafe(this));
+		SetToolTip(nullptr);
 		return;
 	}
 
 	if (!ItemTooltipWidget)
 	{
+		if (!ItemTooltipWidgetClass)
+		{
+			UE_LOG(LogLS, Warning, TEXT("ItemTooltipWidgetClass is not set on %s."), *GetNameSafe(this));
+			return;
+		}
+
 		if (APlayerController* OwningPlayer = GetOwningPlayer())
 		{
 			ItemTooltipWidget = CreateWidget<ULSItemTooltipWidget>(OwningPlayer, ItemTooltipWidgetClass);
@@ -63,9 +53,4 @@ void ULSItemTooltipSlotWidget::ShowItemTooltip()
 
 	ItemTooltipWidget->SetItem(CurrentTooltipItemRowName, CurrentTooltipAmount);
 	SetToolTip(ItemTooltipWidget);
-}
-
-void ULSItemTooltipSlotWidget::HideItemTooltip()
-{
-	SetToolTip(nullptr);
 }
