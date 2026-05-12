@@ -6,6 +6,7 @@
 #include "LSInventoryWidget.generated.h"
 
 class ALSWorldDroppedItem;
+class UBorder;
 class UButton;
 class UDragDropOperation;
 class UWrapBox;
@@ -36,6 +37,9 @@ public:
 protected:
 	virtual void NativeDestruct() override;
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UBorder> InventoryWindowBorder;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UWrapBox> InventoryWrapBox;

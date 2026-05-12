@@ -1,6 +1,7 @@
 #include "UI/Inventory/LSInventoryWidget.h"
 
 #include "Camera/PlayerCameraManager.h"
+#include "Components/Border.h"
 #include "Components/CapsuleComponent.h"
 #include "LostSignal.h"
 #include "Components/Button.h"
@@ -348,11 +349,18 @@ bool ULSInventoryWidget::HandleInventoryBackgroundDrop(const FGeometry& InGeomet
 		return false;
 	}
 
-	const FVector2D LocalDropPosition = InGeometry.AbsoluteToLocal(InDragDropEvent.GetScreenSpacePosition());
+	if (!InventoryWindowBorder)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because InventoryWindowBorder is not bound on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const FGeometry& InventoryWindowGeometry = InventoryWindowBorder->GetCachedGeometry();
+	const FVector2D LocalDropPosition = InventoryWindowGeometry.AbsoluteToLocal(InDragDropEvent.GetScreenSpacePosition());
 	if (LocalDropPosition.X >= 0.0f &&
 		LocalDropPosition.Y >= 0.0f &&
-		LocalDropPosition.X <= InGeometry.GetLocalSize().X &&
-		LocalDropPosition.Y <= InGeometry.GetLocalSize().Y)
+		LocalDropPosition.X <= InventoryWindowGeometry.GetLocalSize().X &&
+		LocalDropPosition.Y <= InventoryWindowGeometry.GetLocalSize().Y)
 	{
 		return false;
 	}
