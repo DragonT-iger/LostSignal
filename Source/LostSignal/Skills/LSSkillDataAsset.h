@@ -22,6 +22,7 @@ public:
 	bool TryGetSkillRow(FLSCharacterSkillRow& OutRow) const;
 
 	bool ActivateSkill(const FLSSkillActivationContext& Context) const;
+	bool HandleBasicAttackHit(const FLSBasicAttackHitContext& Context) const;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TSubclassOf<ULSSkill> SkillClass;

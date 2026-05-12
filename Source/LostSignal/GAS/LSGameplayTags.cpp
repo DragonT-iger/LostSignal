@@ -16,7 +16,12 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Combat_AttackActive, "LS.Combat.AttackActive")
 	UE_DEFINE_GAMEPLAY_TAG(Combat_ComboWindow, "LS.Combat.ComboWindow")
 
+	UE_DEFINE_GAMEPLAY_TAG(Buff_CombatAcceleration, "LS.Buff.CombatAcceleration")
+
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_Base, "LS.Data.Damage.Base")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_AttackCoefficient, "LS.Data.Damage.AttackCoefficient")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_CanCrit, "LS.Data.Damage.CanCrit")
+
+	UE_DEFINE_GAMEPLAY_TAG(Data_Buff_AttackSpeed, "LS.Data.Buff.AttackSpeed")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Buff_AttackPower, "LS.Data.Buff.AttackPower")
 }

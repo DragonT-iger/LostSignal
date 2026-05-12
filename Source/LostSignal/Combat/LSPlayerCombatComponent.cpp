@@ -18,6 +18,7 @@
 #include "GameFramework/RootMotionSource.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
+#include "Skills/LSPlayerSkillComponent.h"
 #include "TimerManager.h"
 
 ULSPlayerCombatComponent::ULSPlayerCombatComponent()
@@ -40,15 +41,6 @@ bool ULSPlayerCombatComponent::RequestBasicAttack()
 
 	if (!AttackMontage)
 	{
-		UE_LOG(
-			LogLS,
-			Warning,
-			TEXT("%s basic attack rejected: AttackMontage is not configured. OwnerClass=%s Component=%s ComponentOuter=%s IsTemplate=%d"),
-			*GetNameSafe(OwnerCharacter),
-			*GetNameSafe(OwnerCharacter->GetClass()),
-			*GetNameSafe(this),
-			*GetNameSafe(GetOuter()),
-			IsTemplate() ? 1 : 0);
 		return false;
 	}
 
@@ -78,10 +70,6 @@ bool ULSPlayerCombatComponent::RequestBasicAttack()
 	FGameplayTagContainer AbilityTags;
 	AbilityTags.AddTag(LSGameplayTags::Ability_PlayerBasicAttack);
 	const bool bActivated = ASC->TryActivateAbilitiesByTag(AbilityTags);
-	if (!bActivated)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s basic attack ability activation failed."), *GetNameSafe(OwnerCharacter));
-	}
 
 	return bActivated;
 }
@@ -260,7 +248,18 @@ void ULSPlayerCombatComponent::PerformMeleeHit()
 	{
 		AttackDirection = AttackDirection.GetSafeNormal();
 	}
-	ExecuteMeleeHit(AttackDirection);
+	const int32 ValidHitCount = ExecuteMeleeHit(AttackDirection);
+	if (ValidHitCount > 0)
+	{
+		const int32 ComboIndex = FindActiveBasicAttackAbility()
+			? FindActiveBasicAttackAbility()->GetCurrentComboIndex()
+			: INDEX_NONE;
+
+		if (ULSPlayerSkillComponent* SkillComponent = OwnerCharacter->FindComponentByClass<ULSPlayerSkillComponent>())
+		{
+			SkillComponent->HandleBasicAttackHit(ComboIndex, ValidHitCount);
+		}
+	}
 
 	SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_AttackActive, false);
 }
@@ -459,13 +458,13 @@ void ULSPlayerCombatComponent::FinishPredictedDashCooldown()
 	}
 }
 
-void ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection)
+int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection)
 {
 	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
 	ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent();
 	if (!OwnerCharacter || !SharedCombatComponent || !OwnerCharacter->HasAuthority())
 	{
-		return;
+		return 0;
 	}
 
 	const FVector TraceCenter = OwnerCharacter->GetActorLocation() + (AttackDirection * BasicAttackForwardOffset);
@@ -506,16 +505,7 @@ void ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection)
 		}
 	}
 
-	UE_LOG(
-		LogLS,
-		Log,
-		TEXT("%s player melee hit. Center=(%.1f, %.1f, %.1f) Radius=%.1f ValidTargets=%d"),
-		*GetNameSafe(OwnerCharacter),
-		TraceCenter.X,
-		TraceCenter.Y,
-		TraceCenter.Z,
-		BasicAttackRadius,
-		UniqueTargets.Num());
+	return UniqueTargets.Num();
 }
 
 bool ULSPlayerCombatComponent::ApplyDashRootMotion(const FVector& DashDirection, uint16& OutRootMotionSourceID) const

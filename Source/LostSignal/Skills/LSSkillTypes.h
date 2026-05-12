@@ -23,6 +23,24 @@ struct FLSSkillActivationContext
 	float AimYaw = 0.0f;
 };
 
+USTRUCT(BlueprintType)
+struct FLSBasicAttackHitContext
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Skill")
+	TObjectPtr<AActor> SourceActor = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Skill")
+	TObjectPtr<ULSSkillDataAsset> SkillData = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Skill")
+	int32 ComboIndex = INDEX_NONE;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Skill")
+	int32 ValidHitCount = 0;
+};
+
 UENUM(BlueprintType)
 enum class ELSPlayerSkillSlot : uint8
 {

@@ -136,6 +136,30 @@ bool ULSPlayerSkillComponent::GetActivePreviewSpec(FLSSkillAreaPreviewSpec& OutP
 	return true;
 }
 
+void ULSPlayerSkillComponent::HandleBasicAttackHit(int32 ComboIndex, int32 ValidHitCount)
+{
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor || !OwnerActor->HasAuthority() || ValidHitCount <= 0)
+	{
+		return;
+	}
+
+	for (ULSSkillDataAsset* PassiveSkillData : PassiveSkills)
+	{
+		if (!PassiveSkillData)
+		{
+			continue;
+		}
+
+		FLSBasicAttackHitContext Context;
+		Context.SourceActor = OwnerActor;
+		Context.SkillData = PassiveSkillData;
+		Context.ComboIndex = ComboIndex;
+		Context.ValidHitCount = ValidHitCount;
+		PassiveSkillData->HandleBasicAttackHit(Context);
+	}
+}
+
 bool ULSPlayerSkillComponent::CanUseLocalPreview() const
 {
 	if (GetNetMode() == NM_DedicatedServer)

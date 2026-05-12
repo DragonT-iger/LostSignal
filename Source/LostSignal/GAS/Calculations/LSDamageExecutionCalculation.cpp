@@ -12,6 +12,7 @@ namespace
 struct FLSDamageCaptureStatics
 {
 	DECLARE_ATTRIBUTE_CAPTUREDEF(Attack)
+	DECLARE_ATTRIBUTE_CAPTUREDEF(AttackPowerMultiplier)
 	DECLARE_ATTRIBUTE_CAPTUREDEF(CritChance)
 	DECLARE_ATTRIBUTE_CAPTUREDEF(CritDamage)
 	DECLARE_ATTRIBUTE_CAPTUREDEF(ArmorPenetration)
@@ -20,6 +21,7 @@ struct FLSDamageCaptureStatics
 	FLSDamageCaptureStatics()
 	{
 		DEFINE_ATTRIBUTE_CAPTUREDEF(ULSCharacterAttributeSet, Attack, Source, false)
+		DEFINE_ATTRIBUTE_CAPTUREDEF(ULSCharacterAttributeSet, AttackPowerMultiplier, Source, false)
 		DEFINE_ATTRIBUTE_CAPTUREDEF(ULSCharacterAttributeSet, CritChance, Source, false)
 		DEFINE_ATTRIBUTE_CAPTUREDEF(ULSCharacterAttributeSet, CritDamage, Source, false)
 		DEFINE_ATTRIBUTE_CAPTUREDEF(ULSCharacterAttributeSet, ArmorPenetration, Source, false)
@@ -37,6 +39,7 @@ const FLSDamageCaptureStatics& DamageCaptureStatics()
 ULSDamageExecutionCalculation::ULSDamageExecutionCalculation()
 {
 	RelevantAttributesToCapture.Add(DamageCaptureStatics().AttackDef);
+	RelevantAttributesToCapture.Add(DamageCaptureStatics().AttackPowerMultiplierDef);
 	RelevantAttributesToCapture.Add(DamageCaptureStatics().CritChanceDef);
 	RelevantAttributesToCapture.Add(DamageCaptureStatics().CritDamageDef);
 	RelevantAttributesToCapture.Add(DamageCaptureStatics().ArmorPenetrationDef);
@@ -58,6 +61,10 @@ void ULSDamageExecutionCalculation::Execute_Implementation(
 	float Attack = 0.0f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(Statics.AttackDef, EvaluateParameters, Attack);
 
+	float AttackPowerMultiplier = 1.0f;
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(Statics.AttackPowerMultiplierDef, EvaluateParameters, AttackPowerMultiplier);
+	AttackPowerMultiplier = FMath::Max(0.0f, AttackPowerMultiplier);
+
 	float CritChance = 0.0f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(Statics.CritChanceDef, EvaluateParameters, CritChance);
 
@@ -74,7 +81,8 @@ void ULSDamageExecutionCalculation::Execute_Implementation(
 	const float AttackCoefficient = Spec.GetSetByCallerMagnitude(LSGameplayTags::Data_Damage_AttackCoefficient, false, 0.0f);
 	const bool bCanCrit = Spec.GetSetByCallerMagnitude(LSGameplayTags::Data_Damage_CanCrit, false, 0.0f) > 0.0f;
 
-	const float RawDamage = FMath::Max(0.0f, BaseDamage + (FMath::Max(0.0f, Attack) * AttackCoefficient));
+	const float EffectiveAttack = FMath::Max(0.0f, Attack) * AttackPowerMultiplier;
+	const float RawDamage = FMath::Max(0.0f, BaseDamage + (EffectiveAttack * AttackCoefficient));
 	const float EffectiveDefence = FMath::Max(0.0f, Defence - ArmorPenetration);
 	float FinalDamage = RawDamage * (100.0f / (100.0f + EffectiveDefence));
 	const float DamageBeforeCrit = FinalDamage;
@@ -97,11 +105,12 @@ void ULSDamageExecutionCalculation::Execute_Implementation(
 	UE_LOG(
 		LogLS,
 		Log,
-		TEXT("DamageCalc %s -> %s | FinalDamage = max(0, (BaseDamage %.2f + Attack %.2f * Coef %.2f) * (100 / (100 + max(0, Defence %.2f - ArmorPen %.2f)))%s) = %.2f | CritRoll %.3f / CritChance %.3f"),
+		TEXT("DamageCalc %s -> %s | FinalDamage = max(0, (BaseDamage %.2f + Attack %.2f * AttackPowerMultiplier %.3f * Coef %.2f) * (100 / (100 + max(0, Defence %.2f - ArmorPen %.2f)))%s) = %.2f | CritRoll %.3f / CritChance %.3f"),
 		*GetNameSafe(SourceActor),
 		*GetNameSafe(TargetActor),
 		BaseDamage,
 		Attack,
+		AttackPowerMultiplier,
 		AttackCoefficient,
 		Defence,
 		ArmorPenetration,

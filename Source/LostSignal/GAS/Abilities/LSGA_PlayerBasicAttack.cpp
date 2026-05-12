@@ -7,6 +7,7 @@
 #include "Combat/LSCombatStateComponent.h"
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "LostSignal.h"
 #include "TimerManager.h"
@@ -73,7 +74,6 @@ void ULSGA_PlayerBasicAttack::QueueComboInput()
 		World->GetTimerManager().SetTimerForNextTick(this, &ULSGA_PlayerBasicAttack::ConsumePostComboInput);
 	}
 
-	UE_LOG(LogLS, Log, TEXT("%s queued post-combo basic attack input."), *GetNameSafe(GetAvatarActorFromActorInfo()));
 }
 
 void ULSGA_PlayerBasicAttack::OpenComboWindow()
@@ -124,7 +124,6 @@ void ULSGA_PlayerBasicAttack::ActivateAbility(
 	ActiveAttackMontage = PlayerCombatComponent->GetBasicAttackMontage();
 	if (!ActiveAttackMontage || ComboSections.Num() == 0)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s basic attack ability missing montage or combo sections."), *GetNameSafe(Character));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -225,13 +224,16 @@ void ULSGA_PlayerBasicAttack::PlayComboSection(int32 SectionIndex)
 		PlayerCombatComponent->ResetBasicAttackHit();
 	}
 
-	Character->MulticastPlayLSMontage(ActiveAttackMontage, ComboSections[SectionIndex]);
+	const UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	const float AttackSpeed = ASC
+		? ASC->GetNumericAttribute(ULSCharacterAttributeSet::GetAttackSpeedAttribute())
+		: 1.0f;
+	Character->MulticastPlayLSMontage(ActiveAttackMontage, ComboSections[SectionIndex], FMath::Max(0.01f, AttackSpeed));
 	Character->MulticastSetLSMontageNextSection(ActiveAttackMontage, ComboSections[SectionIndex], NAME_None);
 
 	UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr;
 	if (!AnimInstance || !AnimInstance->Montage_IsPlaying(ActiveAttackMontage))
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s basic attack failed to play montage %s."), *GetNameSafe(Character), *GetNameSafe(ActiveAttackMontage));
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
@@ -240,14 +242,6 @@ void ULSGA_PlayerBasicAttack::PlayComboSection(int32 SectionIndex)
 	MontageEndedDelegate.BindUObject(this, &ULSGA_PlayerBasicAttack::HandleAttackMontageEnded);
 	AnimInstance->Montage_SetEndDelegate(MontageEndedDelegate, ActiveAttackMontage);
 
-	UE_LOG(
-		LogLS,
-		Log,
-		TEXT("%s playing basic attack combo section %s (%d/%d)."),
-		*GetNameSafe(Character),
-		*ComboSections[SectionIndex].ToString(),
-		SectionIndex + 1,
-		ComboSections.Num());
 }
 
 void ULSGA_PlayerBasicAttack::OpenPostComboInputWindow()
@@ -271,7 +265,6 @@ void ULSGA_PlayerBasicAttack::OpenPostComboInputWindow()
 			false);
 	}
 
-	UE_LOG(LogLS, Log, TEXT("%s opened post-combo input window for %.2f seconds."), *GetNameSafe(GetAvatarActorFromActorInfo()), PostComboInputWindowSeconds);
 }
 
 void ULSGA_PlayerBasicAttack::ClosePostComboInputWindow()
@@ -302,7 +295,6 @@ void ULSGA_PlayerBasicAttack::ConsumePostComboInput()
 		return;
 	}
 
-	UE_LOG(LogLS, Log, TEXT("%s accepted post-combo basic attack input."), *GetNameSafe(GetAvatarActorFromActorInfo()));
 	PlayComboSection(NextSectionIndex);
 }
 

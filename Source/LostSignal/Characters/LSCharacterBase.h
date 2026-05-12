@@ -32,7 +32,7 @@ public:
 	ULSCombatStateComponent* GetCombatStateComponent() const { return CombatStateComponent; }
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastPlayLSMontage(UAnimMontage* Montage, FName StartSection = NAME_None);
+	void MulticastPlayLSMontage(UAnimMontage* Montage, FName StartSection = NAME_None, float PlayRate = 1.0f);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastJumpLSMontageSection(UAnimMontage* Montage, FName SectionName);

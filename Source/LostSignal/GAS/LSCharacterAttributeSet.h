@@ -29,6 +29,10 @@ public:
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, AttackSpeed)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
+	FGameplayAttributeData AttackPowerMultiplier = 1.0f;
+	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, AttackPowerMultiplier)
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData CooldownReduction = 0.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CooldownReduction)
 

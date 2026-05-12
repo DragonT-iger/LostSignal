@@ -26,8 +26,15 @@ namespace LSGameplayTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_AttackActive)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_ComboWindow)
 
+	// Buff tags
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buff_CombatAcceleration)
+
 	// SetByCaller damage data
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_Base)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_AttackCoefficient)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_CanCrit)
+
+	// SetByCaller buff data
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Buff_AttackSpeed)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Buff_AttackPower)
 }

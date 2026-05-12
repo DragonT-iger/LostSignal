@@ -13,6 +13,11 @@ bool ULSSkill::ActivateSkill_Implementation(const FLSSkillActivationContext& Con
 	return false;
 }
 
+bool ULSSkill::HandleBasicAttackHit_Implementation(const FLSBasicAttackHitContext& Context) const
+{
+	return false;
+}
+
 FLSSkillAreaPreviewSpec ULSSkill::BuildPreviewSpec() const
 {
 	FLSSkillAreaPreviewSpec ResolvedSpec = PreviewSpec;

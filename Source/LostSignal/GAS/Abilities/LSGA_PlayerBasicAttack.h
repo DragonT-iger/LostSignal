@@ -20,6 +20,8 @@ public:
 
 	static ULSGA_PlayerBasicAttack* FindActiveBasicAttackAbility(UAbilitySystemComponent* ASC);
 
+	int32 GetCurrentComboIndex() const { return CurrentSectionIndex; }
+
 	void QueueComboInput();
 	void OpenComboWindow();
 	void CloseComboWindow();

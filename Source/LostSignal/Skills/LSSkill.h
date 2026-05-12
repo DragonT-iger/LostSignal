@@ -23,6 +23,10 @@ public:
 	bool ActivateSkill(const FLSSkillActivationContext& Context);
 	virtual bool ActivateSkill_Implementation(const FLSSkillActivationContext& Context);
 
+	UFUNCTION(BlueprintNativeEvent, Category="LS/Skill")
+	bool HandleBasicAttackHit(const FLSBasicAttackHitContext& Context) const;
+	virtual bool HandleBasicAttackHit_Implementation(const FLSBasicAttackHitContext& Context) const;
+
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	FLSSkillAreaPreviewSpec BuildPreviewSpec() const;
 

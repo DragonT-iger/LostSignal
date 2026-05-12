@@ -47,9 +47,14 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	bool GetActivePreviewSpec(FLSSkillAreaPreviewSpec& OutPreviewSpec) const;
 
+	void HandleBasicAttackHit(int32 ComboIndex, int32 ValidHitCount);
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TMap<ELSPlayerSkillSlot, FLSPlayerSkillSlotSpec> SkillSlots;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
+	TArray<TObjectPtr<ULSSkillDataAsset>> PassiveSkills;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill")
 	TObjectPtr<ULSSkillDataAsset> ActiveSkillData;

@@ -105,7 +105,7 @@ private:
 	void TryExecuteBufferedCommand();
 	void FinishPredictedDash();
 	void FinishPredictedDashCooldown();
-	void ExecuteMeleeHit(const FVector& AttackDirection);
+	int32 ExecuteMeleeHit(const FVector& AttackDirection);
 	ULSGA_PlayerBasicAttack* FindActiveBasicAttackAbility() const;
 	bool ApplyDashRootMotion(const FVector& DashDirection, uint16& OutRootMotionSourceID) const;
 	float GetDashDuration() const;

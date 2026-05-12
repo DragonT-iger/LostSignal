@@ -40,7 +40,7 @@ UAbilitySystemComponent* ALSCharacterBase::GetAbilitySystemComponent() const
 	return AbilitySystemComponent;
 }
 
-void ALSCharacterBase::MulticastPlayLSMontage_Implementation(UAnimMontage* Montage, FName StartSection)
+void ALSCharacterBase::MulticastPlayLSMontage_Implementation(UAnimMontage* Montage, FName StartSection, float PlayRate)
 {
 	if (!Montage)
 	{
@@ -53,7 +53,7 @@ void ALSCharacterBase::MulticastPlayLSMontage_Implementation(UAnimMontage* Monta
 		return;
 	}
 
-	AnimInstance->Montage_Play(Montage);
+	AnimInstance->Montage_Play(Montage, FMath::Max(0.01f, PlayRate));
 	if (!StartSection.IsNone())
 	{
 		AnimInstance->Montage_JumpToSection(StartSection, Montage);
