@@ -416,6 +416,11 @@ bool ULSInventoryWidget::ResolveDroppedItemLocation(FVector& OutDropLocation) co
 		OutDropLocation.Z -= CapsuleComponent->GetScaledCapsuleHalfHeight();
 	}
 
+	constexpr float DropXYRandomRadius = 35.0f;
+	const FVector2D DropXYOffset = FMath::RandPointInCircle(DropXYRandomRadius);
+	OutDropLocation.X += DropXYOffset.X;
+	OutDropLocation.Y += DropXYOffset.Y;
+
 	constexpr float DropZRandomRange = 3.0f;
 	OutDropLocation.Z += FMath::FRandRange(0.0f, DropZRandomRange);
 	return true;
