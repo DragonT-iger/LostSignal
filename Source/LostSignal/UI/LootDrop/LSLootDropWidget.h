@@ -41,6 +41,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	bool TransferHoveredLootSlotToInventory();
 
+	bool TransferInventorySlotToLootSlot(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, int32 LootSlotIndex);
+	bool TransferInventorySlotToFirstEmptyLootSlot(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex);
+
 	void NotifyLootSlotHovered(int32 SlotIndex);
 	void NotifyLootSlotUnhovered(int32 SlotIndex);
 

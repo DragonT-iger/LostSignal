@@ -132,6 +132,44 @@ bool ALSLootBox::TransferLootSlotToSessionSlot(const int32 LootSlotIndex, ULSSes
 	return true;
 }
 
+bool ALSLootBox::TransferSessionSlotToLootSlot(const int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, FLSSessionItem& OutLootItem)
+{
+	OutLootItem = FLSSessionItem();
+	if (!LootResults.IsValidIndex(LootSlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer session slot to loot slot because loot index is invalid. Index=%d"), LootSlotIndex);
+		return false;
+	}
+
+	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer session slot to loot slot because raid session is not active."));
+		return false;
+	}
+
+	FLSSessionItem CurrentLootItem;
+	CurrentLootItem.ItemRowName = LootResults[LootSlotIndex].ItemRowName;
+	CurrentLootItem.Amount = LootResults[LootSlotIndex].Amount;
+
+	FLSSessionItem SourceItem;
+	if (!SessionSubsystem->GetSessionSlotItem(FromSlotArea, FromSlotIndex, SourceItem))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer session slot to loot slot because source slot is empty. Area=%d Index=%d"),
+			static_cast<int32>(FromSlotArea), FromSlotIndex);
+		return false;
+	}
+
+	if (!SessionSubsystem->ReplaceSessionSlotItem(FromSlotArea, FromSlotIndex, CurrentLootItem, OutLootItem))
+	{
+		return false;
+	}
+
+	LootResults[LootSlotIndex].ItemRowName = OutLootItem.ItemRowName;
+	LootResults[LootSlotIndex].Amount = OutLootItem.Amount;
+	LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
+	return true;
+}
+
 void ALSLootBox::ClearLootSlot(const int32 LootSlotIndex)
 {
 	if (!LootResults.IsValidIndex(LootSlotIndex))

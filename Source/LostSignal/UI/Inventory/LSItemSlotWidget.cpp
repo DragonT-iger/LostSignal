@@ -4,6 +4,7 @@
 #include "Characters/LSPlayerCharacter.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSArmorRow.h"
 #include "Data/LSChipRow.h"
 #include "Data/LSDropSettings.h"
@@ -149,6 +150,20 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 		return FReply::Handled();
 	}
 
+	if (InventoryWidget.IsValid() && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
+	{
+		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+		{
+			if (PlayerController->TransferInventorySlotToLootDrop(SlotArea, SlotIndex))
+			{
+				InventoryWidget->RebuildInventorySlots();
+				InventoryWidget->RebuildConfirmedStorageSlots();
+			}
+		}
+
+		return FReply::Handled();
+	}
+
 	if (!CanStartItemDrag())
 	{
 		return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
@@ -161,7 +176,7 @@ void ULSItemSlotWidget::NativeOnDragEnter(const FGeometry& InGeometry, const FDr
 {
 	Super::NativeOnDragEnter(InGeometry, InDragDropEvent, InOperation);
 
-	bIsDragTarget = IsValidInventoryDropTarget(InOperation);
+	bIsDragTarget = IsValidInventoryDropTarget(InOperation) || IsValidLootDropTarget(InOperation);
 	ApplyHoverVisual();
 }
 
@@ -210,6 +225,26 @@ bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDro
 
 	bIsDragTarget = false;
 	ApplyHoverVisual();
+
+	if (ULSLootDropWidget* TargetLootDropWidget = LootDropWidget.Get())
+	{
+		if (!DragOperation->SourceInventoryWidget)
+		{
+			return false;
+		}
+
+		const bool bTransferred = TargetLootDropWidget->TransferInventorySlotToLootSlot(
+			DragOperation->SourceSlotArea,
+			DragOperation->SourceSlotIndex,
+			SlotIndex);
+		if (bTransferred)
+		{
+			DragOperation->SourceInventoryWidget->RebuildInventorySlots();
+			DragOperation->SourceInventoryWidget->RebuildConfirmedStorageSlots();
+		}
+
+		return bTransferred;
+	}
 
 	ULSInventoryWidget* TargetInventoryWidget = InventoryWidget.Get();
 	if (TargetInventoryWidget && DragOperation->SourceLootDropWidget)
@@ -281,6 +316,12 @@ bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InO
 	}
 
 	return DragOperation->SourceSlotArea != SlotArea || DragOperation->SourceSlotIndex != SlotIndex;
+}
+
+bool ULSItemSlotWidget::IsValidLootDropTarget(const UDragDropOperation* InOperation) const
+{
+	const ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
+	return DragOperation && LootDropWidget.IsValid() && DragOperation->SourceInventoryWidget && SlotIndex != INDEX_NONE && DragOperation->SourceSlotIndex != INDEX_NONE;
 }
 
 UTexture2D* ULSItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName) const

@@ -223,6 +223,46 @@ bool ULSLootDropWidget::TransferHoveredLootSlotToInventory()
 	return TransferLootSlotToInventory(HoveredLootSlotIndex);
 }
 
+bool ULSLootDropWidget::TransferInventorySlotToLootSlot(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const int32 LootSlotIndex)
+{
+	if (!LootItems.IsValidIndex(LootSlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer inventory slot to loot slot because loot index %d is invalid on %s."), LootSlotIndex, *GetNameSafe(this));
+		return false;
+	}
+
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer inventory slot to loot slot because owning player controller is invalid on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	FLSSessionItem NewLootItem;
+	if (!PlayerController->TransferSessionSlotToLootDropSlot(SourceLootBox, FromSlotArea, FromSlotIndex, LootSlotIndex, LootItems[LootSlotIndex], NewLootItem))
+	{
+		return false;
+	}
+
+	SetLootSlotFromSessionItem(LootSlotIndex, NewLootItem);
+	RebuildLootSlots();
+	return true;
+}
+
+bool ULSLootDropWidget::TransferInventorySlotToFirstEmptyLootSlot(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex)
+{
+	for (int32 LootSlotIndex = 0; LootSlotIndex < LootItems.Num(); ++LootSlotIndex)
+	{
+		const FLSDropResult& LootItem = LootItems[LootSlotIndex];
+		if (LootItem.ItemRowName.IsNone() || LootItem.Amount <= 0)
+		{
+			return TransferInventorySlotToLootSlot(FromSlotArea, FromSlotIndex, LootSlotIndex);
+		}
+	}
+
+	return false;
+}
+
 void ULSLootDropWidget::NotifyLootSlotHovered(const int32 SlotIndex)
 {
 	HoveredLootSlotIndex = SlotIndex;

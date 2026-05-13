@@ -631,6 +631,29 @@ bool ULSSessionSubsystem::ClearSessionSlot(const ELSInventorySlotArea SlotArea, 
 	return true;
 }
 
+bool ULSSessionSubsystem::ReplaceSessionSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem)
+{
+	OutPreviousItem = FLSSessionItem();
+	if (SlotIndex < 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot replace slot because index is invalid. Area=%d Index=%d"),
+			static_cast<int32>(SlotArea), SlotIndex);
+		return false;
+	}
+
+	if (SlotArea == ELSInventorySlotArea::Inventory && SlotIndex >= GetMaxInventorySlotCount())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot replace inventory slot because index exceeds max. Index=%d"), SlotIndex);
+		return false;
+	}
+
+	TArray<FLSSessionItem>& Slots = SlotArea == ELSInventorySlotArea::Safe ? SessionSafeInventory : SessionInventory;
+	EnsureSlotIndex(Slots, SlotIndex);
+	OutPreviousItem = Slots[SlotIndex];
+	Slots[SlotIndex] = NewItem;
+	return true;
+}
+
 int32 ULSSessionSubsystem::GetMaxInventorySlotCount() const
 {
 	return DefaultMaxInventorySlotCount;

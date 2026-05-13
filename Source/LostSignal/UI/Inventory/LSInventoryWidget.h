@@ -10,6 +10,7 @@ class UBorder;
 class UButton;
 class UDragDropOperation;
 class UWrapBox;
+class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
 class ULSLootDropWidget;
 
@@ -35,6 +36,7 @@ public:
 
 	bool HandleInventorySlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 	bool HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
+	bool TryDropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FPointerEvent& PointerEvent);
 
 protected:
 	virtual void NativeDestruct() override;
@@ -75,6 +77,9 @@ private:
 	void HandleSortButtonClicked();
 
 	bool HandleInventoryBackgroundDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation);
+	bool DropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation);
+	bool IsPointerInsideInventoryWindow(FVector2D ScreenPosition) const;
+	bool IsPointerOverUserWidget(const FPointerEvent& PointerEvent) const;
 	bool ResolveDroppedItemLocation(FVector& OutDropLocation) const;
 	bool ResolveDroppedItemYaw(float& OutDropYaw) const;
 };

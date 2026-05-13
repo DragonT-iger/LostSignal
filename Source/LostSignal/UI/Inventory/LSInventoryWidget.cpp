@@ -7,6 +7,7 @@
 #include "Components/Button.h"
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Layout/WidgetPath.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSubsystem.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
@@ -243,6 +244,40 @@ bool ULSInventoryWidget::HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, c
 	return bTransferred;
 }
 
+bool ULSInventoryWidget::TryDropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FPointerEvent& PointerEvent)
+{
+	if (DragOperation.SourceLootDropWidget)
+	{
+		return false;
+	}
+
+	if (DragOperation.SourceInventoryWidget != this)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source inventory widget does not match."));
+		return false;
+	}
+
+	if (DragOperation.SourceSlotIndex == INDEX_NONE)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source slot index is invalid."));
+		return false;
+	}
+
+	if (!InventoryWindowBorder)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because InventoryWindowBorder is not bound on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const FVector2D ScreenPosition = PointerEvent.GetScreenSpacePosition();
+	if (IsPointerInsideInventoryWindow(ScreenPosition) || IsPointerOverUserWidget(PointerEvent))
+	{
+		return false;
+	}
+
+	return DropInventoryDragToWorld(DragOperation);
+}
+
 void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 {
 	if (!ConfirmedStorageSlotWrapBox)
@@ -364,31 +399,25 @@ bool ULSInventoryWidget::HandleInventoryBackgroundDrop(const FGeometry& InGeomet
 		return false;
 	}
 
-	if (DragOperation->SourceInventoryWidget != this)
+	if (IsPointerInsideInventoryWindow(InDragDropEvent.GetScreenSpacePosition()))
+	{
+		return false;
+	}
+
+	return DropInventoryDragToWorld(*DragOperation);
+}
+
+bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation)
+{
+	if (DragOperation.SourceInventoryWidget != this)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source inventory widget does not match."));
 		return false;
 	}
 
-	if (DragOperation->SourceSlotIndex == INDEX_NONE)
+	if (DragOperation.SourceSlotIndex == INDEX_NONE)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source slot index is invalid."));
-		return false;
-	}
-
-	if (!InventoryWindowBorder)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because InventoryWindowBorder is not bound on %s."), *GetNameSafe(this));
-		return false;
-	}
-
-	const FGeometry& InventoryWindowGeometry = InventoryWindowBorder->GetCachedGeometry();
-	const FVector2D LocalDropPosition = InventoryWindowGeometry.AbsoluteToLocal(InDragDropEvent.GetScreenSpacePosition());
-	if (LocalDropPosition.X >= 0.0f &&
-		LocalDropPosition.Y >= 0.0f &&
-		LocalDropPosition.X <= InventoryWindowGeometry.GetLocalSize().X &&
-		LocalDropPosition.Y <= InventoryWindowGeometry.GetLocalSize().Y)
-	{
 		return false;
 	}
 
@@ -412,8 +441,8 @@ bool ULSInventoryWidget::HandleInventoryBackgroundDrop(const FGeometry& InGeomet
 	}
 
 	const bool bDropped = PlayerController->DropSessionSlotToWorld(
-		DragOperation->SourceSlotArea,
-		DragOperation->SourceSlotIndex,
+		DragOperation.SourceSlotArea,
+		DragOperation.SourceSlotIndex,
 		DroppedItemActorClass,
 		DropLocation,
 		DropYaw);
@@ -425,6 +454,42 @@ bool ULSInventoryWidget::HandleInventoryBackgroundDrop(const FGeometry& InGeomet
 	}
 
 	return bDropped;
+}
+
+bool ULSInventoryWidget::IsPointerInsideInventoryWindow(const FVector2D ScreenPosition) const
+{
+	if (!InventoryWindowBorder)
+	{
+		return false;
+	}
+
+	const FGeometry& InventoryWindowGeometry = InventoryWindowBorder->GetCachedGeometry();
+	const FVector2D LocalDropPosition = InventoryWindowGeometry.AbsoluteToLocal(ScreenPosition);
+	return LocalDropPosition.X >= 0.0f &&
+		LocalDropPosition.Y >= 0.0f &&
+		LocalDropPosition.X <= InventoryWindowGeometry.GetLocalSize().X &&
+		LocalDropPosition.Y <= InventoryWindowGeometry.GetLocalSize().Y;
+}
+
+bool ULSInventoryWidget::IsPointerOverUserWidget(const FPointerEvent& PointerEvent) const
+{
+	const FWidgetPath* EventPath = PointerEvent.GetEventPath();
+	if (!EventPath)
+	{
+		return false;
+	}
+
+	static const FName ObjectWidgetTypeName(TEXT("SObjectWidget"));
+	for (int32 WidgetIndex = 0; WidgetIndex < EventPath->Widgets.Num(); ++WidgetIndex)
+	{
+		const TSharedRef<SWidget>& Widget = EventPath->Widgets[WidgetIndex].Widget;
+		if (Widget->GetType() == ObjectWidgetTypeName)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool ULSInventoryWidget::ResolveDroppedItemLocation(FVector& OutDropLocation) const

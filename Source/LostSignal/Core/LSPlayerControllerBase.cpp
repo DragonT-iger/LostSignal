@@ -190,6 +190,30 @@ void ALSPlayerControllerBase::ServerTransferLootDropSlotToSessionSlot_Implementa
 	TransferLootDropSlotToSessionSlotInternal(SourceLootBox, LootSlotIndex, ToSlotArea, ToSlotIndex, IgnoredLootItem);
 }
 
+bool ALSPlayerControllerBase::TransferSessionSlotToLootDropSlot(ALSLootBox* SourceLootBox, const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const int32 LootSlotIndex, const FLSDropResult& CurrentLootItem, FLSSessionItem& OutLootItem)
+{
+	const bool bTransferred = HasAuthority()
+		? TransferSessionSlotToLootDropSlotInternal(SourceLootBox, FromSlotArea, FromSlotIndex, LootSlotIndex, OutLootItem)
+		: TransferSessionSlotToExternalLootSlot(FromSlotArea, FromSlotIndex, CurrentLootItem, OutLootItem);
+	if (!bTransferred)
+	{
+		return false;
+	}
+
+	if (!HasAuthority())
+	{
+		ServerTransferSessionSlotToLootDropSlot(SourceLootBox, FromSlotArea, FromSlotIndex, LootSlotIndex);
+	}
+
+	return true;
+}
+
+void ALSPlayerControllerBase::ServerTransferSessionSlotToLootDropSlot_Implementation(ALSLootBox* SourceLootBox, const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const int32 LootSlotIndex)
+{
+	FLSSessionItem IgnoredLootItem;
+	TransferSessionSlotToLootDropSlotInternal(SourceLootBox, FromSlotArea, FromSlotIndex, LootSlotIndex, IgnoredLootItem);
+}
+
 bool ALSPlayerControllerBase::TransferHoveredLootDropItemToInventory()
 {
 	if (!LootDropWidgetInstance || !LootDropWidgetInstance->IsVisible())
@@ -198,6 +222,16 @@ bool ALSPlayerControllerBase::TransferHoveredLootDropItemToInventory()
 	}
 
 	return LootDropWidgetInstance->TransferHoveredLootSlotToInventory();
+}
+
+bool ALSPlayerControllerBase::TransferInventorySlotToLootDrop(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex)
+{
+	if (!LootDropWidgetInstance || !LootDropWidgetInstance->IsVisible())
+	{
+		return false;
+	}
+
+	return LootDropWidgetInstance->TransferInventorySlotToFirstEmptyLootSlot(FromSlotArea, FromSlotIndex);
 }
 
 bool ALSPlayerControllerBase::TransferLootDropSlotToSessionInternal(ALSLootBox* SourceLootBox, const int32 LootSlotIndex, FLSSessionItem& OutLootItem)
@@ -224,6 +258,19 @@ bool ALSPlayerControllerBase::TransferLootDropSlotToSessionSlotInternal(ALSLootB
 	UGameInstance* GameInstance = GetGameInstance();
 	ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
 	return SourceLootBox->TransferLootSlotToSessionSlot(LootSlotIndex, SessionSubsystem, ToSlotArea, ToSlotIndex, OutLootItem);
+}
+
+bool ALSPlayerControllerBase::TransferSessionSlotToLootDropSlotInternal(ALSLootBox* SourceLootBox, const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const int32 LootSlotIndex, FLSSessionItem& OutLootItem)
+{
+	if (!SourceLootBox)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer session slot to loot drop because source loot box is missing."));
+		return false;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
+	return SourceLootBox->TransferSessionSlotToLootSlot(LootSlotIndex, SessionSubsystem, FromSlotArea, FromSlotIndex, OutLootItem);
 }
 
 bool ALSPlayerControllerBase::TransferExternalLootItemToSession(const FName ItemRowName, const int32 Amount, FLSSessionItem& OutLootItem)
@@ -265,6 +312,32 @@ bool ALSPlayerControllerBase::TransferExternalLootItemToSessionSlot(const FName 
 	OutLootItem.ItemRowName = ItemRowName;
 	OutLootItem.Amount = Amount;
 	return SessionSubsystem->DropExternalItemToSessionSlot(OutLootItem, ToSlotArea, ToSlotIndex);
+}
+
+bool ALSPlayerControllerBase::TransferSessionSlotToExternalLootSlot(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const FLSDropResult& CurrentLootItem, FLSSessionItem& OutLootItem)
+{
+	OutLootItem = FLSSessionItem();
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
+	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer session slot to external loot slot because raid session is not active."));
+		return false;
+	}
+
+	FLSSessionItem SourceItem;
+	if (!SessionSubsystem->GetSessionSlotItem(FromSlotArea, FromSlotIndex, SourceItem))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer session slot to external loot slot because source slot is empty. Area=%d Index=%d"),
+			static_cast<int32>(FromSlotArea), FromSlotIndex);
+		return false;
+	}
+
+	FLSSessionItem NewSessionItem;
+	NewSessionItem.ItemRowName = CurrentLootItem.ItemRowName;
+	NewSessionItem.Amount = CurrentLootItem.Amount;
+	return SessionSubsystem->ReplaceSessionSlotItem(FromSlotArea, FromSlotIndex, NewSessionItem, OutLootItem);
 }
 
 bool ALSPlayerControllerBase::DropSessionSlotToWorld(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector& DropLocation, const float DropYaw)

@@ -77,6 +77,7 @@ public:
 	bool DropExternalItemToSessionSlot(FLSSessionItem& InOutExternalItem, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool GetSessionSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, FLSSessionItem& OutItem) const;
 	bool ClearSessionSlot(ELSInventorySlotArea SlotArea, int32 SlotIndex);
+	bool ReplaceSessionSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem);
 
 	// 레이드 중 소모한 아이템 기록
 	UFUNCTION(BlueprintCallable, Category="LS/Session")

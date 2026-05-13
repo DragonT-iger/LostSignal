@@ -22,6 +22,7 @@ public:
 	const TArray<FLSDropResult>& GetLootResults() const { return LootResults; }
 	bool TransferLootSlotToSession(int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, FLSSessionItem& OutRemainingLootItem);
 	bool TransferLootSlotToSessionSlot(int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutRemainingLootItem);
+	bool TransferSessionSlotToLootSlot(int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, FLSSessionItem& OutLootItem);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="LS/Loot")
 	void OnLootResultReceived(const TArray<FLSDropResult>& Results);
