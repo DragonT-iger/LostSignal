@@ -11,7 +11,7 @@
 
 namespace
 {
-	ELSBreakPowerTier ToBreakPowerTier(int32 Value, ELSBreakPowerTier Fallback)
+	ELSBreakPowerTier ToOverclockBreakPowerTier(int32 Value, ELSBreakPowerTier Fallback)
 	{
 		if (Value >= static_cast<int32>(ELSBreakPowerTier::HardCrowdControl))
 		{
@@ -58,7 +58,7 @@ bool ULSOverclockSkill::ActivateSkill_Implementation(const FLSSkillActivationCon
 	const float ConeDegrees = bHasRow && Row.Range_Y > 0.0f ? Row.Range_Y : FallbackConeDegrees;
 	const float BaseAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : AttackCoefficient;
 	const float AdditionalCoefficientPerStack = bHasRow && Row.Skill_Count_Multiplier > 0.0f ? Row.Skill_Count_Multiplier : FallbackAdditionalAttackCoefficientPerStack;
-	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToBreakPowerTier(Row.Skill_Impact, BreakPower) : BreakPower;
+	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverclockBreakPowerTier(Row.Skill_Impact, BreakPower) : BreakPower;
 
 	const FVector SourceLocation = SourceActor->GetActorLocation();
 	FVector AimDirection = Context.TargetLocation - SourceLocation;

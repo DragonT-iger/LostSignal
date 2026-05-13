@@ -19,7 +19,7 @@
 
 namespace
 {
-	ELSBreakPowerTier ToBreakPowerTier(int32 Value, ELSBreakPowerTier Fallback)
+	ELSBreakPowerTier ToShortCircuitBreakPowerTier(int32 Value, ELSBreakPowerTier Fallback)
 	{
 		if (Value >= static_cast<int32>(ELSBreakPowerTier::HardCrowdControl))
 		{
@@ -245,7 +245,7 @@ void ALSShortCircuitField::ApplyPulse()
 		? SkillDefinition->AttackCoefficient
 		: DefaultShortCircuitAttackCoefficient;
 	const float AttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : FallbackAttackCoefficient;
-	const ELSBreakPowerTier BreakPower = bHasRow ? ToBreakPowerTier(Row.Skill_Impact, SkillDefinition->BreakPower) : SkillDefinition->BreakPower;
+	const ELSBreakPowerTier BreakPower = bHasRow ? ToShortCircuitBreakPowerTier(Row.Skill_Impact, SkillDefinition->BreakPower) : SkillDefinition->BreakPower;
 	const float Radius = AreaComponent ? AreaComponent->GetScaledSphereRadius() : 350.0f;
 	if (!bHasRow || Row.Skill_Multiplier <= 0.0f || SkillDefinition->AttackCoefficient <= 0.0f)
 	{
