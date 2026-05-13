@@ -472,23 +472,23 @@ bool ALSPlayerControllerBase::TransferSessionSlotToLootDropSlotInternal(ALSLootB
 	return SourceLootBox->TransferSessionSlotToLootSlot(LootSlotIndex, GetRaidInventoryComponent(), FromSlotArea, FromSlotIndex, OutLootItem);
 }
 
-bool ALSPlayerControllerBase::DropSessionSlotToWorld(const ELSInventorySlotArea SlotArea, const int32 SlotIndex)
+bool ALSPlayerControllerBase::DropSessionSlotToWorld(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass)
 {
 	if (HasAuthority())
 	{
-		return DropSessionSlotToWorldInternal(SlotArea, SlotIndex);
+		return DropSessionSlotToWorldInternal(SlotArea, SlotIndex, DroppedItemClass);
 	}
 
-	ServerDropSessionSlotToWorld(SlotArea, SlotIndex);
+	ServerDropSessionSlotToWorld(SlotArea, SlotIndex, DroppedItemClass);
 	return true;
 }
 
-void ALSPlayerControllerBase::ServerDropSessionSlotToWorld_Implementation(const ELSInventorySlotArea SlotArea, const int32 SlotIndex)
+void ALSPlayerControllerBase::ServerDropSessionSlotToWorld_Implementation(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass)
 {
-	DropSessionSlotToWorldInternal(SlotArea, SlotIndex);
+	DropSessionSlotToWorldInternal(SlotArea, SlotIndex, DroppedItemClass);
 }
 
-bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventorySlotArea SlotArea, const int32 SlotIndex)
+bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass)
 {
 	if (!HasAuthority())
 	{
@@ -537,8 +537,15 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 		return false;
 	}
 
+	TSubclassOf<ALSWorldDroppedItem> ClassToSpawn = DroppedItemClass;
+	if (!ClassToSpawn)
+	{
+		ClassToSpawn = ALSWorldDroppedItem::StaticClass();
+		UE_LOG(LogLS, Warning, TEXT("DroppedItemClass is not set. Spawning native ALSWorldDroppedItem; interact hint widget class may be missing."));
+	}
+
 	ALSWorldDroppedItem* DroppedItem = World->SpawnActorDeferred<ALSWorldDroppedItem>(
-		ALSWorldDroppedItem::StaticClass(),
+		ClassToSpawn,
 		SpawnTransform,
 		nullptr,
 		GetPawn(),

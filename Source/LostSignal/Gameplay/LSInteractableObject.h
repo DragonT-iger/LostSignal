@@ -40,6 +40,8 @@ protected:
 
 private:
 	TWeakObjectPtr<APawn> FocusedLocalPawn;
+	bool bLoggedMissingInteractWidget = false;
+	bool bLoggedInvalidInteractWidget = false;
 
 	UFUNCTION()
 	void OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,

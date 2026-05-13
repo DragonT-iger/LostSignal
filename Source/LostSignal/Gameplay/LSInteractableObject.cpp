@@ -6,6 +6,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "LostSignal.h"
 #include "UI/LSInteractHintWidget.h"
 
 ALSInteractableObject::ALSInteractableObject()
@@ -34,6 +35,7 @@ void ALSInteractableObject::BeginPlay()
 	Super::BeginPlay();
 	InteractionSphere->OnComponentBeginOverlap.AddDynamic(this, &ALSInteractableObject::OnSphereBeginOverlap);
 	InteractionSphere->OnComponentEndOverlap.AddDynamic(this, &ALSInteractableObject::OnSphereEndOverlap);
+	RefreshWidgetVisibility();
 }
 
 void ALSInteractableObject::Tick(float DeltaSeconds)
@@ -62,6 +64,11 @@ void ALSInteractableObject::RefreshWidgetVisibility()
 	if (!Pawn)
 	{
 		Pawn = FindOverlappingLocalPawn();
+		if (Pawn)
+		{
+			FocusedLocalPawn = Pawn;
+			UpdateHintWidget(Pawn);
+		}
 	}
 
 	ALSPlayerCharacter* LSChar = Cast<ALSPlayerCharacter>(Pawn);
@@ -122,6 +129,16 @@ APawn* ALSInteractableObject::FindOverlappingLocalPawn() const
 
 void ALSInteractableObject::UpdateHintWidget(APawn* Pawn)
 {
+	if (!InteractWidget)
+	{
+		if (!bLoggedMissingInteractWidget)
+		{
+			UE_LOG(LogLS, Warning, TEXT("InteractWidget is not bound on %s."), *GetNameSafe(this));
+			bLoggedMissingInteractWidget = true;
+		}
+		return;
+	}
+
 	FText KeyName = FText::FromString(TEXT("?"));
 
 	ALSPlayerCharacter* LSChar = Cast<ALSPlayerCharacter>(Pawn);
@@ -144,5 +161,14 @@ void ALSInteractableObject::UpdateHintWidget(APawn* Pawn)
 	if (ULSInteractHintWidget* HintWidget = Cast<ULSInteractHintWidget>(InteractWidget->GetWidget()))
 	{
 		HintWidget->UpdateHintInfo(GetInteractText_Implementation(), KeyName);
+		return;
+	}
+
+	if (!bLoggedInvalidInteractWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("InteractWidget on %s does not contain ULSInteractHintWidget. WidgetClass=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(InteractWidget->GetWidgetClass()));
+		bLoggedInvalidInteractWidget = true;
 	}
 }

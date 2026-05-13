@@ -5,6 +5,7 @@
 #include "Components/Button.h"
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Gameplay/LSWorldDroppedItem.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "Layout/WidgetPath.h"
 #include "Session/LSSaveSubsystem.h"
@@ -427,9 +428,15 @@ bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOper
 		return false;
 	}
 
+	if (!DroppedItemActorClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("DroppedItemActorClass is not set on %s. Dropped item will use native class and may not show interact hint UI."), *GetNameSafe(this));
+	}
+
 	const bool bDropped = PlayerController->DropSessionSlotToWorld(
 		DragOperation.SourceSlotArea,
-		DragOperation.SourceSlotIndex);
+		DragOperation.SourceSlotIndex,
+		DroppedItemActorClass);
 
 	if (bDropped)
 	{

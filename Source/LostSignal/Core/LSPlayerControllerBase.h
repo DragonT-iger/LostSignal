@@ -9,6 +9,7 @@
 #include "LSPlayerControllerBase.generated.h"
 
 class ALSLootBox;
+class ALSWorldDroppedItem;
 class UInputMappingContext;
 class ULSRaidInventoryComponent;
 class ULSHpDebugWidget;
@@ -48,7 +49,7 @@ public:
 	bool TransferLootDropSlotToSession(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FName ItemRowName, int32 Amount, FLSSessionItem& OutLootItem);
 	bool TransferLootDropSlotToSessionSlot(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
 	bool TransferSessionSlotToLootDropSlot(ALSLootBox* SourceLootBox, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, int32 LootSlotIndex, const FLSDropResult& CurrentLootItem, FLSSessionItem& OutLootItem);
-	bool DropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex);
+	bool DropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass);
 
 protected:
 	UPROPERTY(EditAnywhere, Category="LS/Input")
@@ -78,7 +79,7 @@ protected:
 
 private:
 	UFUNCTION(Server, Reliable)
-	void ServerDropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex);
+	void ServerDropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass);
 
 	UFUNCTION(Server, Reliable)
 	void ServerTransferLootDropSlotToSession(ALSLootBox* SourceLootBox, int32 LootSlotIndex);
@@ -108,7 +109,7 @@ private:
 	void HideLootDropWidgetLocal();
 	void InitializeRaidInventoryFromSessionSubsystem();
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);
-	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex);
+	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass);
 	bool ResolveServerDroppedItemTransform(FTransform& OutDropTransform) const;
 	bool TransferLootDropSlotToSessionInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FLSSessionItem& OutLootItem);
 	bool TransferLootDropSlotToSessionSlotInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
