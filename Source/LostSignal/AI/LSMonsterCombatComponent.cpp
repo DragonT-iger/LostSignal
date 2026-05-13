@@ -52,6 +52,54 @@ bool ULSMonsterCombatComponent::RequestAbilityByTag(FGameplayTag AbilityTag) con
 	return ASC->TryActivateAbilitiesByTag(AbilityTags);
 }
 
+void ULSMonsterCombatComponent::CancelAbilityByTag(FGameplayTag AbilityTag) const
+{
+	if (!AbilityTag.IsValid())
+	{
+		return;
+	}
+
+	const ALSCharacterBase* Character = Cast<ALSCharacterBase>(GetOwner());
+	UAbilitySystemComponent* ASC = Character ? Character->GetAbilitySystemComponent() : nullptr;
+	if (!ASC)
+	{
+		return;
+	}
+
+	FGameplayTagContainer AbilityTags;
+	AbilityTags.AddTag(AbilityTag);
+	ASC->CancelAbilities(&AbilityTags);
+}
+
+bool ULSMonsterCombatComponent::IsAbilityActiveByTag(FGameplayTag AbilityTag) const
+{
+	if (!AbilityTag.IsValid())
+	{
+		return false;
+	}
+
+	const ALSCharacterBase* Character = Cast<ALSCharacterBase>(GetOwner());
+	UAbilitySystemComponent* ASC = Character ? Character->GetAbilitySystemComponent() : nullptr;
+	if (!ASC)
+	{
+		return false;
+	}
+
+	TArray<FGameplayAbilitySpec*> MatchingSpecs;
+	FGameplayTagContainer AbilityTags;
+	AbilityTags.AddTag(AbilityTag);
+	ASC->GetActivatableGameplayAbilitySpecsByAllMatchingTags(AbilityTags, MatchingSpecs, false);
+	for (const FGameplayAbilitySpec* Spec : MatchingSpecs)
+	{
+		if (Spec && Spec->IsActive())
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void ULSMonsterCombatComponent::PerformMeleeHit()
 {
 	ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner());

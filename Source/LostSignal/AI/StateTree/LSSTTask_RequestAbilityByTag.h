@@ -25,6 +25,18 @@ struct FLSSTTask_RequestAbilityByTagInstanceData
 
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bFallbackToDefaultAttackTag = true;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	TObjectPtr<AActor> TargetActor = nullptr;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI", meta=(ClampMin="0.0"))
+	float CancelIfTargetFartherThan = 180.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	bool bCancelAbilityWhenTargetLeavesRange = true;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI")
+	FGameplayTag ActiveAbilityTag;
 };
 
 /** StateTree task that triggers a monster ability by gameplay tag. */
@@ -39,4 +51,5 @@ struct LOSTSIGNAL_API FLSSTTask_RequestAbilityByTag : public FStateTreeAIActionT
 
 	virtual const UStruct* GetInstanceDataType() const override { return FInstanceDataType::StaticStruct(); }
 	virtual EStateTreeRunStatus EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const override;
+	virtual EStateTreeRunStatus Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const override;
 };

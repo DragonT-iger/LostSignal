@@ -3,7 +3,9 @@
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "Engine/EngineTypes.h"
+#include "GameFramework/Controller.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/Effects/LSGE_PlayerBasicDamage.h"
 #include "GAS/LSGameplayTags.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -153,6 +155,16 @@ void ULSGA_Override::ActivateAbility(
 		}
 
 		KnockbackDirection = KnockbackDirection.GetSafeNormal2D();
+		if (AController* TargetController = TargetCharacter->GetController())
+		{
+			TargetController->StopMovement();
+		}
+
+		if (UCharacterMovementComponent* MovementComponent = TargetCharacter->GetCharacterMovement())
+		{
+			MovementComponent->StopMovementImmediately();
+		}
+
 		TargetCharacter->LaunchCharacter(
 			(KnockbackDirection * KnockbackSpeed) + FVector(0.0f, 0.0f, KnockbackUpSpeed),
 			true,

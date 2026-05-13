@@ -36,6 +36,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	bool RequestAbilityByTag(FGameplayTag AbilityTag) const;
 
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void CancelAbilityByTag(FGameplayTag AbilityTag) const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Combat")
+	bool IsAbilityActiveByTag(FGameplayTag AbilityTag) const;
+
 	/** Called from an authored attack notify to apply the real melee hit on that frame. */
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void PerformMeleeHit();
