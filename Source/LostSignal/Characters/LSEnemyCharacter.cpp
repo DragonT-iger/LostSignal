@@ -18,6 +18,7 @@
 namespace
 {
 	int32 GNextMonsterHpDebugWidgetStackIndex = 0;
+	TWeakObjectPtr<UWorld> GMonsterHpDebugWidgetWorld;
 }
 
 ALSEnemyCharacter::ALSEnemyCharacter()
@@ -150,6 +151,12 @@ void ALSEnemyCharacter::TryCreateDebugHpWidget()
 	if (!World)
 	{
 		return;
+	}
+
+	if (GMonsterHpDebugWidgetWorld.Get() != World)
+	{
+		GMonsterHpDebugWidgetWorld = World;
+		GNextMonsterHpDebugWidgetStackIndex = 0;
 	}
 
 	ALSPlayerControllerBase* LocalPlayerController = nullptr;
