@@ -51,8 +51,23 @@ void ALSWorldDroppedItem::Interact_Implementation(APawn* Interactor)
 	{
 		if (ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>())
 		{
-			SessionSubsystem->AddSessionItem(ItemRowName, Amount);
-			Destroy();
+			FLSSessionItem RemainingItem;
+			if (!SessionSubsystem->TryAddSessionItem(ItemRowName, Amount, RemainingItem))
+			{
+				return;
+			}
+
+			if (RemainingItem.ItemRowName.IsNone() || RemainingItem.Amount <= 0)
+			{
+				Destroy();
+			}
+			else
+			{
+				ItemRowName = RemainingItem.ItemRowName;
+				Amount = RemainingItem.Amount;
+				RefreshItemVisual();
+				ForceNetUpdate();
+			}
 		}
 		else
 		{

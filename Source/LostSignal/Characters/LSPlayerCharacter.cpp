@@ -140,6 +140,7 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	if (Item5Action) { EnhancedInput->BindAction(Item5Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem5); }
 	if (Item6Action) { EnhancedInput->BindAction(Item6Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem6); }
 	if (InteractAction) { EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnInteract); }
+	if (LootTransferAction) { EnhancedInput->BindAction(LootTransferAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnLootTransfer); }
 }
 
 void ALSPlayerCharacter::OnAttack()
@@ -220,19 +221,6 @@ void ALSPlayerCharacter::OnInteract()
 
 	if (IsInventoryWidgetOpen())
 	{
-		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetController()))
-		{
-			if (PlayerController->TransferHoveredLootDropItemToInventory())
-			{
-				if (ULSInventoryWidget* LSInventoryWidget = Cast<ULSInventoryWidget>(InventoryWidget))
-				{
-					LSInventoryWidget->RebuildInventorySlots();
-					LSInventoryWidget->RebuildConfirmedStorageSlots();
-				}
-				return;
-			}
-		}
-
 		HideInventoryWidget();
 		return;
 	}
@@ -291,6 +279,31 @@ void ALSPlayerCharacter::OnInteract()
 		{
 			ShowInventoryWidgetForTarget(BestTarget);
 		}
+	}
+}
+
+void ALSPlayerCharacter::OnLootTransfer()
+{
+	if (!IsLocallyControlled() || !IsInventoryWidgetOpen())
+	{
+		return;
+	}
+
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetController());
+	if (!PlayerController || !PlayerController->TransferHoveredLootDropItemToInventory())
+	{
+		return;
+	}
+
+	RebuildInventoryWidgetSlots();
+}
+
+void ALSPlayerCharacter::RebuildInventoryWidgetSlots()
+{
+	if (ULSInventoryWidget* LSInventoryWidget = Cast<ULSInventoryWidget>(InventoryWidget))
+	{
+		LSInventoryWidget->RebuildInventorySlots();
+		LSInventoryWidget->RebuildConfirmedStorageSlots();
 	}
 }
 

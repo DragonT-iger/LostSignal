@@ -76,8 +76,21 @@ bool ALSLootBox::TransferLootSlotToSession(const int32 LootSlotIndex, ULSSession
 		return false;
 	}
 
-	SessionSubsystem->AddSessionItem(LootResults[LootSlotIndex].ItemRowName, LootResults[LootSlotIndex].Amount);
-	ClearLootSlot(LootSlotIndex);
+	if (!SessionSubsystem->TryAddSessionItem(LootResults[LootSlotIndex].ItemRowName, LootResults[LootSlotIndex].Amount, OutRemainingLootItem))
+	{
+		return false;
+	}
+
+	if (OutRemainingLootItem.ItemRowName.IsNone() || OutRemainingLootItem.Amount <= 0)
+	{
+		ClearLootSlot(LootSlotIndex);
+	}
+	else
+	{
+		LootResults[LootSlotIndex].ItemRowName = OutRemainingLootItem.ItemRowName;
+		LootResults[LootSlotIndex].Amount = OutRemainingLootItem.Amount;
+		LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
+	}
 	return true;
 }
 

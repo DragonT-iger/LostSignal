@@ -1,6 +1,7 @@
 #include "UI/Inventory/LSItemSlotWidget.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Characters/LSPlayerCharacter.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Data/LSArmorRow.h"
@@ -132,6 +133,22 @@ void ULSItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 
 FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+	if (LootDropWidget.IsValid() && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
+	{
+		if (ULSLootDropWidget* OwningLootDropWidget = LootDropWidget.Get())
+		{
+			if (OwningLootDropWidget->TransferLootSlotToInventory(SlotIndex))
+			{
+				if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
+				{
+					PlayerCharacter->RebuildInventoryWidgetSlots();
+				}
+			}
+		}
+
+		return FReply::Handled();
+	}
+
 	if (!CanStartItemDrag())
 	{
 		return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);

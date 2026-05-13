@@ -112,6 +112,7 @@ void ULSInventoryWidget::RebuildInventorySlots()
 	}
 
 	TArray<FLSSessionItem> InventoryItems;
+	int32 SlotCountToBuild = InventorySlotCount;
 	if (UGameInstance* GameInstance = GetGameInstance())
 	{
 		if (ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>())
@@ -119,10 +120,12 @@ void ULSInventoryWidget::RebuildInventorySlots()
 			if (SessionSubsystem->IsRaidActive())
 			{
 				AppendSlotItems(InventoryItems, SessionSubsystem->GetSessionInventory());
+				SlotCountToBuild = SessionSubsystem->GetMaxInventorySlotCount();
 			}
 			else if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
 				AppendSlotItems(InventoryItems, SaveSubsystem->GetStash());
+				SlotCountToBuild = FMath::Max(InventorySlotCount, InventoryItems.Num());
 			}
 			else
 			{
@@ -135,6 +138,7 @@ void ULSInventoryWidget::RebuildInventorySlots()
 			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
 				AppendSlotItems(InventoryItems, SaveSubsystem->GetStash());
+				SlotCountToBuild = FMath::Max(InventorySlotCount, InventoryItems.Num());
 			}
 		}
 
@@ -145,7 +149,6 @@ void ULSInventoryWidget::RebuildInventorySlots()
 		UE_LOG(LogLS, Warning, TEXT("GameInstance is missing on %s."), *GetNameSafe(this));
 	}
 
-	const int32 SlotCountToBuild = FMath::Max(InventorySlotCount, InventoryItems.Num());
 	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
 	{
 		ULSItemSlotWidget* SlotWidget = OwningPlayer

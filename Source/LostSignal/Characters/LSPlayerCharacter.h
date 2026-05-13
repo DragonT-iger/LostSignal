@@ -33,6 +33,7 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	void ApplyFacingRotation(const FRotator& NewRotation);
+	void RebuildInventoryWidgetSlots();
 
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	ULSAimComponent* GetAimComponent() const { return AimComponent; }
@@ -133,6 +134,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Input")
 	TObjectPtr<UInputAction> InteractAction;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Input")
+	TObjectPtr<UInputAction> LootTransferAction;
+
 	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TObjectPtr<UInputAction> RunAction;
 
@@ -220,6 +224,7 @@ private:
 	void OnItem5();
 	void OnItem6();
 	void OnInteract();
+	void OnLootTransfer();
 	void ShowInventoryWidgetForTarget(AActor* Target);
 	void HideInventoryWidget();
 	void UpdateInventoryWidgetDistance();

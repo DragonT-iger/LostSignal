@@ -243,8 +243,7 @@ bool ALSPlayerControllerBase::TransferExternalLootItemToSession(const FName Item
 		return false;
 	}
 
-	SessionSubsystem->AddSessionItem(ItemRowName, Amount);
-	return true;
+	return SessionSubsystem->TryAddSessionItem(ItemRowName, Amount, OutLootItem);
 }
 
 bool ALSPlayerControllerBase::TransferExternalLootItemToSessionSlot(const FName ItemRowName, const int32 Amount, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutLootItem)

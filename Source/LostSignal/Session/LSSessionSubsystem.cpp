@@ -12,6 +12,8 @@
 
 namespace
 {
+constexpr int32 DefaultMaxInventorySlotCount = 10;
+
 bool IsFilledSessionSlot(const FLSSessionItem& Item)
 {
 	return !Item.ItemRowName.IsNone() && Item.Amount > 0;
@@ -127,6 +129,79 @@ void AddItemsToSlotArraySession(TArray<FLSSessionItem>& Slots, const FName ItemR
 		Slots.Add(NewSlot);
 		Amount -= NewSlot.Amount;
 	}
+}
+
+bool TryAddItemsToSlotArraySession(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount, const int32 MaxSlotCount, FLSSessionItem& OutRemainingItem)
+{
+	OutRemainingItem = FLSSessionItem();
+	if (ItemRowName.IsNone() || Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot add invalid session item. Row=%s Amount=%d"), *ItemRowName.ToString(), Amount);
+		return false;
+	}
+
+	if (MaxSlotCount <= 0)
+	{
+		OutRemainingItem.ItemRowName = ItemRowName;
+		OutRemainingItem.Amount = Amount;
+		return false;
+	}
+
+	const int32 OriginalAmount = Amount;
+	const int32 MaxStack = ResolveItemMaxStackForSession(ItemRowName);
+	const int32 ExistingSlotLimit = FMath::Min(Slots.Num(), MaxSlotCount);
+	for (int32 SlotIndex = 0; SlotIndex < ExistingSlotLimit; ++SlotIndex)
+	{
+		FLSSessionItem& Slot = Slots[SlotIndex];
+		if (Amount <= 0)
+		{
+			break;
+		}
+
+		if (Slot.ItemRowName != ItemRowName || Slot.Amount >= MaxStack)
+		{
+			continue;
+		}
+
+		const int32 AddAmount = FMath::Min(Amount, MaxStack - Slot.Amount);
+		Slot.Amount += AddAmount;
+		Amount -= AddAmount;
+	}
+
+	for (int32 SlotIndex = 0; SlotIndex < ExistingSlotLimit; ++SlotIndex)
+	{
+		FLSSessionItem& Slot = Slots[SlotIndex];
+		if (Amount <= 0)
+		{
+			break;
+		}
+
+		if (IsFilledSessionSlot(Slot))
+		{
+			continue;
+		}
+
+		Slot.ItemRowName = ItemRowName;
+		Slot.Amount = FMath::Min(Amount, MaxStack);
+		Amount -= Slot.Amount;
+	}
+
+	while (Amount > 0 && Slots.Num() < MaxSlotCount)
+	{
+		FLSSessionItem NewSlot;
+		NewSlot.ItemRowName = ItemRowName;
+		NewSlot.Amount = FMath::Min(Amount, MaxStack);
+		Slots.Add(NewSlot);
+		Amount -= NewSlot.Amount;
+	}
+
+	if (Amount > 0)
+	{
+		OutRemainingItem.ItemRowName = ItemRowName;
+		OutRemainingItem.Amount = Amount;
+	}
+
+	return Amount < OriginalAmount;
 }
 
 int32 FindRowOrderSession(UDataTable* Table, const FName RowName)
@@ -350,7 +425,13 @@ void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
 
 void ULSSessionSubsystem::AddSessionItem(FName ItemRowName, int32 Amount)
 {
-	AddItemsToSlotArraySession(SessionInventory, ItemRowName, Amount);
+	FLSSessionItem IgnoredRemainingItem;
+	TryAddSessionItem(ItemRowName, Amount, IgnoredRemainingItem);
+}
+
+bool ULSSessionSubsystem::TryAddSessionItem(FName ItemRowName, int32 Amount, FLSSessionItem& OutRemainingItem)
+{
+	return TryAddItemsToSlotArraySession(SessionInventory, ItemRowName, Amount, GetMaxInventorySlotCount(), OutRemainingItem);
 }
 
 void ULSSessionSubsystem::SortSessionInventory()
@@ -487,6 +568,11 @@ bool ULSSessionSubsystem::DropExternalItemToSessionSlot(FLSSessionItem& InOutExt
 		return false;
 	}
 
+	if (ToArea == ELSInventorySlotArea::Inventory && ToIndex >= GetMaxInventorySlotCount())
+	{
+		return false;
+	}
+
 	EnsureSlotIndex(*ToSlots, ToIndex);
 	FLSSessionItem& ToSlot = (*ToSlots)[ToIndex];
 
@@ -543,6 +629,11 @@ bool ULSSessionSubsystem::ClearSessionSlot(const ELSInventorySlotArea SlotArea, 
 
 	Slots[SlotIndex] = MakeEmptySessionSlot();
 	return true;
+}
+
+int32 ULSSessionSubsystem::GetMaxInventorySlotCount() const
+{
+	return DefaultMaxInventorySlotCount;
 }
 
 void ULSSessionSubsystem::ConsumeItem(FName ItemRowName, int32 Amount)

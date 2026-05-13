@@ -60,6 +60,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void AddSessionItem(FName ItemRowName, int32 Amount);
 
+	bool TryAddSessionItem(FName ItemRowName, int32 Amount, FLSSessionItem& OutRemainingItem);
+
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void SortSessionInventory();
 
@@ -91,6 +93,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/Session")
 	bool IsRaidActive() const { return bRaidActive; }
+
+	UFUNCTION(BlueprintPure, Category="LS/Session")
+	int32 GetMaxInventorySlotCount() const;
 
 	// 결과 레벨에서 최종 확정된 아이템 목록 조회 (EndRaid 이후 유효)
 	UFUNCTION(BlueprintPure, Category="LS/Session")
