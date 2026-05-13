@@ -35,6 +35,9 @@ public:
 	void ApplyFacingRotation(const FRotator& NewRotation);
 	void RebuildInventoryWidgetSlots();
 
+	UFUNCTION(BlueprintPure, Category="LS/UI")
+	bool IsInventoryWidgetOpen() const;
+
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	ULSAimComponent* GetAimComponent() const { return AimComponent; }
 
@@ -228,7 +231,6 @@ private:
 	void ShowInventoryWidgetForTarget(AActor* Target);
 	void HideInventoryWidget();
 	void UpdateInventoryWidgetDistance();
-	bool IsInventoryWidgetOpen() const;
 
 	void BeginSkillPreview(ELSPlayerSkillSlot Slot);
 	void UpdateActiveSkillPreview();

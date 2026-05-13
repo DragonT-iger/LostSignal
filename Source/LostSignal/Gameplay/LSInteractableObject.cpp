@@ -64,8 +64,11 @@ void ALSInteractableObject::RefreshWidgetVisibility()
 		Pawn = FindOverlappingLocalPawn();
 	}
 
+	const ALSPlayerCharacter* LSChar = Cast<ALSPlayerCharacter>(Pawn);
+	const bool bInventoryWidgetOpen = LSChar && LSChar->IsInventoryWidgetOpen();
 	const bool bShouldShow =
 		Pawn &&
+		!bInventoryWidgetOpen &&
 		CanInteract_Implementation(Pawn) &&
 		IsInsideMouseAimCone(Pawn);
 
