@@ -115,7 +115,7 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 	AActor* TargetActor,
 	TSubclassOf<UGameplayEffect> DamageEffectClass,
 	float EffectLevel,
-	float BaseDamage,
+	float FixedDamage,
 	float AttackCoefficient,
 	bool bCanCrit,
 	ELSBreakPowerTier BreakPowerTier) const
@@ -154,7 +154,7 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 		return false;
 	}
 
-	SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_Base, BaseDamage);
+	SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_Fixed, FixedDamage);
 	SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_AttackCoefficient, AttackCoefficient);
 	SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_CanCrit, bCanCrit ? 1.0f : 0.0f);
 
@@ -165,12 +165,12 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 	UE_LOG(
 		LogLS,
 		Log,
-		TEXT("DamageApply %s -> %s | GE=%s Level=%.1f Base=%.2f Coef=%.2f CanCrit=%d BreakPower=%d TargetTenacity=%d CCBlocked=%d | HP %.1f -> %.1f (Delta %.1f)"),
+		TEXT("DamageApply %s -> %s | GE=%s Level=%.1f Fixed=%.2f Coef=%.2f CanCrit=%d BreakPower=%d TargetTenacity=%d CCBlocked=%d | HP %.1f -> %.1f (Delta %.1f)"),
 		*GetNameSafe(GetOwner()),
 		*GetNameSafe(TargetActor),
 		*GetNameSafe(DamageEffectClass),
 		EffectLevel,
-		BaseDamage,
+		FixedDamage,
 		AttackCoefficient,
 		bCanCrit ? 1 : 0,
 		static_cast<int32>(BreakPowerTier),

@@ -17,6 +17,7 @@ struct FLSDamageCaptureStatics
 	DECLARE_ATTRIBUTE_CAPTUREDEF(CritDamage)
 	DECLARE_ATTRIBUTE_CAPTUREDEF(ArmorPenetration)
 	DECLARE_ATTRIBUTE_CAPTUREDEF(Defence)
+	DECLARE_ATTRIBUTE_CAPTUREDEF(DamageReduction)
 
 	FLSDamageCaptureStatics()
 	{
@@ -26,6 +27,7 @@ struct FLSDamageCaptureStatics
 		DEFINE_ATTRIBUTE_CAPTUREDEF(ULSCharacterAttributeSet, CritDamage, Source, false)
 		DEFINE_ATTRIBUTE_CAPTUREDEF(ULSCharacterAttributeSet, ArmorPenetration, Source, false)
 		DEFINE_ATTRIBUTE_CAPTUREDEF(ULSCharacterAttributeSet, Defence, Target, false)
+		DEFINE_ATTRIBUTE_CAPTUREDEF(ULSCharacterAttributeSet, DamageReduction, Target, false)
 	}
 };
 
@@ -44,6 +46,7 @@ ULSDamageExecutionCalculation::ULSDamageExecutionCalculation()
 	RelevantAttributesToCapture.Add(DamageCaptureStatics().CritDamageDef);
 	RelevantAttributesToCapture.Add(DamageCaptureStatics().ArmorPenetrationDef);
 	RelevantAttributesToCapture.Add(DamageCaptureStatics().DefenceDef);
+	RelevantAttributesToCapture.Add(DamageCaptureStatics().DamageReductionDef);
 }
 
 void ULSDamageExecutionCalculation::Execute_Implementation(
@@ -61,9 +64,9 @@ void ULSDamageExecutionCalculation::Execute_Implementation(
 	float Attack = 0.0f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(Statics.AttackDef, EvaluateParameters, Attack);
 
-	float AttackPowerMultiplier = 1.0f;
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(Statics.AttackPowerMultiplierDef, EvaluateParameters, AttackPowerMultiplier);
-	AttackPowerMultiplier = FMath::Max(0.0f, AttackPowerMultiplier);
+	float DamageMultiplier = 1.0f;
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(Statics.AttackPowerMultiplierDef, EvaluateParameters, DamageMultiplier);
+	DamageMultiplier = FMath::Max(0.0f, DamageMultiplier);
 
 	float CritChance = 0.0f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(Statics.CritChanceDef, EvaluateParameters, CritChance);
@@ -77,14 +80,19 @@ void ULSDamageExecutionCalculation::Execute_Implementation(
 	float Defence = 0.0f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(Statics.DefenceDef, EvaluateParameters, Defence);
 
-	const float BaseDamage = Spec.GetSetByCallerMagnitude(LSGameplayTags::Data_Damage_Base, false, 0.0f);
+	float DamageReduction = 0.0f;
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(Statics.DamageReductionDef, EvaluateParameters, DamageReduction);
+
+	const float FixedDamage = Spec.GetSetByCallerMagnitude(LSGameplayTags::Data_Damage_Fixed, false, 0.0f);
 	const float AttackCoefficient = Spec.GetSetByCallerMagnitude(LSGameplayTags::Data_Damage_AttackCoefficient, false, 0.0f);
 	const bool bCanCrit = Spec.GetSetByCallerMagnitude(LSGameplayTags::Data_Damage_CanCrit, false, 0.0f) > 0.0f;
 
-	const float EffectiveAttack = FMath::Max(0.0f, Attack) * AttackPowerMultiplier;
-	const float RawDamage = FMath::Max(0.0f, BaseDamage + (EffectiveAttack * AttackCoefficient));
-	const float EffectiveDefence = FMath::Max(0.0f, Defence - ArmorPenetration);
-	float FinalDamage = RawDamage * (100.0f / (100.0f + EffectiveDefence));
+	const float EffectiveAttack = FMath::Max(0.0f, Attack);
+	const float ConvertedAttack = FMath::Max(0.0f, ((EffectiveAttack * AttackCoefficient) + FixedDamage) * DamageMultiplier);
+	const float ClampedArmorPenetration = FMath::Clamp(ArmorPenetration, 0.0f, 1.0f);
+	const float ClampedDamageReduction = FMath::Clamp(DamageReduction, 0.0f, 1.0f);
+	const float PenetratedDefence = FMath::Max(0.0f, Defence) * (1.0f - ClampedArmorPenetration);
+	float FinalDamage = ConvertedAttack * (100.0f / (PenetratedDefence + 100.0f)) * (1.0f - ClampedDamageReduction);
 	const float DamageBeforeCrit = FinalDamage;
 
 	const float ClampedCritChance = FMath::Clamp(CritChance, 0.0f, 1.0f);
@@ -96,7 +104,7 @@ void ULSDamageExecutionCalculation::Execute_Implementation(
 		FinalDamage *= AppliedCritDamage;
 	}
 
-	FinalDamage = FMath::Max(0.0f, FinalDamage);
+	FinalDamage = FMath::Max(0.0f, FinalDamage) + 1.0f;
 	const UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
 	const UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
 	const AActor* SourceActor = SourceASC ? SourceASC->GetAvatarActor() : nullptr;
@@ -105,15 +113,16 @@ void ULSDamageExecutionCalculation::Execute_Implementation(
 	UE_LOG(
 		LogLS,
 		Log,
-		TEXT("DamageCalc %s -> %s | FinalDamage = max(0, (BaseDamage %.2f + Attack %.2f * AttackPowerMultiplier %.3f * Coef %.2f) * (100 / (100 + max(0, Defence %.2f - ArmorPen %.2f)))%s) = %.2f | CritRoll %.3f / CritChance %.3f"),
+		TEXT("DamageCalc %s -> %s | FinalDamage = max(0, ((((Attack %.2f * Coef %.2f) + Fixed %.2f) * DamageMultiplier %.3f) * (100 / ((Defence %.2f * (1 - ArmorPen %.3f)) + 100)) * (1 - DamageReduction %.3f))%s) + 1 = %.2f | CritRoll %.3f / CritChance %.3f"),
 		*GetNameSafe(SourceActor),
 		*GetNameSafe(TargetActor),
-		BaseDamage,
 		Attack,
-		AttackPowerMultiplier,
 		AttackCoefficient,
+		FixedDamage,
+		DamageMultiplier,
 		Defence,
-		ArmorPenetration,
+		ClampedArmorPenetration,
+		ClampedDamageReduction,
 		*(bCriticalHit ? FString::Printf(TEXT(" * CritDamage %.2f"), AppliedCritDamage) : FString()),
 		FinalDamage,
 		CritRoll,

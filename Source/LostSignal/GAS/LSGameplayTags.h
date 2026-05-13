@@ -30,7 +30,7 @@ namespace LSGameplayTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buff_CombatAcceleration)
 
 	// SetByCaller damage data
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_Base)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_Fixed)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_AttackCoefficient)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_CanCrit)
 

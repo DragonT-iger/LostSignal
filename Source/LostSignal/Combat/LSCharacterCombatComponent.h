@@ -52,7 +52,7 @@ public:
 		AActor* TargetActor,
 		TSubclassOf<UGameplayEffect> DamageEffectClass,
 		float EffectLevel = 1.0f,
-		float BaseDamage = 0.0f,
+		float FixedDamage = 0.0f,
 		float AttackCoefficient = 0.0f,
 		bool bCanCrit = false,
 		ELSBreakPowerTier BreakPowerTier = ELSBreakPowerTier::NormalAttack) const;

@@ -124,7 +124,7 @@ void ULSMonsterCombatComponent::PerformMeleeHit()
 			HitActor,
 			DamageEffectClass,
 			DamageEffectLevel,
-			MeleeBaseDamage,
+			MeleeFixedDamage,
 			MeleeAttackCoefficient,
 			bMeleeCanCrit,
 			MeleeBreakPower))

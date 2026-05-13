@@ -9,7 +9,7 @@ ULSShortCircuitSkill::ULSShortCircuitSkill()
 {
 	ProjectileClass = ALSShortCircuitProjectile::StaticClass();
 	FieldClass = ALSShortCircuitField::StaticClass();
-	AttackCoefficient = 0.0f;
+	AttackCoefficient = 1.5f;
 }
 
 bool ULSShortCircuitSkill::ActivateSkill_Implementation(const FLSSkillActivationContext& Context)

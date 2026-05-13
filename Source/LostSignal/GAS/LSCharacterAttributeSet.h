@@ -53,6 +53,10 @@ public:
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Defence)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
+	FGameplayAttributeData DamageReduction = 0.0f;
+	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DamageReduction)
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData Recovery = 0.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Recovery)
 

@@ -66,7 +66,7 @@ private:
 	float DamageEffectLevel = 1.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
-	float MeleeBaseDamage = 10.0f;
+	float MeleeFixedDamage = 10.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
 	float MeleeAttackCoefficient = 0.0f;

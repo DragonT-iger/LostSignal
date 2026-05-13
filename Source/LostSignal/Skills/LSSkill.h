@@ -46,7 +46,7 @@ public:
 	TSubclassOf<UGameplayEffect> SlowEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage", meta=(ClampMin="0.0"))
-	float BaseDamage = 0.0f;
+	float FixedDamage = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage", meta=(ClampMin="0.0"))
 	float AttackCoefficient = 0.0f;

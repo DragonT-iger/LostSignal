@@ -23,6 +23,7 @@
 #include "Vision/LSMPCVisionSourceComponent.h"
 #include "Vision/LSPlayerXRayComponent.h"
 #include "Vision/LSVisionComponent.h"
+#include "Components/CapsuleComponent.h"
 
 ALSPlayerCharacter::ALSPlayerCharacter()
 {
@@ -640,7 +641,8 @@ bool ALSPlayerCharacter::ResolveMouseWorldPoint(FVector& OutMouseWorldPoint) con
 		return false;
 	}
 
-	const float RayDistance = (GetActorLocation().Z - WorldOrigin.Z) / WorldDirection.Z;
+	const float TargetPlaneZ = GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const float RayDistance = (TargetPlaneZ - WorldOrigin.Z) / WorldDirection.Z;
 	if (RayDistance < 0.0f)
 	{
 		return false;

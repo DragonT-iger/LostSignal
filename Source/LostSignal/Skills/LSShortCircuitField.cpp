@@ -40,6 +40,7 @@ namespace
 	}
 
 	constexpr float DebugSphereMeshBaseDiameter = 100.0f;
+	constexpr float DefaultShortCircuitAttackCoefficient = 1.5f;
 }
 
 ALSShortCircuitField::ALSShortCircuitField()
@@ -240,9 +241,26 @@ void ALSShortCircuitField::ApplyPulse()
 
 	FLSCharacterSkillRow Row;
 	const bool bHasRow = SkillDefinition->TryGetSkillRow(Row);
-	const float AttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : SkillDefinition->AttackCoefficient;
+	const float FallbackAttackCoefficient = SkillDefinition->AttackCoefficient > 0.0f
+		? SkillDefinition->AttackCoefficient
+		: DefaultShortCircuitAttackCoefficient;
+	const float AttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : FallbackAttackCoefficient;
 	const ELSBreakPowerTier BreakPower = bHasRow ? ToBreakPowerTier(Row.Skill_Impact, SkillDefinition->BreakPower) : SkillDefinition->BreakPower;
 	const float Radius = AreaComponent ? AreaComponent->GetScaledSphereRadius() : 350.0f;
+	if (!bHasRow || Row.Skill_Multiplier <= 0.0f || SkillDefinition->AttackCoefficient <= 0.0f)
+	{
+		UE_LOG(
+			LogLS,
+			Log,
+			TEXT("[ShortCircuit] Pulse coefficient fallback check. Field=%s Skill=%s HasRow=%d RowMultiplier=%.2f AssetFallbackCoef=%.2f ResolvedCoef=%.2f Fixed=%.2f"),
+			*GetNameSafe(this),
+			*GetNameSafe(SkillDefinition),
+			bHasRow ? 1 : 0,
+			bHasRow ? Row.Skill_Multiplier : 0.0f,
+			SkillDefinition->AttackCoefficient,
+			AttackCoefficient,
+			SkillDefinition->FixedDamage);
+	}
 
 	if (SkillDefinition->bEnableDebugVisualization)
 	{
@@ -292,7 +310,7 @@ void ALSShortCircuitField::ApplyPulse()
 			TargetActor,
 			SkillDefinition->DamageEffectClass,
 			1.0f,
-			SkillDefinition->BaseDamage,
+			SkillDefinition->FixedDamage,
 			AttackCoefficient,
 			SkillDefinition->bCanCrit,
 			BreakPower))
@@ -303,9 +321,9 @@ void ALSShortCircuitField::ApplyPulse()
 			UE_LOG(
 				LogLS,
 				Log,
-				TEXT("[ShortCircuit] Pulse Damaged: Actor=%s | Base=%.2f Coef=%.2f BreakPower=%d | HP %.2f -> %.2f (ActualDamage %.2f)"),
+				TEXT("[ShortCircuit] Pulse Damaged: Actor=%s | Fixed=%.2f Coef=%.2f BreakPower=%d | HP %.2f -> %.2f (ActualDamage %.2f)"),
 				*GetNameSafe(TargetActor),
-				SkillDefinition->BaseDamage,
+				SkillDefinition->FixedDamage,
 				AttackCoefficient,
 				static_cast<int32>(BreakPower),
 				BeforeHealth,

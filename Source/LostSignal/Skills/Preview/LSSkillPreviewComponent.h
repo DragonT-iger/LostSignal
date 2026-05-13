@@ -5,8 +5,9 @@
 #include "Skills/LSSkillAreaTypes.h"
 #include "LSSkillPreviewComponent.generated.h"
 
-class UDecalComponent;
 class UMaterialInstanceDynamic;
+class UStaticMesh;
+class UStaticMeshComponent;
 
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
 class LOSTSIGNAL_API ULSSkillPreviewComponent : public UActorComponent
@@ -26,16 +27,16 @@ public:
 	void EndAreaPreview();
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill|Preview")
-	bool IsAreaPreviewActive() const { return ActivePreviewDecal != nullptr; }
+	bool IsAreaPreviewActive() const { return ActivePreviewMesh != nullptr; }
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill|Preview")
-	UDecalComponent* GetActivePreviewDecal() const { return ActivePreviewDecal; }
+	UStaticMeshComponent* GetActivePreviewMesh() const { return ActivePreviewMesh; }
 
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill|Preview")
-	TObjectPtr<UDecalComponent> ActivePreviewDecal;
+	TObjectPtr<UStaticMeshComponent> ActivePreviewMesh;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill|Preview")
 	TObjectPtr<UMaterialInstanceDynamic> ActivePreviewMaterial;
@@ -43,7 +44,11 @@ protected:
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill|Preview")
 	FLSSkillAreaPreviewSpec ActivePreviewSpec;
 
+	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Preview")
+	TObjectPtr<UStaticMesh> DefaultPreviewMesh;
+
 private:
-	void ApplyDecalSize();
+	void ApplyMeshScale();
 	void ApplyMaterialParameters(float WorldYaw);
+	float ResolveOwnerFootZ(float FallbackZ) const;
 };

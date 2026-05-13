@@ -22,11 +22,11 @@ public:
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxHealth, Category="LS/Stats")
-	FGameplayAttributeData MaxHealth = 100.0f;
+	FGameplayAttributeData MaxHealth = 1000.0f;
 	LS_ATTRIBUTE_ACCESSORS(ULSCombatAttributeSet, MaxHealth)
 
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CurrentHealth, Category="LS/Stats")
-	FGameplayAttributeData CurrentHealth = 100.0f;
+	FGameplayAttributeData CurrentHealth = 1000.0f;
 	LS_ATTRIBUTE_ACCESSORS(ULSCombatAttributeSet, CurrentHealth)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")

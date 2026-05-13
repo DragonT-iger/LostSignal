@@ -496,7 +496,7 @@ int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection)
 			HitActor,
 			BasicAttackDamageEffectClass,
 			DamageEffectLevel,
-			BasicAttackBaseDamage,
+			BasicAttackFixedDamage,
 			BasicAttackAttackCoefficient,
 			bBasicAttackCanCrit,
 			BasicAttackBreakPower))

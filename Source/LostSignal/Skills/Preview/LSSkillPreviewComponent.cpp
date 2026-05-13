@@ -1,14 +1,24 @@
 #include "Skills/Preview/LSSkillPreviewComponent.h"
 
-#include "Components/DecalComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Character.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "UObject/ConstructorHelpers.h"
 
 ULSSkillPreviewComponent::ULSSkillPreviewComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaneMeshFinder(TEXT("/Engine/BasicShapes/Plane.Plane"));
+	if (PlaneMeshFinder.Succeeded())
+	{
+		DefaultPreviewMesh = PlaneMeshFinder.Object;
+	}
 }
 
 bool ULSSkillPreviewComponent::BeginAreaPreview(const FLSSkillAreaPreviewSpec& PreviewSpec)
@@ -32,18 +42,27 @@ bool ULSSkillPreviewComponent::BeginAreaPreview(const FLSSkillAreaPreviewSpec& P
 
 	ActivePreviewSpec = PreviewSpec;
 
-	if (!ActivePreviewDecal)
+	if (!ActivePreviewMesh)
 	{
-		ActivePreviewDecal = NewObject<UDecalComponent>(OwnerActor);
-		if (!ActivePreviewDecal)
+		ActivePreviewMesh = NewObject<UStaticMeshComponent>(OwnerActor);
+		if (!ActivePreviewMesh)
 		{
 			return false;
 		}
 
-		ActivePreviewDecal->SetMobility(EComponentMobility::Movable);
-		ActivePreviewDecal->SetFadeScreenSize(0.0f);
-		ActivePreviewDecal->SetVisibility(true, true);
-		ActivePreviewDecal->RegisterComponent();
+		ActivePreviewMesh->SetMobility(EComponentMobility::Movable);
+		ActivePreviewMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ActivePreviewMesh->SetGenerateOverlapEvents(false);
+		ActivePreviewMesh->SetCastShadow(false);
+		ActivePreviewMesh->SetVisibility(true, true);
+		ActivePreviewMesh->RegisterComponent();
+	}
+
+	ActivePreviewMesh->SetStaticMesh(DefaultPreviewMesh);
+	if (!ActivePreviewMesh->GetStaticMesh())
+	{
+		EndAreaPreview();
+		return false;
 	}
 
 	ActivePreviewMaterial = UMaterialInstanceDynamic::Create(PreviewSpec.Material, this);
@@ -53,34 +72,35 @@ bool ULSSkillPreviewComponent::BeginAreaPreview(const FLSSkillAreaPreviewSpec& P
 		return false;
 	}
 
-	ActivePreviewDecal->SetDecalMaterial(ActivePreviewMaterial);
-	ActivePreviewDecal->SetVisibility(true, true);
-	ApplyDecalSize();
-	ApplyMaterialParameters(ActivePreviewDecal->GetComponentRotation().Yaw);
+	ActivePreviewMesh->SetMaterial(0, ActivePreviewMaterial);
+	ActivePreviewMesh->SetVisibility(true, true);
+	ApplyMeshScale();
+	ApplyMaterialParameters(ActivePreviewMesh->GetComponentRotation().Yaw);
 	return true;
 }
 
 void ULSSkillPreviewComponent::UpdateAreaPreview(const FVector& WorldLocation, const FRotator& WorldRotation)
 {
-	if (!ActivePreviewDecal)
+	if (!ActivePreviewMesh)
 	{
 		return;
 	}
 
 	FVector AdjustedLocation = WorldLocation;
-	AdjustedLocation.Z += ActivePreviewSpec.WorldZOffset;
+	AdjustedLocation.Z = ResolveOwnerFootZ(WorldLocation.Z) + ActivePreviewSpec.WorldZOffset;
 
-	const FRotator DecalRotation(-90.0f, WorldRotation.Yaw, 0.0f);
-	ActivePreviewDecal->SetWorldLocationAndRotation(AdjustedLocation, DecalRotation);
+	const float MeshYaw = ActivePreviewSpec.Shape == ELSSkillAreaShape::Box ? WorldRotation.Yaw : 0.0f;
+	const FRotator MeshRotation(0.0f, MeshYaw, 0.0f);
+	ActivePreviewMesh->SetWorldLocationAndRotation(AdjustedLocation, MeshRotation);
 	ApplyMaterialParameters(WorldRotation.Yaw);
 }
 
 void ULSSkillPreviewComponent::EndAreaPreview()
 {
-	if (ActivePreviewDecal)
+	if (ActivePreviewMesh)
 	{
-		ActivePreviewDecal->DestroyComponent();
-		ActivePreviewDecal = nullptr;
+		ActivePreviewMesh->DestroyComponent();
+		ActivePreviewMesh = nullptr;
 	}
 
 	ActivePreviewMaterial = nullptr;
@@ -93,24 +113,25 @@ void ULSSkillPreviewComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-void ULSSkillPreviewComponent::ApplyDecalSize()
+void ULSSkillPreviewComponent::ApplyMeshScale()
 {
-	if (!ActivePreviewDecal)
+	if (!ActivePreviewMesh)
 	{
 		return;
 	}
 
-	const float ProjectionDepth = FMath::Max(ActivePreviewSpec.DecalProjectionDepth, 1.0f);
+	constexpr float DefaultPlaneSize = 100.0f;
 	if (ActivePreviewSpec.Shape == ELSSkillAreaShape::Circle)
 	{
-		ActivePreviewDecal->DecalSize = FVector(ProjectionDepth, ActivePreviewSpec.Radius, ActivePreviewSpec.Radius);
+		const float Diameter = FMath::Max(ActivePreviewSpec.Radius * 2.0f, 1.0f);
+		ActivePreviewMesh->SetWorldScale3D(FVector(Diameter / DefaultPlaneSize, Diameter / DefaultPlaneSize, 1.0f));
 		return;
 	}
 
-	ActivePreviewDecal->DecalSize = FVector(
-		ProjectionDepth,
-		ActivePreviewSpec.BoxWidth,
-		ActivePreviewSpec.BoxLength);
+	ActivePreviewMesh->SetWorldScale3D(FVector(
+		FMath::Max(ActivePreviewSpec.BoxLength, 1.0f) / DefaultPlaneSize,
+		FMath::Max(ActivePreviewSpec.BoxWidth, 1.0f) / DefaultPlaneSize,
+		1.0f));
 }
 
 void ULSSkillPreviewComponent::ApplyMaterialParameters(float WorldYaw)
@@ -122,15 +143,28 @@ void ULSSkillPreviewComponent::ApplyMaterialParameters(float WorldYaw)
 
 	if (ActivePreviewSpec.Shape == ELSSkillAreaShape::Circle)
 	{
+		const float RotationTurns = FRotator::ClampAxis(WorldYaw + ActivePreviewSpec.RotationOffsetDegrees) / 360.0f;
 		ActivePreviewMaterial->SetScalarParameterValue(TEXT("Degrees"), ActivePreviewSpec.Degrees);
 		ActivePreviewMaterial->SetScalarParameterValue(TEXT("Fade Intensity"), ActivePreviewSpec.FadeIntensity);
 		ActivePreviewMaterial->SetScalarParameterValue(TEXT("Outer Radius"), ActivePreviewSpec.FillAmount);
 		ActivePreviewMaterial->SetScalarParameterValue(TEXT("InnerRadius"), ActivePreviewSpec.InnerRadius);
-		ActivePreviewMaterial->SetScalarParameterValue(TEXT("Rotation"), WorldYaw + ActivePreviewSpec.RotationOffsetDegrees);
+		ActivePreviewMaterial->SetScalarParameterValue(TEXT("Rotation"), RotationTurns);
 		return;
 	}
 
 	ActivePreviewMaterial->SetScalarParameterValue(TEXT("Fill Amount"), ActivePreviewSpec.FillAmount);
 	ActivePreviewMaterial->SetScalarParameterValue(TEXT("Fade Intensity"), ActivePreviewSpec.FadeIntensity);
 	ActivePreviewMaterial->SetScalarParameterValue(TEXT("Outline Thickness"), ActivePreviewSpec.OutlineThickness);
+}
+
+float ULSSkillPreviewComponent::ResolveOwnerFootZ(float FallbackZ) const
+{
+	const ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+	const UCapsuleComponent* CapsuleComponent = OwnerCharacter ? OwnerCharacter->GetCapsuleComponent() : nullptr;
+	if (!OwnerCharacter || !CapsuleComponent)
+	{
+		return FallbackZ;
+	}
+
+	return OwnerCharacter->GetActorLocation().Z - CapsuleComponent->GetScaledCapsuleHalfHeight();
 }

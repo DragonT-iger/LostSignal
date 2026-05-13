@@ -31,6 +31,7 @@ FLSSkillAreaPreviewSpec ULSSkill::BuildPreviewSpec() const
 	{
 	case ELSCharacterSkillRangeShape::Cone:
 		ResolvedSpec.Shape = ELSSkillAreaShape::Circle;
+		ResolvedSpec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
 		ResolvedSpec.Radius = Row->Range_X;
 		ResolvedSpec.Degrees = Row->Range_Y > 0.0f ? Row->Range_Y : ResolvedSpec.Degrees;
 		break;
@@ -43,8 +44,13 @@ FLSSkillAreaPreviewSpec ULSSkill::BuildPreviewSpec() const
 
 	case ELSCharacterSkillRangeShape::Box:
 		ResolvedSpec.Shape = ELSSkillAreaShape::Box;
+		ResolvedSpec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
 		ResolvedSpec.BoxLength = Row->Range_X;
 		ResolvedSpec.BoxWidth = Row->Range_Y;
+		if (ResolvedSpec.LocationOffset.IsNearlyZero() && Row->Range_X > 0.0f)
+		{
+			ResolvedSpec.LocationOffset.X = Row->Range_X * 0.5f;
+		}
 		break;
 
 	default:
