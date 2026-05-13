@@ -11,50 +11,122 @@ void ALSLootBox::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 
 bool ALSLootBox::CanInteract_Implementation(APawn* Interactor)
 {
-	return !bIsOpened;
+	return true;
 }
 
 void ALSLootBox::Interact_Implementation(APawn* Interactor)
 {
-	if (!HasAuthority() || bIsOpened) return;
-
-	bIsOpened = true;
-	RefreshWidgetVisibility();
+	if (!HasAuthority()) return;
 
 	UGameInstance* GI = GetGameInstance();
 	if (!GI) return;
 
-	ULSDropSubsystem* DropSubsystem = GI->GetSubsystem<ULSDropSubsystem>();
-	if (!DropSubsystem)
+	if (!bIsOpened)
 	{
-		UE_LOG(LogLS, Warning, TEXT("ALSLootBox: DropSubsystem 없음"));
-		return;
-	}
+		ULSDropSubsystem* DropSubsystem = GI->GetSubsystem<ULSDropSubsystem>();
+		if (!DropSubsystem)
+		{
+			UE_LOG(LogLS, Warning, TEXT("ALSLootBox: DropSubsystem 없음"));
+			return;
+		}
 
-	if (RootingObjectRowName.IsNone())
-	{
-		UE_LOG(LogLS, Warning, TEXT("ALSLootBox: RootingObjectRowName 미설정"));
-		return;
-	}
+		if (RootingObjectRowName.IsNone())
+		{
+			UE_LOG(LogLS, Warning, TEXT("ALSLootBox: RootingObjectRowName 미설정"));
+			return;
+		}
 
-	const TArray<FLSDropResult> Results = DropSubsystem->OpenRootingObject(RootingObjectRowName);
+		LootResults = DropSubsystem->OpenRootingObject(RootingObjectRowName);
+		bIsOpened = true;
+		RefreshWidgetVisibility();
+		OnLootResultReceived(LootResults);
+	}
 
 	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Interactor ? Interactor->GetController() : nullptr))
 	{
 		const FText InteractObjectText = GetInteractText_Implementation();
 		PlayerController->ShowLootDropWidget(
 			InteractObjectText.IsEmpty() ? FText::FromName(RootingObjectRowName) : InteractObjectText,
-			Results);
+			LootResults,
+			this);
 	}
 	else
 	{
 		UE_LOG(LogLS, Warning, TEXT("ALSLootBox: Cannot show loot drop widget because interactor controller is invalid on %s."), *GetNameSafe(this));
 	}
-
-	OnLootResultReceived(Results);
 }
 
 void ALSLootBox::OnRep_IsOpened()
 {
 	RefreshWidgetVisibility();
+}
+
+bool ALSLootBox::TransferLootSlotToSession(const int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, FLSSessionItem& OutRemainingLootItem)
+{
+	OutRemainingLootItem = FLSSessionItem();
+	if (!LootResults.IsValidIndex(LootSlotIndex) || LootResults[LootSlotIndex].ItemRowName.IsNone() || LootResults[LootSlotIndex].Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot because slot is invalid. Index=%d"), LootSlotIndex);
+		return false;
+	}
+
+	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot because raid session is not active."));
+		return false;
+	}
+
+	SessionSubsystem->AddSessionItem(LootResults[LootSlotIndex].ItemRowName, LootResults[LootSlotIndex].Amount);
+	ClearLootSlot(LootSlotIndex);
+	return true;
+}
+
+bool ALSLootBox::TransferLootSlotToSessionSlot(const int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutRemainingLootItem)
+{
+	OutRemainingLootItem = FLSSessionItem();
+	if (!LootResults.IsValidIndex(LootSlotIndex) || LootResults[LootSlotIndex].ItemRowName.IsNone() || LootResults[LootSlotIndex].Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot to inventory slot because slot is invalid. Index=%d"), LootSlotIndex);
+		return false;
+	}
+
+	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot to inventory slot because raid session is not active."));
+		return false;
+	}
+
+	FLSSessionItem ExternalItem;
+	ExternalItem.ItemRowName = LootResults[LootSlotIndex].ItemRowName;
+	ExternalItem.Amount = LootResults[LootSlotIndex].Amount;
+	if (!SessionSubsystem->DropExternalItemToSessionSlot(ExternalItem, ToSlotArea, ToSlotIndex))
+	{
+		return false;
+	}
+
+	OutRemainingLootItem = ExternalItem;
+	if (ExternalItem.ItemRowName.IsNone() || ExternalItem.Amount <= 0)
+	{
+		ClearLootSlot(LootSlotIndex);
+	}
+	else
+	{
+		LootResults[LootSlotIndex].ItemRowName = ExternalItem.ItemRowName;
+		LootResults[LootSlotIndex].Amount = ExternalItem.Amount;
+		LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
+	}
+
+	return true;
+}
+
+void ALSLootBox::ClearLootSlot(const int32 LootSlotIndex)
+{
+	if (!LootResults.IsValidIndex(LootSlotIndex))
+	{
+		return;
+	}
+
+	LootResults[LootSlotIndex].ItemRowName = NAME_None;
+	LootResults[LootSlotIndex].Amount = 0;
+	LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
 }

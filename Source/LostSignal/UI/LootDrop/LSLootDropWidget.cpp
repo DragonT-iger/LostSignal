@@ -3,6 +3,7 @@
 #include "Components/TextBlock.h"
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Gameplay/LSLootBox.h"
 #include "LostSignal.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
 
@@ -39,7 +40,13 @@ void ULSLootDropWidget::SetLootSourceName(const FText InSourceName)
 void ULSLootDropWidget::SetLootItems(const TArray<FLSDropResult>& InItems)
 {
 	LootItems = InItems;
+	HoveredLootSlotIndex = INDEX_NONE;
 	RebuildLootSlots();
+}
+
+void ULSLootDropWidget::SetSourceLootBox(ALSLootBox* InSourceLootBox)
+{
+	SourceLootBox = InSourceLootBox;
 }
 
 void ULSLootDropWidget::RebuildLootSlots()
@@ -86,6 +93,7 @@ void ULSLootDropWidget::RebuildLootSlots()
 void ULSLootDropWidget::ClearLootItems()
 {
 	LootItems.Empty();
+	HoveredLootSlotIndex = INDEX_NONE;
 
 	if (!LootItemWrapBox)
 	{
@@ -112,7 +120,7 @@ void ULSLootDropWidget::ClearLootSlotAt(const int32 SlotIndex)
 
 	if (LootItems.IsValidIndex(SlotIndex))
 	{
-		LootItems.RemoveAt(SlotIndex);
+		SetLootSlotFromSessionItem(SlotIndex, FLSSessionItem());
 		RebuildLootSlots();
 		return;
 	}
@@ -152,18 +160,14 @@ bool ULSLootDropWidget::TransferLootSlotToInventory(const int32 SlotIndex)
 		return false;
 	}
 
-	if (!PlayerController->TransferLootDropItemToSession(LootItem.ItemRowName, LootItem.Amount))
+	FLSSessionItem RemainingLootItem;
+	if (!PlayerController->TransferLootDropSlotToSession(SourceLootBox, SlotIndex, LootItem.ItemRowName, LootItem.Amount, RemainingLootItem))
 	{
 		return false;
 	}
 
-	LootItems.RemoveAt(SlotIndex);
+	SetLootSlotFromSessionItem(SlotIndex, RemainingLootItem);
 	RebuildLootSlots();
-	if (!HasLootItems())
-	{
-		SetVisibility(ESlateVisibility::Collapsed);
-	}
-
 	return true;
 }
 
@@ -193,46 +197,59 @@ bool ULSLootDropWidget::TransferLootSlotToInventorySlot(const int32 SlotIndex, c
 	}
 
 	FLSSessionItem RemainingLootItem;
-	if (!PlayerController->TransferLootDropItemToSessionSlot(LootItem.ItemRowName, LootItem.Amount, ToSlotArea, ToSlotIndex, RemainingLootItem))
+	if (!PlayerController->TransferLootDropSlotToSessionSlot(SourceLootBox, SlotIndex, LootItem.ItemRowName, LootItem.Amount, ToSlotArea, ToSlotIndex, RemainingLootItem))
 	{
 		return false;
 	}
 
-	if (RemainingLootItem.ItemRowName.IsNone() || RemainingLootItem.Amount <= 0)
-	{
-		LootItems.RemoveAt(SlotIndex);
-	}
-	else
-	{
-		LootItems[SlotIndex].ItemRowName = RemainingLootItem.ItemRowName;
-		LootItems[SlotIndex].Amount = RemainingLootItem.Amount;
-		if (RemainingLootItem.ItemRowName != LootItem.ItemRowName)
-		{
-			LootItems[SlotIndex].ItemText = FText::GetEmpty();
-		}
-	}
-
+	SetLootSlotFromSessionItem(SlotIndex, RemainingLootItem);
 	RebuildLootSlots();
-	if (!HasLootItems())
-	{
-		SetVisibility(ESlateVisibility::Collapsed);
-	}
-
 	return true;
 }
 
-bool ULSLootDropWidget::TransferFirstLootSlotToInventory()
+bool ULSLootDropWidget::TransferHoveredLootSlotToInventory()
 {
-	for (int32 SlotIndex = 0; SlotIndex < LootItems.Num(); ++SlotIndex)
+	if (!LootItems.IsValidIndex(HoveredLootSlotIndex))
 	{
-		const FLSDropResult& LootItem = LootItems[SlotIndex];
-		if (!LootItem.ItemRowName.IsNone() && LootItem.Amount > 0)
-		{
-			return TransferLootSlotToInventory(SlotIndex);
-		}
+		return false;
 	}
 
-	return false;
+	const FLSDropResult& LootItem = LootItems[HoveredLootSlotIndex];
+	if (LootItem.ItemRowName.IsNone() || LootItem.Amount <= 0)
+	{
+		return false;
+	}
+
+	return TransferLootSlotToInventory(HoveredLootSlotIndex);
+}
+
+void ULSLootDropWidget::NotifyLootSlotHovered(const int32 SlotIndex)
+{
+	HoveredLootSlotIndex = SlotIndex;
+}
+
+void ULSLootDropWidget::NotifyLootSlotUnhovered(const int32 SlotIndex)
+{
+	if (HoveredLootSlotIndex == SlotIndex)
+	{
+		HoveredLootSlotIndex = INDEX_NONE;
+	}
+}
+
+void ULSLootDropWidget::SetLootSlotFromSessionItem(const int32 SlotIndex, const FLSSessionItem& SessionItem)
+{
+	if (!LootItems.IsValidIndex(SlotIndex))
+	{
+		return;
+	}
+
+	LootItems[SlotIndex].ItemRowName = SessionItem.ItemRowName;
+	LootItems[SlotIndex].Amount = SessionItem.Amount;
+	LootItems[SlotIndex].ItemText = FText::GetEmpty();
+	if (HoveredLootSlotIndex == SlotIndex && (SessionItem.ItemRowName.IsNone() || SessionItem.Amount <= 0))
+	{
+		HoveredLootSlotIndex = INDEX_NONE;
+	}
 }
 
 bool ULSLootDropWidget::HasLootItems() const

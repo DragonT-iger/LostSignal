@@ -111,6 +111,10 @@ void ULSItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FP
 	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
 
 	bIsHovered = true;
+	if (ULSLootDropWidget* OwningLootDropWidget = LootDropWidget.Get())
+	{
+		OwningLootDropWidget->NotifyLootSlotHovered(SlotIndex);
+	}
 	ApplyHoverVisual();
 }
 
@@ -119,6 +123,10 @@ void ULSItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 	Super::NativeOnMouseLeave(InMouseEvent);
 
 	bIsHovered = false;
+	if (ULSLootDropWidget* OwningLootDropWidget = LootDropWidget.Get())
+	{
+		OwningLootDropWidget->NotifyLootSlotUnhovered(SlotIndex);
+	}
 	ApplyHoverVisual();
 }
 

@@ -9,6 +9,7 @@
 class ULSItemSlotWidget;
 class UTextBlock;
 class UWrapBox;
+class ALSLootBox;
 
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSLootDropWidget : public UUserWidget
@@ -24,6 +25,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void SetLootItems(const TArray<FLSDropResult>& InItems);
 
+	void SetSourceLootBox(ALSLootBox* InSourceLootBox);
+
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void ClearLootItems();
 
@@ -36,7 +39,10 @@ public:
 	bool TransferLootSlotToInventorySlot(int32 SlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
-	bool TransferFirstLootSlotToInventory();
+	bool TransferHoveredLootSlotToInventory();
+
+	void NotifyLootSlotHovered(int32 SlotIndex);
+	void NotifyLootSlotUnhovered(int32 SlotIndex);
 
 	UFUNCTION(BlueprintPure, Category="LS/UI")
 	bool HasLootItems() const;
@@ -55,6 +61,12 @@ private:
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/UI")
 	TArray<FLSDropResult> LootItems;
 
+	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/UI")
+	TObjectPtr<ALSLootBox> SourceLootBox;
+
+	int32 HoveredLootSlotIndex = INDEX_NONE;
+
+	void SetLootSlotFromSessionItem(int32 SlotIndex, const FLSSessionItem& SessionItem);
 	void RebuildLootSlots();
 	ULSItemSlotWidget* CreateLootSlotWidget() const;
 };

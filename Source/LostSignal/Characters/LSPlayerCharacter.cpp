@@ -222,7 +222,7 @@ void ALSPlayerCharacter::OnInteract()
 	{
 		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetController()))
 		{
-			if (PlayerController->TransferFirstLootDropItemToInventory())
+			if (PlayerController->TransferHoveredLootDropItemToInventory())
 			{
 				if (ULSInventoryWidget* LSInventoryWidget = Cast<ULSInventoryWidget>(InventoryWidget))
 				{

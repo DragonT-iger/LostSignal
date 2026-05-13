@@ -6,6 +6,7 @@
 #include "Characters/LSCharacterBase.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
+#include "Gameplay/LSLootBox.h"
 #include "Gameplay/LSWorldDroppedItem.h"
 #include "InputMappingContext.h"
 #include "LostSignal.h"
@@ -66,20 +67,20 @@ void ALSPlayerControllerBase::SetupInputComponent()
 	}
 }
 
-void ALSPlayerControllerBase::ShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results)
+void ALSPlayerControllerBase::ShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox)
 {
 	if (IsLocalPlayerController())
 	{
-		ShowLootDropWidgetLocal(LootSourceName, Results);
+		ShowLootDropWidgetLocal(LootSourceName, Results, SourceLootBox);
 		return;
 	}
 
-	ClientShowLootDropWidget(LootSourceName, Results);
+	ClientShowLootDropWidget(LootSourceName, Results, SourceLootBox);
 }
 
-void ALSPlayerControllerBase::ClientShowLootDropWidget_Implementation(const FText& LootSourceName, const TArray<FLSDropResult>& Results)
+void ALSPlayerControllerBase::ClientShowLootDropWidget_Implementation(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox)
 {
-	ShowLootDropWidgetLocal(LootSourceName, Results);
+	ShowLootDropWidgetLocal(LootSourceName, Results, SourceLootBox);
 }
 
 void ALSPlayerControllerBase::HideLootDropWidget()
@@ -98,7 +99,7 @@ void ALSPlayerControllerBase::ClientHideLootDropWidget_Implementation()
 	HideLootDropWidgetLocal();
 }
 
-void ALSPlayerControllerBase::ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results)
+void ALSPlayerControllerBase::ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox)
 {
 	if (!IsLocalPlayerController())
 	{
@@ -128,6 +129,7 @@ void ALSPlayerControllerBase::ShowLootDropWidgetLocal(const FText& LootSourceNam
 
 	LootDropWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	LootDropWidgetInstance->SetLootSourceName(LootSourceName);
+	LootDropWidgetInstance->SetSourceLootBox(SourceLootBox);
 	LootDropWidgetInstance->SetLootItems(Results);
 }
 
@@ -140,73 +142,96 @@ void ALSPlayerControllerBase::HideLootDropWidgetLocal()
 	}
 }
 
-bool ALSPlayerControllerBase::TransferLootDropItemToSession(const FName ItemRowName, const int32 Amount)
+bool ALSPlayerControllerBase::TransferLootDropSlotToSession(ALSLootBox* SourceLootBox, const int32 LootSlotIndex, const FName ItemRowName, const int32 Amount, FLSSessionItem& OutLootItem)
 {
-	if (ItemRowName.IsNone() || Amount <= 0)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop item because item data is invalid. Row=%s Amount=%d"),
-			*ItemRowName.ToString(),
-			Amount);
-		return false;
-	}
-
-	if (HasAuthority())
-	{
-		return TransferLootDropItemToSessionInternal(ItemRowName, Amount);
-	}
-
-	ServerTransferLootDropItemToSession(ItemRowName, Amount);
-	return true;
-}
-
-void ALSPlayerControllerBase::ServerTransferLootDropItemToSession_Implementation(const FName ItemRowName, const int32 Amount)
-{
-	TransferLootDropItemToSessionInternal(ItemRowName, Amount);
-}
-
-bool ALSPlayerControllerBase::TransferLootDropItemToSessionSlot(const FName ItemRowName, const int32 Amount, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutLootItem)
-{
-	if (ItemRowName.IsNone() || Amount <= 0)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop item to slot because item data is invalid. Row=%s Amount=%d"),
-			*ItemRowName.ToString(),
-			Amount);
-		return false;
-	}
-
-	if (!TransferLootDropItemToSessionSlotInternal(ItemRowName, Amount, ToSlotArea, ToSlotIndex, OutLootItem))
+	const bool bTransferred = HasAuthority()
+		? TransferLootDropSlotToSessionInternal(SourceLootBox, LootSlotIndex, OutLootItem)
+		: TransferExternalLootItemToSession(ItemRowName, Amount, OutLootItem);
+	if (!bTransferred)
 	{
 		return false;
 	}
 
 	if (!HasAuthority())
 	{
-		ServerTransferLootDropItemToSessionSlot(ItemRowName, Amount, ToSlotArea, ToSlotIndex);
+		ServerTransferLootDropSlotToSession(SourceLootBox, LootSlotIndex);
 	}
 
 	return true;
 }
 
-void ALSPlayerControllerBase::ServerTransferLootDropItemToSessionSlot_Implementation(const FName ItemRowName, const int32 Amount, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex)
+void ALSPlayerControllerBase::ServerTransferLootDropSlotToSession_Implementation(ALSLootBox* SourceLootBox, const int32 LootSlotIndex)
 {
 	FLSSessionItem IgnoredLootItem;
-	TransferLootDropItemToSessionSlotInternal(ItemRowName, Amount, ToSlotArea, ToSlotIndex, IgnoredLootItem);
+	TransferLootDropSlotToSessionInternal(SourceLootBox, LootSlotIndex, IgnoredLootItem);
 }
 
-bool ALSPlayerControllerBase::TransferFirstLootDropItemToInventory()
+bool ALSPlayerControllerBase::TransferLootDropSlotToSessionSlot(ALSLootBox* SourceLootBox, const int32 LootSlotIndex, const FName ItemRowName, const int32 Amount, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutLootItem)
+{
+	const bool bTransferred = HasAuthority()
+		? TransferLootDropSlotToSessionSlotInternal(SourceLootBox, LootSlotIndex, ToSlotArea, ToSlotIndex, OutLootItem)
+		: TransferExternalLootItemToSessionSlot(ItemRowName, Amount, ToSlotArea, ToSlotIndex, OutLootItem);
+	if (!bTransferred)
+	{
+		return false;
+	}
+
+	if (!HasAuthority())
+	{
+		ServerTransferLootDropSlotToSessionSlot(SourceLootBox, LootSlotIndex, ToSlotArea, ToSlotIndex);
+	}
+
+	return true;
+}
+
+void ALSPlayerControllerBase::ServerTransferLootDropSlotToSessionSlot_Implementation(ALSLootBox* SourceLootBox, const int32 LootSlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex)
+{
+	FLSSessionItem IgnoredLootItem;
+	TransferLootDropSlotToSessionSlotInternal(SourceLootBox, LootSlotIndex, ToSlotArea, ToSlotIndex, IgnoredLootItem);
+}
+
+bool ALSPlayerControllerBase::TransferHoveredLootDropItemToInventory()
 {
 	if (!LootDropWidgetInstance || !LootDropWidgetInstance->IsVisible())
 	{
 		return false;
 	}
 
-	return LootDropWidgetInstance->TransferFirstLootSlotToInventory();
+	return LootDropWidgetInstance->TransferHoveredLootSlotToInventory();
 }
 
-bool ALSPlayerControllerBase::TransferLootDropItemToSessionInternal(const FName ItemRowName, const int32 Amount)
+bool ALSPlayerControllerBase::TransferLootDropSlotToSessionInternal(ALSLootBox* SourceLootBox, const int32 LootSlotIndex, FLSSessionItem& OutLootItem)
 {
-	if (!HasAuthority())
+	if (!SourceLootBox)
 	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop slot because source loot box is missing."));
+		return false;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
+	return SourceLootBox->TransferLootSlotToSession(LootSlotIndex, SessionSubsystem, OutLootItem);
+}
+
+bool ALSPlayerControllerBase::TransferLootDropSlotToSessionSlotInternal(ALSLootBox* SourceLootBox, const int32 LootSlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutLootItem)
+{
+	if (!SourceLootBox)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop slot to inventory slot because source loot box is missing."));
+		return false;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
+	return SourceLootBox->TransferLootSlotToSessionSlot(LootSlotIndex, SessionSubsystem, ToSlotArea, ToSlotIndex, OutLootItem);
+}
+
+bool ALSPlayerControllerBase::TransferExternalLootItemToSession(const FName ItemRowName, const int32 Amount, FLSSessionItem& OutLootItem)
+{
+	OutLootItem = FLSSessionItem();
+	if (ItemRowName.IsNone() || Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer external loot item because item data is invalid. Row=%s Amount=%d"), *ItemRowName.ToString(), Amount);
 		return false;
 	}
 
@@ -214,7 +239,7 @@ bool ALSPlayerControllerBase::TransferLootDropItemToSessionInternal(const FName 
 	ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
 	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop item because raid session is not active."));
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer external loot item because raid session is not active."));
 		return false;
 	}
 
@@ -222,13 +247,19 @@ bool ALSPlayerControllerBase::TransferLootDropItemToSessionInternal(const FName 
 	return true;
 }
 
-bool ALSPlayerControllerBase::TransferLootDropItemToSessionSlotInternal(const FName ItemRowName, const int32 Amount, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutLootItem)
+bool ALSPlayerControllerBase::TransferExternalLootItemToSessionSlot(const FName ItemRowName, const int32 Amount, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutLootItem)
 {
+	if (ItemRowName.IsNone() || Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer external loot item to slot because item data is invalid. Row=%s Amount=%d"), *ItemRowName.ToString(), Amount);
+		return false;
+	}
+
 	UGameInstance* GameInstance = GetGameInstance();
 	ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
 	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop item to slot because raid session is not active."));
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer external loot item to slot because raid session is not active."));
 		return false;
 	}
 

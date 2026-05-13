@@ -9,6 +9,7 @@
 #include "LSPlayerControllerBase.generated.h"
 
 class ALSWorldDroppedItem;
+class ALSLootBox;
 class UInputMappingContext;
 class ULSHpDebugWidget;
 class ULSLootDropWidget;
@@ -23,18 +24,16 @@ public:
 	TSubclassOf<ULSHpDebugWidget> GetDebugHpWidgetClass() const { return DebugHpWidgetClass; }
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
-	void ShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results);
+	void ShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void HideLootDropWidget();
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
-	bool TransferLootDropItemToSession(FName ItemRowName, int32 Amount);
+	bool TransferHoveredLootDropItemToInventory();
 
-	UFUNCTION(BlueprintCallable, Category="LS/UI")
-	bool TransferFirstLootDropItemToInventory();
-
-	bool TransferLootDropItemToSessionSlot(FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
+	bool TransferLootDropSlotToSession(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FName ItemRowName, int32 Amount, FLSSessionItem& OutLootItem);
+	bool TransferLootDropSlotToSessionSlot(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
 	bool DropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector& DropLocation, float DropYaw);
 
 protected:
@@ -65,20 +64,22 @@ private:
 	void ServerDropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector_NetQuantize DropLocation, float DropYaw);
 
 	UFUNCTION(Server, Reliable)
-	void ServerTransferLootDropItemToSession(FName ItemRowName, int32 Amount);
+	void ServerTransferLootDropSlotToSession(ALSLootBox* SourceLootBox, int32 LootSlotIndex);
 
 	UFUNCTION(Server, Reliable)
-	void ServerTransferLootDropItemToSessionSlot(FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
+	void ServerTransferLootDropSlotToSessionSlot(ALSLootBox* SourceLootBox, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 
 	UFUNCTION(Client, Reliable)
-	void ClientShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results);
+	void ClientShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 
 	UFUNCTION(Client, Reliable)
 	void ClientHideLootDropWidget();
 
-	void ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results);
+	void ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 	void HideLootDropWidgetLocal();
 	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector& DropLocation, float DropYaw);
-	bool TransferLootDropItemToSessionInternal(FName ItemRowName, int32 Amount);
-	bool TransferLootDropItemToSessionSlotInternal(FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
+	bool TransferLootDropSlotToSessionInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FLSSessionItem& OutLootItem);
+	bool TransferLootDropSlotToSessionSlotInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
+	bool TransferExternalLootItemToSession(FName ItemRowName, int32 Amount, FLSSessionItem& OutLootItem);
+	bool TransferExternalLootItemToSessionSlot(FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
 };
