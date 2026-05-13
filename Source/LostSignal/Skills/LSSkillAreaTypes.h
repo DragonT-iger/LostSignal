@@ -28,7 +28,7 @@ struct FLSSkillAreaPreviewSpec
 	ELSSkillAreaShape Shape = ELSSkillAreaShape::Circle;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
-	ELSSkillPreviewLocationMode LocationMode = ELSSkillPreviewLocationMode::MouseWorld;
+	ELSSkillPreviewLocationMode LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
 	FVector2D LocationOffset = FVector2D::ZeroVector;
@@ -46,10 +46,10 @@ struct FLSSkillAreaPreviewSpec
 	float Degrees = 360.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview", meta=(ClampMin="0.0"))
-	float FillAmount = 1.0f;
+	float FillAmount = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview", meta=(ClampMin="0.0"))
-	float FadeIntensity = 1.0f;
+	float FadeIntensity = 2.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview", meta=(ClampMin="0.0"))
 	float OutlineThickness = 0.02f;
@@ -61,10 +61,7 @@ struct FLSSkillAreaPreviewSpec
 	float RotationOffsetDegrees = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
-	float WorldZOffset = 2.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview", meta=(ClampMin="1.0"))
-	float DecalProjectionDepth = 256.0f;
+	float WorldZOffset = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
 	TObjectPtr<UMaterialInterface> Material = nullptr;
