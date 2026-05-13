@@ -9,6 +9,7 @@
 #include "LSSkill.generated.h"
 
 class UGameplayEffect;
+class UGameplayAbility;
 struct FLSCharacterSkillRow;
 
 UCLASS(Abstract, Blueprintable, BlueprintType)
@@ -33,8 +34,14 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	bool TryGetSkillRow(FLSCharacterSkillRow& OutRow) const;
 
+	UFUNCTION(BlueprintPure, Category="LS/Skill")
+	TSubclassOf<UGameplayAbility> GetDefaultAbilityClass() const { return DefaultAbilityClass; }
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|DataTable")
 	FDataTableRowHandle SkillRow;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
+	TSubclassOf<UGameplayAbility> DefaultAbilityClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
 	FLSSkillAreaPreviewSpec PreviewSpec;

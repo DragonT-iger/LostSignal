@@ -1,17 +1,19 @@
-#include "Skills/LSOverrideSkill.h"
+#include "GAS/Abilities/LSGA_Override.h"
 
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "Engine/EngineTypes.h"
 #include "GameFramework/Character.h"
-#include "GameplayEffect.h"
-#include "GAS/Abilities/LSGA_Override.h"
+#include "GAS/Effects/LSGE_PlayerBasicDamage.h"
+#include "GAS/LSGameplayTags.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
+#include "Skills/LSPlayerSkillComponent.h"
+#include "Skills/LSSkillDataAsset.h"
 
 namespace
 {
-	ELSBreakPowerTier ToOverrideBreakPowerTier(int32 Value, ELSBreakPowerTier Fallback)
+	ELSBreakPowerTier ToOverrideAbilityBreakPowerTier(int32 Value, ELSBreakPowerTier Fallback)
 	{
 		if (Value >= static_cast<int32>(ELSBreakPowerTier::HardCrowdControl))
 		{
@@ -32,35 +34,64 @@ namespace
 	}
 }
 
-ULSOverrideSkill::ULSOverrideSkill()
+ULSGA_Override::ULSGA_Override()
 {
-	DefaultAbilityClass = ULSGA_Override::StaticClass();
-	AttackCoefficient = 1.2f;
-	BreakPower = ELSBreakPowerTier::NormalAttack;
+	DamageEffectClass = ULSGE_PlayerBasicDamage::StaticClass();
+
+	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
+	ActivationBlockedTags.AddTag(LSGameplayTags::Combat_Attacking);
+	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);
+
+	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
-bool ULSOverrideSkill::ActivateSkill_Implementation(const FLSSkillActivationContext& Context)
+void ULSGA_Override::ActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	const FGameplayEventData* TriggerEventData)
 {
-	AActor* SourceActor = Context.SourceActor.Get();
-	if (!SourceActor || !SourceActor->HasAuthority())
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	AActor* SourceActor = GetAvatarActorFromActorInfo();
+	ULSPlayerSkillComponent* SkillComponent = SourceActor ? SourceActor->FindComponentByClass<ULSPlayerSkillComponent>() : nullptr;
+	if (!SourceActor || !SourceActor->HasAuthority() || !SkillComponent)
 	{
-		return false;
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	FLSSkillActivationContext SkillContext;
+	if (!SkillComponent->ConsumePendingAbilityContext(GetClass(), SkillContext) || !SkillContext.SkillData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s Override ability missing pending skill context."), *GetNameSafe(SourceActor));
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
 	}
 
 	ULSCharacterCombatComponent* SourceCombatComponent = SourceActor->FindComponentByClass<ULSCharacterCombatComponent>();
 	if (!SourceCombatComponent || !DamageEffectClass)
 	{
-		return false;
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
 	}
 
 	FLSCharacterSkillRow Row;
-	const bool bHasRow = TryGetSkillRow(Row);
+	const bool bHasRow = SkillContext.SkillData->TryGetSkillRow(Row);
 	const float Radius = bHasRow && Row.Range_X > 0.0f ? Row.Range_X : FallbackRadius;
 	const float ResolvedAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : FallbackAttackCoefficient;
-	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverrideBreakPowerTier(Row.Skill_Impact, BreakPower) : BreakPower;
+	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverrideAbilityBreakPowerTier(Row.Skill_Impact, BreakPower) : BreakPower;
 	if (Radius <= 0.0f)
 	{
-		return false;
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
 	}
 
 	TArray<AActor*> OverlappedActors;
@@ -134,7 +165,7 @@ bool ULSOverrideSkill::ActivateSkill_Implementation(const FLSSkillActivationCont
 		UE_LOG(
 			LogLS,
 			Log,
-			TEXT("[Override] Source=%s Radius=%.2f RawTargets=%d ValidHits=%d Knockbacks=%d Coef=%.2f BreakPower=%d"),
+			TEXT("[GA_Override] Source=%s Radius=%.2f RawTargets=%d ValidHits=%d Knockbacks=%d Coef=%.2f BreakPower=%d"),
 			*GetNameSafe(SourceActor),
 			Radius,
 			OverlappedActors.Num(),
@@ -144,5 +175,5 @@ bool ULSOverrideSkill::ActivateSkill_Implementation(const FLSSkillActivationCont
 			static_cast<int32>(ResolvedBreakPower));
 	}
 
-	return true;
+	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }

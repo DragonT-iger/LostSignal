@@ -1,8 +1,17 @@
 #include "Skills/LSPlayerSkillComponent.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbility.h"
+#include "Abilities/GameplayAbilityTypes.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/RootMotionSource.h"
+#include "GAS/Abilities/LSGA_Bypass.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
+#include "TimerManager.h"
 
 ULSPlayerSkillComponent::ULSPlayerSkillComponent()
 {
@@ -88,12 +97,11 @@ bool ULSPlayerSkillComponent::ConfirmAnyActiveSkillPreview(const FVector& Target
 	{
 		if (OwnerActor->HasAuthority())
 		{
-			ActivateSkillOnServer(SlotToActivate, TargetLocation, AimRotation.Yaw);
+			return ActivateSkillOnServer(SlotToActivate, TargetLocation, AimRotation.Yaw);
 		}
-		else
-		{
-			ServerRequestActivateSkill(SlotToActivate, TargetLocation, AimRotation.Yaw);
-		}
+
+		TryPredictBypassMovement(GetSkillData(SlotToActivate), TargetLocation, AimRotation.Yaw);
+		ServerRequestActivateSkill(SlotToActivate, TargetLocation, AimRotation.Yaw);
 	}
 
 	return true;
@@ -160,6 +168,25 @@ void ULSPlayerSkillComponent::HandleBasicAttackHit(int32 ComboIndex, int32 Valid
 	}
 }
 
+bool ULSPlayerSkillComponent::ConsumePendingAbilityContext(TSubclassOf<UGameplayAbility> AbilityClass, FLSSkillActivationContext& OutContext)
+{
+	if (!AbilityClass || PendingAbilityClass != AbilityClass || !PendingAbilityContext.SkillData)
+	{
+		return false;
+	}
+
+	OutContext = PendingAbilityContext;
+	PendingAbilityContext = FLSSkillActivationContext();
+	PendingAbilityClass = nullptr;
+	return true;
+}
+
+void ULSPlayerSkillComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	FinishPredictedBypass();
+	Super::EndPlay(EndPlayReason);
+}
+
 bool ULSPlayerSkillComponent::CanUseLocalPreview() const
 {
 	if (GetNetMode() == NM_DedicatedServer)
@@ -200,5 +227,133 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 	Context.SkillData = SkillData;
 	Context.TargetLocation = TargetLocation;
 	Context.AimYaw = AimYaw;
+
+	if (SkillData->GetAbilityClass())
+	{
+		return TryActivateGameplayAbility(SkillData, Context);
+	}
+
 	return SkillData->ActivateSkill(Context);
+}
+
+bool ULSPlayerSkillComponent::TryActivateGameplayAbility(ULSSkillDataAsset* SkillData, const FLSSkillActivationContext& Context)
+{
+	AActor* OwnerActor = GetOwner();
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerActor);
+	const TSubclassOf<UGameplayAbility> AbilityClass = SkillData ? SkillData->GetAbilityClass() : nullptr;
+	if (!OwnerActor || !OwnerActor->HasAuthority() || !ASC || !AbilityClass)
+	{
+		return false;
+	}
+
+	bool bHasAbility = false;
+	for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		if (Spec.Ability && Spec.Ability->GetClass() == AbilityClass)
+		{
+			bHasAbility = true;
+			break;
+		}
+	}
+
+	if (!bHasAbility)
+	{
+		ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1));
+	}
+
+	PendingAbilityContext = Context;
+	PendingAbilityClass = AbilityClass;
+
+	const bool bActivated = ASC->TryActivateAbilityByClass(AbilityClass);
+	if (!bActivated)
+	{
+		PendingAbilityContext = FLSSkillActivationContext();
+		PendingAbilityClass = nullptr;
+	}
+
+	return bActivated;
+}
+
+bool ULSPlayerSkillComponent::TryPredictBypassMovement(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw)
+{
+	const TSubclassOf<UGameplayAbility> AbilityClass = SkillData ? SkillData->GetAbilityClass() : nullptr;
+	if (!AbilityClass || !AbilityClass->IsChildOf(ULSGA_Bypass::StaticClass()) || bPredictedBypassInProgress)
+	{
+		return false;
+	}
+
+	ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
+	if (!OwnerCharacter || OwnerCharacter->HasAuthority() || !OwnerCharacter->IsLocallyControlled())
+	{
+		return false;
+	}
+
+	const ULSGA_Bypass* BypassCDO = AbilityClass->GetDefaultObject<ULSGA_Bypass>();
+	float Distance = 0.0f;
+	float Duration = 0.0f;
+	if (!BypassCDO || !BypassCDO->ResolveMovementParams(SkillData, Distance, Duration))
+	{
+		return false;
+	}
+
+	FVector AimDirection = TargetLocation - OwnerCharacter->GetActorLocation();
+	AimDirection.Z = 0.0f;
+	if (AimDirection.IsNearlyZero())
+	{
+		AimDirection = FRotator(0.0f, AimYaw, 0.0f).Vector();
+	}
+
+	AimDirection = AimDirection.GetSafeNormal2D();
+	if (AimDirection.IsNearlyZero())
+	{
+		AimDirection = OwnerCharacter->GetActorForwardVector().GetSafeNormal2D();
+	}
+
+	UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement();
+	if (AimDirection.IsNearlyZero() || !MovementComponent)
+	{
+		return false;
+	}
+
+	TSharedPtr<FRootMotionSource_ConstantForce> RootMotion = MakeShared<FRootMotionSource_ConstantForce>();
+	RootMotion->InstanceName = FName("PredictedBypass");
+	RootMotion->AccumulateMode = ERootMotionAccumulateMode::Override;
+	RootMotion->Priority = 5;
+	RootMotion->Force = AimDirection * (Distance / Duration);
+	RootMotion->Duration = Duration;
+	RootMotion->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
+	RootMotion->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
+
+	PredictedBypassRootMotionSourceID = MovementComponent->ApplyRootMotionSource(RootMotion);
+	bPredictedBypassInProgress = true;
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PredictedBypassTimerHandle);
+		World->GetTimerManager().SetTimer(PredictedBypassTimerHandle, this, &ULSPlayerSkillComponent::FinishPredictedBypass, Duration, false);
+	}
+
+	return true;
+}
+
+void ULSPlayerSkillComponent::FinishPredictedBypass()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PredictedBypassTimerHandle);
+	}
+
+	if (bPredictedBypassInProgress)
+	{
+		if (ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner()))
+		{
+			if (UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement())
+			{
+				MovementComponent->RemoveRootMotionSourceByID(PredictedBypassRootMotionSourceID);
+			}
+		}
+	}
+
+	PredictedBypassRootMotionSourceID = 0;
+	bPredictedBypassInProgress = false;
 }

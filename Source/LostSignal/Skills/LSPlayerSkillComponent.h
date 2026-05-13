@@ -8,6 +8,7 @@
 
 class ULSSkillDataAsset;
 class ULSSkillPreviewComponent;
+class UGameplayAbility;
 
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
 class LOSTSIGNAL_API ULSPlayerSkillComponent : public UActorComponent
@@ -48,8 +49,11 @@ public:
 	bool GetActivePreviewSpec(FLSSkillAreaPreviewSpec& OutPreviewSpec) const;
 
 	void HandleBasicAttackHit(int32 ComboIndex, int32 ValidHitCount);
+	bool ConsumePendingAbilityContext(TSubclassOf<UGameplayAbility> AbilityClass, FLSSkillActivationContext& OutContext);
 
 protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TMap<ELSPlayerSkillSlot, FLSPlayerSkillSlotSpec> SkillSlots;
 
@@ -62,11 +66,24 @@ protected:
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill")
 	ELSPlayerSkillSlot ActiveSlot = ELSPlayerSkillSlot::Skill1;
 
+	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill")
+	FLSSkillActivationContext PendingAbilityContext;
+
+	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill")
+	TSubclassOf<UGameplayAbility> PendingAbilityClass;
+
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerRequestActivateSkill(ELSPlayerSkillSlot Slot, FVector_NetQuantize TargetLocation, float AimYaw);
 
 	bool CanUseLocalPreview() const;
 	bool ActivateSkillOnServer(ELSPlayerSkillSlot Slot, const FVector& TargetLocation, float AimYaw);
+	bool TryActivateGameplayAbility(ULSSkillDataAsset* SkillData, const FLSSkillActivationContext& Context);
+	bool TryPredictBypassMovement(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw);
+	void FinishPredictedBypass();
 	ULSSkillPreviewComponent* ResolvePreviewComponent() const;
+
+	FTimerHandle PredictedBypassTimerHandle;
+	uint16 PredictedBypassRootMotionSourceID = 0;
+	bool bPredictedBypassInProgress = false;
 };

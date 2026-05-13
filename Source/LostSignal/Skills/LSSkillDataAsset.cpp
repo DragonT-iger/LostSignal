@@ -1,5 +1,6 @@
 #include "Skills/LSSkillDataAsset.h"
 
+#include "Abilities/GameplayAbility.h"
 #include "Skills/LSSkill.h"
 
 bool ULSSkillDataAsset::ActivateSkill(const FLSSkillActivationContext& Context) const
@@ -24,6 +25,17 @@ bool ULSSkillDataAsset::TryGetSkillRow(FLSCharacterSkillRow& OutRow) const
 {
 	const ULSSkill* Skill = GetSkillDefaultObject();
 	return Skill ? Skill->TryGetSkillRow(OutRow) : false;
+}
+
+TSubclassOf<UGameplayAbility> ULSSkillDataAsset::GetAbilityClass() const
+{
+	if (AbilityClass)
+	{
+		return AbilityClass;
+	}
+
+	const ULSSkill* Skill = GetSkillDefaultObject();
+	return Skill ? Skill->GetDefaultAbilityClass() : nullptr;
 }
 
 ULSSkill* ULSSkillDataAsset::GetSkillDefaultObject() const

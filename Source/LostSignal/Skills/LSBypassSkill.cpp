@@ -2,6 +2,7 @@
 
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"
+#include "GAS/Abilities/LSGA_Bypass.h"
 #include "GAS/LSGameplayTags.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -11,6 +12,7 @@
 
 ULSBypassSkill::ULSBypassSkill()
 {
+	DefaultAbilityClass = ULSGA_Bypass::StaticClass();
 	AttackCoefficient = 0.0f;
 	BreakPower = ELSBreakPowerTier::NormalAttack;
 }
