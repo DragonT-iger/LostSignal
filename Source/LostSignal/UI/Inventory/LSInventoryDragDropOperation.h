@@ -6,7 +6,7 @@
 #include "LSInventoryDragDropOperation.generated.h"
 
 class ULSInventoryWidget;
-class ULSInventoryItemSlotWidget;
+class ULSItemSlotWidget;
 
 UCLASS()
 class LOSTSIGNAL_API ULSInventoryDragDropOperation : public UDragDropOperation
@@ -18,7 +18,7 @@ public:
 	TObjectPtr<ULSInventoryWidget> SourceInventoryWidget;
 
 	UPROPERTY()
-	TObjectPtr<ULSInventoryItemSlotWidget> SourceSlotWidget;
+	TObjectPtr<ULSItemSlotWidget> SourceSlotWidget;
 
 	UPROPERTY()
 	int32 SourceSlotIndex = INDEX_NONE;

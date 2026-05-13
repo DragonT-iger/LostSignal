@@ -1,4 +1,4 @@
-#include "UI/Inventory/LSInventoryItemSlotWidget.h"
+#include "UI/Inventory/LSItemSlotWidget.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Components/Image.h"
@@ -15,7 +15,7 @@
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSInventoryWidget.h"
 
-void ULSInventoryItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount)
+void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount)
 {
 	if (!ItemIconImage)
 	{
@@ -40,7 +40,7 @@ void ULSInventoryItemSlotWidget::SetItem(const FName ItemRowName, const int32 Am
 	if (!IconTexture)
 	{
 		IconTexture = LoadDefaultIconTexture();
-		UE_LOG(LogLS, Warning, TEXT("Using default inventory icon for row '%s' on %s."), *ItemRowName.ToString(), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("Using default item slot icon for row '%s' on %s."), *ItemRowName.ToString(), *GetNameSafe(this));
 	}
 
 	if (IconTexture)
@@ -56,7 +56,7 @@ void ULSInventoryItemSlotWidget::SetItem(const FName ItemRowName, const int32 Am
 	bHasItem = true;
 }
 
-void ULSInventoryItemSlotWidget::ClearItem()
+void ULSItemSlotWidget::ClearItem()
 {
 	if (!ItemIconImage)
 	{
@@ -87,7 +87,7 @@ void ULSInventoryItemSlotWidget::ClearItem()
 	ClearTooltipItem();
 }
 
-void ULSInventoryItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)
+void ULSItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)
 {
 	InventoryWidget = InInventoryWidget;
 	SlotArea = InSlotArea;
@@ -95,7 +95,7 @@ void ULSInventoryItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryW
 	bHasItem = bInHasItem;
 }
 
-void ULSInventoryItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+void ULSItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
 	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
 
@@ -103,7 +103,7 @@ void ULSInventoryItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry,
 	ApplyHoverVisual();
 }
 
-void ULSInventoryItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+void ULSItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 {
 	Super::NativeOnMouseLeave(InMouseEvent);
 
@@ -111,9 +111,9 @@ void ULSInventoryItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouse
 	ApplyHoverVisual();
 }
 
-FReply ULSInventoryItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (!bHasItem)
+	if (!CanStartInventoryDrag())
 	{
 		return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 	}
@@ -121,7 +121,7 @@ FReply ULSInventoryItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGe
 	return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, EKeys::LeftMouseButton).NativeReply;
 }
 
-void ULSInventoryItemSlotWidget::NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+void ULSItemSlotWidget::NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
 	Super::NativeOnDragEnter(InGeometry, InDragDropEvent, InOperation);
 
@@ -129,7 +129,7 @@ void ULSInventoryItemSlotWidget::NativeOnDragEnter(const FGeometry& InGeometry, 
 	ApplyHoverVisual();
 }
 
-void ULSInventoryItemSlotWidget::NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+void ULSItemSlotWidget::NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
 	Super::NativeOnDragLeave(InDragDropEvent, InOperation);
 
@@ -137,12 +137,10 @@ void ULSInventoryItemSlotWidget::NativeOnDragLeave(const FDragDropEvent& InDragD
 	ApplyHoverVisual();
 }
 
-void ULSInventoryItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
+void ULSItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
 {
-	if (!bHasItem || !InventoryWidget.IsValid() || SlotIndex == INDEX_NONE)
+	if (!CanStartInventoryDrag())
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot start inventory drag. Widget=%s SlotIndex=%d HasItem=%s"),
-			*GetNameSafe(this), SlotIndex, bHasItem ? TEXT("true") : TEXT("false"));
 		return;
 	}
 
@@ -165,7 +163,7 @@ void ULSInventoryItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometr
 	OutOperation = DragOperation;
 }
 
-bool ULSInventoryItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
 	ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
 	if (!DragOperation)
@@ -190,14 +188,14 @@ bool ULSInventoryItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const
 		SlotIndex);
 }
 
-void ULSInventoryItemSlotWidget::RestoreDragSourceVisual()
+void ULSItemSlotWidget::RestoreDragSourceVisual()
 {
 	SetVisibility(ESlateVisibility::Visible);
 	SetRenderOpacity(1.0f);
 	ApplyHoverVisual();
 }
 
-void ULSInventoryItemSlotWidget::ApplyHoverVisual()
+void ULSItemSlotWidget::ApplyHoverVisual()
 {
 	if (!ItemIconImage)
 	{
@@ -213,7 +211,12 @@ void ULSInventoryItemSlotWidget::ApplyHoverVisual()
 	ItemIconImage->SetColorAndOpacity(bIsHovered ? HoveredIconTint : NormalIconTint);
 }
 
-bool ULSInventoryItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const
+bool ULSItemSlotWidget::CanStartInventoryDrag() const
+{
+	return bHasItem && InventoryWidget.IsValid() && SlotIndex != INDEX_NONE;
+}
+
+bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const
 {
 	const ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
 	if (!DragOperation || !InventoryWidget.IsValid() || SlotIndex == INDEX_NONE || DragOperation->SourceSlotIndex == INDEX_NONE)
@@ -229,7 +232,7 @@ bool ULSInventoryItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOpera
 	return DragOperation->SourceSlotArea != SlotArea || DragOperation->SourceSlotIndex != SlotIndex;
 }
 
-UTexture2D* ULSInventoryItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName) const
+UTexture2D* ULSItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName) const
 {
 	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
 	if (!Settings)
@@ -335,7 +338,7 @@ UTexture2D* ULSInventoryItemSlotWidget::LoadIconTextureByRowName(const FName Ite
 	return IconTexture;
 }
 
-UTexture2D* ULSInventoryItemSlotWidget::LoadDefaultIconTexture() const
+UTexture2D* ULSItemSlotWidget::LoadDefaultIconTexture() const
 {
 	static const TCHAR* DefaultIconObjectPath = TEXT("/Engine/EngineResources/DefaultTexture.DefaultTexture");
 	UTexture2D* DefaultIconTexture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, DefaultIconObjectPath));
@@ -347,7 +350,7 @@ UTexture2D* ULSInventoryItemSlotWidget::LoadDefaultIconTexture() const
 	return DefaultIconTexture;
 }
 
-FString ULSInventoryItemSlotWidget::BuildIconObjectPath(const FString& IconNameOrPath, const FString& BaseFolder)
+FString ULSItemSlotWidget::BuildIconObjectPath(const FString& IconNameOrPath, const FString& BaseFolder)
 {
 	if (IconNameOrPath.StartsWith(TEXT("/Game/")))
 	{
@@ -364,7 +367,7 @@ FString ULSInventoryItemSlotWidget::BuildIconObjectPath(const FString& IconNameO
 	return FString::Printf(TEXT("%s%s.%s"), *BaseFolder, *IconNameOrPath, *IconNameOrPath);
 }
 
-FString ULSInventoryItemSlotWidget::GetIconBaseFolderByRowName(const FName ItemRowName)
+FString ULSItemSlotWidget::GetIconBaseFolderByRowName(const FName ItemRowName)
 {
 	const FString RowNameString = ItemRowName.ToString();
 	if (RowNameString.StartsWith(TEXT("Chip_")))

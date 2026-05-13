@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "Session/LSSessionSubsystem.h"
 #include "UI/Inventory/LSItemTooltipSlotWidget.h"
-#include "LSInventoryItemSlotWidget.generated.h"
+#include "LSItemSlotWidget.generated.h"
 
 class UImage;
 class ULSInventoryWidget;
@@ -12,7 +12,7 @@ class UTexture2D;
 class UDragDropOperation;
 
 UCLASS(BlueprintType, Blueprintable)
-class LOSTSIGNAL_API ULSInventoryItemSlotWidget : public ULSItemTooltipSlotWidget
+class LOSTSIGNAL_API ULSItemSlotWidget : public ULSItemTooltipSlotWidget
 {
 	GENERATED_BODY()
 
@@ -59,6 +59,7 @@ private:
 	bool bIsDragTarget = false;
 
 	void ApplyHoverVisual();
+	bool CanStartInventoryDrag() const;
 	bool IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const;
 	UTexture2D* LoadIconTextureByRowName(FName ItemRowName) const;
 	UTexture2D* LoadDefaultIconTexture() const;

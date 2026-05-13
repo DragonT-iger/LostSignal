@@ -1,4 +1,5 @@
 #include "Gameplay/LSLootBox.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "LostSignal.h"
 #include "Net/UnrealNetwork.h"
 #include "Session/LSSessionSubsystem.h"
@@ -38,6 +39,18 @@ void ALSLootBox::Interact_Implementation(APawn* Interactor)
 	}
 
 	const TArray<FLSDropResult> Results = DropSubsystem->OpenRootingObject(RootingObjectRowName);
+
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Interactor ? Interactor->GetController() : nullptr))
+	{
+		const FText InteractObjectText = GetInteractText_Implementation();
+		PlayerController->ShowLootDropWidget(
+			InteractObjectText.IsEmpty() ? FText::FromName(RootingObjectRowName) : InteractObjectText,
+			Results);
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("ALSLootBox: Cannot show loot drop widget because interactor controller is invalid on %s."), *GetNameSafe(this));
+	}
 
 	// 드랍 결과를 세션 인벤토리에 등록 (탈출 시 보관 처리됨)
 	ULSSessionSubsystem* Session = GI->GetSubsystem<ULSSessionSubsystem>();

@@ -10,7 +10,7 @@
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSubsystem.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
-#include "UI/Inventory/LSInventoryItemSlotWidget.h"
+#include "UI/Inventory/LSItemSlotWidget.h"
 
 namespace
 {
@@ -96,9 +96,9 @@ void ULSInventoryWidget::RebuildInventorySlots()
 
 	InventoryWrapBox->ClearChildren();
 
-	if (!InventoryItemSlotWidgetClass)
+	if (!ItemSlotWidgetClass)
 	{
-		UE_LOG(LogLS, Warning, TEXT("InventoryItemSlotWidgetClass is not set on %s."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("ItemSlotWidgetClass is not set on %s."), *GetNameSafe(this));
 		return;
 	}
 
@@ -147,9 +147,9 @@ void ULSInventoryWidget::RebuildInventorySlots()
 	const int32 SlotCountToBuild = FMath::Max(InventorySlotCount, InventoryItems.Num());
 	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
 	{
-		ULSInventoryItemSlotWidget* SlotWidget = OwningPlayer
-			? CreateWidget<ULSInventoryItemSlotWidget>(OwningPlayer, InventoryItemSlotWidgetClass)
-			: CreateWidget<ULSInventoryItemSlotWidget>(World, InventoryItemSlotWidgetClass);
+		ULSItemSlotWidget* SlotWidget = OwningPlayer
+			? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
+			: CreateWidget<ULSItemSlotWidget>(World, ItemSlotWidgetClass);
 
 		if (SlotWidget)
 		{
@@ -231,9 +231,9 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 
 	ConfirmedStorageSlotWrapBox->ClearChildren();
 
-	if (!InventoryItemSlotWidgetClass)
+	if (!ItemSlotWidgetClass)
 	{
-		UE_LOG(LogLS, Warning, TEXT("InventoryItemSlotWidgetClass is not set on %s. Confirmed storage slots use the same widget class."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("ItemSlotWidgetClass is not set on %s. Confirmed storage slots use the same widget class."), *GetNameSafe(this));
 		return;
 	}
 
@@ -264,9 +264,9 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 	const int32 SlotCountToBuild = FMath::Max(ConfirmedStorageSlotCount, SafeItems.Num());
 	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
 	{
-		ULSInventoryItemSlotWidget* SlotWidget = OwningPlayer
-			? CreateWidget<ULSInventoryItemSlotWidget>(OwningPlayer, InventoryItemSlotWidgetClass)
-			: CreateWidget<ULSInventoryItemSlotWidget>(World, InventoryItemSlotWidgetClass);
+		ULSItemSlotWidget* SlotWidget = OwningPlayer
+			? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
+			: CreateWidget<ULSItemSlotWidget>(World, ItemSlotWidgetClass);
 
 		if (SlotWidget)
 		{

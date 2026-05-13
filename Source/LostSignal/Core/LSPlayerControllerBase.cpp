@@ -11,6 +11,7 @@
 #include "LostSignal.h"
 #include "Session/LSSessionSubsystem.h"
 #include "UI/Debug/LSHpDebugWidget.h"
+#include "UI/LootDrop/LSLootDropWidget.h"
 
 void ALSPlayerControllerBase::BeginPlay()
 {
@@ -62,6 +63,80 @@ void ALSPlayerControllerBase::SetupInputComponent()
 		}
 
 		bDefaultMappingContextsApplied = true;
+	}
+}
+
+void ALSPlayerControllerBase::ShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results)
+{
+	if (IsLocalPlayerController())
+	{
+		ShowLootDropWidgetLocal(LootSourceName, Results);
+		return;
+	}
+
+	ClientShowLootDropWidget(LootSourceName, Results);
+}
+
+void ALSPlayerControllerBase::ClientShowLootDropWidget_Implementation(const FText& LootSourceName, const TArray<FLSDropResult>& Results)
+{
+	ShowLootDropWidgetLocal(LootSourceName, Results);
+}
+
+void ALSPlayerControllerBase::HideLootDropWidget()
+{
+	if (IsLocalPlayerController())
+	{
+		HideLootDropWidgetLocal();
+		return;
+	}
+
+	ClientHideLootDropWidget();
+}
+
+void ALSPlayerControllerBase::ClientHideLootDropWidget_Implementation()
+{
+	HideLootDropWidgetLocal();
+}
+
+void ALSPlayerControllerBase::ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results)
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	if (!LootDropWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("LootDropWidgetClass is not set on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (!LootDropWidgetInstance)
+	{
+		LootDropWidgetInstance = CreateWidget<ULSLootDropWidget>(this, LootDropWidgetClass);
+		if (!LootDropWidgetInstance)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Failed to create loot drop widget on %s."), *GetNameSafe(this));
+			return;
+		}
+	}
+
+	if (!LootDropWidgetInstance->IsInViewport())
+	{
+		LootDropWidgetInstance->AddToViewport();
+	}
+
+	LootDropWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	LootDropWidgetInstance->SetLootSourceName(LootSourceName);
+	LootDropWidgetInstance->SetLootItems(Results);
+}
+
+void ALSPlayerControllerBase::HideLootDropWidgetLocal()
+{
+	if (LootDropWidgetInstance)
+	{
+		LootDropWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
+		LootDropWidgetInstance->ClearLootItems();
 	}
 }
 

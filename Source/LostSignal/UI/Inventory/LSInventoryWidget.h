@@ -10,7 +10,7 @@ class UBorder;
 class UButton;
 class UDragDropOperation;
 class UWrapBox;
-class ULSInventoryItemSlotWidget;
+class ULSItemSlotWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSInventoryWidget : public UUserWidget
@@ -54,7 +54,7 @@ protected:
 	TObjectPtr<UButton> SortButton;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
-	TSubclassOf<ULSInventoryItemSlotWidget> InventoryItemSlotWidgetClass;
+	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI", meta=(ClampMin="0"))
 	int32 InventorySlotCount = 10;

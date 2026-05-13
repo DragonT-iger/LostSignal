@@ -5,6 +5,7 @@
 #include "Camera/CameraComponent.h"
 #include "Combat/LSAimComponent.h"
 #include "Combat/LSPlayerCombatComponent.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "EnhancedInputComponent.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -330,7 +331,7 @@ void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
 		UE_LOG(LogLS, Warning, TEXT("InventoryWidgetClass is not derived from ULSInventoryWidget on %s."), *GetNameSafe(this));
 	}
 
-	InventoryWidget->SetVisibility(ESlateVisibility::Visible);
+	InventoryWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	ActiveInventoryTarget = Target;
 }
 
@@ -339,6 +340,11 @@ void ALSPlayerCharacter::HideInventoryWidget()
 	if (InventoryWidget)
 	{
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetController()))
+	{
+		PlayerController->HideLootDropWidget();
 	}
 
 	ActiveInventoryTarget.Reset();

@@ -1,6 +1,6 @@
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 
-#include "UI/Inventory/LSInventoryItemSlotWidget.h"
+#include "UI/Inventory/LSItemSlotWidget.h"
 
 void ULSInventoryDragDropOperation::DragCancelled_Implementation(const FPointerEvent& PointerEvent)
 {
