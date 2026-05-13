@@ -26,8 +26,6 @@ ALSWorldDroppedItem::ALSWorldDroppedItem()
 	ItemIconWidgetComponent->SetTwoSided(true);
 	ItemIconWidgetComponent->SetRelativeLocation(FVector(0.0f, 0.0f, GroundOffsetZ));
 	ItemIconWidgetComponent->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
-
-	InteractText = NSLOCTEXT("LSWorldDroppedItem", "PickUpInteractText", "Pick up");
 }
 
 void ALSWorldDroppedItem::BeginPlay()

@@ -10,7 +10,7 @@
 
 namespace
 {
-constexpr int32 DefaultMaxInventorySlotCount = 10;
+constexpr int32 DefaultMaxRaidInventorySlotCount = 10;
 
 bool IsFilledRaidInventorySlot(const FLSSessionItem& Item)
 {
@@ -288,7 +288,7 @@ void ULSRaidInventoryComponent::EndRaidInventory()
 
 int32 ULSRaidInventoryComponent::GetMaxInventorySlotCount() const
 {
-	return DefaultMaxInventorySlotCount;
+	return DefaultMaxRaidInventorySlotCount;
 }
 
 bool ULSRaidInventoryComponent::TryAddSessionItem(const FName ItemRowName, const int32 Amount, FLSSessionItem& OutRemainingItem)

@@ -569,6 +569,7 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 bool ALSPlayerControllerBase::ResolveServerDroppedItemTransform(FTransform& OutDropTransform) const
 {
 	constexpr float DroppedItemGroundTraceDistance = 100.0f;
+	constexpr float DroppedItemRandomGroundOffsetXY = 12.0f;
 	constexpr float DroppedItemRandomGroundOffsetMin = 0.5f;
 	constexpr float DroppedItemRandomGroundOffsetMax = 2.0f;
 
@@ -592,7 +593,11 @@ bool ALSPlayerControllerBase::ResolveServerDroppedItemTransform(FTransform& OutD
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(LSDropInventoryItemToGround), false, ControlledPawn);
 	const bool bHitGround = World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams);
 	const FVector GroundLocation = bHitGround ? HitResult.ImpactPoint : FootLocation;
-	const FVector DropLocation = GroundLocation + FVector(0.0f, 0.0f, FMath::FRandRange(DroppedItemRandomGroundOffsetMin, DroppedItemRandomGroundOffsetMax));
+	const FVector2D RandomGroundOffset = FMath::RandPointInCircle(DroppedItemRandomGroundOffsetXY);
+	const FVector DropLocation = GroundLocation + FVector(
+		RandomGroundOffset.X,
+		RandomGroundOffset.Y,
+		FMath::FRandRange(DroppedItemRandomGroundOffsetMin, DroppedItemRandomGroundOffsetMax));
 
 	float DropYaw = GetControlRotation().Yaw;
 	if (const UCameraComponent* CameraComponent = ControlledPawn->FindComponentByClass<UCameraComponent>())

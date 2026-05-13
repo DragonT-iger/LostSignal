@@ -7,6 +7,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
+#include "TimerManager.h"
 #include "UI/LSInteractHintWidget.h"
 
 ALSInteractableObject::ALSInteractableObject()
@@ -35,7 +36,13 @@ void ALSInteractableObject::BeginPlay()
 	Super::BeginPlay();
 	InteractionSphere->OnComponentBeginOverlap.AddDynamic(this, &ALSInteractableObject::OnSphereBeginOverlap);
 	InteractionSphere->OnComponentEndOverlap.AddDynamic(this, &ALSInteractableObject::OnSphereEndOverlap);
+	InteractionSphere->UpdateOverlaps();
 	RefreshWidgetVisibility();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(this, &ALSInteractableObject::RefreshWidgetVisibility);
+	}
 }
 
 void ALSInteractableObject::Tick(float DeltaSeconds)
