@@ -8,8 +8,9 @@
 #include "Data/LSItemRow.h"
 #include "Data/LSWeaponRow.h"
 #include "Engine/DataTable.h"
+#include "Core/LSPlayerControllerBase.h"
+#include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
-#include "Session/LSSessionSubsystem.h"
 #include "UI/Inventory/LSItemTooltipExtraInfoRowWidget.h"
 #include "UI/Inventory/LSItemTooltipStatRowWidget.h"
 
@@ -292,13 +293,14 @@ void ULSItemTooltipWidget::PopulateItemTooltip(const FName ItemRowName, const in
 		return;
 	}
 
-	UGameInstance* GameInstance = GetGameInstance();
-	const ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
 	int32 CurrentCount = HoveredSlotAmount;
-	if (SessionSubsystem)
+	if (const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 	{
-		CurrentCount = CountItems(SessionSubsystem->GetSessionInventory(), ItemRowName);
-		CurrentCount += CountItems(SessionSubsystem->GetSessionSafeInventory(), ItemRowName);
+		if (const ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
+		{
+			CurrentCount = CountItems(RaidInventory->GetSessionInventory(), ItemRowName);
+			CurrentCount += CountItems(RaidInventory->GetSessionSafeInventory(), ItemRowName);
+		}
 	}
 
 	SetCommonTexts(LOCTEXT("ItemTooltipType", "일반 아이템 설명창"), Row->Item_Text, Row->Item_Grade, Row->Item_Description, Row->Item_Cost);

@@ -140,9 +140,13 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 		{
 			if (OwningLootDropWidget->TransferLootSlotToInventory(SlotIndex))
 			{
-				if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
+				APlayerController* OwningPlayer = GetOwningPlayer();
+				if (OwningPlayer && OwningPlayer->HasAuthority())
 				{
-					PlayerCharacter->RebuildInventoryWidgetSlots();
+					if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
+					{
+						PlayerCharacter->RebuildInventoryWidgetSlots();
+					}
 				}
 			}
 		}
@@ -156,8 +160,11 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 		{
 			if (PlayerController->TransferInventorySlotToLootDrop(SlotArea, SlotIndex))
 			{
-				InventoryWidget->RebuildInventorySlots();
-				InventoryWidget->RebuildConfirmedStorageSlots();
+				if (PlayerController->HasAuthority())
+				{
+					InventoryWidget->RebuildInventorySlots();
+					InventoryWidget->RebuildConfirmedStorageSlots();
+				}
 			}
 		}
 

@@ -64,13 +64,12 @@ void ALSInteractableObject::RefreshWidgetVisibility()
 		Pawn = FindOverlappingLocalPawn();
 	}
 
-	const ALSPlayerCharacter* LSChar = Cast<ALSPlayerCharacter>(Pawn);
+	ALSPlayerCharacter* LSChar = Cast<ALSPlayerCharacter>(Pawn);
 	const bool bInventoryWidgetOpen = LSChar && LSChar->IsInventoryWidgetOpen();
 	const bool bShouldShow =
-		Pawn &&
+		LSChar &&
 		!bInventoryWidgetOpen &&
-		CanInteract_Implementation(Pawn) &&
-		IsInsideMouseAimCone(Pawn);
+		LSChar->ResolveBestInteractTarget() == this;
 
 	InteractWidget->SetHiddenInGame(!bShouldShow);
 	SetActorTickEnabled(Pawn != nullptr);
@@ -119,70 +118,6 @@ APawn* ALSInteractableObject::FindOverlappingLocalPawn() const
 	}
 
 	return nullptr;
-}
-
-bool ALSInteractableObject::IsInsideMouseAimCone(APawn* Pawn) const
-{
-	if (!Pawn)
-	{
-		return false;
-	}
-
-	FVector MouseWorldPoint = FVector::ZeroVector;
-	if (!ResolveMouseWorldPoint(Pawn, MouseWorldPoint))
-	{
-		return false;
-	}
-
-	FVector MouseDirection = MouseWorldPoint - Pawn->GetActorLocation();
-	MouseDirection.Z = 0.0f;
-
-	FVector ObjectDirection = GetActorLocation() - Pawn->GetActorLocation();
-	ObjectDirection.Z = 0.0f;
-
-	if (MouseDirection.IsNearlyZero() || ObjectDirection.IsNearlyZero())
-	{
-		return false;
-	}
-
-	const float DistanceScore = 1.0f - FMath::Clamp(
-		ObjectDirection.Size2D() / FMath::Max(InteractionSphere->GetScaledSphereRadius(), 1.0f),
-		0.0f,
-		1.0f);
-	const float Dot = FVector::DotProduct(MouseDirection.GetSafeNormal(), ObjectDirection.GetSafeNormal());
-	const float AngleScore = (FMath::Clamp(Dot, -1.0f, 1.0f) + 1.0f) * 0.5f;
-	const float InteractionScore = (DistanceScore * MouseAimDistanceWeight) + (AngleScore * MouseAimAngleWeight);
-	return InteractionScore >= MouseAimScoreThreshold;
-}
-
-bool ALSInteractableObject::ResolveMouseWorldPoint(APawn* Pawn, FVector& OutMouseWorldPoint) const
-{
-	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
-	if (!PC || !PC->IsLocalPlayerController())
-	{
-		return false;
-	}
-
-	FVector WorldOrigin = FVector::ZeroVector;
-	FVector WorldDirection = FVector::ZeroVector;
-	if (!PC->DeprojectMousePositionToWorld(WorldOrigin, WorldDirection))
-	{
-		return false;
-	}
-
-	if (FMath::IsNearlyZero(WorldDirection.Z))
-	{
-		return false;
-	}
-
-	const float RayDistance = (GetActorLocation().Z - WorldOrigin.Z) / WorldDirection.Z;
-	if (RayDistance < 0.0f)
-	{
-		return false;
-	}
-
-	OutMouseWorldPoint = WorldOrigin + (WorldDirection * RayDistance);
-	return true;
 }
 
 void ALSInteractableObject::UpdateHintWidget(APawn* Pawn)

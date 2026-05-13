@@ -1,5 +1,6 @@
 #include "Gameplay/LSLootBox.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Net/UnrealNetwork.h"
 
@@ -7,6 +8,7 @@ void ALSLootBox::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ALSLootBox, bIsOpened);
+	DOREPLIFETIME(ALSLootBox, LootResults);
 }
 
 bool ALSLootBox::CanInteract_Implementation(APawn* Interactor)
@@ -40,6 +42,8 @@ void ALSLootBox::Interact_Implementation(APawn* Interactor)
 		bIsOpened = true;
 		RefreshWidgetVisibility();
 		OnLootResultReceived(LootResults);
+		NotifyLootResultsChanged();
+		ForceNetUpdate();
 	}
 
 	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Interactor ? Interactor->GetController() : nullptr))
@@ -61,7 +65,12 @@ void ALSLootBox::OnRep_IsOpened()
 	RefreshWidgetVisibility();
 }
 
-bool ALSLootBox::TransferLootSlotToSession(const int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, FLSSessionItem& OutRemainingLootItem)
+void ALSLootBox::OnRep_LootResults()
+{
+	NotifyLootResultsChanged();
+}
+
+bool ALSLootBox::TransferLootSlotToSession(const int32 LootSlotIndex, ULSRaidInventoryComponent* RaidInventory, FLSSessionItem& OutRemainingLootItem)
 {
 	OutRemainingLootItem = FLSSessionItem();
 	if (!LootResults.IsValidIndex(LootSlotIndex) || LootResults[LootSlotIndex].ItemRowName.IsNone() || LootResults[LootSlotIndex].Amount <= 0)
@@ -70,13 +79,13 @@ bool ALSLootBox::TransferLootSlotToSession(const int32 LootSlotIndex, ULSSession
 		return false;
 	}
 
-	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
+	if (!RaidInventory || !RaidInventory->IsRaidActive())
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot because raid session is not active."));
 		return false;
 	}
 
-	if (!SessionSubsystem->TryAddSessionItem(LootResults[LootSlotIndex].ItemRowName, LootResults[LootSlotIndex].Amount, OutRemainingLootItem))
+	if (!RaidInventory->TryAddSessionItem(LootResults[LootSlotIndex].ItemRowName, LootResults[LootSlotIndex].Amount, OutRemainingLootItem))
 	{
 		return false;
 	}
@@ -91,10 +100,12 @@ bool ALSLootBox::TransferLootSlotToSession(const int32 LootSlotIndex, ULSSession
 		LootResults[LootSlotIndex].Amount = OutRemainingLootItem.Amount;
 		LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
 	}
+	NotifyLootResultsChanged();
+	ForceNetUpdate();
 	return true;
 }
 
-bool ALSLootBox::TransferLootSlotToSessionSlot(const int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutRemainingLootItem)
+bool ALSLootBox::TransferLootSlotToSessionSlot(const int32 LootSlotIndex, ULSRaidInventoryComponent* RaidInventory, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutRemainingLootItem)
 {
 	OutRemainingLootItem = FLSSessionItem();
 	if (!LootResults.IsValidIndex(LootSlotIndex) || LootResults[LootSlotIndex].ItemRowName.IsNone() || LootResults[LootSlotIndex].Amount <= 0)
@@ -103,7 +114,7 @@ bool ALSLootBox::TransferLootSlotToSessionSlot(const int32 LootSlotIndex, ULSSes
 		return false;
 	}
 
-	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
+	if (!RaidInventory || !RaidInventory->IsRaidActive())
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot to inventory slot because raid session is not active."));
 		return false;
@@ -112,7 +123,7 @@ bool ALSLootBox::TransferLootSlotToSessionSlot(const int32 LootSlotIndex, ULSSes
 	FLSSessionItem ExternalItem;
 	ExternalItem.ItemRowName = LootResults[LootSlotIndex].ItemRowName;
 	ExternalItem.Amount = LootResults[LootSlotIndex].Amount;
-	if (!SessionSubsystem->DropExternalItemToSessionSlot(ExternalItem, ToSlotArea, ToSlotIndex))
+	if (!RaidInventory->DropExternalItemToSessionSlot(ExternalItem, ToSlotArea, ToSlotIndex))
 	{
 		return false;
 	}
@@ -129,10 +140,12 @@ bool ALSLootBox::TransferLootSlotToSessionSlot(const int32 LootSlotIndex, ULSSes
 		LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
 	}
 
+	NotifyLootResultsChanged();
+	ForceNetUpdate();
 	return true;
 }
 
-bool ALSLootBox::TransferSessionSlotToLootSlot(const int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, FLSSessionItem& OutLootItem)
+bool ALSLootBox::TransferSessionSlotToLootSlot(const int32 LootSlotIndex, ULSRaidInventoryComponent* RaidInventory, const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, FLSSessionItem& OutLootItem)
 {
 	OutLootItem = FLSSessionItem();
 	if (!LootResults.IsValidIndex(LootSlotIndex))
@@ -141,7 +154,7 @@ bool ALSLootBox::TransferSessionSlotToLootSlot(const int32 LootSlotIndex, ULSSes
 		return false;
 	}
 
-	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
+	if (!RaidInventory || !RaidInventory->IsRaidActive())
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot transfer session slot to loot slot because raid session is not active."));
 		return false;
@@ -152,14 +165,14 @@ bool ALSLootBox::TransferSessionSlotToLootSlot(const int32 LootSlotIndex, ULSSes
 	CurrentLootItem.Amount = LootResults[LootSlotIndex].Amount;
 
 	FLSSessionItem SourceItem;
-	if (!SessionSubsystem->GetSessionSlotItem(FromSlotArea, FromSlotIndex, SourceItem))
+	if (!RaidInventory->GetSessionSlotItem(FromSlotArea, FromSlotIndex, SourceItem))
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot transfer session slot to loot slot because source slot is empty. Area=%d Index=%d"),
 			static_cast<int32>(FromSlotArea), FromSlotIndex);
 		return false;
 	}
 
-	if (!SessionSubsystem->ReplaceSessionSlotItem(FromSlotArea, FromSlotIndex, CurrentLootItem, OutLootItem))
+	if (!RaidInventory->ReplaceSessionSlotItem(FromSlotArea, FromSlotIndex, CurrentLootItem, OutLootItem))
 	{
 		return false;
 	}
@@ -167,6 +180,8 @@ bool ALSLootBox::TransferSessionSlotToLootSlot(const int32 LootSlotIndex, ULSSes
 	LootResults[LootSlotIndex].ItemRowName = OutLootItem.ItemRowName;
 	LootResults[LootSlotIndex].Amount = OutLootItem.Amount;
 	LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
+	NotifyLootResultsChanged();
+	ForceNetUpdate();
 	return true;
 }
 
@@ -180,4 +195,21 @@ void ALSLootBox::ClearLootSlot(const int32 LootSlotIndex)
 	LootResults[LootSlotIndex].ItemRowName = NAME_None;
 	LootResults[LootSlotIndex].Amount = 0;
 	LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
+}
+
+void ALSLootBox::NotifyLootResultsChanged()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(It->Get()))
+		{
+			PlayerController->RefreshLootDropWidgetForSource(this, LootResults);
+		}
+	}
 }

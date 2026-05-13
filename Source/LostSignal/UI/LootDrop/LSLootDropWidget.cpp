@@ -49,6 +49,21 @@ void ULSLootDropWidget::SetSourceLootBox(ALSLootBox* InSourceLootBox)
 	SourceLootBox = InSourceLootBox;
 }
 
+bool ULSLootDropWidget::IsShowingLootSource(const ALSLootBox* InSourceLootBox) const
+{
+	return SourceLootBox == InSourceLootBox;
+}
+
+void ULSLootDropWidget::RefreshLootItemsFromSource(ALSLootBox* InSourceLootBox, const TArray<FLSDropResult>& InItems)
+{
+	if (!IsShowingLootSource(InSourceLootBox))
+	{
+		return;
+	}
+
+	SetLootItems(InItems);
+}
+
 void ULSLootDropWidget::RebuildLootSlots()
 {
 	if (!LootItemWrapBox)
@@ -166,6 +181,11 @@ bool ULSLootDropWidget::TransferLootSlotToInventory(const int32 SlotIndex)
 		return false;
 	}
 
+	if (!PlayerController->HasAuthority())
+	{
+		return true;
+	}
+
 	SetLootSlotFromSessionItem(SlotIndex, RemainingLootItem);
 	RebuildLootSlots();
 	return true;
@@ -200,6 +220,11 @@ bool ULSLootDropWidget::TransferLootSlotToInventorySlot(const int32 SlotIndex, c
 	if (!PlayerController->TransferLootDropSlotToSessionSlot(SourceLootBox, SlotIndex, LootItem.ItemRowName, LootItem.Amount, ToSlotArea, ToSlotIndex, RemainingLootItem))
 	{
 		return false;
+	}
+
+	if (!PlayerController->HasAuthority())
+	{
+		return true;
 	}
 
 	SetLootSlotFromSessionItem(SlotIndex, RemainingLootItem);
@@ -242,6 +267,11 @@ bool ULSLootDropWidget::TransferInventorySlotToLootSlot(const ELSInventorySlotAr
 	if (!PlayerController->TransferSessionSlotToLootDropSlot(SourceLootBox, FromSlotArea, FromSlotIndex, LootSlotIndex, LootItems[LootSlotIndex], NewLootItem))
 	{
 		return false;
+	}
+
+	if (!PlayerController->HasAuthority())
+	{
+		return true;
 	}
 
 	SetLootSlotFromSessionItem(LootSlotIndex, NewLootItem);

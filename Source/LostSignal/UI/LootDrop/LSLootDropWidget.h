@@ -26,6 +26,8 @@ public:
 	void SetLootItems(const TArray<FLSDropResult>& InItems);
 
 	void SetSourceLootBox(ALSLootBox* InSourceLootBox);
+	bool IsShowingLootSource(const ALSLootBox* InSourceLootBox) const;
+	void RefreshLootItemsFromSource(ALSLootBox* InSourceLootBox, const TArray<FLSDropResult>& InItems);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void ClearLootItems();

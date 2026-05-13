@@ -1,34 +1,80 @@
 #include "Core/LSLobbyGameMode.h"
-#include "Session/LSSaveSubsystem.h"
-#include "Session/LSSessionSubsystem.h"
-#include "Session/LSSessionSettings.h"
+
+#include "Core/LSPlayerControllerBase.h"
+#include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
-#include "Kismet/GameplayStatics.h"
+#include "Session/LSSaveSubsystem.h"
+#include "Session/LSSessionSettings.h"
+#include "Session/LSSessionSubsystem.h"
 
 void ALSLobbyGameMode::StartRaid()
 {
-	ULSSessionSubsystem* SessionSub = GetGameInstance()->GetSubsystem<ULSSessionSubsystem>();
-	if (!SessionSub) return;
+	if (bRaidStartRequested)
+	{
+		return;
+	}
 
-	// 로드아웃은 인벤토리 시스템 구현 후 연결 — 지금은 빈 상태로 시작
-	const ULSSaveSubsystem* SaveSub = GetGameInstance()->GetSubsystem<ULSSaveSubsystem>();
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSessionSubsystem* SessionSub = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
+	if (!SessionSub)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot start raid because SessionSubsystem is missing."));
+		return;
+	}
+
+	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
+	if (!Settings || Settings->FarmingLevel.IsNull())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] FarmingLevel is not set. Check Project Settings > LS Session Settings."));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot start raid because World is missing."));
+		return;
+	}
+
+	const FString FarmingLevelPath = Settings->FarmingLevel.ToSoftObjectPath().GetLongPackageName();
+	if (FarmingLevelPath.IsEmpty())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot start raid because FarmingLevel path is invalid."));
+		return;
+	}
+
+	bRaidStartRequested = true;
+
+	TArray<FLSSessionItem> Loadout;
+	TArray<FLSSessionItem> SafeItems;
+	const ULSSaveSubsystem* SaveSub = GameInstance->GetSubsystem<ULSSaveSubsystem>();
 	if (SaveSub)
 	{
-		SessionSub->StartRaid(SaveSub->GetStash());
+		Loadout = SaveSub->GetStash();
+		SafeItems = SaveSub->GetSafeStash();
 	}
 	else
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Lobby] SaveSubsystem is missing. Starting raid with an empty inventory."));
-		SessionSub->StartRaid({});
 	}
 
-	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
-	if (!Settings->FarmingLevel.IsNull())
+	SessionSub->StartRaid(Loadout);
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
-		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->FarmingLevel);
+		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(It->Get()))
+		{
+			if (ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
+			{
+				RaidInventory->StartRaidInventory(Loadout, SafeItems);
+			}
+			PlayerController->ClientStartRaidSession(Loadout, SafeItems);
+		}
 	}
-	else
+
+	if (!World->ServerTravel(FarmingLevelPath))
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] FarmingLevel 미설정 - 프로젝트 설정 > LS Session Settings 확인"));
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Failed to server travel to raid level: %s"), *FarmingLevelPath);
+		bRaidStartRequested = false;
 	}
 }

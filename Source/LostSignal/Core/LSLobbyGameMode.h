@@ -13,4 +13,8 @@ public:
 	// 로비에서 레이드 시작 (로드아웃은 인벤토리 시스템 구현 후 연결)
 	UFUNCTION(BlueprintCallable, Category="LS/Lobby")
 	void StartRaid();
+
+private:
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Lobby")
+	bool bRaidStartRequested = false;
 };

@@ -1,15 +1,13 @@
 #include "UI/Inventory/LSInventoryWidget.h"
 
-#include "Camera/PlayerCameraManager.h"
 #include "Components/Border.h"
-#include "Components/CapsuleComponent.h"
 #include "LostSignal.h"
 #include "Components/Button.h"
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Inventory/LSRaidInventoryComponent.h"
 #include "Layout/WidgetPath.h"
 #include "Session/LSSaveSubsystem.h"
-#include "Session/LSSessionSubsystem.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
@@ -114,16 +112,25 @@ void ULSInventoryWidget::RebuildInventorySlots()
 
 	TArray<FLSSessionItem> InventoryItems;
 	int32 SlotCountToBuild = InventorySlotCount;
-	if (UGameInstance* GameInstance = GetGameInstance())
+	bool bUsingRaidInventory = false;
+	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(OwningPlayer))
 	{
-		if (ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>())
+		if (ULSRaidInventoryComponent* RaidInventory = LSPlayerController->GetRaidInventoryComponent())
 		{
-			if (SessionSubsystem->IsRaidActive())
+			if (RaidInventory->IsRaidActive())
 			{
-				AppendSlotItems(InventoryItems, SessionSubsystem->GetSessionInventory());
-				SlotCountToBuild = SessionSubsystem->GetMaxInventorySlotCount();
+				AppendSlotItems(InventoryItems, RaidInventory->GetSessionInventory());
+				SlotCountToBuild = RaidInventory->GetMaxInventorySlotCount();
+				bUsingRaidInventory = true;
 			}
-			else if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
+		}
+	}
+
+	if (!bUsingRaidInventory)
+	{
+		if (UGameInstance* GameInstance = GetGameInstance())
+		{
+			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
 				AppendSlotItems(InventoryItems, SaveSubsystem->GetStash());
 				SlotCountToBuild = FMath::Max(InventorySlotCount, InventoryItems.Num());
@@ -133,22 +140,9 @@ void ULSInventoryWidget::RebuildInventorySlots()
 				UE_LOG(LogLS, Warning, TEXT("SaveSubsystem is missing on %s."), *GetNameSafe(this));
 			}
 		}
-		else
-		{
-			UE_LOG(LogLS, Warning, TEXT("SessionSubsystem is missing on %s."), *GetNameSafe(this));
-			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
-			{
-				AppendSlotItems(InventoryItems, SaveSubsystem->GetStash());
-				SlotCountToBuild = FMath::Max(InventorySlotCount, InventoryItems.Num());
-			}
-		}
+	}
 
-		UE_LOG(LogLS, Log, TEXT("InventoryWidget rebuilt with %d slot items on %s."), InventoryItems.Num(), *GetNameSafe(this));
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("GameInstance is missing on %s."), *GetNameSafe(this));
-	}
+	UE_LOG(LogLS, Log, TEXT("InventoryWidget rebuilt with %d slot items on %s."), InventoryItems.Num(), *GetNameSafe(this));
 
 	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
 	{
@@ -189,27 +183,21 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 		return false;
 	}
 
-	UGameInstance* GameInstance = GetGameInstance();
-	if (!GameInstance)
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot handle inventory slot drop because GameInstance is missing on %s."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle inventory slot drop because owning player controller is invalid on %s."), *GetNameSafe(this));
 		return false;
 	}
 
-	ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>();
-	if (!SessionSubsystem)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot handle inventory slot drop because SessionSubsystem is missing on %s."), *GetNameSafe(this));
-		return false;
-	}
-
-	if (!SessionSubsystem->IsRaidActive())
+	ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent();
+	if (!RaidInventory || !RaidInventory->IsRaidActive())
 	{
 		UE_LOG(LogLS, Warning, TEXT("Inventory slot drag/drop is only supported during an active raid on %s."), *GetNameSafe(this));
 		return false;
 	}
 
-	const bool bChanged = SessionSubsystem->DropSessionSlot(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
+	const bool bChanged = PlayerController->DropInventorySlot(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
 
 	UE_LOG(LogLS, Log, TEXT("Inventory slot drop handled on %s. From=%d To=%d Changed=%s"),
 		*GetNameSafe(this),
@@ -217,7 +205,7 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 		ToSlotIndex,
 		bChanged ? TEXT("true") : TEXT("false"));
 
-	if (bChanged)
+	if (bChanged && PlayerController->HasAuthority())
 	{
 		RebuildInventorySlots();
 		RebuildConfirmedStorageSlots();
@@ -235,7 +223,8 @@ bool ULSInventoryWidget::HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, c
 	}
 
 	const bool bTransferred = LootDropWidget->TransferLootSlotToInventorySlot(LootSlotIndex, ToSlotArea, ToSlotIndex);
-	if (bTransferred)
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	if (bTransferred && OwningPlayer && OwningPlayer->HasAuthority())
 	{
 		RebuildInventorySlots();
 		RebuildConfirmedStorageSlots();
@@ -303,15 +292,24 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 	}
 
 	TArray<FLSSessionItem> SafeItems;
-	if (UGameInstance* GameInstance = GetGameInstance())
+	bool bUsingRaidInventory = false;
+	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(OwningPlayer))
 	{
-		if (ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>())
+		if (ULSRaidInventoryComponent* RaidInventory = LSPlayerController->GetRaidInventoryComponent())
 		{
-			if (SessionSubsystem->IsRaidActive())
+			if (RaidInventory->IsRaidActive())
 			{
-				AppendSlotItems(SafeItems, SessionSubsystem->GetSessionSafeInventory());
+				AppendSlotItems(SafeItems, RaidInventory->GetSessionSafeInventory());
+				bUsingRaidInventory = true;
 			}
-			else if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
+		}
+	}
+
+	if (!bUsingRaidInventory)
+	{
+		if (UGameInstance* GameInstance = GetGameInstance())
+		{
+			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
 				AppendSlotItems(SafeItems, SaveSubsystem->GetSafeStash());
 			}
@@ -355,20 +353,25 @@ void ULSInventoryWidget::HandleStoreAllButtonClicked()
 
 void ULSInventoryWidget::HandleSortButtonClicked()
 {
-	UGameInstance* GameInstance = GetGameInstance();
-	if (!GameInstance)
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot sort inventory because GameInstance is missing on %s."), *GetNameSafe(this));
-		return;
+		if (ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
+		{
+			if (RaidInventory->IsRaidActive())
+			{
+				if (PlayerController->SortRaidInventory() && PlayerController->HasAuthority())
+				{
+					RebuildInventorySlots();
+					RebuildConfirmedStorageSlots();
+				}
+				return;
+			}
+		}
 	}
 
-	if (ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>())
+	if (UGameInstance* GameInstance = GetGameInstance())
 	{
-		if (SessionSubsystem->IsRaidActive())
-		{
-			SessionSubsystem->SortSessionInventory();
-		}
-		else if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
+		if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 		{
 			SaveSubsystem->SortStash();
 		}
@@ -376,10 +379,6 @@ void ULSInventoryWidget::HandleSortButtonClicked()
 		{
 			UE_LOG(LogLS, Warning, TEXT("Cannot sort stash because SaveSubsystem is missing on %s."), *GetNameSafe(this));
 		}
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot sort session inventory because SessionSubsystem is missing on %s."), *GetNameSafe(this));
 	}
 
 	RebuildInventorySlots();
@@ -421,18 +420,6 @@ bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOper
 		return false;
 	}
 
-	FVector DropLocation = FVector::ZeroVector;
-	if (!ResolveDroppedItemLocation(DropLocation))
-	{
-		return false;
-	}
-
-	float DropYaw = 0.0f;
-	if (!ResolveDroppedItemYaw(DropYaw))
-	{
-		return false;
-	}
-
 	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
 	if (!PlayerController)
 	{
@@ -442,10 +429,7 @@ bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOper
 
 	const bool bDropped = PlayerController->DropSessionSlotToWorld(
 		DragOperation.SourceSlotArea,
-		DragOperation.SourceSlotIndex,
-		DroppedItemActorClass,
-		DropLocation,
-		DropYaw);
+		DragOperation.SourceSlotIndex);
 
 	if (bDropped)
 	{
@@ -490,43 +474,4 @@ bool ULSInventoryWidget::IsPointerOverUserWidget(const FPointerEvent& PointerEve
 	}
 
 	return false;
-}
-
-bool ULSInventoryWidget::ResolveDroppedItemLocation(FVector& OutDropLocation) const
-{
-	const APlayerController* PlayerController = GetOwningPlayer();
-	const APawn* Pawn = PlayerController ? PlayerController->GetPawn() : nullptr;
-	if (!Pawn)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot resolve dropped item location because owning pawn is missing on %s."), *GetNameSafe(this));
-		return false;
-	}
-
-	OutDropLocation = Pawn->GetActorLocation();
-	if (const UCapsuleComponent* CapsuleComponent = Pawn->FindComponentByClass<UCapsuleComponent>())
-	{
-		OutDropLocation.Z -= CapsuleComponent->GetScaledCapsuleHalfHeight();
-	}
-
-	constexpr float DropXYRandomRadius = 35.0f;
-	const FVector2D DropXYOffset = FMath::RandPointInCircle(DropXYRandomRadius);
-	OutDropLocation.X += DropXYOffset.X;
-	OutDropLocation.Y += DropXYOffset.Y;
-
-	constexpr float DropZRandomRange = 3.0f;
-	OutDropLocation.Z += FMath::FRandRange(0.0f, DropZRandomRange);
-	return true;
-}
-
-bool ULSInventoryWidget::ResolveDroppedItemYaw(float& OutDropYaw) const
-{
-	const APlayerController* PlayerController = GetOwningPlayer();
-	if (!PlayerController || !PlayerController->PlayerCameraManager)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot resolve dropped item yaw because player camera manager is missing on %s."), *GetNameSafe(this));
-		return false;
-	}
-
-	OutDropYaw = PlayerController->PlayerCameraManager->GetCameraRotation().Yaw + 180.0f;
-	return true;
 }

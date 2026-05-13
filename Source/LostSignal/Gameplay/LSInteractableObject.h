@@ -38,15 +38,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact")
 	FText InteractText;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact", meta=(ClampMin="0.0"))
-	float MouseAimDistanceWeight = 0.55f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact", meta=(ClampMin="0.0"))
-	float MouseAimAngleWeight = 0.45f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact", meta=(ClampMin="0.0"))
-	float MouseAimScoreThreshold = 0.25f;
-
 private:
 	TWeakObjectPtr<APawn> FocusedLocalPawn;
 
@@ -59,7 +50,5 @@ private:
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 	APawn* FindOverlappingLocalPawn() const;
-	bool IsInsideMouseAimCone(APawn* Pawn) const;
-	bool ResolveMouseWorldPoint(APawn* Pawn, FVector& OutMouseWorldPoint) const;
 	void UpdateHintWidget(APawn* Pawn);
 };

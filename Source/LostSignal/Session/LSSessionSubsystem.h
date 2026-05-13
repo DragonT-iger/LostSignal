@@ -52,6 +52,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void StartRaid(const TArray<FLSSessionItem>& Loadout);
 
+	void StartRaidClientMirror(const TArray<FLSSessionItem>& Loadout);
+	void MirrorRaidSessionState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems);
+
 	// 레이드 종료 - 결과 처리 후 결과 레벨로 전환
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void EndRaid(ELSRaidResult Result);
@@ -111,5 +114,6 @@ private:
 	TArray<FLSSessionItem> ResolvedItems;
 	ELSRaidResult LastRaidResult = ELSRaidResult::Dead;
 
+	void StartRaidInternal(const TArray<FLSSessionItem>& Loadout, bool bPersistRaidSave);
 	TArray<FLSSessionItem> BuildQuitRecovery() const;
 };

@@ -225,19 +225,38 @@ void ALSPlayerCharacter::OnInteract()
 		return;
 	}
 
+	AActor* BestTarget = ResolveBestInteractTarget();
+	if (BestTarget)
+	{
+		ServerRequestInteract(BestTarget);
+
+		if (BestTarget->IsA<ALSLootBox>())
+		{
+			ShowInventoryWidgetForTarget(BestTarget);
+		}
+	}
+}
+
+AActor* ALSPlayerCharacter::ResolveBestInteractTarget()
+{
+	if (!IsLocallyControlled())
+	{
+		return nullptr;
+	}
+
 	const FVector MyLocation = GetActorLocation();
 
 	FVector MouseWorldPoint = FVector::ZeroVector;
 	if (!ResolveMouseWorldPoint(MouseWorldPoint))
 	{
-		return;
+		return nullptr;
 	}
 
 	FVector AimDirection = MouseWorldPoint - MyLocation;
 	AimDirection.Z = 0.0f;
 	if (AimDirection.IsNearlyZero())
 	{
-		return;
+		return nullptr;
 	}
 
 	AimDirection.Normalize();
@@ -249,6 +268,7 @@ void ALSPlayerCharacter::OnInteract()
 	{
 		AActor* Actor = *It;
 		if (!Actor || Actor == this || !Actor->Implements<ULSInteractable>()) continue;
+		if (!ILSInteractable::Execute_CanInteract(Actor, this)) continue;
 
 		const FVector ToActor = Actor->GetActorLocation() - MyLocation;
 		const float DistSq = ToActor.SizeSquared();
@@ -256,11 +276,11 @@ void ALSPlayerCharacter::OnInteract()
 
 		FVector TargetDirection = ToActor;
 		TargetDirection.Z = 0.0f;
-		if (TargetDirection.IsNearlyZero()) continue;
 
 		const float DistanceScore = 1.0f - FMath::Clamp(FMath::Sqrt(DistSq) / FMath::Max(MaxInteractRange, 1.0f), 0.0f, 1.0f);
-		const float Dot = FVector::DotProduct(AimDirection, TargetDirection.GetSafeNormal());
-		const float AngleScore = (FMath::Clamp(Dot, -1.0f, 1.0f) + 1.0f) * 0.5f;
+		const float AngleScore = TargetDirection.IsNearlyZero()
+			? 1.0f
+			: (FMath::Clamp(FVector::DotProduct(AimDirection, TargetDirection.GetSafeNormal()), -1.0f, 1.0f) + 1.0f) * 0.5f;
 		const float Score = (DistanceScore * InteractDistanceWeight) + (AngleScore * InteractAngleWeight);
 		if (Score < InteractScoreThreshold) continue;
 
@@ -271,15 +291,7 @@ void ALSPlayerCharacter::OnInteract()
 		}
 	}
 
-	if (BestTarget)
-	{
-		ServerRequestInteract(BestTarget);
-
-		if (BestTarget->IsA<ALSLootBox>())
-		{
-			ShowInventoryWidgetForTarget(BestTarget);
-		}
-	}
+	return BestTarget;
 }
 
 void ALSPlayerCharacter::OnLootTransfer()
@@ -295,7 +307,10 @@ void ALSPlayerCharacter::OnLootTransfer()
 		return;
 	}
 
-	RebuildInventoryWidgetSlots();
+	if (PlayerController->HasAuthority())
+	{
+		RebuildInventoryWidgetSlots();
+	}
 }
 
 void ALSPlayerCharacter::RebuildInventoryWidgetSlots()

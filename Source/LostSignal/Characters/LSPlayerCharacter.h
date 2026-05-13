@@ -56,6 +56,8 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Input")
 	UInputAction* GetInteractAction() const { return InteractAction; }
 
+	AActor* ResolveBestInteractTarget();
+
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 

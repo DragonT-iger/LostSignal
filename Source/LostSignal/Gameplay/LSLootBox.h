@@ -6,7 +6,7 @@
 #include "Session/LSSessionSubsystem.h"
 #include "LSLootBox.generated.h"
 
-class ULSSessionSubsystem;
+class ULSRaidInventoryComponent;
 
 UCLASS()
 class LOSTSIGNAL_API ALSLootBox : public ALSInteractableObject
@@ -20,9 +20,9 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	const TArray<FLSDropResult>& GetLootResults() const { return LootResults; }
-	bool TransferLootSlotToSession(int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, FLSSessionItem& OutRemainingLootItem);
-	bool TransferLootSlotToSessionSlot(int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutRemainingLootItem);
-	bool TransferSessionSlotToLootSlot(int32 LootSlotIndex, ULSSessionSubsystem* SessionSubsystem, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, FLSSessionItem& OutLootItem);
+	bool TransferLootSlotToSession(int32 LootSlotIndex, ULSRaidInventoryComponent* RaidInventory, FLSSessionItem& OutRemainingLootItem);
+	bool TransferLootSlotToSessionSlot(int32 LootSlotIndex, ULSRaidInventoryComponent* RaidInventory, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutRemainingLootItem);
+	bool TransferSessionSlotToLootSlot(int32 LootSlotIndex, ULSRaidInventoryComponent* RaidInventory, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, FLSSessionItem& OutLootItem);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="LS/Loot")
 	void OnLootResultReceived(const TArray<FLSDropResult>& Results);
@@ -35,11 +35,15 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_IsOpened, VisibleInstanceOnly, Category="LS/Loot")
 	bool bIsOpened = false;
 
-	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Loot")
+	UPROPERTY(ReplicatedUsing=OnRep_LootResults, Transient, VisibleInstanceOnly, Category="LS/Loot")
 	TArray<FLSDropResult> LootResults;
 
 	UFUNCTION()
 	void OnRep_IsOpened();
 
+	UFUNCTION()
+	void OnRep_LootResults();
+
 	void ClearLootSlot(int32 LootSlotIndex);
+	void NotifyLootResultsChanged();
 };

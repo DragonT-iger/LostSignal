@@ -5,7 +5,6 @@
 #include "Session/LSSessionSubsystem.h"
 #include "LSInventoryWidget.generated.h"
 
-class ALSWorldDroppedItem;
 class UBorder;
 class UButton;
 class UDragDropOperation;
@@ -66,9 +65,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI", meta=(ClampMin="0"))
 	int32 ConfirmedStorageSlotCount = 4;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
-	TSubclassOf<ALSWorldDroppedItem> DroppedItemActorClass;
-
 private:
 	UFUNCTION()
 	void HandleStoreAllButtonClicked();
@@ -80,6 +76,4 @@ private:
 	bool DropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation);
 	bool IsPointerInsideInventoryWindow(FVector2D ScreenPosition) const;
 	bool IsPointerOverUserWidget(const FPointerEvent& PointerEvent) const;
-	bool ResolveDroppedItemLocation(FVector& OutDropLocation) const;
-	bool ResolveDroppedItemYaw(float& OutDropYaw) const;
 };

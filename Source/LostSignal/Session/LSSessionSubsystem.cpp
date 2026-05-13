@@ -335,6 +335,23 @@ void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, const int32 SlotIndex)
 
 void ULSSessionSubsystem::StartRaid(const TArray<FLSSessionItem>& Loadout)
 {
+	StartRaidInternal(Loadout, true);
+}
+
+void ULSSessionSubsystem::StartRaidClientMirror(const TArray<FLSSessionItem>& Loadout)
+{
+	StartRaidInternal(Loadout, false);
+}
+
+void ULSSessionSubsystem::MirrorRaidSessionState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems)
+{
+	SessionInventory = InventoryItems;
+	SessionSafeInventory = SafeItems;
+	bRaidActive = true;
+}
+
+void ULSSessionSubsystem::StartRaidInternal(const TArray<FLSSessionItem>& Loadout, const bool bPersistRaidSave)
+{
 	LoadoutSnapshot.Items = Loadout;
 	SessionInventory = Loadout;
 	SessionSafeInventory.Empty();
@@ -345,7 +362,10 @@ void ULSSessionSubsystem::StartRaid(const TArray<FLSSessionItem>& Loadout)
 	if (ULSSaveSubsystem* SaveSub = GetGameInstance()->GetSubsystem<ULSSaveSubsystem>())
 	{
 		SessionSafeInventory = SaveSub->GetSafeStash();
-		SaveSub->BeginRaidSave(LoadoutSnapshot.Items);
+		if (bPersistRaidSave)
+		{
+			SaveSub->BeginRaidSave(LoadoutSnapshot.Items);
+		}
 	}
 
 	UE_LOG(LogLS, Log, TEXT("[Session] Raid started with %d inventory slots."), SessionInventory.Num());

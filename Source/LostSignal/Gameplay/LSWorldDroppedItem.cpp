@@ -1,6 +1,7 @@
 #include "Gameplay/LSWorldDroppedItem.h"
 
 #include "Components/WidgetComponent.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSArmorRow.h"
 #include "Data/LSChipRow.h"
 #include "Data/LSDropSettings.h"
@@ -8,9 +9,9 @@
 #include "Data/LSWeaponRow.h"
 #include "Engine/DataTable.h"
 #include "Engine/Texture2D.h"
+#include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Net/UnrealNetwork.h"
-#include "Session/LSSessionSubsystem.h"
 #include "UI/Inventory/LSWorldDroppedItemIconWidget.h"
 
 ALSWorldDroppedItem::ALSWorldDroppedItem()
@@ -47,33 +48,32 @@ void ALSWorldDroppedItem::Interact_Implementation(APawn* Interactor)
 		return;
 	}
 
-	if (UGameInstance* GameInstance = GetGameInstance())
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Interactor ? Interactor->GetController() : nullptr);
+	ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
+	if (RaidInventory && RaidInventory->IsRaidActive())
 	{
-		if (ULSSessionSubsystem* SessionSubsystem = GameInstance->GetSubsystem<ULSSessionSubsystem>())
+		FLSSessionItem RemainingItem;
+		if (!RaidInventory->TryAddSessionItem(ItemRowName, Amount, RemainingItem))
 		{
-			FLSSessionItem RemainingItem;
-			if (!SessionSubsystem->TryAddSessionItem(ItemRowName, Amount, RemainingItem))
-			{
-				return;
-			}
+			return;
+		}
 
-			if (RemainingItem.ItemRowName.IsNone() || RemainingItem.Amount <= 0)
-			{
-				Destroy();
-			}
-			else
-			{
-				ItemRowName = RemainingItem.ItemRowName;
-				Amount = RemainingItem.Amount;
-				RefreshItemVisual();
-				ForceNetUpdate();
-			}
+		if (RemainingItem.ItemRowName.IsNone() || RemainingItem.Amount <= 0)
+		{
+			Destroy();
 		}
 		else
 		{
-			UE_LOG(LogLS, Warning, TEXT("Cannot pick up dropped item because SessionSubsystem is missing on %s."), *GetNameSafe(this));
+			ItemRowName = RemainingItem.ItemRowName;
+			Amount = RemainingItem.Amount;
+			RefreshItemVisual();
+			ForceNetUpdate();
 		}
+		PlayerController->SyncRaidInventoryToClient();
+		return;
 	}
+
+	UE_LOG(LogLS, Warning, TEXT("Cannot pick up dropped item because RaidInventoryComponent is missing or inactive on %s."), *GetNameSafe(this));
 }
 
 FText ALSWorldDroppedItem::GetInteractText_Implementation()
