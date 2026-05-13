@@ -2,6 +2,7 @@
 
 #include "Components/TextBlock.h"
 #include "Components/WrapBox.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "LostSignal.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
 
@@ -21,6 +22,7 @@ void ULSLootDropWidget::NativeConstruct()
 	}
 
 	LootItemWrapBox->ClearChildren();
+	LootItems.Empty();
 }
 
 void ULSLootDropWidget::SetLootSourceName(const FText InSourceName)
@@ -36,6 +38,12 @@ void ULSLootDropWidget::SetLootSourceName(const FText InSourceName)
 
 void ULSLootDropWidget::SetLootItems(const TArray<FLSDropResult>& InItems)
 {
+	LootItems = InItems;
+	RebuildLootSlots();
+}
+
+void ULSLootDropWidget::RebuildLootSlots()
+{
 	if (!LootItemWrapBox)
 	{
 		UE_LOG(LogLS, Warning, TEXT("LootItemWrapBox is not bound on %s."), *GetNameSafe(this));
@@ -50,8 +58,9 @@ void ULSLootDropWidget::SetLootItems(const TArray<FLSDropResult>& InItems)
 		return;
 	}
 
-	for (const FLSDropResult& Item : InItems)
+	for (int32 SlotIndex = 0; SlotIndex < LootItems.Num(); ++SlotIndex)
 	{
+		const FLSDropResult& Item = LootItems[SlotIndex];
 		ULSItemSlotWidget* SlotWidget = CreateLootSlotWidget();
 		if (!SlotWidget)
 		{
@@ -59,7 +68,9 @@ void ULSLootDropWidget::SetLootItems(const TArray<FLSDropResult>& InItems)
 			continue;
 		}
 
-		if (!Item.ItemRowName.IsNone() && Item.Amount > 0)
+		const bool bHasItem = !Item.ItemRowName.IsNone() && Item.Amount > 0;
+		SlotWidget->SetLootSlotContext(this, SlotIndex, bHasItem);
+		if (bHasItem)
 		{
 			SlotWidget->SetItem(Item.ItemRowName, Item.Amount);
 		}
@@ -74,6 +85,8 @@ void ULSLootDropWidget::SetLootItems(const TArray<FLSDropResult>& InItems)
 
 void ULSLootDropWidget::ClearLootItems()
 {
+	LootItems.Empty();
+
 	if (!LootItemWrapBox)
 	{
 		UE_LOG(LogLS, Warning, TEXT("LootItemWrapBox is not bound on %s."), *GetNameSafe(this));
@@ -97,6 +110,13 @@ void ULSLootDropWidget::ClearLootSlotAt(const int32 SlotIndex)
 		return;
 	}
 
+	if (LootItems.IsValidIndex(SlotIndex))
+	{
+		LootItems.RemoveAt(SlotIndex);
+		RebuildLootSlots();
+		return;
+	}
+
 	ULSItemSlotWidget* SlotWidget = Cast<ULSItemSlotWidget>(LootItemWrapBox->GetChildAt(SlotIndex));
 	if (!SlotWidget)
 	{
@@ -105,6 +125,127 @@ void ULSLootDropWidget::ClearLootSlotAt(const int32 SlotIndex)
 	}
 
 	SlotWidget->ClearItem();
+}
+
+bool ULSLootDropWidget::TransferLootSlotToInventory(const int32 SlotIndex)
+{
+	if (!LootItems.IsValidIndex(SlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot because index %d is invalid on %s."), SlotIndex, *GetNameSafe(this));
+		return false;
+	}
+
+	const FLSDropResult LootItem = LootItems[SlotIndex];
+	if (LootItem.ItemRowName.IsNone() || LootItem.Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot because item data is invalid. Index=%d Row=%s Amount=%d"),
+			SlotIndex,
+			*LootItem.ItemRowName.ToString(),
+			LootItem.Amount);
+		return false;
+	}
+
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot because owning player controller is invalid on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	if (!PlayerController->TransferLootDropItemToSession(LootItem.ItemRowName, LootItem.Amount))
+	{
+		return false;
+	}
+
+	LootItems.RemoveAt(SlotIndex);
+	RebuildLootSlots();
+	if (!HasLootItems())
+	{
+		SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	return true;
+}
+
+bool ULSLootDropWidget::TransferLootSlotToInventorySlot(const int32 SlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex)
+{
+	if (!LootItems.IsValidIndex(SlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot to inventory slot because index %d is invalid on %s."), SlotIndex, *GetNameSafe(this));
+		return false;
+	}
+
+	const FLSDropResult LootItem = LootItems[SlotIndex];
+	if (LootItem.ItemRowName.IsNone() || LootItem.Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot to inventory slot because item data is invalid. Index=%d Row=%s Amount=%d"),
+			SlotIndex,
+			*LootItem.ItemRowName.ToString(),
+			LootItem.Amount);
+		return false;
+	}
+
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot to inventory slot because owning player controller is invalid on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	FLSSessionItem RemainingLootItem;
+	if (!PlayerController->TransferLootDropItemToSessionSlot(LootItem.ItemRowName, LootItem.Amount, ToSlotArea, ToSlotIndex, RemainingLootItem))
+	{
+		return false;
+	}
+
+	if (RemainingLootItem.ItemRowName.IsNone() || RemainingLootItem.Amount <= 0)
+	{
+		LootItems.RemoveAt(SlotIndex);
+	}
+	else
+	{
+		LootItems[SlotIndex].ItemRowName = RemainingLootItem.ItemRowName;
+		LootItems[SlotIndex].Amount = RemainingLootItem.Amount;
+		if (RemainingLootItem.ItemRowName != LootItem.ItemRowName)
+		{
+			LootItems[SlotIndex].ItemText = FText::GetEmpty();
+		}
+	}
+
+	RebuildLootSlots();
+	if (!HasLootItems())
+	{
+		SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	return true;
+}
+
+bool ULSLootDropWidget::TransferFirstLootSlotToInventory()
+{
+	for (int32 SlotIndex = 0; SlotIndex < LootItems.Num(); ++SlotIndex)
+	{
+		const FLSDropResult& LootItem = LootItems[SlotIndex];
+		if (!LootItem.ItemRowName.IsNone() && LootItem.Amount > 0)
+		{
+			return TransferLootSlotToInventory(SlotIndex);
+		}
+	}
+
+	return false;
+}
+
+bool ULSLootDropWidget::HasLootItems() const
+{
+	for (const FLSDropResult& LootItem : LootItems)
+	{
+		if (!LootItem.ItemRowName.IsNone() && LootItem.Amount > 0)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 ULSItemSlotWidget* ULSLootDropWidget::CreateLootSlotWidget() const

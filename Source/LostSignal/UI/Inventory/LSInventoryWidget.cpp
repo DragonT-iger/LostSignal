@@ -11,6 +11,7 @@
 #include "Session/LSSessionSubsystem.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
+#include "UI/LootDrop/LSLootDropWidget.h"
 
 namespace
 {
@@ -221,6 +222,24 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 	return bChanged;
 }
 
+bool ULSInventoryWidget::HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, const int32 LootSlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex)
+{
+	if (!LootDropWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle loot slot drop because LootDropWidget is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const bool bTransferred = LootDropWidget->TransferLootSlotToInventorySlot(LootSlotIndex, ToSlotArea, ToSlotIndex);
+	if (bTransferred)
+	{
+		RebuildInventorySlots();
+		RebuildConfirmedStorageSlots();
+	}
+
+	return bTransferred;
+}
+
 void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 {
 	if (!ConfirmedStorageSlotWrapBox)
@@ -333,6 +352,11 @@ bool ULSInventoryWidget::HandleInventoryBackgroundDrop(const FGeometry& InGeomet
 {
 	ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
 	if (!DragOperation)
+	{
+		return false;
+	}
+
+	if (DragOperation->SourceLootDropWidget)
 	{
 		return false;
 	}

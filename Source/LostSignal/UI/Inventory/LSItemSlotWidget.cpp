@@ -14,6 +14,7 @@
 #include "LostSignal.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSInventoryWidget.h"
+#include "UI/LootDrop/LSLootDropWidget.h"
 
 void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount)
 {
@@ -90,7 +91,17 @@ void ULSItemSlotWidget::ClearItem()
 void ULSItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)
 {
 	InventoryWidget = InInventoryWidget;
+	LootDropWidget.Reset();
 	SlotArea = InSlotArea;
+	SlotIndex = InSlotIndex;
+	bHasItem = bInHasItem;
+}
+
+void ULSItemSlotWidget::SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, const int32 InSlotIndex, const bool bInHasItem)
+{
+	LootDropWidget = InLootDropWidget;
+	InventoryWidget.Reset();
+	SlotArea = ELSInventorySlotArea::Inventory;
 	SlotIndex = InSlotIndex;
 	bHasItem = bInHasItem;
 }
@@ -113,7 +124,7 @@ void ULSItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 
 FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (!CanStartInventoryDrag())
+	if (!CanStartItemDrag())
 	{
 		return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 	}
@@ -139,7 +150,7 @@ void ULSItemSlotWidget::NativeOnDragLeave(const FDragDropEvent& InDragDropEvent,
 
 void ULSItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
 {
-	if (!CanStartInventoryDrag())
+	if (!CanStartItemDrag())
 	{
 		return;
 	}
@@ -153,6 +164,7 @@ void ULSItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const 
 	}
 
 	DragOperation->SourceInventoryWidget = InventoryWidget.Get();
+	DragOperation->SourceLootDropWidget = LootDropWidget.Get();
 	DragOperation->SourceSlotWidget = this;
 	DragOperation->SourceSlotIndex = SlotIndex;
 	DragOperation->SourceSlotArea = SlotArea;
@@ -175,6 +187,15 @@ bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDro
 	ApplyHoverVisual();
 
 	ULSInventoryWidget* TargetInventoryWidget = InventoryWidget.Get();
+	if (TargetInventoryWidget && DragOperation->SourceLootDropWidget)
+	{
+		return TargetInventoryWidget->HandleLootSlotDrop(
+			DragOperation->SourceLootDropWidget,
+			DragOperation->SourceSlotIndex,
+			SlotArea,
+			SlotIndex);
+	}
+
 	if (!TargetInventoryWidget || DragOperation->SourceInventoryWidget != TargetInventoryWidget)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot because source/target inventory widget does not match."));
@@ -211,9 +232,9 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 	ItemIconImage->SetColorAndOpacity(bIsHovered ? HoveredIconTint : NormalIconTint);
 }
 
-bool ULSItemSlotWidget::CanStartInventoryDrag() const
+bool ULSItemSlotWidget::CanStartItemDrag() const
 {
-	return bHasItem && InventoryWidget.IsValid() && SlotIndex != INDEX_NONE;
+	return bHasItem && SlotIndex != INDEX_NONE && (InventoryWidget.IsValid() || LootDropWidget.IsValid());
 }
 
 bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const
@@ -222,6 +243,11 @@ bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InO
 	if (!DragOperation || !InventoryWidget.IsValid() || SlotIndex == INDEX_NONE || DragOperation->SourceSlotIndex == INDEX_NONE)
 	{
 		return false;
+	}
+
+	if (DragOperation->SourceLootDropWidget)
+	{
+		return true;
 	}
 
 	if (DragOperation->SourceInventoryWidget != InventoryWidget.Get())

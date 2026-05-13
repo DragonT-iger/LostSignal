@@ -28,6 +28,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void HideLootDropWidget();
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	bool TransferLootDropItemToSession(FName ItemRowName, int32 Amount);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	bool TransferFirstLootDropItemToInventory();
+
+	bool TransferLootDropItemToSessionSlot(FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
 	bool DropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector& DropLocation, float DropYaw);
 
 protected:
@@ -57,6 +64,12 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerDropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector_NetQuantize DropLocation, float DropYaw);
 
+	UFUNCTION(Server, Reliable)
+	void ServerTransferLootDropItemToSession(FName ItemRowName, int32 Amount);
+
+	UFUNCTION(Server, Reliable)
+	void ServerTransferLootDropItemToSessionSlot(FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
+
 	UFUNCTION(Client, Reliable)
 	void ClientShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results);
 
@@ -66,4 +79,6 @@ private:
 	void ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results);
 	void HideLootDropWidgetLocal();
 	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector& DropLocation, float DropYaw);
+	bool TransferLootDropItemToSessionInternal(FName ItemRowName, int32 Amount);
+	bool TransferLootDropItemToSessionSlotInternal(FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
 };

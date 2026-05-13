@@ -7,6 +7,7 @@
 
 class UImage;
 class ULSInventoryWidget;
+class ULSLootDropWidget;
 class UTextBlock;
 class UTexture2D;
 class UDragDropOperation;
@@ -24,6 +25,7 @@ public:
 	void ClearItem();
 
 	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem);
+	void SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, int32 InSlotIndex, bool bInHasItem);
 	void RestoreDragSourceVisual();
 
 protected:
@@ -52,6 +54,7 @@ protected:
 
 private:
 	TWeakObjectPtr<ULSInventoryWidget> InventoryWidget;
+	TWeakObjectPtr<ULSLootDropWidget> LootDropWidget;
 	ELSInventorySlotArea SlotArea = ELSInventorySlotArea::Inventory;
 	int32 SlotIndex = INDEX_NONE;
 	bool bHasItem = false;
@@ -59,7 +62,7 @@ private:
 	bool bIsDragTarget = false;
 
 	void ApplyHoverVisual();
-	bool CanStartInventoryDrag() const;
+	bool CanStartItemDrag() const;
 	bool IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const;
 	UTexture2D* LoadIconTextureByRowName(FName ItemRowName) const;
 	UTexture2D* LoadDefaultIconTexture() const;

@@ -140,6 +140,103 @@ void ALSPlayerControllerBase::HideLootDropWidgetLocal()
 	}
 }
 
+bool ALSPlayerControllerBase::TransferLootDropItemToSession(const FName ItemRowName, const int32 Amount)
+{
+	if (ItemRowName.IsNone() || Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop item because item data is invalid. Row=%s Amount=%d"),
+			*ItemRowName.ToString(),
+			Amount);
+		return false;
+	}
+
+	if (HasAuthority())
+	{
+		return TransferLootDropItemToSessionInternal(ItemRowName, Amount);
+	}
+
+	ServerTransferLootDropItemToSession(ItemRowName, Amount);
+	return true;
+}
+
+void ALSPlayerControllerBase::ServerTransferLootDropItemToSession_Implementation(const FName ItemRowName, const int32 Amount)
+{
+	TransferLootDropItemToSessionInternal(ItemRowName, Amount);
+}
+
+bool ALSPlayerControllerBase::TransferLootDropItemToSessionSlot(const FName ItemRowName, const int32 Amount, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutLootItem)
+{
+	if (ItemRowName.IsNone() || Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop item to slot because item data is invalid. Row=%s Amount=%d"),
+			*ItemRowName.ToString(),
+			Amount);
+		return false;
+	}
+
+	if (!TransferLootDropItemToSessionSlotInternal(ItemRowName, Amount, ToSlotArea, ToSlotIndex, OutLootItem))
+	{
+		return false;
+	}
+
+	if (!HasAuthority())
+	{
+		ServerTransferLootDropItemToSessionSlot(ItemRowName, Amount, ToSlotArea, ToSlotIndex);
+	}
+
+	return true;
+}
+
+void ALSPlayerControllerBase::ServerTransferLootDropItemToSessionSlot_Implementation(const FName ItemRowName, const int32 Amount, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex)
+{
+	FLSSessionItem IgnoredLootItem;
+	TransferLootDropItemToSessionSlotInternal(ItemRowName, Amount, ToSlotArea, ToSlotIndex, IgnoredLootItem);
+}
+
+bool ALSPlayerControllerBase::TransferFirstLootDropItemToInventory()
+{
+	if (!LootDropWidgetInstance || !LootDropWidgetInstance->IsVisible())
+	{
+		return false;
+	}
+
+	return LootDropWidgetInstance->TransferFirstLootSlotToInventory();
+}
+
+bool ALSPlayerControllerBase::TransferLootDropItemToSessionInternal(const FName ItemRowName, const int32 Amount)
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
+	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop item because raid session is not active."));
+		return false;
+	}
+
+	SessionSubsystem->AddSessionItem(ItemRowName, Amount);
+	return true;
+}
+
+bool ALSPlayerControllerBase::TransferLootDropItemToSessionSlotInternal(const FName ItemRowName, const int32 Amount, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutLootItem)
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSessionSubsystem* SessionSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
+	if (!SessionSubsystem || !SessionSubsystem->IsRaidActive())
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop item to slot because raid session is not active."));
+		return false;
+	}
+
+	OutLootItem.ItemRowName = ItemRowName;
+	OutLootItem.Amount = Amount;
+	return SessionSubsystem->DropExternalItemToSessionSlot(OutLootItem, ToSlotArea, ToSlotIndex);
+}
+
 bool ALSPlayerControllerBase::DropSessionSlotToWorld(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector& DropLocation, const float DropYaw)
 {
 	if (HasAuthority())

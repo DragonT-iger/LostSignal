@@ -474,6 +474,51 @@ bool ULSSessionSubsystem::DropSessionSlot(const ELSInventorySlotArea FromArea, c
 	return true;
 }
 
+bool ULSSessionSubsystem::DropExternalItemToSessionSlot(FLSSessionItem& InOutExternalItem, const ELSInventorySlotArea ToArea, const int32 ToIndex)
+{
+	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
+	if (!IsFilledSessionSlot(InOutExternalItem) || ToIndex < 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot drop external item. ToArea=%d To=%d Row=%s Amount=%d"),
+			static_cast<int32>(ToArea),
+			ToIndex,
+			*InOutExternalItem.ItemRowName.ToString(),
+			InOutExternalItem.Amount);
+		return false;
+	}
+
+	EnsureSlotIndex(*ToSlots, ToIndex);
+	FLSSessionItem& ToSlot = (*ToSlots)[ToIndex];
+
+	if (!IsFilledSessionSlot(ToSlot))
+	{
+		ToSlot = InOutExternalItem;
+		InOutExternalItem = MakeEmptySessionSlot();
+		return true;
+	}
+
+	if (InOutExternalItem.ItemRowName == ToSlot.ItemRowName)
+	{
+		const int32 MaxStack = ResolveItemMaxStackForSession(InOutExternalItem.ItemRowName);
+		const int32 AddAmount = FMath::Min(InOutExternalItem.Amount, MaxStack - ToSlot.Amount);
+		if (AddAmount <= 0)
+		{
+			return false;
+		}
+
+		ToSlot.Amount += AddAmount;
+		InOutExternalItem.Amount -= AddAmount;
+		if (InOutExternalItem.Amount <= 0)
+		{
+			InOutExternalItem = MakeEmptySessionSlot();
+		}
+		return true;
+	}
+
+	Swap(InOutExternalItem, ToSlot);
+	return true;
+}
+
 bool ULSSessionSubsystem::GetSessionSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, FLSSessionItem& OutItem) const
 {
 	const TArray<FLSSessionItem>& Slots = SlotArea == ELSInventorySlotArea::Safe ? SessionSafeInventory : SessionInventory;

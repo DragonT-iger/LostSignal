@@ -2,7 +2,6 @@
 #include "Core/LSPlayerControllerBase.h"
 #include "LostSignal.h"
 #include "Net/UnrealNetwork.h"
-#include "Session/LSSessionSubsystem.h"
 
 void ALSLootBox::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -50,16 +49,6 @@ void ALSLootBox::Interact_Implementation(APawn* Interactor)
 	else
 	{
 		UE_LOG(LogLS, Warning, TEXT("ALSLootBox: Cannot show loot drop widget because interactor controller is invalid on %s."), *GetNameSafe(this));
-	}
-
-	// 드랍 결과를 세션 인벤토리에 등록 (탈출 시 보관 처리됨)
-	ULSSessionSubsystem* Session = GI->GetSubsystem<ULSSessionSubsystem>();
-	if (Session)
-	{
-		for (const FLSDropResult& Result : Results)
-		{
-			Session->AddSessionItem(Result.ItemRowName, Result.Amount);
-		}
 	}
 
 	OnLootResultReceived(Results);

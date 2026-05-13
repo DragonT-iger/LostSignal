@@ -220,6 +220,19 @@ void ALSPlayerCharacter::OnInteract()
 
 	if (IsInventoryWidgetOpen())
 	{
+		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetController()))
+		{
+			if (PlayerController->TransferFirstLootDropItemToInventory())
+			{
+				if (ULSInventoryWidget* LSInventoryWidget = Cast<ULSInventoryWidget>(InventoryWidget))
+				{
+					LSInventoryWidget->RebuildInventorySlots();
+					LSInventoryWidget->RebuildConfirmedStorageSlots();
+				}
+				return;
+			}
+		}
+
 		HideInventoryWidget();
 		return;
 	}

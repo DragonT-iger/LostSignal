@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Data/LSDropSubsystem.h"
+#include "Session/LSSessionSubsystem.h"
 #include "LSLootDropWidget.generated.h"
 
 class ULSItemSlotWidget;
@@ -29,6 +30,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void ClearLootSlotAt(int32 SlotIndex);
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	bool TransferLootSlotToInventory(int32 SlotIndex);
+
+	bool TransferLootSlotToInventorySlot(int32 SlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	bool TransferFirstLootSlotToInventory();
+
+	UFUNCTION(BlueprintPure, Category="LS/UI")
+	bool HasLootItems() const;
+
 protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTextBlock> LootSourceNameText;
@@ -40,5 +52,9 @@ protected:
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
 
 private:
+	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/UI")
+	TArray<FLSDropResult> LootItems;
+
+	void RebuildLootSlots();
 	ULSItemSlotWidget* CreateLootSlotWidget() const;
 };

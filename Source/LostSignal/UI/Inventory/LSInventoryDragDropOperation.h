@@ -7,6 +7,7 @@
 
 class ULSInventoryWidget;
 class ULSItemSlotWidget;
+class ULSLootDropWidget;
 
 UCLASS()
 class LOSTSIGNAL_API ULSInventoryDragDropOperation : public UDragDropOperation
@@ -16,6 +17,9 @@ class LOSTSIGNAL_API ULSInventoryDragDropOperation : public UDragDropOperation
 public:
 	UPROPERTY()
 	TObjectPtr<ULSInventoryWidget> SourceInventoryWidget;
+
+	UPROPERTY()
+	TObjectPtr<ULSLootDropWidget> SourceLootDropWidget;
 
 	UPROPERTY()
 	TObjectPtr<ULSItemSlotWidget> SourceSlotWidget;

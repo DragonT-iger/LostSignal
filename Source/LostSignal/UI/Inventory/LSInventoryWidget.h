@@ -11,6 +11,7 @@ class UButton;
 class UDragDropOperation;
 class UWrapBox;
 class ULSItemSlotWidget;
+class ULSLootDropWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSInventoryWidget : public UUserWidget
@@ -33,6 +34,7 @@ public:
 	void RebuildConfirmedStorageSlots();
 
 	bool HandleInventorySlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
+	bool HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 
 protected:
 	virtual void NativeDestruct() override;
