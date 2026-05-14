@@ -9,6 +9,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
 #include "GAS/Abilities/LSGA_Bypass.h"
+#include "GAS/Abilities/LSGA_Execution.h"
+#include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "LostSignal.h"
 #include "Skills/LSSkillDataAsset.h"
@@ -32,6 +34,12 @@ bool ULSPlayerSkillComponent::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 	ULSSkillPreviewComponent* PreviewComponent = ResolvePreviewComponent();
 	if (!SkillData || !PreviewComponent)
 	{
+		return false;
+	}
+
+	if (IsSkillCooldownActive(SkillData))
+	{
+		LogSkillCooldownBlocked(SkillData, TEXT("Preview"));
 		return false;
 	}
 
@@ -102,7 +110,7 @@ bool ULSPlayerSkillComponent::ConfirmAnyActiveSkillPreview(const FVector& Target
 			return ActivateSkillOnServer(SlotToActivate, TargetLocation, AimRotation.Yaw);
 		}
 
-		TryPredictBypassMovement(GetSkillData(SlotToActivate), TargetLocation, AimRotation.Yaw);
+		TryPredictFastMovementSkill(GetSkillData(SlotToActivate), TargetLocation, AimRotation.Yaw);
 		ServerRequestActivateSkill(SlotToActivate, TargetLocation, AimRotation.Yaw);
 	}
 
@@ -178,9 +186,85 @@ bool ULSPlayerSkillComponent::ConsumePendingAbilityContext(TSubclassOf<UGameplay
 	return true;
 }
 
+bool ULSPlayerSkillComponent::ApplySkillCooldown(const ULSSkillDataAsset* SkillData) const
+{
+	AActor* OwnerActor = GetOwner();
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerActor);
+	if (!OwnerActor || !OwnerActor->HasAuthority() || !ASC || !SkillData)
+	{
+		return false;
+	}
+
+	const FGameplayTag CooldownTag = SkillData->GetCooldownTag();
+	const float BaseDuration = SkillData->GetCooldownDuration();
+	if (!CooldownTag.IsValid() || BaseDuration <= 0.0f || !SkillData->CooldownEffectClass)
+	{
+		return false;
+	}
+
+	const float CooldownReduction = ASC->GetNumericAttribute(ULSCharacterAttributeSet::GetCooldownReductionAttribute());
+	const float ReductionRatio = CooldownReduction > 1.0f ? CooldownReduction * 0.01f : CooldownReduction;
+	const float FinalDuration = BaseDuration * FMath::Clamp(1.0f - ReductionRatio, 0.0f, 1.0f);
+	if (FinalDuration <= 0.0f)
+	{
+		return false;
+	}
+
+	FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
+	EffectContext.AddSourceObject(SkillData);
+
+	const FGameplayEffectSpecHandle SpecHandle = ASC->MakeOutgoingSpec(SkillData->CooldownEffectClass, 1.0f, EffectContext);
+	if (!SpecHandle.IsValid())
+	{
+		return false;
+	}
+
+	SpecHandle.Data->SetDuration(FinalDuration, true);
+	SpecHandle.Data->DynamicGrantedTags.AddTag(CooldownTag);
+	ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+
+	UE_LOG(LogLS, Log, TEXT("%s applied skill cooldown. Skill=%s Tag=%s Duration=%.2f Base=%.2f Reduction=%.2f"),
+		*GetNameSafe(OwnerActor),
+		*GetNameSafe(SkillData),
+		*CooldownTag.ToString(),
+		FinalDuration,
+		BaseDuration,
+		CooldownReduction);
+
+	return true;
+}
+
+bool ULSPlayerSkillComponent::IsSkillCooldownActive(const ULSSkillDataAsset* SkillData) const
+{
+	const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+	const FGameplayTag CooldownTag = SkillData ? SkillData->GetCooldownTag() : FGameplayTag();
+	return ASC && CooldownTag.IsValid() && ASC->HasMatchingGameplayTag(CooldownTag);
+}
+
+float ULSPlayerSkillComponent::GetSkillCooldownRemaining(const ULSSkillDataAsset* SkillData) const
+{
+	const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+	const FGameplayTag CooldownTag = SkillData ? SkillData->GetCooldownTag() : FGameplayTag();
+	if (!ASC || !CooldownTag.IsValid())
+	{
+		return 0.0f;
+	}
+
+	FGameplayTagContainer QueryTags;
+	QueryTags.AddTag(CooldownTag);
+
+	float RemainingTime = 0.0f;
+	for (const TPair<float, float>& TimePair : ASC->GetActiveEffectsTimeRemainingAndDuration(FGameplayEffectQuery::MakeQuery_MatchAllOwningTags(QueryTags)))
+	{
+		RemainingTime = FMath::Max(RemainingTime, TimePair.Key);
+	}
+
+	return RemainingTime;
+}
+
 void ULSPlayerSkillComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	FinishPredictedBypass();
+	FinishPredictedFastMovementSkill();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -219,6 +303,12 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 		return false;
 	}
 
+	if (IsSkillCooldownActive(SkillData))
+	{
+		LogSkillCooldownBlocked(SkillData, TEXT("ServerActivate"));
+		return false;
+	}
+
 	FLSSkillActivationContext Context;
 	Context.SourceActor = OwnerActor;
 	Context.SkillData = SkillData;
@@ -234,6 +324,18 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 		*GetNameSafe(OwnerActor),
 		*GetNameSafe(SkillData));
 	return false;
+}
+
+void ULSPlayerSkillComponent::LogSkillCooldownBlocked(const ULSSkillDataAsset* SkillData, const TCHAR* Phase) const
+{
+	const AActor* OwnerActor = GetOwner();
+	const FGameplayTag CooldownTag = SkillData ? SkillData->GetCooldownTag() : FGameplayTag();
+	UE_LOG(LogLS, Log, TEXT("%s skill blocked by cooldown. Phase=%s Skill=%s Tag=%s Remaining=%.2f"),
+		*GetNameSafe(OwnerActor),
+		Phase ? Phase : TEXT("Unknown"),
+		*GetNameSafe(SkillData),
+		CooldownTag.IsValid() ? *CooldownTag.ToString() : TEXT("None"),
+		GetSkillCooldownRemaining(SkillData));
 }
 
 bool ULSPlayerSkillComponent::TryActivateGameplayAbility(ULSSkillDataAsset* SkillData, const FLSSkillActivationContext& Context)
@@ -310,10 +412,10 @@ bool ULSPlayerSkillComponent::TrySendPassiveGameplayEvent(ULSSkillDataAsset* Ski
 	return true;
 }
 
-bool ULSPlayerSkillComponent::TryPredictBypassMovement(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw)
+bool ULSPlayerSkillComponent::TryPredictFastMovementSkill(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw)
 {
 	const TSubclassOf<UGameplayAbility> AbilityClass = SkillData ? SkillData->GetAbilityClass() : nullptr;
-	if (!AbilityClass || !AbilityClass->IsChildOf(ULSGA_Bypass::StaticClass()) || bPredictedBypassInProgress)
+	if (!AbilityClass || bPredictedFastMovementInProgress || IsSkillCooldownActive(SkillData))
 	{
 		return false;
 	}
@@ -324,10 +426,9 @@ bool ULSPlayerSkillComponent::TryPredictBypassMovement(ULSSkillDataAsset* SkillD
 		return false;
 	}
 
-	const ULSGA_Bypass* BypassCDO = AbilityClass->GetDefaultObject<ULSGA_Bypass>();
 	float Distance = 0.0f;
 	float Duration = 0.0f;
-	if (!BypassCDO || !BypassCDO->ResolveMovementParams(SkillData, Distance, Duration))
+	if (!ResolvePredictedFastMovementParams(SkillData, Distance, Duration))
 	{
 		return false;
 	}
@@ -352,7 +453,7 @@ bool ULSPlayerSkillComponent::TryPredictBypassMovement(ULSSkillDataAsset* SkillD
 	}
 
 	TSharedPtr<FRootMotionSource_ConstantForce> RootMotion = MakeShared<FRootMotionSource_ConstantForce>();
-	RootMotion->InstanceName = FName("PredictedBypass");
+	RootMotion->InstanceName = FName("PredictedFastMovementSkill");
 	RootMotion->AccumulateMode = ERootMotionAccumulateMode::Override;
 	RootMotion->Priority = 5;
 	RootMotion->Force = AimDirection * (Distance / Duration);
@@ -360,36 +461,59 @@ bool ULSPlayerSkillComponent::TryPredictBypassMovement(ULSSkillDataAsset* SkillD
 	RootMotion->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
 	RootMotion->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
 
-	PredictedBypassRootMotionSourceID = MovementComponent->ApplyRootMotionSource(RootMotion);
-	bPredictedBypassInProgress = true;
+	PredictedFastMovementRootMotionSourceID = MovementComponent->ApplyRootMotionSource(RootMotion);
+	bPredictedFastMovementInProgress = true;
 
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().ClearTimer(PredictedBypassTimerHandle);
-		World->GetTimerManager().SetTimer(PredictedBypassTimerHandle, this, &ULSPlayerSkillComponent::FinishPredictedBypass, Duration, false);
+		World->GetTimerManager().ClearTimer(PredictedFastMovementTimerHandle);
+		World->GetTimerManager().SetTimer(PredictedFastMovementTimerHandle, this, &ULSPlayerSkillComponent::FinishPredictedFastMovementSkill, Duration, false);
 	}
 
 	return true;
 }
 
-void ULSPlayerSkillComponent::FinishPredictedBypass()
+bool ULSPlayerSkillComponent::ResolvePredictedFastMovementParams(ULSSkillDataAsset* SkillData, float& OutDistance, float& OutDuration) const
+{
+	const TSubclassOf<UGameplayAbility> AbilityClass = SkillData ? SkillData->GetAbilityClass() : nullptr;
+	if (!AbilityClass)
+	{
+		return false;
+	}
+
+	if (AbilityClass->IsChildOf(ULSGA_Bypass::StaticClass()))
+	{
+		const ULSGA_Bypass* BypassCDO = AbilityClass->GetDefaultObject<ULSGA_Bypass>();
+		return BypassCDO && BypassCDO->ResolveMovementParams(SkillData, OutDistance, OutDuration);
+	}
+
+	if (AbilityClass->IsChildOf(ULSGA_Execution::StaticClass()))
+	{
+		const ULSGA_Execution* ExecutionCDO = AbilityClass->GetDefaultObject<ULSGA_Execution>();
+		return ExecutionCDO && ExecutionCDO->ResolveMovementParams(SkillData, OutDistance, OutDuration);
+	}
+
+	return false;
+}
+
+void ULSPlayerSkillComponent::FinishPredictedFastMovementSkill()
 {
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().ClearTimer(PredictedBypassTimerHandle);
+		World->GetTimerManager().ClearTimer(PredictedFastMovementTimerHandle);
 	}
 
-	if (bPredictedBypassInProgress)
+	if (bPredictedFastMovementInProgress)
 	{
 		if (ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner()))
 		{
 			if (UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement())
 			{
-				MovementComponent->RemoveRootMotionSourceByID(PredictedBypassRootMotionSourceID);
+				MovementComponent->RemoveRootMotionSourceByID(PredictedFastMovementRootMotionSourceID);
 			}
 		}
 	}
 
-	PredictedBypassRootMotionSourceID = 0;
-	bPredictedBypassInProgress = false;
+	PredictedFastMovementRootMotionSourceID = 0;
+	bPredictedFastMovementInProgress = false;
 }

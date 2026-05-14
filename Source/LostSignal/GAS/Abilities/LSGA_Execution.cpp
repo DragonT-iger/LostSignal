@@ -56,6 +56,22 @@ ULSGA_Execution::ULSGA_Execution()
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
+bool ULSGA_Execution::ResolveMovementParams(const ULSSkillDataAsset* InSkillData, float& OutDistance, float& OutDuration) const
+{
+	const ULSExecutionSkillDataAsset* InExecutionData = Cast<ULSExecutionSkillDataAsset>(InSkillData);
+
+	FLSCharacterSkillRow Row;
+	const bool bHasRow = InSkillData && InSkillData->TryGetSkillRow(Row);
+	OutDistance = bHasRow && Row.Range_X > 0.0f
+		? Row.Range_X
+		: InExecutionData ? InExecutionData->FallbackDashDistance : 650.0f;
+	OutDuration = bHasRow && Row.Skill_Time > 0.0f
+		? Row.Skill_Time
+		: InExecutionData ? InExecutionData->FallbackDashDuration : 0.25f;
+
+	return OutDistance > 0.0f && OutDuration > 0.0f;
+}
+
 void ULSGA_Execution::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -94,20 +110,10 @@ void ULSGA_Execution::ActivateAbility(
 		return;
 	}
 
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
 	FLSCharacterSkillRow Row;
 	const bool bHasRow = SkillContext.SkillData->TryGetSkillRow(Row);
-	CachedDashDistance = bHasRow && Row.Range_X > 0.0f
-		? Row.Range_X
-		: ExecutionData ? ExecutionData->FallbackDashDistance : 650.0f;
-	const float DashDuration = bHasRow && Row.Skill_Time > 0.0f
-		? Row.Skill_Time
-		: ExecutionData ? ExecutionData->FallbackDashDuration : 0.25f;
+	float DashDuration = 0.0f;
+	ResolveMovementParams(SkillContext.SkillData, CachedDashDistance, DashDuration);
 	CachedSlashWidth = bHasRow && Row.Range_Y > 0.0f
 		? Row.Range_Y
 		: ExecutionData ? ExecutionData->FallbackSlashWidth : 220.0f;
@@ -140,6 +146,13 @@ void ULSGA_Execution::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
 
 	CachedStartLocation = SourceActor->GetActorLocation();
 	CachedConsumedAccelerationStacks = ConsumeCombatAccelerationStacks(SourceActor);

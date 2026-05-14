@@ -21,6 +21,11 @@ namespace LSGameplayTags
 
 	// Cooldown tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Dash)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill_Overclock)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill_Bypass)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill_ShortCircuit)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill_Override)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Skill_Execution)
 
 	// Combat phase tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Attacking)

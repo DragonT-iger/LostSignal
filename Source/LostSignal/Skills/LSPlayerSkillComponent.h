@@ -50,6 +50,9 @@ public:
 
 	void HandleBasicAttackHit(int32 ComboIndex, int32 ValidHitCount);
 	bool ConsumePendingAbilityContext(TSubclassOf<UGameplayAbility> AbilityClass, FLSSkillActivationContext& OutContext);
+	bool ApplySkillCooldown(const ULSSkillDataAsset* SkillData) const;
+	bool IsSkillCooldownActive(const ULSSkillDataAsset* SkillData) const;
+	float GetSkillCooldownRemaining(const ULSSkillDataAsset* SkillData) const;
 
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -78,13 +81,15 @@ private:
 
 	bool CanUseLocalPreview() const;
 	bool ActivateSkillOnServer(ELSPlayerSkillSlot Slot, const FVector& TargetLocation, float AimYaw);
+	void LogSkillCooldownBlocked(const ULSSkillDataAsset* SkillData, const TCHAR* Phase) const;
 	bool TryActivateGameplayAbility(ULSSkillDataAsset* SkillData, const FLSSkillActivationContext& Context);
 	bool TrySendPassiveGameplayEvent(ULSSkillDataAsset* SkillData, int32 ComboIndex) const;
-	bool TryPredictBypassMovement(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw);
-	void FinishPredictedBypass();
+	bool TryPredictFastMovementSkill(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw);
+	bool ResolvePredictedFastMovementParams(ULSSkillDataAsset* SkillData, float& OutDistance, float& OutDuration) const;
+	void FinishPredictedFastMovementSkill();
 	ULSSkillPreviewComponent* ResolvePreviewComponent() const;
 
-	FTimerHandle PredictedBypassTimerHandle;
-	uint16 PredictedBypassRootMotionSourceID = 0;
-	bool bPredictedBypassInProgress = false;
+	FTimerHandle PredictedFastMovementTimerHandle;
+	uint16 PredictedFastMovementRootMotionSourceID = 0;
+	bool bPredictedFastMovementInProgress = false;
 };

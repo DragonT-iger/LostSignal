@@ -6,5 +6,6 @@
 ULSCombatAccelerationSkillDataAsset::ULSCombatAccelerationSkillDataAsset()
 {
 	AbilityClass = ULSGA_CombatAccelerationPassive::StaticClass();
+	FallbackCooldown = 0.0f;
 	BuffEffectClass = ULSGE_CombatAcceleration::StaticClass();
 }

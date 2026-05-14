@@ -16,6 +16,8 @@ class LOSTSIGNAL_API ULSGA_Execution : public UGameplayAbility
 public:
 	ULSGA_Execution();
 
+	bool ResolveMovementParams(const class ULSSkillDataAsset* SkillData, float& OutDistance, float& OutDuration) const;
+
 protected:
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,

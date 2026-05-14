@@ -4,6 +4,7 @@
 #include "Combat/LSCombatTypes.h"
 #include "Engine/DataAsset.h"
 #include "Engine/DataTable.h"
+#include "GameplayTagContainer.h"
 #include "Skills/LSSkillAreaTypes.h"
 #include "Skills/LSSkillTypes.h"
 #include "LSSkillDataAsset.generated.h"
@@ -30,12 +31,27 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	TSubclassOf<UGameplayAbility> GetAbilityClass() const;
 
+	UFUNCTION(BlueprintPure, Category="LS/Skill|Cooldown")
+	float GetCooldownDuration() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Skill|Cooldown")
+	FGameplayTag GetCooldownTag() const;
+
 	/** Legacy migration-only field. Runtime skill execution must use AbilityClass/DataAsset fields. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TSubclassOf<ULSSkill> SkillClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TSubclassOf<UGameplayAbility> AbilityClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Cooldown")
+	FGameplayTag CooldownTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Cooldown", meta=(ClampMin="0.0"))
+	float FallbackCooldown = 0.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Cooldown")
+	TSubclassOf<UGameplayEffect> CooldownEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|DataTable")
 	FDataTableRowHandle SkillRow;

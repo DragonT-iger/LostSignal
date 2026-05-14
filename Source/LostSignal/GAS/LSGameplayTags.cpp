@@ -12,6 +12,11 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Ability_MonsterMelee, "LS.Ability.Monster.Melee")
 
 	UE_DEFINE_GAMEPLAY_TAG(Cooldown_Dash, "LS.Cooldown.Dash")
+	UE_DEFINE_GAMEPLAY_TAG(Cooldown_Skill_Overclock, "LS.Cooldown.Skill.Overclock")
+	UE_DEFINE_GAMEPLAY_TAG(Cooldown_Skill_Bypass, "LS.Cooldown.Skill.Bypass")
+	UE_DEFINE_GAMEPLAY_TAG(Cooldown_Skill_ShortCircuit, "LS.Cooldown.Skill.ShortCircuit")
+	UE_DEFINE_GAMEPLAY_TAG(Cooldown_Skill_Override, "LS.Cooldown.Skill.Override")
+	UE_DEFINE_GAMEPLAY_TAG(Cooldown_Skill_Execution, "LS.Cooldown.Skill.Execution")
 
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Attacking, "LS.Combat.Attacking")
 	UE_DEFINE_GAMEPLAY_TAG(Combat_AttackActive, "LS.Combat.AttackActive")

@@ -58,6 +58,7 @@ void ULSGA_ShortCircuit::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
 
 	UWorld* World = SourceActor->GetWorld();
 	if (!World)

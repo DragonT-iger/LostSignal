@@ -82,6 +82,7 @@ void ULSGA_Override::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
 
 	FLSCharacterSkillRow Row;
 	const bool bHasRow = SkillContext.SkillData->TryGetSkillRow(Row);

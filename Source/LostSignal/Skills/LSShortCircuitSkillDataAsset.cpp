@@ -1,12 +1,14 @@
 #include "Skills/LSShortCircuitSkillDataAsset.h"
 
 #include "GAS/Abilities/LSGA_ShortCircuit.h"
+#include "GAS/LSGameplayTags.h"
 #include "Skills/LSShortCircuitField.h"
 #include "Skills/LSShortCircuitProjectile.h"
 
 ULSShortCircuitSkillDataAsset::ULSShortCircuitSkillDataAsset()
 {
 	AbilityClass = ULSGA_ShortCircuit::StaticClass();
+	CooldownTag = LSGameplayTags::Cooldown_Skill_ShortCircuit;
 	ProjectileClass = ALSShortCircuitProjectile::StaticClass();
 	FieldClass = ALSShortCircuitField::StaticClass();
 	AttackCoefficient = 1.5f;

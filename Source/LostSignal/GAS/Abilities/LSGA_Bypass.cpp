@@ -46,12 +46,6 @@ void ULSGA_Bypass::ActivateAbility(
 		return;
 	}
 
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
 	float Distance = 0.0f;
 	float Duration = 0.0f;
 	if (!ResolveMovementParams(SkillContext.SkillData, Distance, Duration))
@@ -79,6 +73,13 @@ void ULSGA_Bypass::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
 
 	SetInvincibleTagActive(true);
 
