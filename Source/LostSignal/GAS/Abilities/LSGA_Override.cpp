@@ -69,8 +69,9 @@ void ULSGA_Override::ActivateAbility(
 		return;
 	}
 
+	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = SkillContext.SkillData->DamageEffectClass ? SkillContext.SkillData->DamageEffectClass : DamageEffectClass;
 	ULSCharacterCombatComponent* SourceCombatComponent = SourceActor->FindComponentByClass<ULSCharacterCombatComponent>();
-	if (!SourceCombatComponent || !DamageEffectClass)
+	if (!SourceCombatComponent || !ResolvedDamageEffectClass)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -85,8 +86,9 @@ void ULSGA_Override::ActivateAbility(
 	FLSCharacterSkillRow Row;
 	const bool bHasRow = SkillContext.SkillData->TryGetSkillRow(Row);
 	const float Radius = bHasRow && Row.Range_X > 0.0f ? Row.Range_X : FallbackRadius;
-	const float ResolvedAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : FallbackAttackCoefficient;
-	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverrideAbilityBreakPowerTier(Row.Skill_Impact, BreakPower) : BreakPower;
+	const float DataAssetAttackCoefficient = SkillContext.SkillData->AttackCoefficient > 0.0f ? SkillContext.SkillData->AttackCoefficient : FallbackAttackCoefficient;
+	const float ResolvedAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : DataAssetAttackCoefficient;
+	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverrideAbilityBreakPowerTier(Row.Skill_Impact, SkillContext.SkillData->BreakPower) : SkillContext.SkillData->BreakPower;
 	const float ResolvedKnockbackDuration = bHasRow && Row.Skill_Time > 0.0f ? Row.Skill_Time : FallbackKnockbackDuration;
 	if (Radius <= 0.0f)
 	{
@@ -121,11 +123,11 @@ void ULSGA_Override::ActivateAbility(
 
 		if (!SourceCombatComponent->ApplyDamageEffectToTarget(
 			TargetActor,
-			DamageEffectClass,
+			ResolvedDamageEffectClass,
 			1.0f,
-			FixedDamage,
+			SkillContext.SkillData->FixedDamage,
 			ResolvedAttackCoefficient,
-			bCanCrit,
+			SkillContext.SkillData->bCanCrit,
 			ResolvedBreakPower))
 		{
 			continue;

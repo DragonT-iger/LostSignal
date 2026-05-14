@@ -9,6 +9,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
 #include "GAS/Abilities/LSGA_Bypass.h"
+#include "GAS/LSGameplayTags.h"
+#include "LostSignal.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "TimerManager.h"
@@ -159,12 +161,7 @@ void ULSPlayerSkillComponent::HandleBasicAttackHit(int32 ComboIndex, int32 Valid
 			continue;
 		}
 
-		FLSBasicAttackHitContext Context;
-		Context.SourceActor = OwnerActor;
-		Context.SkillData = PassiveSkillData;
-		Context.ComboIndex = ComboIndex;
-		Context.ValidHitCount = ValidHitCount;
-		PassiveSkillData->HandleBasicAttackHit(Context);
+		TrySendPassiveGameplayEvent(PassiveSkillData, ComboIndex);
 	}
 }
 
@@ -233,7 +230,10 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 		return TryActivateGameplayAbility(SkillData, Context);
 	}
 
-	return SkillData->ActivateSkill(Context);
+	UE_LOG(LogLS, Warning, TEXT("%s skill activation rejected because %s has no GAS AbilityClass."),
+		*GetNameSafe(OwnerActor),
+		*GetNameSafe(SkillData));
+	return false;
 }
 
 bool ULSPlayerSkillComponent::TryActivateGameplayAbility(ULSSkillDataAsset* SkillData, const FLSSkillActivationContext& Context)
@@ -272,6 +272,42 @@ bool ULSPlayerSkillComponent::TryActivateGameplayAbility(ULSSkillDataAsset* Skil
 	}
 
 	return bActivated;
+}
+
+bool ULSPlayerSkillComponent::TrySendPassiveGameplayEvent(ULSSkillDataAsset* SkillData, int32 ComboIndex) const
+{
+	AActor* OwnerActor = GetOwner();
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerActor);
+	const TSubclassOf<UGameplayAbility> AbilityClass = SkillData ? SkillData->GetAbilityClass() : nullptr;
+	if (!OwnerActor || !OwnerActor->HasAuthority() || !ASC || !AbilityClass)
+	{
+		return false;
+	}
+
+	bool bHasAbility = false;
+	for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		if (Spec.Ability && Spec.Ability->GetClass() == AbilityClass)
+		{
+			bHasAbility = true;
+			break;
+		}
+	}
+
+	if (!bHasAbility)
+	{
+		ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1));
+	}
+
+	FGameplayEventData EventData;
+	EventData.EventTag = LSGameplayTags::Event_Combat_BasicAttackHit;
+	EventData.Instigator = OwnerActor;
+	EventData.Target = OwnerActor;
+	EventData.OptionalObject = SkillData;
+	EventData.EventMagnitude = static_cast<float>(ComboIndex);
+	ASC->HandleGameplayEvent(LSGameplayTags::Event_Combat_BasicAttackHit, &EventData);
+
+	return true;
 }
 
 bool ULSPlayerSkillComponent::TryPredictBypassMovement(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw)

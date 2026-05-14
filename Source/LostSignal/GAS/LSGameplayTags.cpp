@@ -19,6 +19,8 @@ namespace LSGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Buff_CombatAcceleration, "LS.Buff.CombatAcceleration")
 
+	UE_DEFINE_GAMEPLAY_TAG(Event_Combat_BasicAttackHit, "LS.Event.Combat.BasicAttackHit")
+
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_Fixed, "LS.Data.Damage.Fixed")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_AttackCoefficient, "LS.Data.Damage.AttackCoefficient")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_CanCrit, "LS.Data.Damage.CanCrit")

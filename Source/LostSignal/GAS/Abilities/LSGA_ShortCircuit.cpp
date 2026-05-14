@@ -5,7 +5,7 @@
 #include "LostSignal.h"
 #include "Skills/LSPlayerSkillComponent.h"
 #include "Skills/LSShortCircuitProjectile.h"
-#include "Skills/LSShortCircuitSkill.h"
+#include "Skills/LSShortCircuitSkillDataAsset.h"
 #include "Skills/LSSkillDataAsset.h"
 
 ULSGA_ShortCircuit::ULSGA_ShortCircuit()
@@ -42,15 +42,13 @@ void ULSGA_ShortCircuit::ActivateAbility(
 		return;
 	}
 
-	ULSShortCircuitSkill* SkillDefinition = SkillContext.SkillData->SkillClass
-		? Cast<ULSShortCircuitSkill>(SkillContext.SkillData->SkillClass->GetDefaultObject())
+	ULSShortCircuitSkillDataAsset* ShortCircuitData = Cast<ULSShortCircuitSkillDataAsset>(SkillContext.SkillData);
+	const TSubclassOf<ALSShortCircuitProjectile> ResolvedProjectileClass = ShortCircuitData
+		? ShortCircuitData->ResolveProjectileClass()
 		: nullptr;
-	const TSubclassOf<ALSShortCircuitProjectile> ResolvedProjectileClass = SkillDefinition
-		? SkillDefinition->ResolveProjectileClass()
-		: nullptr;
-	if (!SkillDefinition || !ResolvedProjectileClass)
+	if (!ShortCircuitData || !ResolvedProjectileClass)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s ShortCircuit ability missing SkillClass or ProjectileClass."), *GetNameSafe(SourceActor));
+		UE_LOG(LogLS, Warning, TEXT("%s ShortCircuit ability requires ULSShortCircuitSkillDataAsset with ProjectileClass."), *GetNameSafe(SourceActor));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -89,8 +87,8 @@ void ULSGA_ShortCircuit::ActivateAbility(
 
 	const FVector SpawnLocation =
 		SourceLocation +
-		(AimDirection * SkillDefinition->ProjectileSpawnForwardOffset) +
-		FVector(0.0f, 0.0f, SkillDefinition->ProjectileSpawnZOffset);
+		(AimDirection * ShortCircuitData->ProjectileSpawnForwardOffset) +
+		FVector(0.0f, 0.0f, ShortCircuitData->ProjectileSpawnZOffset);
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = SourceActor;
@@ -112,9 +110,9 @@ void ULSGA_ShortCircuit::ActivateAbility(
 		return;
 	}
 
-	Projectile->InitializeProjectile(SourceActor, SkillDefinition, SkillContext.TargetLocation);
+	Projectile->InitializeProjectile(SourceActor, ShortCircuitData, SkillContext.TargetLocation);
 
-	if (SkillDefinition->bEnableDebugVisualization)
+	if (ShortCircuitData->bEnableDebugVisualization)
 	{
 		UE_LOG(LogLS, Log, TEXT("[GA_ShortCircuit] Projectile=%s SpawnLocation=%s Target=%s AimDirection=%s"),
 			*GetNameSafe(Projectile),

@@ -6,7 +6,8 @@
 
 class USphereComponent;
 class UStaticMeshComponent;
-class ULSShortCircuitSkill;
+class ULSShortCircuitSkillDataAsset;
+class ULSSkillDataAsset;
 
 UCLASS()
 class LOSTSIGNAL_API ALSShortCircuitField : public AActor
@@ -16,7 +17,14 @@ class LOSTSIGNAL_API ALSShortCircuitField : public AActor
 public:
 	ALSShortCircuitField();
 
-	void InitializeField(AActor* InSourceActor, ULSShortCircuitSkill* InSkillDefinition);
+	void InitializeField(AActor* InSourceActor, ULSShortCircuitSkillDataAsset* InSkillData);
+	bool ExplodeByExecution(
+		AActor* InstigatorActor,
+		const ULSSkillDataAsset* ExecutionSkillData,
+		float FixedDamage,
+		float AttackCoefficient,
+		float RadiusOverride = 0.0f,
+		bool bDestroyAfterExplosion = true);
 
 protected:
 	virtual void BeginPlay() override;
@@ -32,7 +40,7 @@ protected:
 	TObjectPtr<AActor> SourceActor;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit")
-	TObjectPtr<ULSShortCircuitSkill> SkillDefinition;
+	TObjectPtr<ULSShortCircuitSkillDataAsset> SkillData;
 
 private:
 	UFUNCTION(NetMulticast, Unreliable)

@@ -9,6 +9,7 @@
 #include "GAS/LSGameplayTags.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
+#include "Skills/LSSkillDataAsset.h"
 
 namespace
 {
@@ -48,19 +49,24 @@ bool ULSOverclockSkill::ActivateSkill_Implementation(const FLSSkillActivationCon
 		return false;
 	}
 
+	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = Context.SkillData && Context.SkillData->DamageEffectClass
+		? Context.SkillData->DamageEffectClass
+		: DamageEffectClass;
 	ULSCharacterCombatComponent* SourceCombatComponent = SourceActor->FindComponentByClass<ULSCharacterCombatComponent>();
-	if (!SourceCombatComponent || !DamageEffectClass)
+	if (!SourceCombatComponent || !ResolvedDamageEffectClass)
 	{
 		return false;
 	}
 
 	FLSCharacterSkillRow Row;
-	const bool bHasRow = TryGetSkillRow(Row);
+	const bool bHasRow = Context.SkillData && Context.SkillData->TryGetSkillRow(Row);
 	const float Range = bHasRow && Row.Range_X > 0.0f ? Row.Range_X : FallbackRange;
 	const float ConeDegrees = bHasRow && Row.Range_Y > 0.0f ? Row.Range_Y : FallbackConeDegrees;
-	const float BaseAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : AttackCoefficient;
+	const float DataAssetAttackCoefficient = Context.SkillData && Context.SkillData->AttackCoefficient > 0.0f ? Context.SkillData->AttackCoefficient : AttackCoefficient;
+	const float BaseAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : DataAssetAttackCoefficient;
 	const float AdditionalCoefficientPerStack = bHasRow && Row.Skill_Count_Multiplier > 0.0f ? Row.Skill_Count_Multiplier : FallbackAdditionalAttackCoefficientPerStack;
-	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverclockBreakPowerTier(Row.Skill_Impact, BreakPower) : BreakPower;
+	const ELSBreakPowerTier DataAssetBreakPower = Context.SkillData ? Context.SkillData->BreakPower : BreakPower;
+	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverclockBreakPowerTier(Row.Skill_Impact, DataAssetBreakPower) : DataAssetBreakPower;
 
 	const FVector SourceLocation = SourceActor->GetActorLocation();
 	FVector AimDirection = Context.TargetLocation - SourceLocation;
@@ -132,11 +138,11 @@ bool ULSOverclockSkill::ActivateSkill_Implementation(const FLSSkillActivationCon
 	{
 		if (SourceCombatComponent->ApplyDamageEffectToTarget(
 			TargetActor,
-			DamageEffectClass,
+			ResolvedDamageEffectClass,
 			1.0f,
-			FixedDamage,
+			Context.SkillData ? Context.SkillData->FixedDamage : FixedDamage,
 			FinalAttackCoefficient,
-			bCanCrit,
+			Context.SkillData ? Context.SkillData->bCanCrit : bCanCrit,
 			ResolvedBreakPower))
 		{
 			++ValidHitCount;

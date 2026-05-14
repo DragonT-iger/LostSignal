@@ -8,7 +8,7 @@
 #include "LostSignal.h"
 #include "Net/UnrealNetwork.h"
 #include "Skills/LSShortCircuitField.h"
-#include "Skills/LSShortCircuitSkill.h"
+#include "Skills/LSShortCircuitSkillDataAsset.h"
 #include "UObject/ConstructorHelpers.h"
 
 ALSShortCircuitProjectile::ALSShortCircuitProjectile()
@@ -48,7 +48,7 @@ void ALSShortCircuitProjectile::BeginPlay()
 
 	OnRep_DebugProjectileMesh();
 
-	if (HasAuthority() && SkillDefinition && SkillDefinition->bEnableDebugVisualization)
+	if (HasAuthority() && SkillData && SkillData->bEnableDebugVisualization)
 	{
 		UE_LOG(LogLS, Log, TEXT("[ShortCircuit] Projectile BeginPlay: Projectile=%s CollisionEnabled=%d ObjectType=%d"),
 			*GetNameSafe(this),
@@ -75,7 +75,7 @@ void ALSShortCircuitProjectile::Tick(float DeltaSeconds)
 	MovementElapsedSeconds += DeltaSeconds;
 	const float Alpha = FMath::Clamp(MovementElapsedSeconds / MovementDurationSeconds, 0.0f, 1.0f);
 	const FVector LinearLocation = FMath::Lerp(MovementStartLocation, MovementVisualTargetLocation, Alpha);
-	const float ArcOffset = SkillDefinition ? SkillDefinition->ProjectileArcHeight * FMath::Sin(UE_PI * Alpha) : 0.0f;
+	const float ArcOffset = SkillData ? SkillData->ProjectileArcHeight * FMath::Sin(UE_PI * Alpha) : 0.0f;
 	SetActorLocation(LinearLocation + FVector(0.0f, 0.0f, ArcOffset));
 
 	if (Alpha >= 1.0f)
@@ -91,10 +91,10 @@ void ALSShortCircuitProjectile::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 	DOREPLIFETIME(ALSShortCircuitProjectile, bShowDebugProjectileMesh);
 }
 
-void ALSShortCircuitProjectile::InitializeProjectile(AActor* InSourceActor, ULSShortCircuitSkill* InSkillDefinition, const FVector& TargetLocation)
+void ALSShortCircuitProjectile::InitializeProjectile(AActor* InSourceActor, ULSShortCircuitSkillDataAsset* InSkillData, const FVector& TargetLocation)
 {
 	SourceActor = InSourceActor;
-	SkillDefinition = InSkillDefinition;
+	SkillData = InSkillData;
 	ImpactTargetLocation = TargetLocation;
 
 	if (CollisionComponent && SourceActor)
@@ -109,13 +109,13 @@ void ALSShortCircuitProjectile::InitializeProjectile(AActor* InSourceActor, ULSS
 		MovementVisualTargetLocation.Z += CollisionComponent->GetScaledSphereRadius();
 	}
 
-	const float Speed = SkillDefinition ? FMath::Max(SkillDefinition->ProjectileSpeed, 1.0f) : 1200.0f;
+	const float Speed = SkillData ? FMath::Max(SkillData->ProjectileSpeed, 1.0f) : 1200.0f;
 	MovementDurationSeconds = FMath::Max(FVector::Dist2D(MovementStartLocation, TargetLocation) / Speed, 0.05f);
 	MovementElapsedSeconds = 0.0f;
-	SetLifeSpan(SkillDefinition ? FMath::Max(SkillDefinition->ProjectileLifeSeconds, MovementDurationSeconds + 0.5f) : MovementDurationSeconds + 0.5f);
+	SetLifeSpan(SkillData ? FMath::Max(SkillData->ProjectileLifeSeconds, MovementDurationSeconds + 0.5f) : MovementDurationSeconds + 0.5f);
 	SetActorTickEnabled(HasAuthority());
 
-	if (HasAuthority() && SkillDefinition && SkillDefinition->bEnableDebugVisualization)
+	if (HasAuthority() && SkillData && SkillData->bEnableDebugVisualization)
 	{
 		bShowDebugProjectileMesh = true;
 		SetDebugProjectileMeshVisible(true);
@@ -123,12 +123,12 @@ void ALSShortCircuitProjectile::InitializeProjectile(AActor* InSourceActor, ULSS
 		UE_LOG(LogLS, Log, TEXT("[ShortCircuit] Projectile initialized: Projectile=%s Source=%s Skill=%s Start=%s Target=%s VisualTarget=%s Speed=%.2f ArcHeight=%.2f Duration=%.2f Life=%.2f"),
 			*GetNameSafe(this),
 			*GetNameSafe(SourceActor),
-			*GetNameSafe(SkillDefinition),
+			*GetNameSafe(SkillData),
 			*MovementStartLocation.ToCompactString(),
 			*TargetLocation.ToCompactString(),
 			*MovementVisualTargetLocation.ToCompactString(),
 			Speed,
-			SkillDefinition ? SkillDefinition->ProjectileArcHeight : 0.0f,
+			SkillData ? SkillData->ProjectileArcHeight : 0.0f,
 			MovementDurationSeconds,
 			GetLifeSpan());
 	}
@@ -141,12 +141,12 @@ void ALSShortCircuitProjectile::OnRep_DebugProjectileMesh()
 
 void ALSShortCircuitProjectile::FinishProjectile()
 {
-	if (!HasAuthority() || !SkillDefinition)
+	if (!HasAuthority() || !SkillData)
 	{
 		return;
 	}
 
-	if (SkillDefinition && SkillDefinition->bEnableDebugVisualization)
+	if (SkillData && SkillData->bEnableDebugVisualization)
 	{
 		UE_LOG(LogLS, Log, TEXT("[ShortCircuit] Projectile finished: Projectile=%s Target=%s ActorLocation=%s XYError=%.2f"),
 			*GetNameSafe(this),
@@ -155,8 +155,8 @@ void ALSShortCircuitProjectile::FinishProjectile()
 			FVector::Dist2D(GetActorLocation(), ImpactTargetLocation));
 		MulticastDrawDebugImpact(
 			ImpactTargetLocation,
-			SkillDefinition->DebugProjectileColor,
-			SkillDefinition->DebugDrawDuration);
+			SkillData->DebugProjectileColor,
+			SkillData->DebugDrawDuration);
 	}
 
 	SpawnFieldAtLocation(ImpactTargetLocation);
@@ -165,12 +165,12 @@ void ALSShortCircuitProjectile::FinishProjectile()
 
 void ALSShortCircuitProjectile::SpawnFieldAtLocation(const FVector& FieldLocation)
 {
-	const TSubclassOf<ALSShortCircuitField> ResolvedFieldClass = SkillDefinition ? SkillDefinition->ResolveFieldClass() : nullptr;
-	if (!SkillDefinition || !ResolvedFieldClass)
+	const TSubclassOf<ALSShortCircuitField> ResolvedFieldClass = SkillData ? SkillData->ResolveFieldClass() : nullptr;
+	if (!SkillData || !ResolvedFieldClass)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[ShortCircuit] Field spawn skipped: SkillDefinition or FieldClass missing. Projectile=%s Skill=%s FieldClass=%s"),
+		UE_LOG(LogLS, Warning, TEXT("[ShortCircuit] Field spawn skipped: SkillData or FieldClass missing. Projectile=%s Skill=%s FieldClass=%s"),
 			*GetNameSafe(this),
-			*GetNameSafe(SkillDefinition),
+			*GetNameSafe(SkillData),
 			*GetNameSafe(ResolvedFieldClass.Get()));
 		return;
 	}
@@ -195,17 +195,17 @@ void ALSShortCircuitProjectile::SpawnFieldAtLocation(const FVector& FieldLocatio
 
 	if (Field)
 	{
-		if (SkillDefinition->bEnableDebugVisualization)
+		if (SkillData->bEnableDebugVisualization)
 		{
 			UE_LOG(LogLS, Log, TEXT("[ShortCircuit] Field spawned: Field=%s Location=%s RadiusPreview=%.2f Duration=%.2f Interval=%.2f"),
 				*GetNameSafe(Field),
 				*FieldLocation.ToCompactString(),
-				SkillDefinition->BuildPreviewSpec().Radius,
-				SkillDefinition->FieldDuration,
-				SkillDefinition->FieldPulseInterval);
+				SkillData->BuildPreviewSpec().Radius,
+				SkillData->FieldDuration,
+				SkillData->FieldPulseInterval);
 		}
 
-		Field->InitializeField(SourceActor, SkillDefinition);
+		Field->InitializeField(SourceActor, SkillData);
 		return;
 	}
 

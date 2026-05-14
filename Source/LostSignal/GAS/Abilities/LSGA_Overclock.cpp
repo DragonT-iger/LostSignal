@@ -71,8 +71,9 @@ void ULSGA_Overclock::ActivateAbility(
 		return;
 	}
 
+	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = SkillContext.SkillData->DamageEffectClass ? SkillContext.SkillData->DamageEffectClass : DamageEffectClass;
 	ULSCharacterCombatComponent* SourceCombatComponent = SourceActor->FindComponentByClass<ULSCharacterCombatComponent>();
-	if (!SourceCombatComponent || !DamageEffectClass)
+	if (!SourceCombatComponent || !ResolvedDamageEffectClass)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -88,9 +89,10 @@ void ULSGA_Overclock::ActivateAbility(
 	const bool bHasRow = SkillContext.SkillData->TryGetSkillRow(Row);
 	const float Range = bHasRow && Row.Range_X > 0.0f ? Row.Range_X : FallbackRange;
 	const float ConeDegrees = bHasRow && Row.Range_Y > 0.0f ? Row.Range_Y : FallbackConeDegrees;
-	const float BaseAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : FallbackAttackCoefficient;
+	const float DataAssetAttackCoefficient = SkillContext.SkillData->AttackCoefficient > 0.0f ? SkillContext.SkillData->AttackCoefficient : FallbackAttackCoefficient;
+	const float BaseAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : DataAssetAttackCoefficient;
 	const float AdditionalCoefficientPerStack = bHasRow && Row.Skill_Count_Multiplier > 0.0f ? Row.Skill_Count_Multiplier : FallbackAdditionalAttackCoefficientPerStack;
-	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverclockAbilityBreakPowerTier(Row.Skill_Impact, BreakPower) : BreakPower;
+	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverclockAbilityBreakPowerTier(Row.Skill_Impact, SkillContext.SkillData->BreakPower) : SkillContext.SkillData->BreakPower;
 
 	const FVector SourceLocation = SourceActor->GetActorLocation();
 	FVector AimDirection = SkillContext.TargetLocation - SourceLocation;
@@ -158,11 +160,11 @@ void ULSGA_Overclock::ActivateAbility(
 	{
 		if (SourceCombatComponent->ApplyDamageEffectToTarget(
 			TargetActor,
-			DamageEffectClass,
+			ResolvedDamageEffectClass,
 			1.0f,
-			FixedDamage,
+			SkillContext.SkillData->FixedDamage,
 			FinalAttackCoefficient,
-			bCanCrit,
+			SkillContext.SkillData->bCanCrit,
 			ResolvedBreakPower))
 		{
 			++ValidHitCount;

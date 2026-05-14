@@ -13,7 +13,8 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
 #include "Net/UnrealNetwork.h"
-#include "Skills/LSShortCircuitSkill.h"
+#include "Skills/LSShortCircuitSkillDataAsset.h"
+#include "Skills/LSSkillDataAsset.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -90,17 +91,17 @@ void ALSShortCircuitField::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(ALSShortCircuitField, DebugFieldMeshRadius);
 }
 
-void ALSShortCircuitField::InitializeField(AActor* InSourceActor, ULSShortCircuitSkill* InSkillDefinition)
+void ALSShortCircuitField::InitializeField(AActor* InSourceActor, ULSShortCircuitSkillDataAsset* InSkillData)
 {
 	SourceActor = InSourceActor;
-	SkillDefinition = InSkillDefinition;
+	SkillData = InSkillData;
 
-	if (HasAuthority() && SkillDefinition && SkillDefinition->bEnableDebugVisualization)
+	if (HasAuthority() && SkillData && SkillData->bEnableDebugVisualization)
 	{
 		UE_LOG(LogLS, Log, TEXT("[ShortCircuit] Field initialized: Field=%s Source=%s Skill=%s BegunPlay=%d"),
 			*GetNameSafe(this),
 			*GetNameSafe(SourceActor),
-			*GetNameSafe(SkillDefinition),
+			*GetNameSafe(SkillData),
 			HasActorBegunPlay() ? 1 : 0);
 	}
 
@@ -110,17 +111,108 @@ void ALSShortCircuitField::InitializeField(AActor* InSourceActor, ULSShortCircui
 	}
 }
 
+bool ALSShortCircuitField::ExplodeByExecution(
+	AActor* InstigatorActor,
+	const ULSSkillDataAsset* ExecutionSkillData,
+	float FixedDamage,
+	float AttackCoefficient,
+	float RadiusOverride,
+	bool bDestroyAfterExplosion)
+{
+	if (!HasAuthority() || !InstigatorActor || !ExecutionSkillData || !ExecutionSkillData->DamageEffectClass)
+	{
+		return false;
+	}
+
+	ULSCharacterCombatComponent* SourceCombatComponent = InstigatorActor->FindComponentByClass<ULSCharacterCombatComponent>();
+	if (!SourceCombatComponent)
+	{
+		return false;
+	}
+
+	const float Radius = RadiusOverride > 0.0f
+		? RadiusOverride
+		: AreaComponent ? AreaComponent->GetScaledSphereRadius() : 350.0f;
+	if (Radius <= 0.0f)
+	{
+		return false;
+	}
+
+	FLSCharacterSkillRow Row;
+	const bool bHasRow = ExecutionSkillData->TryGetSkillRow(Row);
+	const ELSBreakPowerTier ResolvedBreakPower = bHasRow
+		? ToShortCircuitBreakPowerTier(Row.Skill_Impact, ExecutionSkillData->BreakPower)
+		: ExecutionSkillData->BreakPower;
+
+	TArray<AActor*> OverlappedActors;
+	TArray<AActor*> ActorsToIgnore;
+	ActorsToIgnore.Add(InstigatorActor);
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+	UKismetSystemLibrary::SphereOverlapActors(
+		GetWorld(),
+		GetActorLocation(),
+		Radius,
+		ObjectTypes,
+		nullptr,
+		ActorsToIgnore,
+		OverlappedActors);
+
+	int32 ValidHitCount = 0;
+	TSet<AActor*> UniqueTargets;
+	for (AActor* TargetActor : OverlappedActors)
+	{
+		if (!TargetActor || UniqueTargets.Contains(TargetActor))
+		{
+			continue;
+		}
+
+		if (SourceCombatComponent->ApplyDamageEffectToTarget(
+			TargetActor,
+			ExecutionSkillData->DamageEffectClass,
+			1.0f,
+			FixedDamage,
+			AttackCoefficient,
+			ExecutionSkillData->bCanCrit,
+			ResolvedBreakPower))
+		{
+			UniqueTargets.Add(TargetActor);
+			++ValidHitCount;
+		}
+	}
+
+	UE_LOG(
+		LogLS,
+		Log,
+		TEXT("[ShortCircuit] Field exploded by Execution. Field=%s Source=%s Radius=%.2f RawTargets=%d ValidHits=%d Coef=%.2f"),
+		*GetNameSafe(this),
+		*GetNameSafe(InstigatorActor),
+		Radius,
+		OverlappedActors.Num(),
+		ValidHitCount,
+		AttackCoefficient);
+
+	if (bDestroyAfterExplosion)
+	{
+		GetWorldTimerManager().ClearTimer(PulseTimerHandle);
+		Destroy();
+	}
+
+	return ValidHitCount > 0;
+}
+
 void ALSShortCircuitField::StartField()
 {
-	if (bFieldStarted || !SourceActor || !SkillDefinition)
+	if (bFieldStarted || !SourceActor || !SkillData)
 	{
-		if (SkillDefinition && SkillDefinition->bEnableDebugVisualization)
+		if (SkillData && SkillData->bEnableDebugVisualization)
 		{
 			UE_LOG(LogLS, Log, TEXT("[ShortCircuit] Field start skipped: Field=%s AlreadyStarted=%d Source=%s Skill=%s"),
 				*GetNameSafe(this),
 				bFieldStarted ? 1 : 0,
 				*GetNameSafe(SourceActor),
-				*GetNameSafe(SkillDefinition));
+				*GetNameSafe(SkillData));
 		}
 		return;
 	}
@@ -128,7 +220,7 @@ void ALSShortCircuitField::StartField()
 	bFieldStarted = true;
 	ConfigureFromSkillData();
 
-	if (SkillDefinition->bEnableDebugVisualization)
+	if (SkillData->bEnableDebugVisualization)
 	{
 		const float Radius = AreaComponent ? AreaComponent->GetScaledSphereRadius() : 350.0f;
 		UE_LOG(LogLS, Log, TEXT("[ShortCircuit] Field started: Field=%s Location=%s Radius=%.2f Pulses=%d Interval=%.2f"),
@@ -136,10 +228,10 @@ void ALSShortCircuitField::StartField()
 			*GetActorLocation().ToCompactString(),
 			Radius,
 			PulsesRemaining,
-			SkillDefinition->FieldPulseInterval);
+			SkillData->FieldPulseInterval);
 	}
 
-	if (SkillDefinition->bEnableDebugVisualization)
+	if (SkillData->bEnableDebugVisualization)
 	{
 		const float Radius = AreaComponent ? AreaComponent->GetScaledSphereRadius() : 350.0f;
 		DebugFieldMeshRadius = Radius;
@@ -150,7 +242,7 @@ void ALSShortCircuitField::StartField()
 
 	if (PulsesRemaining > 0)
 	{
-		const float Interval = FMath::Max(SkillDefinition->FieldPulseInterval, 1.0f);
+		const float Interval = FMath::Max(SkillData->FieldPulseInterval, 1.0f);
 		GetWorldTimerManager().SetTimer(PulseTimerHandle, this, &ALSShortCircuitField::ApplyPulse, Interval, true);
 	}
 }
@@ -183,17 +275,17 @@ void ALSShortCircuitField::HideDebugFieldMesh()
 void ALSShortCircuitField::ConfigureFromSkillData()
 {
 	float Radius = 350.0f;
-	float Duration = SkillDefinition ? SkillDefinition->FieldDuration : 5.0f;
-	float Interval = SkillDefinition ? FMath::Max(SkillDefinition->FieldPulseInterval, 0.01f) : 1.0f;
+	float Duration = SkillData ? SkillData->FieldDuration : 5.0f;
+	float Interval = SkillData ? FMath::Max(SkillData->FieldPulseInterval, 0.01f) : 1.0f;
 	int32 HitCount = FMath::Max(1, FMath::RoundToInt(Duration / Interval));
 
-	if (SkillDefinition)
+	if (SkillData)
 	{
-		FLSSkillAreaPreviewSpec PreviewSpec = SkillDefinition->BuildPreviewSpec();
+		FLSSkillAreaPreviewSpec PreviewSpec = SkillData->BuildPreviewSpec();
 		Radius = PreviewSpec.Radius > 0.0f ? PreviewSpec.Radius : Radius;
 
 		FLSCharacterSkillRow Row;
-		if (SkillDefinition->TryGetSkillRow(Row))
+		if (SkillData->TryGetSkillRow(Row))
 		{
 			HitCount = Row.Skill_HitCount > 0 ? Row.Skill_HitCount : HitCount;
 			Interval = Row.Skill_HitRate > 0.0f ? Row.Skill_HitRate : Interval;
@@ -212,15 +304,15 @@ void ALSShortCircuitField::ConfigureFromSkillData()
 
 void ALSShortCircuitField::ApplyPulse()
 {
-	if (!HasAuthority() || !SourceActor || !SkillDefinition || PulsesRemaining <= 0)
+	if (!HasAuthority() || !SourceActor || !SkillData || PulsesRemaining <= 0)
 	{
-		if (SkillDefinition && SkillDefinition->bEnableDebugVisualization)
+		if (SkillData && SkillData->bEnableDebugVisualization)
 		{
 			UE_LOG(LogLS, Log, TEXT("[ShortCircuit] Pulse stopped: Field=%s Authority=%d Source=%s Skill=%s PulsesRemaining=%d"),
 				*GetNameSafe(this),
 				HasAuthority() ? 1 : 0,
 				*GetNameSafe(SourceActor),
-				*GetNameSafe(SkillDefinition),
+				*GetNameSafe(SkillData),
 				PulsesRemaining);
 		}
 		GetWorldTimerManager().ClearTimer(PulseTimerHandle);
@@ -228,45 +320,45 @@ void ALSShortCircuitField::ApplyPulse()
 	}
 
 	ULSCharacterCombatComponent* SourceCombatComponent = SourceActor->FindComponentByClass<ULSCharacterCombatComponent>();
-	if (!SourceCombatComponent || !SkillDefinition->DamageEffectClass)
+	if (!SourceCombatComponent || !SkillData->DamageEffectClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[ShortCircuit] Pulse stopped: SourceCombatComponent or DamageEffectClass missing. Field=%s Source=%s Combat=%s DamageEffect=%s"),
 			*GetNameSafe(this),
 			*GetNameSafe(SourceActor),
 			*GetNameSafe(SourceCombatComponent),
-			*GetNameSafe(SkillDefinition->DamageEffectClass.Get()));
+			*GetNameSafe(SkillData->DamageEffectClass.Get()));
 		GetWorldTimerManager().ClearTimer(PulseTimerHandle);
 		return;
 	}
 
 	FLSCharacterSkillRow Row;
-	const bool bHasRow = SkillDefinition->TryGetSkillRow(Row);
-	const float FallbackAttackCoefficient = SkillDefinition->AttackCoefficient > 0.0f
-		? SkillDefinition->AttackCoefficient
+	const bool bHasRow = SkillData->TryGetSkillRow(Row);
+	const float FallbackAttackCoefficient = SkillData->AttackCoefficient > 0.0f
+		? SkillData->AttackCoefficient
 		: DefaultShortCircuitAttackCoefficient;
 	const float AttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : FallbackAttackCoefficient;
-	const ELSBreakPowerTier BreakPower = bHasRow ? ToShortCircuitBreakPowerTier(Row.Skill_Impact, SkillDefinition->BreakPower) : SkillDefinition->BreakPower;
+	const ELSBreakPowerTier BreakPower = bHasRow ? ToShortCircuitBreakPowerTier(Row.Skill_Impact, SkillData->BreakPower) : SkillData->BreakPower;
 	const float Radius = AreaComponent ? AreaComponent->GetScaledSphereRadius() : 350.0f;
-	if (!bHasRow || Row.Skill_Multiplier <= 0.0f || SkillDefinition->AttackCoefficient <= 0.0f)
+	if (!bHasRow || Row.Skill_Multiplier <= 0.0f || SkillData->AttackCoefficient <= 0.0f)
 	{
 		UE_LOG(
 			LogLS,
 			Log,
 			TEXT("[ShortCircuit] Pulse coefficient fallback check. Field=%s Skill=%s HasRow=%d RowMultiplier=%.2f AssetFallbackCoef=%.2f ResolvedCoef=%.2f Fixed=%.2f"),
 			*GetNameSafe(this),
-			*GetNameSafe(SkillDefinition),
+			*GetNameSafe(SkillData),
 			bHasRow ? 1 : 0,
 			bHasRow ? Row.Skill_Multiplier : 0.0f,
-			SkillDefinition->AttackCoefficient,
+			SkillData->AttackCoefficient,
 			AttackCoefficient,
-			SkillDefinition->FixedDamage);
+			SkillData->FixedDamage);
 	}
 
-	if (SkillDefinition->bEnableDebugVisualization)
+	if (SkillData->bEnableDebugVisualization)
 	{
 		MulticastBlinkDebugFieldMesh(
 			Radius,
-			FMath::Min(FMath::Max(SkillDefinition->FieldPulseInterval * 0.35f, 0.08f), 0.35f));
+			FMath::Min(FMath::Max(SkillData->FieldPulseInterval * 0.35f, 0.08f), 0.35f));
 	}
 
 	TArray<AActor*> OverlappedActors;
@@ -284,7 +376,7 @@ void ALSShortCircuitField::ApplyPulse()
 		ActorsToIgnore,
 		OverlappedActors);
 
-	if (SkillDefinition->bEnableDebugVisualization)
+	if (SkillData->bEnableDebugVisualization)
 	{
 		UE_LOG(LogLS, Log, TEXT("[ShortCircuit] Pulse overlap: Field=%s Radius=%.2f RawTargets=%d PulsesRemaining=%d"),
 			*GetNameSafe(this),
@@ -308,11 +400,11 @@ void ALSShortCircuitField::ApplyPulse()
 
 		if (SourceCombatComponent->ApplyDamageEffectToTarget(
 			TargetActor,
-			SkillDefinition->DamageEffectClass,
+			SkillData->DamageEffectClass,
 			1.0f,
-			SkillDefinition->FixedDamage,
+			SkillData->FixedDamage,
 			AttackCoefficient,
-			SkillDefinition->bCanCrit,
+			SkillData->bCanCrit,
 			BreakPower))
 		{
 			const float AfterHealth = TargetASC
@@ -323,7 +415,7 @@ void ALSShortCircuitField::ApplyPulse()
 				Log,
 				TEXT("[ShortCircuit] Pulse Damaged: Actor=%s | Fixed=%.2f Coef=%.2f BreakPower=%d | HP %.2f -> %.2f (ActualDamage %.2f)"),
 				*GetNameSafe(TargetActor),
-				SkillDefinition->FixedDamage,
+				SkillData->FixedDamage,
 				AttackCoefficient,
 				static_cast<int32>(BreakPower),
 				BeforeHealth,
@@ -344,7 +436,7 @@ void ALSShortCircuitField::ApplyPulse()
 
 void ALSShortCircuitField::ApplySlowEffect(AActor* TargetActor) const
 {
-	if (!SkillDefinition || !SkillDefinition->SlowEffectClass || !SourceActor || !TargetActor)
+	if (!SkillData || !SkillData->SlowEffectClass || !SourceActor || !TargetActor)
 	{
 		return;
 	}
@@ -359,7 +451,7 @@ void ALSShortCircuitField::ApplySlowEffect(AActor* TargetActor) const
 	FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
 	EffectContext.AddSourceObject(this);
 
-	const FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(SkillDefinition->SlowEffectClass, 1.0f, EffectContext);
+	const FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(SkillData->SlowEffectClass, 1.0f, EffectContext);
 	if (SpecHandle.IsValid())
 	{
 		SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);

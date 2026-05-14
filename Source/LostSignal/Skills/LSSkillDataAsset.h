@@ -1,13 +1,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/LSCombatTypes.h"
 #include "Engine/DataAsset.h"
+#include "Engine/DataTable.h"
 #include "Skills/LSSkillAreaTypes.h"
 #include "Skills/LSSkillTypes.h"
 #include "LSSkillDataAsset.generated.h"
 
 class ULSSkill;
 class UGameplayAbility;
+class UGameplayEffect;
 struct FLSCharacterSkillRow;
 
 UCLASS(BlueprintType)
@@ -16,6 +19,8 @@ class LOSTSIGNAL_API ULSSkillDataAsset : public UDataAsset
 	GENERATED_BODY()
 
 public:
+	ULSSkillDataAsset();
+
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	FLSSkillAreaPreviewSpec BuildPreviewSpec() const;
 
@@ -25,15 +30,37 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	TSubclassOf<UGameplayAbility> GetAbilityClass() const;
 
-	bool ActivateSkill(const FLSSkillActivationContext& Context) const;
-	bool HandleBasicAttackHit(const FLSBasicAttackHitContext& Context) const;
-
+	/** Legacy migration-only field. Runtime skill execution must use AbilityClass/DataAsset fields. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TSubclassOf<ULSSkill> SkillClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TSubclassOf<UGameplayAbility> AbilityClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|DataTable")
+	FDataTableRowHandle SkillRow;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
+	FLSSkillAreaPreviewSpec PreviewSpec;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage")
+	TSubclassOf<UGameplayEffect> DamageEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage")
+	TSubclassOf<UGameplayEffect> SlowEffectClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage", meta=(ClampMin="0.0"))
+	float FixedDamage = 0.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage", meta=(ClampMin="0.0"))
+	float AttackCoefficient = 0.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage")
+	bool bCanCrit = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage")
+	ELSBreakPowerTier BreakPower = ELSBreakPowerTier::NormalAttack;
+
 private:
-	ULSSkill* GetSkillDefaultObject() const;
+	const FLSCharacterSkillRow* ResolveSkillRow() const;
 };

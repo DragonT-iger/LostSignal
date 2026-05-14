@@ -9,6 +9,7 @@
 #include "GameFramework/RootMotionSource.h"
 #include "TimerManager.h"
 #include "LostSignal.h"
+#include "Skills/LSSkillDataAsset.h"
 
 ULSBypassSkill::ULSBypassSkill()
 {
@@ -26,7 +27,7 @@ bool ULSBypassSkill::ActivateSkill_Implementation(const FLSSkillActivationContex
 	}
 
 	FLSCharacterSkillRow Row;
-	const bool bHasRow = TryGetSkillRow(Row);
+	const bool bHasRow = Context.SkillData && Context.SkillData->TryGetSkillRow(Row);
 	const float Distance = bHasRow && Row.Range_X > 0.0f ? Row.Range_X : FallbackDistance;
 	const float Duration = bHasRow && Row.Skill_Time > 0.0f ? Row.Skill_Time : FallbackDuration;
 	if (Distance <= 0.0f || Duration <= 0.0f)

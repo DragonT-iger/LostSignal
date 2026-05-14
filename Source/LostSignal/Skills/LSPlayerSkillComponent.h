@@ -79,6 +79,7 @@ private:
 	bool CanUseLocalPreview() const;
 	bool ActivateSkillOnServer(ELSPlayerSkillSlot Slot, const FVector& TargetLocation, float AimYaw);
 	bool TryActivateGameplayAbility(ULSSkillDataAsset* SkillData, const FLSSkillActivationContext& Context);
+	bool TrySendPassiveGameplayEvent(ULSSkillDataAsset* SkillData, int32 ComboIndex) const;
 	bool TryPredictBypassMovement(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw);
 	void FinishPredictedBypass();
 	ULSSkillPreviewComponent* ResolvePreviewComponent() const;

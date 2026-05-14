@@ -6,7 +6,7 @@
 
 class USphereComponent;
 class UStaticMeshComponent;
-class ULSShortCircuitSkill;
+class ULSShortCircuitSkillDataAsset;
 
 UCLASS()
 class LOSTSIGNAL_API ALSShortCircuitProjectile : public AActor
@@ -16,7 +16,7 @@ class LOSTSIGNAL_API ALSShortCircuitProjectile : public AActor
 public:
 	ALSShortCircuitProjectile();
 
-	void InitializeProjectile(AActor* InSourceActor, ULSShortCircuitSkill* InSkillDefinition, const FVector& TargetLocation);
+	void InitializeProjectile(AActor* InSourceActor, ULSShortCircuitSkillDataAsset* InSkillData, const FVector& TargetLocation);
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -33,7 +33,7 @@ protected:
 	TObjectPtr<AActor> SourceActor;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit")
-	TObjectPtr<ULSShortCircuitSkill> SkillDefinition;
+	TObjectPtr<ULSShortCircuitSkillDataAsset> SkillData;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit")
 	FVector ImpactTargetLocation = FVector::ZeroVector;

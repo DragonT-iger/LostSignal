@@ -7,6 +7,7 @@
 #include "GAS/Abilities/LSGA_Override.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
+#include "Skills/LSSkillDataAsset.h"
 
 namespace
 {
@@ -46,17 +47,22 @@ bool ULSOverrideSkill::ActivateSkill_Implementation(const FLSSkillActivationCont
 		return false;
 	}
 
+	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = Context.SkillData && Context.SkillData->DamageEffectClass
+		? Context.SkillData->DamageEffectClass
+		: DamageEffectClass;
 	ULSCharacterCombatComponent* SourceCombatComponent = SourceActor->FindComponentByClass<ULSCharacterCombatComponent>();
-	if (!SourceCombatComponent || !DamageEffectClass)
+	if (!SourceCombatComponent || !ResolvedDamageEffectClass)
 	{
 		return false;
 	}
 
 	FLSCharacterSkillRow Row;
-	const bool bHasRow = TryGetSkillRow(Row);
+	const bool bHasRow = Context.SkillData && Context.SkillData->TryGetSkillRow(Row);
 	const float Radius = bHasRow && Row.Range_X > 0.0f ? Row.Range_X : FallbackRadius;
-	const float ResolvedAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : FallbackAttackCoefficient;
-	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverrideBreakPowerTier(Row.Skill_Impact, BreakPower) : BreakPower;
+	const float DataAssetAttackCoefficient = Context.SkillData && Context.SkillData->AttackCoefficient > 0.0f ? Context.SkillData->AttackCoefficient : FallbackAttackCoefficient;
+	const float ResolvedAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : DataAssetAttackCoefficient;
+	const ELSBreakPowerTier DataAssetBreakPower = Context.SkillData ? Context.SkillData->BreakPower : BreakPower;
+	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverrideBreakPowerTier(Row.Skill_Impact, DataAssetBreakPower) : DataAssetBreakPower;
 	const float ResolvedKnockbackDuration = bHasRow && Row.Skill_Time > 0.0f ? Row.Skill_Time : FallbackKnockbackDuration;
 	if (Radius <= 0.0f)
 	{
@@ -90,11 +96,11 @@ bool ULSOverrideSkill::ActivateSkill_Implementation(const FLSSkillActivationCont
 
 		if (!SourceCombatComponent->ApplyDamageEffectToTarget(
 			TargetActor,
-			DamageEffectClass,
+			ResolvedDamageEffectClass,
 			1.0f,
-			FixedDamage,
+			Context.SkillData ? Context.SkillData->FixedDamage : FixedDamage,
 			ResolvedAttackCoefficient,
-			bCanCrit,
+			Context.SkillData ? Context.SkillData->bCanCrit : bCanCrit,
 			ResolvedBreakPower))
 		{
 			continue;
