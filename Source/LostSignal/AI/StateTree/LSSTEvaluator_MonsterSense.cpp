@@ -46,6 +46,7 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 		InstanceData.bHasInterestLocation = false;
 		InstanceData.DistanceToTarget = 0.0f;
 		InstanceData.bIsDead = false;
+		InstanceData.bIsKnockback = false;
 		return;
 	}
 
@@ -58,6 +59,7 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 	InstanceData.bHasVisualTarget = InstanceData.SenseComponent->HasVisualTarget();
 	InstanceData.bHasInterestLocation = InstanceData.SenseComponent->HasInterestLocation();
 	InstanceData.bIsDead = false;
+	InstanceData.bIsKnockback = false;
 
 	if (InstanceData.EnemyCharacter)
 	{
@@ -65,6 +67,7 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 		{
 			// StateTree does not decide death itself; it only mirrors the final GAS state tag for transitions.
 			InstanceData.bIsDead = ASC->HasMatchingGameplayTag(LSGameplayTags::State_Dead);
+			InstanceData.bIsKnockback = ASC->HasMatchingGameplayTag(LSGameplayTags::State_Knockback);
 		}
 	}
 

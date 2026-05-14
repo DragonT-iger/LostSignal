@@ -3,9 +3,6 @@
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "Engine/EngineTypes.h"
-#include "GameFramework/Controller.h"
-#include "GameFramework/Character.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayEffect.h"
 #include "GAS/Abilities/LSGA_Override.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -60,6 +57,7 @@ bool ULSOverrideSkill::ActivateSkill_Implementation(const FLSSkillActivationCont
 	const float Radius = bHasRow && Row.Range_X > 0.0f ? Row.Range_X : FallbackRadius;
 	const float ResolvedAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : FallbackAttackCoefficient;
 	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverrideBreakPowerTier(Row.Skill_Impact, BreakPower) : BreakPower;
+	const float ResolvedKnockbackDuration = bHasRow && Row.Skill_Time > 0.0f ? Row.Skill_Time : FallbackKnockbackDuration;
 	if (Radius <= 0.0f)
 	{
 		return false;
@@ -104,14 +102,13 @@ bool ULSOverrideSkill::ActivateSkill_Implementation(const FLSSkillActivationCont
 
 		++ValidHitCount;
 
-		const ULSCharacterCombatComponent* TargetCombatComponent = TargetActor->FindComponentByClass<ULSCharacterCombatComponent>();
+		ULSCharacterCombatComponent* TargetCombatComponent = TargetActor->FindComponentByClass<ULSCharacterCombatComponent>();
 		if (TargetCombatComponent && !TargetCombatComponent->CanApplyCrowdControl(ResolvedBreakPower))
 		{
 			continue;
 		}
 
-		ACharacter* TargetCharacter = Cast<ACharacter>(TargetActor);
-		if (!TargetCharacter)
+		if (!TargetCombatComponent)
 		{
 			continue;
 		}
@@ -124,21 +121,10 @@ bool ULSOverrideSkill::ActivateSkill_Implementation(const FLSSkillActivationCont
 		}
 
 		KnockbackDirection = KnockbackDirection.GetSafeNormal2D();
-		if (AController* TargetController = TargetCharacter->GetController())
+		if (TargetCombatComponent->ApplyKnockback(KnockbackDirection, KnockbackSpeed, ResolvedKnockbackDuration, KnockbackUpSpeed))
 		{
-			TargetController->StopMovement();
+			++KnockbackCount;
 		}
-
-		if (UCharacterMovementComponent* MovementComponent = TargetCharacter->GetCharacterMovement())
-		{
-			MovementComponent->StopMovementImmediately();
-		}
-
-		TargetCharacter->LaunchCharacter(
-			(KnockbackDirection * KnockbackSpeed) + FVector(0.0f, 0.0f, KnockbackUpSpeed),
-			true,
-			true);
-		++KnockbackCount;
 	}
 
 	if (bEnableDebugLog)

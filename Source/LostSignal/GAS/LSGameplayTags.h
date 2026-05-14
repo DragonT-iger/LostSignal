@@ -12,6 +12,7 @@ namespace LSGameplayTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_SuperArmor)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Invincible)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dead)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Knockback)
 
 	// Ability tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Dash)

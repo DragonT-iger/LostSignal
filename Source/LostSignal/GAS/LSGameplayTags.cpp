@@ -5,6 +5,7 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(State_SuperArmor, "LS.State.SuperArmor")
 	UE_DEFINE_GAMEPLAY_TAG(State_Invincible, "LS.State.Invincible")
 	UE_DEFINE_GAMEPLAY_TAG(State_Dead, "LS.State.Dead")
+	UE_DEFINE_GAMEPLAY_TAG(State_Knockback, "LS.State.Knockback")
 
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Dash, "LS.Ability.Dash")
 	UE_DEFINE_GAMEPLAY_TAG(Ability_PlayerBasicAttack, "LS.Ability.Player.BasicAttack")

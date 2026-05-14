@@ -48,6 +48,9 @@ public:
 	void SetCombatTagActive(FGameplayTag Tag, bool bActive);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	bool ApplyKnockback(const FVector& Direction, float Speed, float Duration, float UpSpeed = 0.0f);
+
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	bool ApplyDamageEffectToTarget(
 		AActor* TargetActor,
 		TSubclassOf<UGameplayEffect> DamageEffectClass,
@@ -65,11 +68,17 @@ private:
 	void HandleCurrentHealthChanged(const FOnAttributeChangeData& ChangeData);
 	void RefreshDeathState();
 	void HandleDeathStateChanged(bool bIsDead);
+	void FinishKnockback();
+	void ClearKnockback();
 	bool CanDamageTarget(AActor* TargetActor) const;
 	bool IsFriendlyTarget(AActor* TargetActor) const;
 
 	UPROPERTY()
 	TMap<FGameplayTag, int32> LooseTagRefCounts;
+
+	FTimerHandle KnockbackTimerHandle;
+	uint16 KnockbackRootMotionSourceID = 0;
+	bool bKnockbackActive = false;
 
 	bool bCachedIsDead = false;
 };

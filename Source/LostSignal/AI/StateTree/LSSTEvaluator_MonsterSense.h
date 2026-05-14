@@ -58,6 +58,10 @@ struct FLSSTEvaluator_MonsterSenseInstanceData
 	/** Mirrors the monster ASC dead tag so every state can transition into Dead with one shared bool. */
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bIsDead = false;
+
+	/** Mirrors temporary CC movement lock state such as Override knockback. */
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	bool bIsKnockback = false;
 };
 
 /** StateTree evaluator that exposes monster sensing data to transitions and tasks. */

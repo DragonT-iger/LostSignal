@@ -9,9 +9,11 @@
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/RootMotionSource.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
 #include "LostSignal.h"
+#include "TimerManager.h"
 
 ULSCharacterCombatComponent::ULSCharacterCombatComponent()
 {
@@ -109,6 +111,53 @@ void ULSCharacterCombatComponent::SetCombatTagActive(FGameplayTag Tag, bool bAct
 			ASC->RemoveLooseGameplayTag(Tag);
 		}
 	}
+}
+
+bool ULSCharacterCombatComponent::ApplyKnockback(const FVector& Direction, float Speed, float Duration, float UpSpeed)
+{
+	ALSCharacterBase* OwnerCharacter = GetOwnerCharacter();
+	if (!OwnerCharacter || !OwnerCharacter->HasAuthority() || IsDead() || Speed <= 0.0f || Duration <= 0.0f)
+	{
+		return false;
+	}
+
+	FVector KnockbackDirection = Direction.GetSafeNormal2D();
+	if (KnockbackDirection.IsNearlyZero())
+	{
+		KnockbackDirection = -OwnerCharacter->GetActorForwardVector().GetSafeNormal2D();
+	}
+
+	UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement();
+	if (KnockbackDirection.IsNearlyZero() || !MovementComponent)
+	{
+		return false;
+	}
+
+	ClearKnockback();
+	SetCombatTagActive(LSGameplayTags::State_Knockback, true);
+	bKnockbackActive = true;
+
+	if (ULSCombatStateComponent* CombatStateComponent = OwnerCharacter->GetCombatStateComponent())
+	{
+		CombatStateComponent->BeginAction(ELSCombatActionState::HitReaction, ELSCombatActionPhase::Active);
+	}
+
+	TSharedPtr<FRootMotionSource_ConstantForce> RootMotion = MakeShared<FRootMotionSource_ConstantForce>();
+	RootMotion->InstanceName = FName("Knockback");
+	RootMotion->AccumulateMode = ERootMotionAccumulateMode::Override;
+	RootMotion->Priority = 8;
+	RootMotion->Force = (KnockbackDirection * Speed) + FVector(0.0f, 0.0f, UpSpeed);
+	RootMotion->Duration = Duration;
+	RootMotion->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
+	RootMotion->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
+	KnockbackRootMotionSourceID = MovementComponent->ApplyRootMotionSource(RootMotion);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(KnockbackTimerHandle, this, &ULSCharacterCombatComponent::FinishKnockback, Duration, false);
+	}
+
+	return true;
 }
 
 bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
@@ -259,6 +308,8 @@ void ULSCharacterCombatComponent::HandleDeathStateChanged(bool bIsDead)
 		return;
 	}
 
+	ClearKnockback();
+
 	if (UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement())
 	{
 		MovementComponent->StopMovementImmediately();
@@ -271,6 +322,49 @@ void ULSCharacterCombatComponent::HandleDeathStateChanged(bool bIsDead)
 		{
 			Controller->StopMovement();
 		}
+	}
+}
+
+void ULSCharacterCombatComponent::FinishKnockback()
+{
+	ClearKnockback();
+}
+
+void ULSCharacterCombatComponent::ClearKnockback()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(KnockbackTimerHandle);
+	}
+
+	if (bKnockbackActive)
+	{
+		SetCombatTagActive(LSGameplayTags::State_Knockback, false);
+		bKnockbackActive = false;
+
+		if (ALSCharacterBase* OwnerCharacter = GetOwnerCharacter())
+		{
+			if (ULSCombatStateComponent* CombatStateComponent = OwnerCharacter->GetCombatStateComponent())
+			{
+				if (CombatStateComponent->GetCurrentState() == ELSCombatActionState::HitReaction)
+				{
+					CombatStateComponent->EndAction();
+				}
+			}
+		}
+	}
+
+	if (KnockbackRootMotionSourceID != 0)
+	{
+		if (ALSCharacterBase* OwnerCharacter = GetOwnerCharacter())
+		{
+			if (UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement())
+			{
+				MovementComponent->RemoveRootMotionSourceByID(KnockbackRootMotionSourceID);
+			}
+		}
+
+		KnockbackRootMotionSourceID = 0;
 	}
 }
 
