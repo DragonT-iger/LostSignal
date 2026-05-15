@@ -36,11 +36,19 @@ bool ULSPlayerCombatComponent::RequestBasicAttack()
 	ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent();
 	if (!OwnerCharacter || OwnerCharacter->IsTemplate() || !SharedCombatComponent || !CombatStateComponent || SharedCombatComponent->IsDead())
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s basic attack rejected. Owner=%s SharedCombat=%s CombatState=%s Dead=%d"),
+			*GetNameSafe(GetOwner()),
+			*GetNameSafe(OwnerCharacter),
+			*GetNameSafe(SharedCombatComponent),
+			*GetNameSafe(CombatStateComponent),
+			SharedCombatComponent && SharedCombatComponent->IsDead() ? 1 : 0);
 		return false;
 	}
 
 	if (!AttackMontage)
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s basic attack rejected because AttackMontage is not set."),
+			*GetNameSafe(OwnerCharacter));
 		return false;
 	}
 
@@ -58,18 +66,30 @@ bool ULSPlayerCombatComponent::RequestBasicAttack()
 
 	if (!CombatStateComponent->TrySubmitCommand(ELSCombatCommandType::BasicAttack))
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s basic attack rejected by combat state. State=%d Phase=%d"),
+			*GetNameSafe(OwnerCharacter),
+			static_cast<int32>(CombatStateComponent->GetCurrentState()),
+			static_cast<int32>(CombatStateComponent->GetCurrentPhase()));
 		return false;
 	}
 
 	UAbilitySystemComponent* ASC = SharedCombatComponent->GetAbilitySystemComponent();
 	if (!ASC)
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s basic attack rejected because ASC is missing."),
+			*GetNameSafe(OwnerCharacter));
 		return false;
 	}
 
 	FGameplayTagContainer AbilityTags;
 	AbilityTags.AddTag(LSGameplayTags::Ability_PlayerBasicAttack);
 	const bool bActivated = ASC->TryActivateAbilitiesByTag(AbilityTags);
+	if (!bActivated)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s basic attack ability activation failed. Tag=%s"),
+			*GetNameSafe(OwnerCharacter),
+			*LSGameplayTags::Ability_PlayerBasicAttack.GetTag().ToString());
+	}
 
 	return bActivated;
 }
@@ -289,6 +309,52 @@ void ULSPlayerCombatComponent::ResetBasicAttackHit()
 	bAttackHitConsumed = false;
 }
 
+void ULSPlayerCombatComponent::SetPendingBasicAttackComboIndexOverride(int32 ComboIndex, float ExpireSeconds)
+{
+	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
+	if (!OwnerCharacter || !OwnerCharacter->HasAuthority() || ComboIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	PendingComboIndexOverride = ComboIndex;
+	if (ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent())
+	{
+		SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_NextAttack_ComboIndexOverride, true);
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PendingComboIndexOverrideTimerHandle);
+		if (ExpireSeconds > 0.0f)
+		{
+			World->GetTimerManager().SetTimer(
+				PendingComboIndexOverrideTimerHandle,
+				this,
+				&ULSPlayerCombatComponent::ClearPendingBasicAttackComboIndexOverride,
+				ExpireSeconds,
+				false);
+		}
+	}
+
+	UE_LOG(LogLS, Log, TEXT("%s reserved next basic attack combo index override. ComboIndex=%d Window=%.2f"),
+		*GetNameSafe(OwnerCharacter),
+		PendingComboIndexOverride,
+		ExpireSeconds);
+}
+
+bool ULSPlayerCombatComponent::ConsumePendingBasicAttackComboIndexOverride(int32& OutComboIndex)
+{
+	if (PendingComboIndexOverride == INDEX_NONE)
+	{
+		return false;
+	}
+
+	OutComboIndex = PendingComboIndexOverride;
+	ClearPendingBasicAttackComboIndexOverride();
+	return true;
+}
+
 void ULSPlayerCombatComponent::BeginPlay()
 {
 	Super::BeginPlay();
@@ -455,6 +521,25 @@ void ULSPlayerCombatComponent::FinishPredictedDashCooldown()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PredictedDashCooldownTimerHandle);
+	}
+}
+
+void ULSPlayerCombatComponent::ClearPendingBasicAttackComboIndexOverride()
+{
+	if (PendingComboIndexOverride == INDEX_NONE)
+	{
+		return;
+	}
+
+	PendingComboIndexOverride = INDEX_NONE;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PendingComboIndexOverrideTimerHandle);
+	}
+
+	if (ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent())
+	{
+		SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_NextAttack_ComboIndexOverride, false);
 	}
 }
 

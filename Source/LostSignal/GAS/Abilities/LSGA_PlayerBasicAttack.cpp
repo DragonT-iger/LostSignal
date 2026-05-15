@@ -147,7 +147,19 @@ void ULSGA_PlayerBasicAttack::ActivateAbility(
 		CombatStateComponent->BeginAction(ELSCombatActionState::BasicAttack, ELSCombatActionPhase::Startup);
 	}
 
-	PlayComboSection(0);
+	int32 StartSectionIndex = 0;
+	if (PlayerCombatComponent->ConsumePendingBasicAttackComboIndexOverride(StartSectionIndex))
+	{
+		UE_LOG(LogLS, Log, TEXT("%s basic attack starts from override combo index %d."),
+			*GetNameSafe(Character),
+			StartSectionIndex);
+	}
+	if (!ComboSections.IsValidIndex(StartSectionIndex))
+	{
+		StartSectionIndex = 0;
+	}
+
+	PlayComboSection(StartSectionIndex);
 }
 
 void ULSGA_PlayerBasicAttack::EndAbility(

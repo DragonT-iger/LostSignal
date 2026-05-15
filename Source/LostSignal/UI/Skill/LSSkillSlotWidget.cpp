@@ -36,6 +36,13 @@ void ULSSkillSlotWidget::NativeConstruct()
 void ULSSkillSlotWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	ULSSkillDataAsset* CurrentSkillData = SkillComponent ? SkillComponent->GetSkillData(Slot) : nullptr;
+	if (CurrentSkillData != CachedSkillData)
+	{
+		RefreshSkillIcon();
+	}
+
 	RefreshCooldown();
 }
 
@@ -47,6 +54,7 @@ void ULSSkillSlotWidget::RefreshSkillIcon()
 	}
 
 	ULSSkillDataAsset* SkillData = SkillComponent ? SkillComponent->GetSkillData(Slot) : nullptr;
+	CachedSkillData = SkillData;
 	if (SkillData && SkillData->Icon)
 	{
 		IconImage->SetBrushFromTexture(SkillData->Icon);

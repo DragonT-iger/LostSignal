@@ -31,6 +31,11 @@ public:
 	void ResetBasicAttackHit();
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void SetPendingBasicAttackComboIndexOverride(int32 ComboIndex, float ExpireSeconds);
+
+	bool ConsumePendingBasicAttackComboIndexOverride(int32& OutComboIndex);
+
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	bool RequestDash();
 
 	bool RequestDash(const FVector& DashDirection);
@@ -90,11 +95,13 @@ private:
 
 	FTimerHandle PredictedDashTimerHandle;
 	FTimerHandle PredictedDashCooldownTimerHandle;
+	FTimerHandle PendingComboIndexOverrideTimerHandle;
 	bool bAttackHitConsumed = false;
 	bool bPredictedDashInProgress = false;
 	bool bPredictedDashCooldownActive = false;
 	uint16 PredictedDashRootMotionSourceID = 0;
 	FVector PendingDashDirection = FVector::ZeroVector;
+	int32 PendingComboIndexOverride = INDEX_NONE;
 
 	ULSAimComponent* ResolveAimComponent() const;
 	ULSCharacterCombatComponent* ResolveSharedCombatComponent() const;
@@ -105,6 +112,7 @@ private:
 	void TryExecuteBufferedCommand();
 	void FinishPredictedDash();
 	void FinishPredictedDashCooldown();
+	void ClearPendingBasicAttackComboIndexOverride();
 	int32 ExecuteMeleeHit(const FVector& AttackDirection);
 	ULSGA_PlayerBasicAttack* FindActiveBasicAttackAbility() const;
 	bool ApplyDashRootMotion(const FVector& DashDirection, uint16& OutRootMotionSourceID) const;

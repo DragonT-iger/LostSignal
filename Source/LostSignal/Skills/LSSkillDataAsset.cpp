@@ -126,6 +126,11 @@ FGameplayTag ULSSkillDataAsset::GetCooldownTag() const
 	return FGameplayTag();
 }
 
+ULSSkillDataAsset* ULSSkillDataAsset::GetEnhancementVariant(int32 Index) const
+{
+	return EnhancementVariants.IsValidIndex(Index) ? EnhancementVariants[Index].Get() : nullptr;
+}
+
 const FLSCharacterSkillRow* ULSSkillDataAsset::ResolveSkillRow() const
 {
 	return SkillRow.GetRow<FLSCharacterSkillRow>(TEXT("LSSkillDataAsset"));

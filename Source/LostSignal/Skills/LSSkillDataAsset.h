@@ -37,6 +37,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Skill|Cooldown")
 	FGameplayTag GetCooldownTag() const;
 
+	UFUNCTION(BlueprintPure, Category="LS/Skill|Enhancement")
+	ULSSkillDataAsset* GetEnhancementVariant(int32 Index) const;
+
 	/** Legacy migration-only field. Runtime skill execution must use AbilityClass/DataAsset fields. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TSubclassOf<ULSSkill> SkillClass;
@@ -89,6 +92,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LS/Skill|UI")
 	TObjectPtr<UTexture2D> Icon;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Enhancement")
+	TArray<TObjectPtr<ULSSkillDataAsset>> EnhancementVariants;
 
 private:
 	const FLSCharacterSkillRow* ResolveSkillRow() const;

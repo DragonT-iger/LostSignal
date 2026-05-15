@@ -21,6 +21,7 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Attacking, "LS.Combat.Attacking")
 	UE_DEFINE_GAMEPLAY_TAG(Combat_AttackActive, "LS.Combat.AttackActive")
 	UE_DEFINE_GAMEPLAY_TAG(Combat_ComboWindow, "LS.Combat.ComboWindow")
+	UE_DEFINE_GAMEPLAY_TAG(Combat_NextAttack_ComboIndexOverride, "LS.Combat.NextAttack.ComboIndexOverride")
 
 	UE_DEFINE_GAMEPLAY_TAG(Buff_CombatAcceleration, "LS.Buff.CombatAcceleration")
 

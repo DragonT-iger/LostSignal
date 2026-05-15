@@ -45,6 +45,12 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	ULSSkillDataAsset* GetSkillData(ELSPlayerSkillSlot Slot) const;
 
+	UFUNCTION(BlueprintCallable, Category="LS/Skill")
+	bool SetSkillData(ELSPlayerSkillSlot Slot, ULSSkillDataAsset* NewSkillData);
+
+	UFUNCTION(BlueprintCallable, Category="LS/Skill|Enhancement")
+	bool ApplySkillEnhancementByIndex(ELSPlayerSkillSlot Slot, int32 EnhancementIndex);
+
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	bool GetActivePreviewSpec(FLSSkillAreaPreviewSpec& OutPreviewSpec) const;
 

@@ -143,6 +143,46 @@ ULSSkillDataAsset* ULSPlayerSkillComponent::GetSkillData(ELSPlayerSkillSlot Slot
 	return SlotSpec ? SlotSpec->SkillData.Get() : nullptr;
 }
 
+bool ULSPlayerSkillComponent::SetSkillData(ELSPlayerSkillSlot Slot, ULSSkillDataAsset* NewSkillData)
+{
+	if (!NewSkillData)
+	{
+		return false;
+	}
+
+	if (ActiveSkillData && ActiveSlot == Slot)
+	{
+		CancelAnyActiveSkillPreview();
+	}
+
+	FLSPlayerSkillSlotSpec& SlotSpec = SkillSlots.FindOrAdd(Slot);
+	SlotSpec.SkillData = NewSkillData;
+
+	UE_LOG(LogLS, Log, TEXT("%s changed skill slot data. Slot=%d Skill=%s"),
+		*GetNameSafe(GetOwner()),
+		static_cast<int32>(Slot),
+		*GetNameSafe(NewSkillData));
+
+	return true;
+}
+
+bool ULSPlayerSkillComponent::ApplySkillEnhancementByIndex(ELSPlayerSkillSlot Slot, int32 EnhancementIndex)
+{
+	ULSSkillDataAsset* CurrentSkillData = GetSkillData(Slot);
+	ULSSkillDataAsset* EnhancedSkillData = CurrentSkillData ? CurrentSkillData->GetEnhancementVariant(EnhancementIndex) : nullptr;
+	if (!EnhancedSkillData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s failed to apply skill enhancement. Slot=%d Index=%d CurrentSkill=%s"),
+			*GetNameSafe(GetOwner()),
+			static_cast<int32>(Slot),
+			EnhancementIndex,
+			*GetNameSafe(CurrentSkillData));
+		return false;
+	}
+
+	return SetSkillData(Slot, EnhancedSkillData);
+}
+
 bool ULSPlayerSkillComponent::GetActivePreviewSpec(FLSSkillAreaPreviewSpec& OutPreviewSpec) const
 {
 	if (!ActiveSkillData)

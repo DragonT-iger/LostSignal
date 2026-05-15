@@ -31,6 +31,7 @@ namespace LSGameplayTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Attacking)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_AttackActive)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_ComboWindow)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_NextAttack_ComboIndexOverride)
 
 	// Buff tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buff_CombatAcceleration)

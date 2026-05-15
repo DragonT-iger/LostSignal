@@ -1,12 +1,14 @@
 #include "GAS/Abilities/LSGA_Bypass.h"
 
 #include "Combat/LSCharacterCombatComponent.h"
+#include "Combat/LSPlayerCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
 #include "GAS/LSGameplayTags.h"
 #include "LostSignal.h"
+#include "Skills/LSBypassSkillDataAsset.h"
 #include "Skills/LSPlayerSkillComponent.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "TimerManager.h"
@@ -45,6 +47,7 @@ void ULSGA_Bypass::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	ActiveSkillData = SkillContext.SkillData;
 
 	float Distance = 0.0f;
 	float Duration = 0.0f;
@@ -82,6 +85,7 @@ void ULSGA_Bypass::ActivateAbility(
 	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
 
 	SetInvincibleTagActive(true);
+	ApplyBypassStartEffects(Duration);
 
 	const float SlideSpeed = Distance / Duration;
 	TSharedPtr<FRootMotionSource_ConstantForce> RootMotion = MakeShared<FRootMotionSource_ConstantForce>();
@@ -116,10 +120,15 @@ void ULSGA_Bypass::ActivateAbility(
 
 bool ULSGA_Bypass::ResolveMovementParams(const ULSSkillDataAsset* SkillData, float& OutDistance, float& OutDuration) const
 {
+	const ULSBypassSkillDataAsset* BypassData = Cast<ULSBypassSkillDataAsset>(SkillData);
 	FLSCharacterSkillRow Row;
 	const bool bHasRow = SkillData && SkillData->TryGetSkillRow(Row);
-	OutDistance = bHasRow && Row.Range_X > 0.0f ? Row.Range_X : FallbackDistance;
-	OutDuration = bHasRow && Row.Skill_Time > 0.0f ? Row.Skill_Time : FallbackDuration;
+	OutDistance = bHasRow && Row.Range_X > 0.0f
+		? Row.Range_X
+		: BypassData ? BypassData->FallbackDistance : FallbackDistance;
+	OutDuration = bHasRow && Row.Skill_Time > 0.0f
+		? Row.Skill_Time
+		: BypassData ? BypassData->FallbackDuration : FallbackDuration;
 	return OutDistance > 0.0f && OutDuration > 0.0f;
 }
 
@@ -145,6 +154,7 @@ void ULSGA_Bypass::EndAbility(
 
 	SetInvincibleTagActive(false);
 	RootMotionSourceID = 0;
+	ActiveSkillData = nullptr;
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -155,6 +165,26 @@ void ULSGA_Bypass::FinishBypass()
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 	}
+}
+
+void ULSGA_Bypass::ApplyBypassStartEffects(float Duration)
+{
+	AActor* SourceActor = GetAvatarActorFromActorInfo();
+	const ULSBypassSkillDataAsset* BypassData = Cast<ULSBypassSkillDataAsset>(ActiveSkillData);
+	if (!SourceActor || !SourceActor->HasAuthority() || !BypassData || !BypassData->bSetComboIndexOverrideOnFinish)
+	{
+		return;
+	}
+
+	ULSPlayerCombatComponent* PlayerCombatComponent = SourceActor->FindComponentByClass<ULSPlayerCombatComponent>();
+	if (!PlayerCombatComponent)
+	{
+		return;
+	}
+
+	PlayerCombatComponent->SetPendingBasicAttackComboIndexOverride(
+		BypassData->ComboIndexOverride,
+		Duration + BypassData->ComboIndexOverrideWindowSeconds);
 }
 
 void ULSGA_Bypass::SetInvincibleTagActive(bool bActive)

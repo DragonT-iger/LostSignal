@@ -39,9 +39,13 @@ protected:
 
 private:
 	void FinishBypass();
+	void ApplyBypassStartEffects(float Duration);
 	void SetInvincibleTagActive(bool bActive);
 
 	FTimerHandle BypassTimerHandle;
 	uint16 RootMotionSourceID = 0;
 	bool bInvincibleTagActive = false;
+
+	UPROPERTY(Transient)
+	TObjectPtr<class ULSSkillDataAsset> ActiveSkillData = nullptr;
 };

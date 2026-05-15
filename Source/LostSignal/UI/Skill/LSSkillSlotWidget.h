@@ -7,6 +7,7 @@
 #include "LSSkillSlotWidget.generated.h"
 
 class ULSPlayerSkillComponent;
+class ULSSkillDataAsset;
 class UImage;
 class UTextBlock;
 class UProgressBar;
@@ -40,6 +41,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULSPlayerSkillComponent> SkillComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ULSSkillDataAsset> CachedSkillData;
 
 	ELSPlayerSkillSlot Slot = ELSPlayerSkillSlot::Skill1;
 };
