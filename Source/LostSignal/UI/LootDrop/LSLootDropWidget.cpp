@@ -293,6 +293,41 @@ bool ULSLootDropWidget::TransferInventorySlotToFirstEmptyLootSlot(const ELSInven
 	return false;
 }
 
+bool ULSLootDropWidget::DropLootSlot(const int32 FromLootSlotIndex, const int32 ToLootSlotIndex)
+{
+	if (!LootItems.IsValidIndex(FromLootSlotIndex) || !LootItems.IsValidIndex(ToLootSlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop loot slot because an index is invalid on %s. From=%d To=%d"),
+			*GetNameSafe(this),
+			FromLootSlotIndex,
+			ToLootSlotIndex);
+		return false;
+	}
+
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop loot slot because owning player controller is invalid on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	if (!PlayerController->DropLootDropSlot(SourceLootBox, FromLootSlotIndex, ToLootSlotIndex))
+	{
+		return false;
+	}
+
+	if (!PlayerController->HasAuthority())
+	{
+		return true;
+	}
+
+	if (SourceLootBox)
+	{
+		RefreshLootItemsFromSource(SourceLootBox, SourceLootBox->GetLootResults());
+	}
+	return true;
+}
+
 void ULSLootDropWidget::NotifyLootSlotHovered(const int32 SlotIndex)
 {
 	HoveredLootSlotIndex = SlotIndex;

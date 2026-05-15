@@ -45,6 +45,7 @@ public:
 
 	bool TransferInventorySlotToLootSlot(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, int32 LootSlotIndex);
 	bool TransferInventorySlotToFirstEmptyLootSlot(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex);
+	bool DropLootSlot(int32 FromLootSlotIndex, int32 ToLootSlotIndex);
 
 	void NotifyLootSlotHovered(int32 SlotIndex);
 	void NotifyLootSlotUnhovered(int32 SlotIndex);

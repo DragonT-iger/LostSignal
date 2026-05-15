@@ -441,6 +441,39 @@ void ALSPlayerControllerBase::ServerDropInventorySlot_Implementation(const ELSIn
 	}
 }
 
+bool ALSPlayerControllerBase::DropLootDropSlot(ALSLootBox* SourceLootBox, const int32 FromLootSlotIndex, const int32 ToLootSlotIndex)
+{
+	if (!SourceLootBox || FromLootSlotIndex == INDEX_NONE || ToLootSlotIndex == INDEX_NONE)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot request loot slot drop because request data is invalid. From=%d To=%d"),
+			FromLootSlotIndex,
+			ToLootSlotIndex);
+		return false;
+	}
+
+	if (HasAuthority())
+	{
+		const bool bChanged = DropLootDropSlotInternal(SourceLootBox, FromLootSlotIndex, ToLootSlotIndex);
+		if (bChanged)
+		{
+			SyncRaidSessionAndLootFromServer(SourceLootBox);
+		}
+		return bChanged;
+	}
+
+	ServerDropLootDropSlot(SourceLootBox, FromLootSlotIndex, ToLootSlotIndex);
+	return true;
+}
+
+void ALSPlayerControllerBase::ServerDropLootDropSlot_Implementation(ALSLootBox* SourceLootBox, const int32 FromLootSlotIndex, const int32 ToLootSlotIndex)
+{
+	const bool bChanged = DropLootDropSlotInternal(SourceLootBox, FromLootSlotIndex, ToLootSlotIndex);
+	if (SourceLootBox || bChanged)
+	{
+		SyncRaidSessionAndLootFromServer(SourceLootBox);
+	}
+}
+
 bool ALSPlayerControllerBase::SortRaidInventory()
 {
 	if (HasAuthority())
@@ -525,6 +558,17 @@ bool ALSPlayerControllerBase::TransferSessionSlotToLootDropSlotInternal(ALSLootB
 	}
 
 	return SourceLootBox->TransferSessionSlotToLootSlot(LootSlotIndex, GetRaidInventoryComponent(), FromSlotArea, FromSlotIndex, OutLootItem);
+}
+
+bool ALSPlayerControllerBase::DropLootDropSlotInternal(ALSLootBox* SourceLootBox, const int32 FromLootSlotIndex, const int32 ToLootSlotIndex)
+{
+	if (!SourceLootBox)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop loot slot because source loot box is missing."));
+		return false;
+	}
+
+	return SourceLootBox->DropLootSlot(FromLootSlotIndex, ToLootSlotIndex);
 }
 
 bool ALSPlayerControllerBase::DropSessionSlotToWorld(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass)

@@ -235,6 +235,17 @@ bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDro
 
 	if (ULSLootDropWidget* TargetLootDropWidget = LootDropWidget.Get())
 	{
+		if (DragOperation->SourceLootDropWidget)
+		{
+			if (DragOperation->SourceLootDropWidget != TargetLootDropWidget)
+			{
+				UE_LOG(LogLS, Warning, TEXT("Cannot drop loot slot because source/target loot drop widget does not match."));
+				return false;
+			}
+
+			return TargetLootDropWidget->DropLootSlot(DragOperation->SourceSlotIndex, SlotIndex);
+		}
+
 		if (!DragOperation->SourceInventoryWidget)
 		{
 			return false;
@@ -328,7 +339,17 @@ bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InO
 bool ULSItemSlotWidget::IsValidLootDropTarget(const UDragDropOperation* InOperation) const
 {
 	const ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
-	return DragOperation && LootDropWidget.IsValid() && DragOperation->SourceInventoryWidget && SlotIndex != INDEX_NONE && DragOperation->SourceSlotIndex != INDEX_NONE;
+	if (!DragOperation || !LootDropWidget.IsValid() || SlotIndex == INDEX_NONE || DragOperation->SourceSlotIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	if (DragOperation->SourceInventoryWidget)
+	{
+		return true;
+	}
+
+	return DragOperation->SourceLootDropWidget == LootDropWidget.Get() && DragOperation->SourceSlotIndex != SlotIndex;
 }
 
 UTexture2D* ULSItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName) const
