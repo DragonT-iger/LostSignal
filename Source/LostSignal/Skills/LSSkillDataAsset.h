@@ -56,9 +56,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|DataTable")
 	FDataTableRowHandle SkillRow;
 
+	//Preview Effect
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
 	FLSSkillAreaPreviewSpec PreviewSpec;
 
+	//Base Damage
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 
@@ -76,6 +78,17 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage")
 	ELSBreakPowerTier BreakPower = ELSBreakPowerTier::NormalAttack;
+
+	//UI Info
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LS/Skill|UI")
+	FText DisplayName;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LS/Skill|UI")
+	FText Description;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "LS/Skill|UI")
+	TObjectPtr<UTexture2D> Icon;
+
 
 private:
 	const FLSCharacterSkillRow* ResolveSkillRow() const;

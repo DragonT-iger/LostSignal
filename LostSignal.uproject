@@ -7,7 +7,10 @@
 		{
 			"Name": "LostSignal",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"UMG"
+			]
 		},
 		{
 			"Name": "LostSignalVisionShaders",
