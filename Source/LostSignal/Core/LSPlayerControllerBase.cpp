@@ -16,6 +16,7 @@
 #include "UI/Debug/LSHpDebugWidget.h"
 #include "UI/LSPlayerHUDWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
+#include "UI/Storage/LSLobbyStorageWidget.h"
 
 ALSPlayerControllerBase::ALSPlayerControllerBase()
 {
@@ -156,6 +157,43 @@ void ALSPlayerControllerBase::ClientHideLootDropWidget_Implementation()
 	HideLootDropWidgetLocal();
 }
 
+void ALSPlayerControllerBase::ShowLobbyStorageWidget(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass)
+{
+	if (IsLocalPlayerController())
+	{
+		ShowLobbyStorageWidgetLocal(LobbyStorageWidgetClass);
+		return;
+	}
+
+	ClientShowLobbyStorageWidget(LobbyStorageWidgetClass);
+}
+
+void ALSPlayerControllerBase::HideLobbyStorageWidget()
+{
+	if (IsLocalPlayerController())
+	{
+		HideLobbyStorageWidgetLocal();
+		return;
+	}
+
+	ClientHideLobbyStorageWidget();
+}
+
+bool ALSPlayerControllerBase::IsLobbyStorageWidgetOpen() const
+{
+	return LobbyStorageWidgetInstance && LobbyStorageWidgetInstance->IsVisible();
+}
+
+void ALSPlayerControllerBase::ClientShowLobbyStorageWidget_Implementation(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass)
+{
+	ShowLobbyStorageWidgetLocal(LobbyStorageWidgetClass);
+}
+
+void ALSPlayerControllerBase::ClientHideLobbyStorageWidget_Implementation()
+{
+	HideLobbyStorageWidgetLocal();
+}
+
 void ALSPlayerControllerBase::ClientSyncRaidSessionAndLoot_Implementation(ALSLootBox* SourceLootBox, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSDropResult>& LootResults)
 {
 	if (!RaidInventoryComponent)
@@ -238,6 +276,52 @@ void ALSPlayerControllerBase::HideLootDropWidgetLocal()
 	{
 		LootDropWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 		LootDropWidgetInstance->ClearLootItems();
+	}
+}
+
+void ALSPlayerControllerBase::ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass)
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	if (!LobbyStorageWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("LobbyStorageWidgetClass is not set on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (LobbyStorageWidgetInstance && LobbyStorageWidgetInstance->GetClass() != LobbyStorageWidgetClass)
+	{
+		LobbyStorageWidgetInstance->RemoveFromParent();
+		LobbyStorageWidgetInstance = nullptr;
+	}
+
+	if (!LobbyStorageWidgetInstance)
+	{
+		LobbyStorageWidgetInstance = CreateWidget<ULSLobbyStorageWidget>(this, LobbyStorageWidgetClass);
+		if (!LobbyStorageWidgetInstance)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Failed to create lobby storage widget on %s."), *GetNameSafe(this));
+			return;
+		}
+	}
+
+	if (!LobbyStorageWidgetInstance->IsInViewport())
+	{
+		LobbyStorageWidgetInstance->AddToViewport();
+	}
+
+	LobbyStorageWidgetInstance->RefreshStorage();
+	LobbyStorageWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+void ALSPlayerControllerBase::HideLobbyStorageWidgetLocal()
+{
+	if (LobbyStorageWidgetInstance)
+	{
+		LobbyStorageWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 

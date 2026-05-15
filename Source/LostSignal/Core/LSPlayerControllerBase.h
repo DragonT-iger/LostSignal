@@ -11,6 +11,7 @@
 class ALSLootBox;
 class ALSWorldDroppedItem;
 class UInputMappingContext;
+class ULSLobbyStorageWidget;
 class ULSRaidInventoryComponent;
 class ULSHpDebugWidget;
 class ULSLootDropWidget;
@@ -34,6 +35,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void HideLootDropWidget();
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	void ShowLobbyStorageWidget(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	void HideLobbyStorageWidget();
+
+	UFUNCTION(BlueprintPure, Category="LS/UI")
+	bool IsLobbyStorageWidgetOpen() const;
 
 	void RefreshLootDropWidgetForSource(ALSLootBox* SourceLootBox, const TArray<FLSDropResult>& Results);
 	void SyncRaidInventoryToClient();
@@ -74,6 +84,9 @@ protected:
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSPlayerHUDWidget> PlayerHUDWidgetInstance;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSLobbyStorageWidget> LobbyStorageWidgetInstance;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Input")
 	bool bDefaultMappingContextsApplied = false;
@@ -116,10 +129,18 @@ private:
 	void ClientHideLootDropWidget();
 
 	UFUNCTION(Client, Reliable)
+	void ClientShowLobbyStorageWidget(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass);
+
+	UFUNCTION(Client, Reliable)
+	void ClientHideLobbyStorageWidget();
+
+	UFUNCTION(Client, Reliable)
 	void ClientSyncRaidSessionAndLoot(ALSLootBox* SourceLootBox, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSDropResult>& LootResults);
 
 	void ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 	void HideLootDropWidgetLocal();
+	void ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass);
+	void HideLobbyStorageWidgetLocal();
 	void CreatePlayerHUDWidgetLocal();
 	void InitializeRaidInventoryFromSessionSubsystem();
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);

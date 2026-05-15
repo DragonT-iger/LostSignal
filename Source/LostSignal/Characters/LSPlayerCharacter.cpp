@@ -219,6 +219,15 @@ void ALSPlayerCharacter::OnInteract()
 {
 	if (!IsLocallyControlled()) return;
 
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetController()))
+	{
+		if (PlayerController->IsLobbyStorageWidgetOpen())
+		{
+			PlayerController->HideLobbyStorageWidget();
+			return;
+		}
+	}
+
 	if (IsInventoryWidgetOpen())
 	{
 		HideInventoryWidget();
