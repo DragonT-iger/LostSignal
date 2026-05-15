@@ -14,6 +14,7 @@
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "UI/Debug/LSHpDebugWidget.h"
+#include "UI/LSPlayerHUDWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 
 ALSPlayerControllerBase::ALSPlayerControllerBase()
@@ -51,6 +52,20 @@ void ALSPlayerControllerBase::BeginPlay()
 			DebugHpWidgetInstance->AddToViewport();
 		}
 	}
+
+	CreatePlayerHUDWidgetLocal();
+}
+
+void ALSPlayerControllerBase::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+	CreatePlayerHUDWidgetLocal();
+}
+
+void ALSPlayerControllerBase::AcknowledgePossession(APawn* InPawn)
+{
+	Super::AcknowledgePossession(InPawn);
+	CreatePlayerHUDWidgetLocal();
 }
 
 void ALSPlayerControllerBase::SetupInputComponent()
@@ -224,6 +239,46 @@ void ALSPlayerControllerBase::HideLootDropWidgetLocal()
 		LootDropWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 		LootDropWidgetInstance->ClearLootItems();
 	}
+}
+
+void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	if (!PlayerHUDWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("PlayerHUDWidgetClass is not set on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (!PlayerHUDWidgetInstance)
+	{
+		PlayerHUDWidgetInstance = CreateWidget<ULSPlayerHUDWidget>(this, PlayerHUDWidgetClass);
+		if (!PlayerHUDWidgetInstance)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Failed to create player HUD widget on %s."), *GetNameSafe(this));
+			return;
+		}
+	}
+
+	if (!PlayerHUDWidgetInstance->IsInViewport())
+	{
+		PlayerHUDWidgetInstance->AddToViewport();
+	}
+
+	PlayerHUDWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+
+	APawn* CurrentPawn = GetPawn();
+	if (!CurrentPawn)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s created player HUD but pawn is not ready yet."), *GetNameSafe(this));
+		return;
+	}
+
+	PlayerHUDWidgetInstance->InitializeHUDForPawn(CurrentPawn);
 }
 
 bool ALSPlayerControllerBase::TransferLootDropSlotToSession(ALSLootBox* SourceLootBox, const int32 LootSlotIndex, const FName ItemRowName, const int32 Amount, FLSSessionItem& OutLootItem)

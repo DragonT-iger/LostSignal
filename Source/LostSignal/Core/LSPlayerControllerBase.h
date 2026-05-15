@@ -14,6 +14,7 @@ class UInputMappingContext;
 class ULSRaidInventoryComponent;
 class ULSHpDebugWidget;
 class ULSLootDropWidget;
+class ULSPlayerHUDWidget;
 
 UCLASS(Abstract)
 class LOSTSIGNAL_API ALSPlayerControllerBase : public APlayerController
@@ -61,11 +62,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
 	TSubclassOf<ULSLootDropWidget> LootDropWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
+	TSubclassOf<ULSPlayerHUDWidget> PlayerHUDWidgetClass;
+
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSHpDebugWidget> DebugHpWidgetInstance;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSLootDropWidget> LootDropWidgetInstance;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSPlayerHUDWidget> PlayerHUDWidgetInstance;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Input")
 	bool bDefaultMappingContextsApplied = false;
@@ -76,6 +83,8 @@ protected:
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
+	virtual void OnPossess(APawn* InPawn) override;
+	virtual void AcknowledgePossession(APawn* InPawn) override;
 
 private:
 	UFUNCTION(Server, Reliable)
@@ -107,6 +116,7 @@ private:
 
 	void ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 	void HideLootDropWidgetLocal();
+	void CreatePlayerHUDWidgetLocal();
 	void InitializeRaidInventoryFromSessionSubsystem();
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);
 	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass);
