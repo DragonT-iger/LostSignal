@@ -5,7 +5,7 @@
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "Engine/EngineTypes.h"
-#include "GAS/Abilities/LSGA_Overclock.h"
+#include "GAS/Abilities/Character1/LSGA_Overclock.h"
 #include "GAS/LSGameplayTags.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"

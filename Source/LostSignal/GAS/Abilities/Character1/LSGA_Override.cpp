@@ -1,4 +1,4 @@
-#include "GAS/Abilities/LSGA_Override.h"
+#include "GAS/Abilities/Character1/LSGA_Override.h"
 
 #include "AbilitySystemComponent.h"
 #include "Combat/LSCharacterCombatComponent.h"

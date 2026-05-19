@@ -1,4 +1,4 @@
-#include "GAS/Abilities/LSGA_CombatAccelerationPassive.h"
+#include "GAS/Abilities/Character1/LSGA_CombatAccelerationPassive.h"
 
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"

@@ -40,10 +40,17 @@ protected:
 private:
 	void FinishBypass();
 	void ApplyBypassStartEffects(float Duration);
+	void ApplySpoofingStartEffects(const FVector& HologramLocation);
+	void IgnoreEnemiesForBypass(ACharacter* SourceCharacter, const FVector& StartLocation, const FVector& Direction, float Distance);
+	void ClearIgnoredEnemiesForBypass(ACharacter* SourceCharacter);
+	static void PullTargetsToHologram(AActor* SourceActor, FVector HologramLocation, class ULSBypassSkillDataAsset* BypassData);
+	static void ApplySpoofingStunIfConfigured(AActor* TargetActor, const class ULSBypassSkillDataAsset* BypassData);
 	void SetInvincibleTagActive(bool bActive);
 
 	FTimerHandle BypassTimerHandle;
+	FTimerHandle BypassSpoofingTimerHandle;
 	uint16 RootMotionSourceID = 0;
+	TArray<TWeakObjectPtr<AActor>> IgnoredEnemyActors;
 	bool bInvincibleTagActive = false;
 
 	UPROPERTY(Transient)

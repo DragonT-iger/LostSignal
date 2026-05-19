@@ -1,4 +1,4 @@
-#include "GAS/Abilities/LSGA_PlayerBasicAttack.h"
+#include "GAS/Abilities/Character1/LSGA_PlayerBasicAttack.h"
 
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimInstance.h"

@@ -4,14 +4,18 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
 #include "Abilities/GameplayAbilityTypes.h"
+#include "Characters/LSEnemyCharacter.h"
+#include "Components/CapsuleComponent.h"
+#include "Engine/EngineTypes.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
-#include "GAS/Abilities/LSGA_Bypass.h"
-#include "GAS/Abilities/LSGA_Execution.h"
+#include "GAS/Abilities/Character1/LSGA_Bypass.h"
+#include "GAS/Abilities/Character1/LSGA_Execution.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
@@ -492,6 +496,8 @@ bool ULSPlayerSkillComponent::TryPredictFastMovementSkill(ULSSkillDataAsset* Ski
 		return false;
 	}
 
+	IgnoreEnemiesForPredictedFastMovement(OwnerCharacter, OwnerCharacter->GetActorLocation(), AimDirection, Distance);
+
 	TSharedPtr<FRootMotionSource_ConstantForce> RootMotion = MakeShared<FRootMotionSource_ConstantForce>();
 	RootMotion->InstanceName = FName("PredictedFastMovementSkill");
 	RootMotion->AccumulateMode = ERootMotionAccumulateMode::Override;
@@ -536,6 +542,113 @@ bool ULSPlayerSkillComponent::ResolvePredictedFastMovementParams(ULSSkillDataAss
 	return false;
 }
 
+void ULSPlayerSkillComponent::IgnoreEnemiesForPredictedFastMovement(ACharacter* OwnerCharacter, const FVector& StartLocation, const FVector& Direction, float Distance)
+{
+	if (!OwnerCharacter || OwnerCharacter->HasAuthority() || Distance <= 0.0f || Direction.IsNearlyZero())
+	{
+		return;
+	}
+
+	UCapsuleComponent* OwnerCapsule = OwnerCharacter->GetCapsuleComponent();
+	if (!OwnerCapsule)
+	{
+		return;
+	}
+
+	TArray<AActor*> OverlappedActors;
+	TArray<AActor*> ActorsToIgnore;
+	ActorsToIgnore.Add(OwnerCharacter);
+
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+	const float PathHalfLength = Distance * 0.5f;
+	const float PathHalfWidth = OwnerCapsule->GetScaledCapsuleRadius() * 2.0f;
+	const FVector AreaCenter = StartLocation + (Direction * PathHalfLength);
+	const float QueryRadius = FMath::Sqrt(FMath::Square(PathHalfLength) + FMath::Square(PathHalfWidth));
+
+	UKismetSystemLibrary::SphereOverlapActors(
+		GetWorld(),
+		AreaCenter,
+		QueryRadius,
+		ObjectTypes,
+		ALSEnemyCharacter::StaticClass(),
+		ActorsToIgnore,
+		OverlappedActors);
+
+	const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, Direction).GetSafeNormal2D();
+	for (AActor* EnemyActor : OverlappedActors)
+	{
+		if (!EnemyActor)
+		{
+			continue;
+		}
+
+		const FVector ToEnemy = EnemyActor->GetActorLocation() - StartLocation;
+		const float ForwardDistance = FVector::DotProduct(ToEnemy, Direction);
+		const float LateralDistance = FMath::Abs(FVector::DotProduct(ToEnemy, RightDirection));
+		if (ForwardDistance < 0.0f || ForwardDistance > Distance || LateralDistance > PathHalfWidth)
+		{
+			continue;
+		}
+
+		OwnerCapsule->IgnoreActorWhenMoving(EnemyActor, true);
+		OwnerCharacter->MoveIgnoreActorAdd(EnemyActor);
+
+		if (ACharacter* EnemyCharacter = Cast<ACharacter>(EnemyActor))
+		{
+			if (UCapsuleComponent* EnemyCapsule = EnemyCharacter->GetCapsuleComponent())
+			{
+				EnemyCapsule->IgnoreActorWhenMoving(OwnerCharacter, true);
+			}
+			EnemyCharacter->MoveIgnoreActorAdd(OwnerCharacter);
+		}
+
+		PredictedFastMovementIgnoredEnemies.AddUnique(EnemyActor);
+	}
+}
+
+void ULSPlayerSkillComponent::ClearIgnoredEnemiesForPredictedFastMovement(ACharacter* OwnerCharacter)
+{
+	if (!OwnerCharacter)
+	{
+		PredictedFastMovementIgnoredEnemies.Reset();
+		return;
+	}
+
+	if (UCapsuleComponent* OwnerCapsule = OwnerCharacter->GetCapsuleComponent())
+	{
+		for (const TWeakObjectPtr<AActor>& IgnoredActor : PredictedFastMovementIgnoredEnemies)
+		{
+			if (AActor* EnemyActor = IgnoredActor.Get())
+			{
+				OwnerCapsule->IgnoreActorWhenMoving(EnemyActor, false);
+			}
+		}
+	}
+
+	for (const TWeakObjectPtr<AActor>& IgnoredActor : PredictedFastMovementIgnoredEnemies)
+	{
+		AActor* EnemyActor = IgnoredActor.Get();
+		if (!EnemyActor)
+		{
+			continue;
+		}
+
+		OwnerCharacter->MoveIgnoreActorRemove(EnemyActor);
+		if (ACharacter* EnemyCharacter = Cast<ACharacter>(EnemyActor))
+		{
+			if (UCapsuleComponent* EnemyCapsule = EnemyCharacter->GetCapsuleComponent())
+			{
+				EnemyCapsule->IgnoreActorWhenMoving(OwnerCharacter, false);
+			}
+			EnemyCharacter->MoveIgnoreActorRemove(OwnerCharacter);
+		}
+	}
+
+	PredictedFastMovementIgnoredEnemies.Reset();
+}
+
 void ULSPlayerSkillComponent::FinishPredictedFastMovementSkill()
 {
 	if (UWorld* World = GetWorld())
@@ -547,6 +660,8 @@ void ULSPlayerSkillComponent::FinishPredictedFastMovementSkill()
 	{
 		if (ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner()))
 		{
+			ClearIgnoredEnemiesForPredictedFastMovement(OwnerCharacter);
+
 			if (UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement())
 			{
 				MovementComponent->RemoveRootMotionSourceByID(PredictedFastMovementRootMotionSourceID);
@@ -555,5 +670,6 @@ void ULSPlayerSkillComponent::FinishPredictedFastMovementSkill()
 	}
 
 	PredictedFastMovementRootMotionSourceID = 0;
+	PredictedFastMovementIgnoredEnemies.Reset();
 	bPredictedFastMovementInProgress = false;
 }

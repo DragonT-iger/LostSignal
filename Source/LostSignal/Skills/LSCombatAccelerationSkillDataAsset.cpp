@@ -1,6 +1,6 @@
 #include "Skills/LSCombatAccelerationSkillDataAsset.h"
 
-#include "GAS/Abilities/LSGA_CombatAccelerationPassive.h"
+#include "GAS/Abilities/Character1/LSGA_CombatAccelerationPassive.h"
 #include "GAS/Effects/LSGE_CombatAcceleration.h"
 
 ULSCombatAccelerationSkillDataAsset::ULSCombatAccelerationSkillDataAsset()

@@ -92,10 +92,13 @@ private:
 	bool TrySendPassiveGameplayEvent(ULSSkillDataAsset* SkillData, int32 ComboIndex) const;
 	bool TryPredictFastMovementSkill(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw);
 	bool ResolvePredictedFastMovementParams(ULSSkillDataAsset* SkillData, float& OutDistance, float& OutDuration) const;
+	void IgnoreEnemiesForPredictedFastMovement(ACharacter* OwnerCharacter, const FVector& StartLocation, const FVector& Direction, float Distance);
+	void ClearIgnoredEnemiesForPredictedFastMovement(ACharacter* OwnerCharacter);
 	void FinishPredictedFastMovementSkill();
 	ULSSkillPreviewComponent* ResolvePreviewComponent() const;
 
 	FTimerHandle PredictedFastMovementTimerHandle;
 	uint16 PredictedFastMovementRootMotionSourceID = 0;
+	TArray<TWeakObjectPtr<AActor>> PredictedFastMovementIgnoredEnemies;
 	bool bPredictedFastMovementInProgress = false;
 };

@@ -1,7 +1,7 @@
 #include "Skills/LSShortCircuitSkill.h"
 
 #include "GameFramework/Pawn.h"
-#include "GAS/Abilities/LSGA_ShortCircuit.h"
+#include "GAS/Abilities/Character1/LSGA_ShortCircuit.h"
 #include "LostSignal.h"
 #include "Skills/LSShortCircuitField.h"
 #include "Skills/LSShortCircuitProjectile.h"

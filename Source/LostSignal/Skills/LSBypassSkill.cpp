@@ -2,7 +2,7 @@
 
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"
-#include "GAS/Abilities/LSGA_Bypass.h"
+#include "GAS/Abilities/Character1/LSGA_Bypass.h"
 #include "GAS/LSGameplayTags.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"

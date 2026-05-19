@@ -1,6 +1,6 @@
 #include "Skills/LSShortCircuitSkillDataAsset.h"
 
-#include "GAS/Abilities/LSGA_ShortCircuit.h"
+#include "GAS/Abilities/Character1/LSGA_ShortCircuit.h"
 #include "GAS/LSGameplayTags.h"
 #include "Skills/LSShortCircuitField.h"
 #include "Skills/LSShortCircuitProjectile.h"

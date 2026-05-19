@@ -3,7 +3,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "GAS/Abilities/LSGA_PlayerBasicAttack.h"
+#include "GAS/Abilities/Character1/LSGA_PlayerBasicAttack.h"
 
 void ULSANS_PlayerComboWindow::NotifyBegin(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float TotalDuration, const FAnimNotifyEventReference& EventReference)
 {

@@ -1,6 +1,6 @@
 #include "Skills/LSOverrideSkillDataAsset.h"
 
-#include "GAS/Abilities/LSGA_Override.h"
+#include "GAS/Abilities/Character1/LSGA_Override.h"
 #include "GAS/Effects/LSGE_AttackSpeedBuff.h"
 #include "GAS/LSGameplayTags.h"
 

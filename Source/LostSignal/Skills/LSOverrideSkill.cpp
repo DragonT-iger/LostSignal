@@ -4,7 +4,7 @@
 #include "Data/LSCharacterSkillRow.h"
 #include "Engine/EngineTypes.h"
 #include "GameplayEffect.h"
-#include "GAS/Abilities/LSGA_Override.h"
+#include "GAS/Abilities/Character1/LSGA_Override.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
 #include "Skills/LSSkillDataAsset.h"

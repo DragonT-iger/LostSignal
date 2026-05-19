@@ -1,4 +1,4 @@
-#include "GAS/Abilities/LSGA_ShortCircuit.h"
+#include "GAS/Abilities/Character1/LSGA_ShortCircuit.h"
 
 #include "GameFramework/Pawn.h"
 #include "GAS/LSGameplayTags.h"

@@ -1,4 +1,4 @@
-#include "GAS/Abilities/LSGA_Overclock.h"
+#include "GAS/Abilities/Character1/LSGA_Overclock.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"

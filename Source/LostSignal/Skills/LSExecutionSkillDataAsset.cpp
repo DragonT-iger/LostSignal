@@ -1,6 +1,6 @@
 #include "Skills/LSExecutionSkillDataAsset.h"
 
-#include "GAS/Abilities/LSGA_Execution.h"
+#include "GAS/Abilities/Character1/LSGA_Execution.h"
 #include "GAS/LSGameplayTags.h"
 
 ULSExecutionSkillDataAsset::ULSExecutionSkillDataAsset()

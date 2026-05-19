@@ -10,7 +10,7 @@
 #include "Engine/EngineTypes.h"
 #include "Engine/World.h"
 #include "GAS/Abilities/LSGA_Dash.h"
-#include "GAS/Abilities/LSGA_PlayerBasicAttack.h"
+#include "GAS/Abilities/Character1/LSGA_PlayerBasicAttack.h"
 #include "GAS/Effects/LSGE_PlayerBasicDamage.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
