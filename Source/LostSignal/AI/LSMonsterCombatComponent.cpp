@@ -42,7 +42,8 @@ bool ULSMonsterCombatComponent::RequestAbilityByTag(FGameplayTag AbilityTag) con
 		return false;
 	}
 
-	if (ASC->HasMatchingGameplayTag(LSGameplayTags::State_Dead))
+	if (ASC->HasMatchingGameplayTag(LSGameplayTags::State_Dead) ||
+		ASC->HasMatchingGameplayTag(LSGameplayTags::State_Stunned))
 	{
 		return false;
 	}

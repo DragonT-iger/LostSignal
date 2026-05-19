@@ -2,6 +2,9 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AIController.h"
+#include "BrainComponent.h"
+#include "AI/LSAIController.h"
 #include "Characters/LSCharacterBase.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Characters/LSPlayerCharacter.h"
@@ -237,6 +240,7 @@ void ULSCharacterCombatComponent::BeginPlay()
 	Super::BeginPlay();
 
 	BindHealthDelegates();
+	BindStateTagDelegates();
 	RefreshDeathState();
 }
 
@@ -252,9 +256,31 @@ void ULSCharacterCombatComponent::BindHealthDelegates()
 		.AddUObject(this, &ULSCharacterCombatComponent::HandleCurrentHealthChanged);
 }
 
+void ULSCharacterCombatComponent::BindStateTagDelegates()
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC)
+	{
+		return;
+	}
+
+	ASC->RegisterGameplayTagEvent(LSGameplayTags::State_Stunned, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &ULSCharacterCombatComponent::HandleStunnedTagChanged);
+}
+
 void ULSCharacterCombatComponent::HandleCurrentHealthChanged(const FOnAttributeChangeData& ChangeData)
 {
 	RefreshDeathState();
+}
+
+void ULSCharacterCombatComponent::HandleStunnedTagChanged(const FGameplayTag CallbackTag, int32 NewCount)
+{
+	UE_LOG(LogLS, Log, TEXT("%s stun tag changed. Tag=%s Count=%d"),
+		*GetNameSafe(GetOwner()),
+		*CallbackTag.ToString(),
+		NewCount);
+
+	HandleStunStateChanged(NewCount > 0);
 }
 
 void ULSCharacterCombatComponent::RefreshDeathState()
@@ -321,6 +347,69 @@ void ULSCharacterCombatComponent::HandleDeathStateChanged(bool bIsDead)
 		if (AController* Controller = OwnerCharacter->GetController())
 		{
 			Controller->StopMovement();
+		}
+	}
+}
+
+void ULSCharacterCombatComponent::HandleStunStateChanged(bool bIsStunned)
+{
+	ALSCharacterBase* OwnerCharacter = GetOwnerCharacter();
+	if (!OwnerCharacter || IsDead())
+	{
+		return;
+	}
+
+	ULSCombatStateComponent* CombatStateComponent = OwnerCharacter->GetCombatStateComponent();
+	if (bIsStunned)
+	{
+		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+		{
+			FGameplayTagContainer CancelTags;
+			CancelTags.AddTag(LSGameplayTags::Combat_Attacking);
+			ASC->CancelAbilities(&CancelTags);
+		}
+
+		if (CombatStateComponent)
+		{
+			CombatStateComponent->BeginAction(ELSCombatActionState::Stunned, ELSCombatActionPhase::Active);
+		}
+
+		if (OwnerCharacter->HasAuthority())
+		{
+			if (AController* Controller = OwnerCharacter->GetController())
+			{
+				Controller->StopMovement();
+			}
+
+			if (AAIController* AIController = Cast<AAIController>(OwnerCharacter->GetController()))
+			{
+				if (AIController->BrainComponent)
+				{
+					AIController->BrainComponent->StopLogic(TEXT("Stunned"));
+				}
+			}
+		}
+
+		return;
+	}
+
+	if (CombatStateComponent && CombatStateComponent->GetCurrentState() == ELSCombatActionState::Stunned)
+	{
+		CombatStateComponent->EndAction();
+	}
+
+	if (OwnerCharacter->HasAuthority())
+	{
+		if (ALSAIController* LSAIController = Cast<ALSAIController>(OwnerCharacter->GetController()))
+		{
+			LSAIController->TryStartStateTreeLogic();
+		}
+		else if (AAIController* AIController = Cast<AAIController>(OwnerCharacter->GetController()))
+		{
+			if (AIController->BrainComponent && !AIController->BrainComponent->IsRunning())
+			{
+				AIController->BrainComponent->RestartLogic();
+			}
 		}
 	}
 }

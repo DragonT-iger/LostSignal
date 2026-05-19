@@ -5,6 +5,7 @@
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/EngineTypes.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
@@ -23,6 +24,7 @@
 ULSGA_Bypass::ULSGA_Bypass()
 {
 	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
+	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);
 	ActivationBlockedTags.AddTag(LSGameplayTags::Combat_Attacking);
 	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);
 
@@ -226,6 +228,23 @@ void ULSGA_Bypass::ApplySpoofingStartEffects(const FVector& HologramLocation)
 		}
 	}
 
+	if (BypassData->bEnableSpoofingDebugLog && BypassData->PullRadius > 0.0f)
+	{
+		DrawDebugCircle(
+			SourceCharacter->GetWorld(),
+			HologramLocation,
+			BypassData->PullRadius,
+			64,
+			FColor::Cyan,
+			false,
+			BypassData->HologramLifeSeconds,
+			0,
+			2.0f,
+			FVector::ForwardVector,
+			FVector::RightVector,
+			false);
+	}
+
 	if (BypassData->bPullTargetsToHologram)
 	{
 		if (UWorld* World = GetWorld())
@@ -403,7 +422,7 @@ void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLo
 		if (TargetCombatComponent->ApplyKnockback(PullDirection, BypassData->PullSpeed, BypassData->PullDuration, BypassData->PullUpSpeed))
 		{
 			++PulledCount;
-			ApplySpoofingStunIfConfigured(TargetActor, BypassData);
+			ScheduleSpoofingStun(TargetActor, BypassData);
 		}
 	}
 
@@ -418,12 +437,43 @@ void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLo
 	}
 }
 
+void ULSGA_Bypass::ScheduleSpoofingStun(AActor* TargetActor, const ULSBypassSkillDataAsset* BypassData)
+{
+	if (!TargetActor || !BypassData || !BypassData->StunEffectClass)
+	{
+		return;
+	}
+
+	UWorld* World = TargetActor->GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	TWeakObjectPtr<AActor> WeakTarget(TargetActor);
+	TWeakObjectPtr<const ULSBypassSkillDataAsset> WeakBypassData(BypassData);
+	FTimerDelegate TimerDelegate = FTimerDelegate::CreateLambda([WeakTarget, WeakBypassData]()
+	{
+		ULSGA_Bypass::ApplySpoofingStunIfConfigured(WeakTarget.Get(), WeakBypassData.Get());
+	});
+
+	FTimerHandle StunTimerHandle;
+	World->GetTimerManager().SetTimer(StunTimerHandle, TimerDelegate, FMath::Max(0.01f, BypassData->PullDuration), false);
+}
+
 void ULSGA_Bypass::ApplySpoofingStunIfConfigured(AActor* TargetActor, const ULSBypassSkillDataAsset* BypassData)
 {
 	ULSCharacterCombatComponent* TargetCombatComponent = TargetActor ? TargetActor->FindComponentByClass<ULSCharacterCombatComponent>() : nullptr;
 	UAbilitySystemComponent* TargetASC = TargetCombatComponent ? TargetCombatComponent->GetAbilitySystemComponent() : nullptr;
 	if (!TargetASC || !BypassData || !BypassData->StunEffectClass)
 	{
+		if (BypassData && BypassData->bEnableSpoofingDebugLog)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[GA_Bypass] Spoofing stun skipped. Target=%s ASC=%s StunGE=%s"),
+				*GetNameSafe(TargetActor),
+				*GetNameSafe(TargetASC),
+				*GetNameSafe(BypassData ? BypassData->StunEffectClass.Get() : nullptr));
+		}
 		return;
 	}
 
@@ -433,6 +483,12 @@ void ULSGA_Bypass::ApplySpoofingStunIfConfigured(AActor* TargetActor, const ULSB
 	const FGameplayEffectSpecHandle SpecHandle = TargetASC->MakeOutgoingSpec(BypassData->StunEffectClass, 1.0f, EffectContext);
 	if (!SpecHandle.IsValid())
 	{
+		if (BypassData->bEnableSpoofingDebugLog)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[GA_Bypass] Spoofing stun spec failed. Target=%s StunGE=%s"),
+				*GetNameSafe(TargetActor),
+				*GetNameSafe(BypassData->StunEffectClass.Get()));
+		}
 		return;
 	}
 
@@ -442,6 +498,14 @@ void ULSGA_Bypass::ApplySpoofingStunIfConfigured(AActor* TargetActor, const ULSB
 	}
 
 	TargetASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+	if (BypassData->bEnableSpoofingDebugLog)
+	{
+		UE_LOG(LogLS, Log, TEXT("[GA_Bypass] Spoofing stun applied. Target=%s StunGE=%s Duration=%.2f HasTag=%d"),
+			*GetNameSafe(TargetActor),
+			*GetNameSafe(BypassData->StunEffectClass.Get()),
+			BypassData->StunDuration,
+			TargetASC->HasMatchingGameplayTag(LSGameplayTags::State_Stunned) ? 1 : 0);
+	}
 }
 
 void ULSGA_Bypass::SetInvincibleTagActive(bool bActive)

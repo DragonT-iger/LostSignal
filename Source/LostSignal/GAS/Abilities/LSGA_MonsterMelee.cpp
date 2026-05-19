@@ -16,6 +16,7 @@ ULSGA_MonsterMelee::ULSGA_MonsterMelee()
 	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);
 	ActivationBlockedTags.AddTag(LSGameplayTags::Combat_Attacking);
 	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
+	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;

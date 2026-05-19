@@ -20,6 +20,7 @@ ULSGA_PlayerBasicAttack::ULSGA_PlayerBasicAttack()
 
 	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);
 	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
+	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);
 
 	ComboSections = { TEXT("Attack_1"), TEXT("Attack_2"), TEXT("Attack_3") };
 

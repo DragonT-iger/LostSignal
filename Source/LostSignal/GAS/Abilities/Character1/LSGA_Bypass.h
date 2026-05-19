@@ -45,6 +45,7 @@ private:
 	void ClearIgnoredEnemiesForBypass(ACharacter* SourceCharacter);
 	static void PullTargetsToHologram(AActor* SourceActor, FVector HologramLocation, class ULSBypassSkillDataAsset* BypassData);
 	static void ApplySpoofingStunIfConfigured(AActor* TargetActor, const class ULSBypassSkillDataAsset* BypassData);
+	static void ScheduleSpoofingStun(AActor* TargetActor, const class ULSBypassSkillDataAsset* BypassData);
 	void SetInvincibleTagActive(bool bActive);
 
 	FTimerHandle BypassTimerHandle;

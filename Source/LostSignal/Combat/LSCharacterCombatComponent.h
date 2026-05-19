@@ -3,6 +3,7 @@
 #include "Combat/LSCombatTypes.h"
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
 #include "LSCharacterCombatComponent.generated.h"
 
@@ -65,9 +66,12 @@ protected:
 
 private:
 	void BindHealthDelegates();
+	void BindStateTagDelegates();
 	void HandleCurrentHealthChanged(const FOnAttributeChangeData& ChangeData);
+	void HandleStunnedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
 	void RefreshDeathState();
 	void HandleDeathStateChanged(bool bIsDead);
+	void HandleStunStateChanged(bool bIsStunned);
 	void FinishKnockback();
 	void ClearKnockback();
 	bool CanDamageTarget(AActor* TargetActor) const;

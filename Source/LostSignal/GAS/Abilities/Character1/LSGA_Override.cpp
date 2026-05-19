@@ -126,6 +126,7 @@ ULSGA_Override::ULSGA_Override()
 	DamageEffectClass = ULSGE_PlayerBasicDamage::StaticClass();
 
 	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
+	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);
 	ActivationBlockedTags.AddTag(LSGameplayTags::Combat_Attacking);
 	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);
 

@@ -11,6 +11,7 @@
 ULSGA_ShortCircuit::ULSGA_ShortCircuit()
 {
 	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
+	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);
 	ActivationBlockedTags.AddTag(LSGameplayTags::Combat_Attacking);
 	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);
 
