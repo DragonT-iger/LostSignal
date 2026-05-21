@@ -18,6 +18,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void AddToInventory(const TArray<FLSSessionItem>& Items);
 
+	bool TryAddToInventory(FName ItemRowName, int32 Amount, FLSSessionItem& OutRemainingItem);
+
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void ReplaceInventory(const TArray<FLSSessionItem>& Items);
 
@@ -47,6 +49,10 @@ public:
 	const TArray<FLSSessionItem>& GetSafeStash() const;
 
 	bool DropStoredSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
+	bool TransferStoredSlotToArea(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea);
+	bool GetStoredSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, FLSSessionItem& OutItem) const;
+	bool ClearStoredSlot(ELSInventorySlotArea SlotArea, int32 SlotIndex);
+	bool ReplaceStoredSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem);
 
 private:
 	void Load();
@@ -56,6 +62,7 @@ private:
 	void MigrateInventory();
 	TArray<FLSSessionItem>& GetMutableInventory();
 	TArray<FLSSessionItem>* GetMutableStoredSlots(ELSInventorySlotArea SlotArea);
+	const TArray<FLSSessionItem>* GetStoredSlots(ELSInventorySlotArea SlotArea) const;
 
 	UPROPERTY() TObjectPtr<ULSSaveGame> SaveData;
 

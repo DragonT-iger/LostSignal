@@ -1,11 +1,6 @@
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSaveGame.h"
-#include "Data/LSArmorRow.h"
-#include "Data/LSChipRow.h"
-#include "Data/LSDropSettings.h"
-#include "Data/LSItemRow.h"
-#include "Data/LSWeaponRow.h"
-#include "Engine/DataTable.h"
+#include "Inventory/LSInventorySlotUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
 #include "Misc/FileHelper.h"
@@ -16,291 +11,6 @@
 
 const FString ULSSaveSubsystem::SlotName = TEXT("LostSignalSave");
 const FString ULSSaveSubsystem::DebugFileName = TEXT("LostSignalSave_Debug.json");
-
-namespace
-{
-bool IsFilledSaveSlot(const FLSSessionItem& Item)
-{
-	return !Item.ItemRowName.IsNone() && Item.Amount > 0;
-}
-
-FLSSessionItem MakeEmptySaveSlot()
-{
-	return FLSSessionItem();
-}
-
-int32 ResolveItemMaxStackForSave(const FName ItemRowName)
-{
-	if (ItemRowName.IsNone())
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot resolve max stack because ItemRowName is none."));
-		return 1;
-	}
-
-	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
-	if (!Settings)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot resolve max stack because LS Drop Settings is missing."));
-		return 1;
-	}
-
-	const FString RowNameString = ItemRowName.ToString();
-	int32 MaxStack = 1;
-
-	if (RowNameString.StartsWith(TEXT("Chip_")))
-	{
-		UDataTable* Table = Settings->ChipTable.LoadSynchronous();
-		const FLSChipRow* Row = Table ? Table->FindRow<FLSChipRow>(ItemRowName, TEXT("ResolveItemMaxStackForSave")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("[Save] Chip row missing for max stack: %s"), *ItemRowName.ToString());
-	}
-	else if (RowNameString.StartsWith(TEXT("Weapon_")))
-	{
-		UDataTable* Table = Settings->WeaponTable.LoadSynchronous();
-		const FLSWeaponRow* Row = Table ? Table->FindRow<FLSWeaponRow>(ItemRowName, TEXT("ResolveItemMaxStackForSave")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("[Save] Weapon row missing for max stack: %s"), *ItemRowName.ToString());
-	}
-	else if (RowNameString.StartsWith(TEXT("Armor_")))
-	{
-		UDataTable* Table = Settings->ArmorTable.LoadSynchronous();
-		const FLSArmorRow* Row = Table ? Table->FindRow<FLSArmorRow>(ItemRowName, TEXT("ResolveItemMaxStackForSave")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("[Save] Armor row missing for max stack: %s"), *ItemRowName.ToString());
-	}
-	else if (RowNameString.StartsWith(TEXT("Item_")))
-	{
-		UDataTable* Table = Settings->ItemTable.LoadSynchronous();
-		const FLSItemRow* Row = Table ? Table->FindRow<FLSItemRow>(ItemRowName, TEXT("ResolveItemMaxStackForSave")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("[Save] Item row missing for max stack: %s"), *ItemRowName.ToString());
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Save] Unknown item row prefix for max stack: %s"), *ItemRowName.ToString());
-	}
-
-	if (MaxStack <= 0)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Save] Invalid Item_Max for %s: %d. Falling back to 1."), *ItemRowName.ToString(), MaxStack);
-		return 1;
-	}
-
-	return MaxStack;
-}
-
-void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount)
-{
-	if (ItemRowName.IsNone() || Amount <= 0)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot add invalid stash item. Row=%s Amount=%d"), *ItemRowName.ToString(), Amount);
-		return;
-	}
-
-	const int32 MaxStack = ResolveItemMaxStackForSave(ItemRowName);
-	for (FLSSessionItem& Slot : Slots)
-	{
-		if (Amount <= 0)
-		{
-			return;
-		}
-
-		if (Slot.ItemRowName != ItemRowName || Slot.Amount >= MaxStack)
-		{
-			continue;
-		}
-
-		const int32 AddAmount = FMath::Min(Amount, MaxStack - Slot.Amount);
-		Slot.Amount += AddAmount;
-		Amount -= AddAmount;
-	}
-
-	for (FLSSessionItem& Slot : Slots)
-	{
-		if (Amount <= 0)
-		{
-			return;
-		}
-
-		if (IsFilledSaveSlot(Slot))
-		{
-			continue;
-		}
-
-		Slot.ItemRowName = ItemRowName;
-		Slot.Amount = FMath::Min(Amount, MaxStack);
-		Amount -= Slot.Amount;
-	}
-
-	while (Amount > 0)
-	{
-		FLSSessionItem NewSlot;
-		NewSlot.ItemRowName = ItemRowName;
-		NewSlot.Amount = FMath::Min(Amount, MaxStack);
-		Slots.Add(NewSlot);
-		Amount -= NewSlot.Amount;
-	}
-}
-
-void NormalizeSlotArray(TArray<FLSSessionItem>& Slots)
-{
-	TArray<FLSSessionItem> OldSlots = MoveTemp(Slots);
-	Slots.Reset();
-
-	for (const FLSSessionItem& OldSlot : OldSlots)
-	{
-		if (!IsFilledSaveSlot(OldSlot))
-		{
-			Slots.Add(MakeEmptySaveSlot());
-			continue;
-		}
-
-		const int32 MaxStack = ResolveItemMaxStackForSave(OldSlot.ItemRowName);
-		FLSSessionItem NormalizedSlot;
-		NormalizedSlot.ItemRowName = OldSlot.ItemRowName;
-		NormalizedSlot.Amount = FMath::Min(OldSlot.Amount, MaxStack);
-		Slots.Add(NormalizedSlot);
-
-		const int32 OverflowAmount = OldSlot.Amount - NormalizedSlot.Amount;
-		if (OverflowAmount > 0)
-		{
-			AddItemsToSlotArray(Slots, OldSlot.ItemRowName, OverflowAmount);
-		}
-	}
-}
-
-void RemoveItemsFromSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount)
-{
-	if (ItemRowName.IsNone() || Amount <= 0)
-	{
-		return;
-	}
-
-	for (FLSSessionItem& Slot : Slots)
-	{
-		if (Amount <= 0)
-		{
-			break;
-		}
-
-		if (Slot.ItemRowName != ItemRowName || Slot.Amount <= 0)
-		{
-			continue;
-		}
-
-		const int32 RemoveAmount = FMath::Min(Amount, Slot.Amount);
-		Slot.Amount -= RemoveAmount;
-		Amount -= RemoveAmount;
-	}
-
-	for (FLSSessionItem& Slot : Slots)
-	{
-		if (Slot.Amount <= 0)
-		{
-			Slot = MakeEmptySaveSlot();
-		}
-	}
-}
-
-int32 FindRowOrder(UDataTable* Table, const FName RowName)
-{
-	if (!Table)
-	{
-		return MAX_int32 / 2;
-	}
-
-	const TArray<FName> RowNames = Table->GetRowNames();
-	const int32 RowIndex = RowNames.IndexOfByKey(RowName);
-	return RowIndex == INDEX_NONE ? MAX_int32 / 2 : RowIndex;
-}
-
-int32 ResolveItemSortKeyForSave(const FName ItemRowName)
-{
-	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
-	if (!Settings || ItemRowName.IsNone())
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot resolve sort key. Row=%s"), *ItemRowName.ToString());
-		return MAX_int32;
-	}
-
-	const FString RowNameString = ItemRowName.ToString();
-	if (RowNameString.StartsWith(TEXT("Chip_")))
-	{
-		return FindRowOrder(Settings->ChipTable.LoadSynchronous(), ItemRowName);
-	}
-
-	if (RowNameString.StartsWith(TEXT("Weapon_")))
-	{
-		return 100000 + FindRowOrder(Settings->WeaponTable.LoadSynchronous(), ItemRowName);
-	}
-
-	if (RowNameString.StartsWith(TEXT("Armor_")))
-	{
-		return 200000 + FindRowOrder(Settings->ArmorTable.LoadSynchronous(), ItemRowName);
-	}
-
-	if (RowNameString.StartsWith(TEXT("Item_")))
-	{
-		return 300000 + FindRowOrder(Settings->ItemTable.LoadSynchronous(), ItemRowName);
-	}
-
-	UE_LOG(LogLS, Warning, TEXT("[Save] Unknown item row prefix for sort key: %s"), *ItemRowName.ToString());
-	return MAX_int32;
-}
-
-void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots)
-{
-	const int32 OriginalSlotCount = Slots.Num();
-	TMap<FName, int32> AmountByRowName;
-	for (const FLSSessionItem& Slot : Slots)
-	{
-		if (!IsFilledSaveSlot(Slot))
-		{
-			continue;
-		}
-
-		AmountByRowName.FindOrAdd(Slot.ItemRowName) += Slot.Amount;
-	}
-
-	TArray<FLSSessionItem> MergedItems;
-	MergedItems.Reserve(AmountByRowName.Num());
-	for (const TPair<FName, int32>& Pair : AmountByRowName)
-	{
-		MergedItems.Add({ Pair.Key, Pair.Value });
-	}
-
-	MergedItems.Sort([](const FLSSessionItem& Left, const FLSSessionItem& Right)
-	{
-		const int32 LeftSortKey = ResolveItemSortKeyForSave(Left.ItemRowName);
-		const int32 RightSortKey = ResolveItemSortKeyForSave(Right.ItemRowName);
-		if (LeftSortKey != RightSortKey)
-		{
-			return LeftSortKey < RightSortKey;
-		}
-
-		return Left.ItemRowName.LexicalLess(Right.ItemRowName);
-	});
-
-	Slots.Reset();
-	for (const FLSSessionItem& MergedItem : MergedItems)
-	{
-		AddItemsToSlotArray(Slots, MergedItem.ItemRowName, MergedItem.Amount);
-	}
-
-	while (Slots.Num() < OriginalSlotCount)
-	{
-		Slots.Add(MakeEmptySaveSlot());
-	}
-}
-
-void EnsureSaveSlotIndex(TArray<FLSSessionItem>& Slots, const int32 SlotIndex)
-{
-	while (Slots.Num() <= SlotIndex)
-	{
-		Slots.Add(MakeEmptySaveSlot());
-	}
-}
-}
 
 void ULSSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -318,11 +28,28 @@ void ULSSaveSubsystem::AddToInventory(const TArray<FLSSessionItem>& Items)
 	TArray<FLSSessionItem>& Inv = GetMutableInventory();
 	for (const FLSSessionItem& NewItem : Items)
 	{
-		AddItemsToSlotArray(Inv, NewItem.ItemRowName, NewItem.Amount);
+		LSInventorySlotUtils::AddItemsToSlotArray(Inv, NewItem.ItemRowName, NewItem.Amount);
 	}
 
 	UE_LOG(LogLS, Log, TEXT("[Save] Inventory updated: added %d entries, total slots %d"), Items.Num(), Inv.Num());
 	Save();
+}
+
+bool ULSSaveSubsystem::TryAddToInventory(const FName ItemRowName, const int32 Amount, FLSSessionItem& OutRemainingItem)
+{
+	OutRemainingItem = FLSSessionItem();
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot add inventory item because SaveData is missing."));
+		return false;
+	}
+
+	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, MAX_int32, OutRemainingItem);
+	if (bChanged)
+	{
+		Save();
+	}
+	return bChanged;
 }
 
 void ULSSaveSubsystem::ReplaceInventory(const TArray<FLSSessionItem>& Items)
@@ -334,7 +61,7 @@ void ULSSaveSubsystem::ReplaceInventory(const TArray<FLSSessionItem>& Items)
 	}
 
 	SaveData->Inventory = Items;
-	NormalizeSlotArray(SaveData->Inventory);
+	LSInventorySlotUtils::NormalizeSlotArray(SaveData->Inventory);
 
 	UE_LOG(LogLS, Log, TEXT("[Save] Inventory replaced. Total slots: %d"), SaveData->Inventory.Num());
 	Save();
@@ -349,7 +76,7 @@ void ULSSaveSubsystem::ReplaceWarehouseItems(const TArray<FLSSessionItem>& Items
 	}
 
 	SaveData->WarehouseItems = Items;
-	NormalizeSlotArray(SaveData->WarehouseItems);
+	LSInventorySlotUtils::NormalizeSlotArray(SaveData->WarehouseItems);
 
 	UE_LOG(LogLS, Log, TEXT("[Save] Warehouse replaced. Total slots: %d"), SaveData->WarehouseItems.Num());
 	Save();
@@ -364,7 +91,7 @@ void ULSSaveSubsystem::ReplaceSafeStash(const TArray<FLSSessionItem>& Items)
 	}
 
 	SaveData->SafeStash = Items;
-	NormalizeSlotArray(SaveData->SafeStash);
+	LSInventorySlotUtils::NormalizeSlotArray(SaveData->SafeStash);
 
 	UE_LOG(LogLS, Log, TEXT("[Save] Safe stash replaced. Total slots: %d"), SaveData->SafeStash.Num());
 	Save();
@@ -396,7 +123,7 @@ void ULSSaveSubsystem::SortInventory()
 		return;
 	}
 
-	SortAndCompactSlotArray(SaveData->Inventory);
+	LSInventorySlotUtils::SortAndCompactSlotArray(SaveData->Inventory);
 	UE_LOG(LogLS, Log, TEXT("[Save] Inventory sorted and compacted. Total slots: %d"), SaveData->Inventory.Num());
 	Save();
 }
@@ -409,7 +136,7 @@ void ULSSaveSubsystem::SortWarehouse()
 		return;
 	}
 
-	SortAndCompactSlotArray(SaveData->WarehouseItems);
+	LSInventorySlotUtils::SortAndCompactSlotArray(SaveData->WarehouseItems);
 	UE_LOG(LogLS, Log, TEXT("[Save] Warehouse sorted and compacted. Total slots: %d"), SaveData->WarehouseItems.Num());
 	Save();
 }
@@ -424,7 +151,7 @@ bool ULSSaveSubsystem::DropStoredSlot(const ELSInventorySlotArea FromArea, const
 
 	TArray<FLSSessionItem>* FromSlots = GetMutableStoredSlots(FromArea);
 	TArray<FLSSessionItem>* ToSlots = GetMutableStoredSlots(ToArea);
-	if (!FromSlots || !ToSlots || !FromSlots->IsValidIndex(FromIndex) || !IsFilledSaveSlot((*FromSlots)[FromIndex]) || ToIndex < 0)
+	if (!FromSlots || !ToSlots || !FromSlots->IsValidIndex(FromIndex) || !LSInventorySlotUtils::IsFilled((*FromSlots)[FromIndex]) || ToIndex < 0)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop stored slot. FromArea=%d From=%d ToArea=%d To=%d"),
 			static_cast<int32>(FromArea), FromIndex, static_cast<int32>(ToArea), ToIndex);
@@ -436,39 +163,96 @@ bool ULSSaveSubsystem::DropStoredSlot(const ELSInventorySlotArea FromArea, const
 		return true;
 	}
 
-	EnsureSaveSlotIndex(*ToSlots, ToIndex);
+	const bool bChanged = LSInventorySlotUtils::DropSlot(*FromSlots, FromIndex, *ToSlots, ToIndex);
+	if (bChanged)
+	{
+		Save();
+	}
+	return bChanged;
+}
+
+bool ULSSaveSubsystem::TransferStoredSlotToArea(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot transfer stored slot because SaveData is missing."));
+		return false;
+	}
+
+	TArray<FLSSessionItem>* FromSlots = GetMutableStoredSlots(FromArea);
+	TArray<FLSSessionItem>* ToSlots = GetMutableStoredSlots(ToArea);
+	if (!FromSlots || !ToSlots || !FromSlots->IsValidIndex(FromIndex) || !LSInventorySlotUtils::IsFilled((*FromSlots)[FromIndex]))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot transfer stored slot. FromArea=%d From=%d ToArea=%d"),
+			static_cast<int32>(FromArea), FromIndex, static_cast<int32>(ToArea));
+		return false;
+	}
+
+	if (FromSlots == ToSlots)
+	{
+		return false;
+	}
 
 	FLSSessionItem& FromSlot = (*FromSlots)[FromIndex];
-	FLSSessionItem& ToSlot = (*ToSlots)[ToIndex];
-
-	if (!IsFilledSaveSlot(ToSlot))
+	FLSSessionItem RemainingItem;
+	if (!LSInventorySlotUtils::TryAddItemsToSlotArray(*ToSlots, FromSlot.ItemRowName, FromSlot.Amount, MAX_int32, RemainingItem))
 	{
-		ToSlot = FromSlot;
-		FromSlot = MakeEmptySaveSlot();
-		Save();
-		return true;
+		return false;
 	}
 
-	if (FromSlot.ItemRowName == ToSlot.ItemRowName)
-	{
-		const int32 MaxStack = ResolveItemMaxStackForSave(FromSlot.ItemRowName);
-		const int32 AddAmount = FMath::Min(FromSlot.Amount, MaxStack - ToSlot.Amount);
-		if (AddAmount <= 0)
-		{
-			return false;
-		}
+	FromSlot = RemainingItem;
+	Save();
+	return true;
+}
 
-		ToSlot.Amount += AddAmount;
-		FromSlot.Amount -= AddAmount;
-		if (FromSlot.Amount <= 0)
-		{
-			FromSlot = MakeEmptySaveSlot();
-		}
-		Save();
-		return true;
+bool ULSSaveSubsystem::GetStoredSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, FLSSessionItem& OutItem) const
+{
+	OutItem = FLSSessionItem();
+	const TArray<FLSSessionItem>* Slots = GetStoredSlots(SlotArea);
+	if (!Slots || !Slots->IsValidIndex(SlotIndex) || !LSInventorySlotUtils::IsFilled((*Slots)[SlotIndex]))
+	{
+		return false;
 	}
 
-	Swap(FromSlot, ToSlot);
+	OutItem = (*Slots)[SlotIndex];
+	return true;
+}
+
+bool ULSSaveSubsystem::ClearStoredSlot(const ELSInventorySlotArea SlotArea, const int32 SlotIndex)
+{
+	TArray<FLSSessionItem>* Slots = GetMutableStoredSlots(SlotArea);
+	if (!Slots || !Slots->IsValidIndex(SlotIndex) || !LSInventorySlotUtils::IsFilled((*Slots)[SlotIndex]))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot clear stored slot. Area=%d Index=%d"), static_cast<int32>(SlotArea), SlotIndex);
+		return false;
+	}
+
+	(*Slots)[SlotIndex] = LSInventorySlotUtils::MakeEmptyItem();
+	Save();
+	return true;
+}
+
+bool ULSSaveSubsystem::ReplaceStoredSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem)
+{
+	OutPreviousItem = FLSSessionItem();
+	if (SlotIndex < 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace stored slot because index is invalid. Area=%d Index=%d"),
+			static_cast<int32>(SlotArea), SlotIndex);
+		return false;
+	}
+
+	TArray<FLSSessionItem>* Slots = GetMutableStoredSlots(SlotArea);
+	if (!Slots)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace stored slot because area is invalid. Area=%d Index=%d"),
+			static_cast<int32>(SlotArea), SlotIndex);
+		return false;
+	}
+
+	LSInventorySlotUtils::EnsureSlotIndex(*Slots, SlotIndex);
+	OutPreviousItem = (*Slots)[SlotIndex];
+	(*Slots)[SlotIndex] = NewItem;
 	Save();
 	return true;
 }
@@ -519,9 +303,9 @@ void ULSSaveSubsystem::Load()
 		if (SaveData)
 		{
 			MigrateInventory();
-			NormalizeSlotArray(SaveData->Inventory);
-			NormalizeSlotArray(SaveData->WarehouseItems);
-			NormalizeSlotArray(SaveData->SafeStash);
+			LSInventorySlotUtils::NormalizeSlotArray(SaveData->Inventory);
+			LSInventorySlotUtils::NormalizeSlotArray(SaveData->WarehouseItems);
+			LSInventorySlotUtils::NormalizeSlotArray(SaveData->SafeStash);
 			ResolveInterruptedRaid();
 			Save();
 		}
@@ -548,12 +332,12 @@ void ULSSaveSubsystem::MigrateInventory()
 		// Player1Inventory 있으면 우선, 없으면 Stash에서 마이그레이션
 		if (!SaveData->Player1Inventory.IsEmpty())
 		{
-			NormalizeSlotArray(SaveData->Player1Inventory);
+		LSInventorySlotUtils::NormalizeSlotArray(SaveData->Player1Inventory);
 			SaveData->Inventory = SaveData->Player1Inventory;
 		}
 		else if (!SaveData->Stash.IsEmpty())
 		{
-			NormalizeSlotArray(SaveData->Stash);
+		LSInventorySlotUtils::NormalizeSlotArray(SaveData->Stash);
 			SaveData->Inventory = SaveData->Stash;
 		}
 	}
@@ -570,11 +354,11 @@ void ULSSaveSubsystem::ResolveInterruptedRaid()
 	}
 
 	TArray<FLSSessionItem> RecoveredStash = SaveData->ActiveRaidLoadout;
-	NormalizeSlotArray(RecoveredStash);
+	LSInventorySlotUtils::NormalizeSlotArray(RecoveredStash);
 
 	for (const FLSSessionItem& ConsumedItem : SaveData->ActiveRaidConsumedItems)
 	{
-		RemoveItemsFromSlotArray(RecoveredStash, ConsumedItem.ItemRowName, ConsumedItem.Amount);
+		LSInventorySlotUtils::RemoveItemsFromSlotArray(RecoveredStash, ConsumedItem.ItemRowName, ConsumedItem.Amount);
 	}
 
 	SaveData->Inventory = RecoveredStash;
@@ -605,6 +389,26 @@ TArray<FLSSessionItem>& ULSSaveSubsystem::GetMutableInventory()
 }
 
 TArray<FLSSessionItem>* ULSSaveSubsystem::GetMutableStoredSlots(const ELSInventorySlotArea SlotArea)
+{
+	if (!SaveData)
+	{
+		return nullptr;
+	}
+
+	switch (SlotArea)
+	{
+	case ELSInventorySlotArea::Inventory:
+		return &SaveData->Inventory;
+	case ELSInventorySlotArea::Safe:
+		return &SaveData->SafeStash;
+	case ELSInventorySlotArea::Warehouse:
+		return &SaveData->WarehouseItems;
+	default:
+		return nullptr;
+	}
+}
+
+const TArray<FLSSessionItem>* ULSSaveSubsystem::GetStoredSlots(const ELSInventorySlotArea SlotArea) const
 {
 	if (!SaveData)
 	{
