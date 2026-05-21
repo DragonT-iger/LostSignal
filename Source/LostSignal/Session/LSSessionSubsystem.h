@@ -18,6 +18,7 @@ enum class ELSInventorySlotArea : uint8
 {
 	Inventory,
 	Safe,
+	Warehouse,
 };
 
 USTRUCT(BlueprintType)

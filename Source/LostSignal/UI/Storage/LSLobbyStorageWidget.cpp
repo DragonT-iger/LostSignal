@@ -1,5 +1,6 @@
 #include "UI/Storage/LSLobbyStorageWidget.h"
 
+#include "Characters/LSPlayerCharacter.h"
 #include "Components/TextBlock.h"
 #include "Components/WrapBox.h"
 #include "Data/LSDropSettings.h"
@@ -7,6 +8,7 @@
 #include "Engine/DataTable.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
+#include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
 #include "UI/Storage/LSStorageButtonWidget.h"
 
@@ -62,7 +64,7 @@ void ULSLobbyStorageWidget::RefreshStorage()
 
 	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
 	static const TArray<FLSSessionItem> EmptyStashItems;
-	const TArray<FLSSessionItem>& StashItems = SaveSubsystem ? SaveSubsystem->GetStash() : EmptyStashItems;
+	const TArray<FLSSessionItem>& StashItems = SaveSubsystem ? SaveSubsystem->GetWarehouseItems() : EmptyStashItems;
 	UpdateStorageCountText(StashItems);
 
 	if (!SaveSubsystem)
@@ -85,48 +87,127 @@ void ULSLobbyStorageWidget::RefreshStorage()
 		return;
 	}
 
-	TArray<FLSSessionItem> FilteredItems;
-	BuildFilteredItems(StashItems, FilteredItems);
-
 	const int32 SlotCountToBuild = FMath::Max(0, MaxStorageSlotCount);
-	if (FilteredItems.Num() > SlotCountToBuild)
+
+	if (CurrentFilter == ELSStorageFilter::All)
 	{
-		UE_LOG(LogLS, Warning, TEXT("Lobby storage has %d filtered items but only %d slots are visible on %s."),
-			FilteredItems.Num(),
-			SlotCountToBuild,
-			*GetNameSafe(this));
+		for (int32 VisualIndex = 0; VisualIndex < SlotCountToBuild; ++VisualIndex)
+		{
+			ULSItemSlotWidget* SlotWidget = OwningPlayer
+				? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
+				: CreateWidget<ULSItemSlotWidget>(World, ItemSlotWidgetClass);
+
+			if (!SlotWidget)
+			{
+				UE_LOG(LogLS, Warning, TEXT("Failed to create lobby storage slot widget at index %d on %s."), VisualIndex, *GetNameSafe(this));
+				continue;
+			}
+
+			const bool bHasItemAtSlot = StashItems.IsValidIndex(VisualIndex) && IsFilledStorageSlot(StashItems[VisualIndex]);
+			if (bHasItemAtSlot)
+			{
+				SlotWidget->SetItem(StashItems[VisualIndex].ItemRowName, StashItems[VisualIndex].Amount);
+			}
+			else
+			{
+				SlotWidget->ClearItem();
+			}
+
+			SlotWidget->SetWarehouseSlotContext(this, ELSInventorySlotArea::Warehouse, VisualIndex, bHasItemAtSlot);
+			StorageSlotWrapBox->AddChildToWrapBox(SlotWidget);
+		}
+	}
+	else
+	{
+		TArray<TPair<int32, FLSSessionItem>> IndexedItems;
+		BuildFilteredItems(StashItems, IndexedItems);
+
+		if (IndexedItems.Num() > SlotCountToBuild)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Lobby storage has %d filtered items but only %d slots are visible on %s."),
+				IndexedItems.Num(),
+				SlotCountToBuild,
+				*GetNameSafe(this));
+		}
+
+		for (const TPair<int32, FLSSessionItem>& IndexedItem : IndexedItems)
+		{
+			ULSItemSlotWidget* SlotWidget = OwningPlayer
+				? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
+				: CreateWidget<ULSItemSlotWidget>(World, ItemSlotWidgetClass);
+
+			if (!SlotWidget)
+			{
+				UE_LOG(LogLS, Warning, TEXT("Failed to create lobby storage slot widget for original index %d on %s."), IndexedItem.Key, *GetNameSafe(this));
+				continue;
+			}
+
+			SlotWidget->SetItem(IndexedItem.Value.ItemRowName, IndexedItem.Value.Amount);
+			SlotWidget->SetWarehouseSlotContext(this, ELSInventorySlotArea::Warehouse, IndexedItem.Key, true);
+			StorageSlotWrapBox->AddChildToWrapBox(SlotWidget);
+		}
+	}
+}
+
+bool ULSLobbyStorageWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
+	if (!DragOperation || !DragOperation->SourceInventoryWidget || DragOperation->SourceSlotIndex == INDEX_NONE)
+	{
+		return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 	}
 
-	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
+	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	if (!SaveSubsystem)
 	{
-		ULSItemSlotWidget* SlotWidget = OwningPlayer
-			? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
-			: CreateWidget<ULSItemSlotWidget>(World, ItemSlotWidgetClass);
-
-		if (!SlotWidget)
-		{
-			UE_LOG(LogLS, Warning, TEXT("Failed to create lobby storage slot widget at index %d on %s."), SlotIndex, *GetNameSafe(this));
-			continue;
-		}
-
-		if (FilteredItems.IsValidIndex(SlotIndex) && IsFilledStorageSlot(FilteredItems[SlotIndex]))
-		{
-			SlotWidget->SetItem(FilteredItems[SlotIndex].ItemRowName, FilteredItems[SlotIndex].Amount);
-		}
-		else
-		{
-			SlotWidget->ClearItem();
-		}
-
-		StorageSlotWrapBox->AddChildToWrapBox(SlotWidget);
+		return false;
 	}
+
+	const TArray<FLSSessionItem>& WarehouseItems = SaveSubsystem->GetWarehouseItems();
+	int32 EmptyIndex = INDEX_NONE;
+	for (int32 i = 0; i < WarehouseItems.Num(); ++i)
+	{
+		if (!IsFilledStorageSlot(WarehouseItems[i]))
+		{
+			EmptyIndex = i;
+			break;
+		}
+	}
+
+	if (EmptyIndex == INDEX_NONE)
+	{
+		EmptyIndex = WarehouseItems.Num();
+	}
+
+	return HandleStorageSlotDrop(DragOperation->SourceSlotArea, DragOperation->SourceSlotIndex, EmptyIndex);
+}
+
+bool ULSLobbyStorageWidget::HandleStorageSlotDrop(const ELSInventorySlotArea FromArea, const int32 FromIndex, const int32 ToWarehouseIndex)
+{
+	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle storage slot drop because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const bool bSuccess = SaveSubsystem->DropStoredSlot(FromArea, FromIndex, ELSInventorySlotArea::Warehouse, ToWarehouseIndex);
+	if (bSuccess)
+	{
+		RefreshStorage();
+		if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
+		{
+			PlayerCharacter->RebuildInventoryWidgetSlots();
+		}
+	}
+	return bSuccess;
 }
 
 void ULSLobbyStorageWidget::HandleSortButtonClicked()
 {
 	if (ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem())
 	{
-		SaveSubsystem->SortStash();
+		SaveSubsystem->SortWarehouse();
 		RefreshStorage();
 		return;
 	}
@@ -323,15 +404,16 @@ void ULSLobbyStorageWidget::ApplyFilterButtonState() const
 	}
 }
 
-void ULSLobbyStorageWidget::BuildFilteredItems(const TArray<FLSSessionItem>& StashItems, TArray<FLSSessionItem>& OutItems) const
+void ULSLobbyStorageWidget::BuildFilteredItems(const TArray<FLSSessionItem>& StashItems, TArray<TPair<int32, FLSSessionItem>>& OutIndexedItems) const
 {
-	OutItems.Reset();
+	OutIndexedItems.Reset();
 
-	for (const FLSSessionItem& Item : StashItems)
+	for (int32 i = 0; i < StashItems.Num(); ++i)
 	{
+		const FLSSessionItem& Item = StashItems[i];
 		if (IsFilledStorageSlot(Item) && DoesItemMatchCurrentFilter(Item.ItemRowName))
 		{
-			OutItems.Add(Item);
+			OutIndexedItems.Add(TPair<int32, FLSSessionItem>(i, Item));
 		}
 	}
 }

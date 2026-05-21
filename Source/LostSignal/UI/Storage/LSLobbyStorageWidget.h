@@ -5,6 +5,8 @@
 #include "Session/LSSessionSubsystem.h"
 #include "LSLobbyStorageWidget.generated.h"
 
+class UDragDropOperation;
+class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
 class ULSStorageButtonWidget;
 class ULSSaveSubsystem;
@@ -37,7 +39,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Storage")
 	void RefreshStorage();
 
+	bool HandleStorageSlotDrop(ELSInventorySlotArea FromArea, int32 FromIndex, int32 ToWarehouseIndex);
+
 protected:
+	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
+
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Storage")
 	TObjectPtr<UWrapBox> StorageSlotWrapBox;
 
@@ -99,7 +105,7 @@ private:
 	void UnbindStorageButtons();
 	void UpdateStorageCountText(const TArray<FLSSessionItem>& StashItems) const;
 	void ApplyFilterButtonState() const;
-	void BuildFilteredItems(const TArray<FLSSessionItem>& StashItems, TArray<FLSSessionItem>& OutItems) const;
+	void BuildFilteredItems(const TArray<FLSSessionItem>& StashItems, TArray<TPair<int32, FLSSessionItem>>& OutIndexedItems) const;
 	bool DoesItemMatchCurrentFilter(FName ItemRowName) const;
 	bool IsConsumableItem(FName ItemRowName) const;
 	ULSSaveSubsystem* GetSaveSubsystem() const;

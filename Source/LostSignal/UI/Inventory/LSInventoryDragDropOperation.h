@@ -7,6 +7,7 @@
 
 class ULSInventoryWidget;
 class ULSItemSlotWidget;
+class ULSLobbyStorageWidget;
 class ULSLootDropWidget;
 
 UCLASS()
@@ -20,6 +21,9 @@ public:
 
 	UPROPERTY()
 	TObjectPtr<ULSLootDropWidget> SourceLootDropWidget;
+
+	UPROPERTY()
+	TObjectPtr<ULSLobbyStorageWidget> SourceLobbyStorageWidget;
 
 	UPROPERTY()
 	TObjectPtr<ULSItemSlotWidget> SourceSlotWidget;

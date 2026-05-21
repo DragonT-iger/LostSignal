@@ -57,11 +57,6 @@ bool ALSLobbyStorageActor::CanInteract_Implementation(APawn* Interactor)
 
 void ALSLobbyStorageActor::Interact_Implementation(APawn* Interactor)
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
-
 	if (!LobbyStorageWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("LobbyStorageWidgetClass is not set on %s."), *GetNameSafe(this));

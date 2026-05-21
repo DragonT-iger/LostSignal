@@ -50,7 +50,7 @@ void ALSLobbyGameMode::StartRaid()
 	const ULSSaveSubsystem* SaveSub = GameInstance->GetSubsystem<ULSSaveSubsystem>();
 	if (SaveSub)
 	{
-		Loadout = SaveSub->GetStash();
+		Loadout = SaveSub->GetInventory();
 		SafeItems = SaveSub->GetSafeStash();
 	}
 	else

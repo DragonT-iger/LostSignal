@@ -133,7 +133,7 @@ void ULSInventoryWidget::RebuildInventorySlots()
 		{
 			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
-				AppendSlotItems(InventoryItems, SaveSubsystem->GetStash());
+				AppendSlotItems(InventoryItems, SaveSubsystem->GetInventory());
 				SlotCountToBuild = FMath::Max(InventorySlotCount, InventoryItems.Num());
 			}
 			else
@@ -194,7 +194,21 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 	ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent();
 	if (!RaidInventory || !RaidInventory->IsRaidActive())
 	{
-		UE_LOG(LogLS, Warning, TEXT("Inventory slot drag/drop is only supported during an active raid on %s."), *GetNameSafe(this));
+		if (UGameInstance* GameInstance = GetGameInstance())
+		{
+			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
+			{
+				const bool bChanged = SaveSubsystem->DropStoredSlot(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
+				if (bChanged)
+				{
+					RebuildInventorySlots();
+					RebuildConfirmedStorageSlots();
+				}
+				return bChanged;
+			}
+		}
+
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle stored inventory slot drop because SaveSubsystem is missing on %s."), *GetNameSafe(this));
 		return false;
 	}
 
@@ -312,7 +326,7 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 		{
 			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
-				AppendSlotItems(SafeItems, SaveSubsystem->GetSafeStash());
+				AppendSlotItems(SafeItems, SaveSubsystem->GetWarehouseItems());
 			}
 		}
 	}
@@ -329,7 +343,8 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 			const bool bHasSlotItem = SafeItems.IsValidIndex(SlotIndex) &&
 				!SafeItems[SlotIndex].ItemRowName.IsNone() &&
 				SafeItems[SlotIndex].Amount > 0;
-			SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Safe, SlotIndex, bHasSlotItem);
+			const ELSInventorySlotArea SlotArea = bUsingRaidInventory ? ELSInventorySlotArea::Safe : ELSInventorySlotArea::Warehouse;
+			SlotWidget->SetSlotContext(this, SlotArea, SlotIndex, bHasSlotItem);
 			if (bHasSlotItem)
 			{
 				SlotWidget->SetItem(SafeItems[SlotIndex].ItemRowName, SafeItems[SlotIndex].Amount);
@@ -374,11 +389,11 @@ void ULSInventoryWidget::HandleSortButtonClicked()
 	{
 		if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 		{
-			SaveSubsystem->SortStash();
+			SaveSubsystem->SortInventory();
 		}
 		else
 		{
-			UE_LOG(LogLS, Warning, TEXT("Cannot sort stash because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+			UE_LOG(LogLS, Warning, TEXT("Cannot sort player inventory because SaveSubsystem is missing on %s."), *GetNameSafe(this));
 		}
 	}
 

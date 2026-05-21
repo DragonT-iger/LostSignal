@@ -15,34 +15,47 @@ class LOSTSIGNAL_API ULSSaveSubsystem : public UGameInstanceSubsystem
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 
-	// 아이템을 스태시에 추가하고 즉시 저장
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
-	void AddToStash(const TArray<FLSSessionItem>& Items);
+	void AddToInventory(const TArray<FLSSessionItem>& Items);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
-	void ReplaceStash(const TArray<FLSSessionItem>& Items);
+	void ReplaceInventory(const TArray<FLSSessionItem>& Items);
+
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	void ReplaceWarehouseItems(const TArray<FLSSessionItem>& Items);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void ReplaceSafeStash(const TArray<FLSSessionItem>& Items);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
-	void SortStash();
+	void SortInventory();
+
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	void SortWarehouse();
 
 	void BeginRaidSave(const TArray<FLSSessionItem>& Loadout);
 	void UpdateRaidConsumedItems(const TArray<FLSSessionItem>& ConsumedItems);
 	void ClearRaidSave();
 
 	UFUNCTION(BlueprintPure, Category="LS/Save")
-	const TArray<FLSSessionItem>& GetStash() const;
+	const TArray<FLSSessionItem>& GetInventory() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	const TArray<FLSSessionItem>& GetWarehouseItems() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	const TArray<FLSSessionItem>& GetSafeStash() const;
+
+	bool DropStoredSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 
 private:
 	void Load();
 	void Save();
 	void SaveDebugJson() const;
 	void ResolveInterruptedRaid();
+	void MigrateInventory();
+	TArray<FLSSessionItem>& GetMutableInventory();
+	TArray<FLSSessionItem>* GetMutableStoredSlots(ELSInventorySlotArea SlotArea);
 
 	UPROPERTY() TObjectPtr<ULSSaveGame> SaveData;
 

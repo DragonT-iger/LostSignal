@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Characters/LSPlayerCharacter.h"
 
@@ -13,6 +13,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "EngineUtils.h"
 #include "Gameplay/LSInteractable.h"
+#include "Gameplay/LSLobbyStorageActor.h"
 #include "Gameplay/LSLootBox.h"
 #include "InputActionValue.h"
 #include "LostSignal.h"
@@ -239,7 +240,7 @@ void ALSPlayerCharacter::OnInteract()
 	{
 		ServerRequestInteract(BestTarget);
 
-		if (BestTarget->IsA<ALSLootBox>())
+		if (BestTarget->IsA<ALSLootBox>() || BestTarget->IsA<ALSLobbyStorageActor>())
 		{
 			ShowInventoryWidgetForTarget(BestTarget);
 		}

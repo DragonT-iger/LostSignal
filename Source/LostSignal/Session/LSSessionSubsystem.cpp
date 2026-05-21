@@ -419,7 +419,7 @@ void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
 
 		if (bShouldSaveResolvedItems)
 		{
-			SaveSub->ReplaceStash(ResolvedItems);
+			SaveSub->ReplaceInventory(ResolvedItems);
 			if (Result == ELSRaidResult::Extracted || Result == ELSRaidResult::Dead)
 			{
 				SaveSub->ReplaceSafeStash(SessionSafeInventory);
@@ -472,6 +472,12 @@ bool ULSSessionSubsystem::MoveSessionInventorySlot(const int32 FromIndex, const 
 
 bool ULSSessionSubsystem::SwapSessionSlots(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
 {
+	if (FromArea == ELSInventorySlotArea::Warehouse || ToArea == ELSInventorySlotArea::Warehouse)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Warehouse slots are not part of raid session inventory."));
+		return false;
+	}
+
 	TArray<FLSSessionItem>* FromSlots = FromArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 
@@ -494,6 +500,12 @@ bool ULSSessionSubsystem::SwapSessionSlots(const ELSInventorySlotArea FromArea, 
 
 bool ULSSessionSubsystem::MoveSessionSlot(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
 {
+	if (FromArea == ELSInventorySlotArea::Warehouse || ToArea == ELSInventorySlotArea::Warehouse)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Warehouse slots are not part of raid session inventory."));
+		return false;
+	}
+
 	if (FromArea != ToArea)
 	{
 		return SwapSessionSlots(FromArea, FromIndex, ToArea, ToIndex);
@@ -526,6 +538,12 @@ bool ULSSessionSubsystem::MoveSessionSlot(const ELSInventorySlotArea FromArea, c
 
 bool ULSSessionSubsystem::DropSessionSlot(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
 {
+	if (FromArea == ELSInventorySlotArea::Warehouse || ToArea == ELSInventorySlotArea::Warehouse)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Warehouse slots are not part of raid session inventory."));
+		return false;
+	}
+
 	TArray<FLSSessionItem>* FromSlots = FromArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 
@@ -577,6 +595,12 @@ bool ULSSessionSubsystem::DropSessionSlot(const ELSInventorySlotArea FromArea, c
 
 bool ULSSessionSubsystem::DropExternalItemToSessionSlot(FLSSessionItem& InOutExternalItem, const ELSInventorySlotArea ToArea, const int32 ToIndex)
 {
+	if (ToArea == ELSInventorySlotArea::Warehouse)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Warehouse slots are not part of raid session inventory."));
+		return false;
+	}
+
 	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 	if (!IsFilledSessionSlot(InOutExternalItem) || ToIndex < 0)
 	{
@@ -627,6 +651,11 @@ bool ULSSessionSubsystem::DropExternalItemToSessionSlot(FLSSessionItem& InOutExt
 
 bool ULSSessionSubsystem::GetSessionSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, FLSSessionItem& OutItem) const
 {
+	if (SlotArea == ELSInventorySlotArea::Warehouse)
+	{
+		return false;
+	}
+
 	const TArray<FLSSessionItem>& Slots = SlotArea == ELSInventorySlotArea::Safe ? SessionSafeInventory : SessionInventory;
 	if (!Slots.IsValidIndex(SlotIndex) || !IsFilledSessionSlot(Slots[SlotIndex]))
 	{
@@ -639,6 +668,12 @@ bool ULSSessionSubsystem::GetSessionSlotItem(const ELSInventorySlotArea SlotArea
 
 bool ULSSessionSubsystem::ClearSessionSlot(const ELSInventorySlotArea SlotArea, const int32 SlotIndex)
 {
+	if (SlotArea == ELSInventorySlotArea::Warehouse)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Warehouse slots are not part of raid session inventory."));
+		return false;
+	}
+
 	TArray<FLSSessionItem>& Slots = SlotArea == ELSInventorySlotArea::Safe ? SessionSafeInventory : SessionInventory;
 	if (!Slots.IsValidIndex(SlotIndex) || !IsFilledSessionSlot(Slots[SlotIndex]))
 	{
@@ -654,6 +689,12 @@ bool ULSSessionSubsystem::ClearSessionSlot(const ELSInventorySlotArea SlotArea, 
 bool ULSSessionSubsystem::ReplaceSessionSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem)
 {
 	OutPreviousItem = FLSSessionItem();
+	if (SlotArea == ELSInventorySlotArea::Warehouse)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Warehouse slots are not part of raid session inventory."));
+		return false;
+	}
+
 	if (SlotIndex < 0)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot replace slot because index is invalid. Area=%d Index=%d"),

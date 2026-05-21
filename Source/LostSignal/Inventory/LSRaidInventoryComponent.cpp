@@ -303,6 +303,11 @@ void ULSRaidInventoryComponent::SortSessionInventory()
 
 bool ULSRaidInventoryComponent::DropSessionSlot(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
 {
+	if (FromArea == ELSInventorySlotArea::Warehouse || ToArea == ELSInventorySlotArea::Warehouse)
+	{
+		return false;
+	}
+
 	TArray<FLSSessionItem>* FromSlots = FromArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 
@@ -356,6 +361,11 @@ bool ULSRaidInventoryComponent::DropSessionSlot(const ELSInventorySlotArea FromA
 
 bool ULSRaidInventoryComponent::DropExternalItemToSessionSlot(FLSSessionItem& InOutExternalItem, const ELSInventorySlotArea ToArea, const int32 ToIndex)
 {
+	if (ToArea == ELSInventorySlotArea::Warehouse)
+	{
+		return false;
+	}
+
 	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 	if (!IsFilledRaidInventorySlot(InOutExternalItem) || ToIndex < 0)
 	{
@@ -400,6 +410,11 @@ bool ULSRaidInventoryComponent::DropExternalItemToSessionSlot(FLSSessionItem& In
 
 bool ULSRaidInventoryComponent::GetSessionSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, FLSSessionItem& OutItem) const
 {
+	if (SlotArea == ELSInventorySlotArea::Warehouse)
+	{
+		return false;
+	}
+
 	const TArray<FLSSessionItem>& Slots = SlotArea == ELSInventorySlotArea::Safe ? SessionSafeInventory : SessionInventory;
 	if (!Slots.IsValidIndex(SlotIndex) || !IsFilledRaidInventorySlot(Slots[SlotIndex]))
 	{
@@ -412,6 +427,11 @@ bool ULSRaidInventoryComponent::GetSessionSlotItem(const ELSInventorySlotArea Sl
 
 bool ULSRaidInventoryComponent::ClearSessionSlot(const ELSInventorySlotArea SlotArea, const int32 SlotIndex)
 {
+	if (SlotArea == ELSInventorySlotArea::Warehouse)
+	{
+		return false;
+	}
+
 	TArray<FLSSessionItem>& Slots = SlotArea == ELSInventorySlotArea::Safe ? SessionSafeInventory : SessionInventory;
 	if (!Slots.IsValidIndex(SlotIndex) || !IsFilledRaidInventorySlot(Slots[SlotIndex]))
 	{
@@ -425,6 +445,11 @@ bool ULSRaidInventoryComponent::ClearSessionSlot(const ELSInventorySlotArea Slot
 bool ULSRaidInventoryComponent::ReplaceSessionSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem)
 {
 	OutPreviousItem = FLSSessionItem();
+	if (SlotArea == ELSInventorySlotArea::Warehouse)
+	{
+		return false;
+	}
+
 	if (SlotIndex < 0)
 	{
 		return false;

@@ -17,6 +17,7 @@
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
+#include "UI/Storage/LSLobbyStorageWidget.h"
 
 void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount)
 {
@@ -103,7 +104,18 @@ void ULSItemSlotWidget::SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, 
 {
 	LootDropWidget = InLootDropWidget;
 	InventoryWidget.Reset();
+	LobbyStorageWidget.Reset();
 	SlotArea = ELSInventorySlotArea::Inventory;
+	SlotIndex = InSlotIndex;
+	bHasItem = bInHasItem;
+}
+
+void ULSItemSlotWidget::SetWarehouseSlotContext(ULSLobbyStorageWidget* InStorageWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)
+{
+	LobbyStorageWidget = InStorageWidget;
+	InventoryWidget.Reset();
+	LootDropWidget.Reset();
+	SlotArea = InSlotArea;
 	SlotIndex = InSlotIndex;
 	bHasItem = bInHasItem;
 }
@@ -183,7 +195,7 @@ void ULSItemSlotWidget::NativeOnDragEnter(const FGeometry& InGeometry, const FDr
 {
 	Super::NativeOnDragEnter(InGeometry, InDragDropEvent, InOperation);
 
-	bIsDragTarget = IsValidInventoryDropTarget(InOperation) || IsValidLootDropTarget(InOperation);
+	bIsDragTarget = IsValidInventoryDropTarget(InOperation) || IsValidLootDropTarget(InOperation) || IsValidWarehouseDropTarget(InOperation);
 	ApplyHoverVisual();
 }
 
@@ -212,6 +224,7 @@ void ULSItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const 
 
 	DragOperation->SourceInventoryWidget = InventoryWidget.Get();
 	DragOperation->SourceLootDropWidget = LootDropWidget.Get();
+	DragOperation->SourceLobbyStorageWidget = LobbyStorageWidget.Get();
 	DragOperation->SourceSlotWidget = this;
 	DragOperation->SourceSlotIndex = SlotIndex;
 	DragOperation->SourceSlotArea = SlotArea;
@@ -264,6 +277,20 @@ bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDro
 		return bTransferred;
 	}
 
+	if (ULSLobbyStorageWidget* TargetStorageWidget = LobbyStorageWidget.Get())
+	{
+		if (!DragOperation->SourceInventoryWidget && !DragOperation->SourceLobbyStorageWidget)
+		{
+			return false;
+		}
+
+		const ELSInventorySlotArea SourceArea = DragOperation->SourceLobbyStorageWidget
+			? ELSInventorySlotArea::Warehouse
+			: DragOperation->SourceSlotArea;
+
+		return TargetStorageWidget->HandleStorageSlotDrop(SourceArea, DragOperation->SourceSlotIndex, SlotIndex);
+	}
+
 	ULSInventoryWidget* TargetInventoryWidget = InventoryWidget.Get();
 	if (TargetInventoryWidget && DragOperation->SourceLootDropWidget)
 	{
@@ -272,6 +299,20 @@ bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDro
 			DragOperation->SourceSlotIndex,
 			SlotArea,
 			SlotIndex);
+	}
+
+	if (TargetInventoryWidget && DragOperation->SourceLobbyStorageWidget)
+	{
+		const bool bDropped = TargetInventoryWidget->HandleInventorySlotDrop(
+			ELSInventorySlotArea::Warehouse,
+			DragOperation->SourceSlotIndex,
+			SlotArea,
+			SlotIndex);
+		if (bDropped)
+		{
+			DragOperation->SourceLobbyStorageWidget->RefreshStorage();
+		}
+		return bDropped;
 	}
 
 	if (!TargetInventoryWidget || DragOperation->SourceInventoryWidget != TargetInventoryWidget)
@@ -312,7 +353,7 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 
 bool ULSItemSlotWidget::CanStartItemDrag() const
 {
-	return bHasItem && SlotIndex != INDEX_NONE && (InventoryWidget.IsValid() || LootDropWidget.IsValid());
+	return bHasItem && SlotIndex != INDEX_NONE && (InventoryWidget.IsValid() || LootDropWidget.IsValid() || LobbyStorageWidget.IsValid());
 }
 
 bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const
@@ -350,6 +391,27 @@ bool ULSItemSlotWidget::IsValidLootDropTarget(const UDragDropOperation* InOperat
 	}
 
 	return DragOperation->SourceLootDropWidget == LootDropWidget.Get() && DragOperation->SourceSlotIndex != SlotIndex;
+}
+
+bool ULSItemSlotWidget::IsValidWarehouseDropTarget(const UDragDropOperation* InOperation) const
+{
+	const ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
+	if (!DragOperation || !LobbyStorageWidget.IsValid() || SlotIndex == INDEX_NONE || DragOperation->SourceSlotIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	if (DragOperation->SourceInventoryWidget)
+	{
+		return true;
+	}
+
+	if (DragOperation->SourceLobbyStorageWidget == LobbyStorageWidget.Get())
+	{
+		return DragOperation->SourceSlotIndex != SlotIndex;
+	}
+
+	return false;
 }
 
 UTexture2D* ULSItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName) const

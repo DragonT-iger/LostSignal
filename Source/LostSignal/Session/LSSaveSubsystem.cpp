@@ -292,6 +292,14 @@ void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots)
 		Slots.Add(MakeEmptySaveSlot());
 	}
 }
+
+void EnsureSaveSlotIndex(TArray<FLSSessionItem>& Slots, const int32 SlotIndex)
+{
+	while (Slots.Num() <= SlotIndex)
+	{
+		Slots.Add(MakeEmptySaveSlot());
+	}
+}
 }
 
 void ULSSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -300,35 +308,50 @@ void ULSSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	Load();
 }
 
-void ULSSaveSubsystem::AddToStash(const TArray<FLSSessionItem>& Items)
+void ULSSaveSubsystem::AddToInventory(const TArray<FLSSessionItem>& Items)
 {
 	if (!SaveData || Items.IsEmpty())
 	{
 		return;
 	}
 
+	TArray<FLSSessionItem>& Inv = GetMutableInventory();
 	for (const FLSSessionItem& NewItem : Items)
 	{
-		AddItemsToSlotArray(SaveData->Stash, NewItem.ItemRowName, NewItem.Amount);
+		AddItemsToSlotArray(Inv, NewItem.ItemRowName, NewItem.Amount);
 	}
 
-	UE_LOG(LogLS, Log, TEXT("[Save] Stash updated: added %d entries, total slots %d"),
-		Items.Num(), SaveData->Stash.Num());
+	UE_LOG(LogLS, Log, TEXT("[Save] Inventory updated: added %d entries, total slots %d"), Items.Num(), Inv.Num());
 	Save();
 }
 
-void ULSSaveSubsystem::ReplaceStash(const TArray<FLSSessionItem>& Items)
+void ULSSaveSubsystem::ReplaceInventory(const TArray<FLSSessionItem>& Items)
 {
 	if (!SaveData)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace stash because SaveData is missing."));
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace inventory because SaveData is missing."));
 		return;
 	}
 
-	SaveData->Stash = Items;
-	NormalizeSlotArray(SaveData->Stash);
+	SaveData->Inventory = Items;
+	NormalizeSlotArray(SaveData->Inventory);
 
-	UE_LOG(LogLS, Log, TEXT("[Save] Stash replaced. Total slots: %d"), SaveData->Stash.Num());
+	UE_LOG(LogLS, Log, TEXT("[Save] Inventory replaced. Total slots: %d"), SaveData->Inventory.Num());
+	Save();
+}
+
+void ULSSaveSubsystem::ReplaceWarehouseItems(const TArray<FLSSessionItem>& Items)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace warehouse because SaveData is missing."));
+		return;
+	}
+
+	SaveData->WarehouseItems = Items;
+	NormalizeSlotArray(SaveData->WarehouseItems);
+
+	UE_LOG(LogLS, Log, TEXT("[Save] Warehouse replaced. Total slots: %d"), SaveData->WarehouseItems.Num());
 	Save();
 }
 
@@ -347,10 +370,16 @@ void ULSSaveSubsystem::ReplaceSafeStash(const TArray<FLSSessionItem>& Items)
 	Save();
 }
 
-const TArray<FLSSessionItem>& ULSSaveSubsystem::GetStash() const
+const TArray<FLSSessionItem>& ULSSaveSubsystem::GetInventory() const
 {
 	static TArray<FLSSessionItem> Empty;
-	return SaveData ? SaveData->Stash : Empty;
+	return SaveData ? SaveData->Inventory : Empty;
+}
+
+const TArray<FLSSessionItem>& ULSSaveSubsystem::GetWarehouseItems() const
+{
+	static TArray<FLSSessionItem> Empty;
+	return SaveData ? SaveData->WarehouseItems : Empty;
 }
 
 const TArray<FLSSessionItem>& ULSSaveSubsystem::GetSafeStash() const
@@ -359,17 +388,89 @@ const TArray<FLSSessionItem>& ULSSaveSubsystem::GetSafeStash() const
 	return SaveData ? SaveData->SafeStash : Empty;
 }
 
-void ULSSaveSubsystem::SortStash()
+void ULSSaveSubsystem::SortInventory()
 {
 	if (!SaveData)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot sort stash because SaveData is missing."));
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot sort inventory because SaveData is missing."));
 		return;
 	}
 
-	SortAndCompactSlotArray(SaveData->Stash);
-	UE_LOG(LogLS, Log, TEXT("[Save] Stash sorted and compacted. Total slots: %d"), SaveData->Stash.Num());
+	SortAndCompactSlotArray(SaveData->Inventory);
+	UE_LOG(LogLS, Log, TEXT("[Save] Inventory sorted and compacted. Total slots: %d"), SaveData->Inventory.Num());
 	Save();
+}
+
+void ULSSaveSubsystem::SortWarehouse()
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot sort warehouse because SaveData is missing."));
+		return;
+	}
+
+	SortAndCompactSlotArray(SaveData->WarehouseItems);
+	UE_LOG(LogLS, Log, TEXT("[Save] Warehouse sorted and compacted. Total slots: %d"), SaveData->WarehouseItems.Num());
+	Save();
+}
+
+bool ULSSaveSubsystem::DropStoredSlot(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop stored slot because SaveData is missing."));
+		return false;
+	}
+
+	TArray<FLSSessionItem>* FromSlots = GetMutableStoredSlots(FromArea);
+	TArray<FLSSessionItem>* ToSlots = GetMutableStoredSlots(ToArea);
+	if (!FromSlots || !ToSlots || !FromSlots->IsValidIndex(FromIndex) || !IsFilledSaveSlot((*FromSlots)[FromIndex]) || ToIndex < 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop stored slot. FromArea=%d From=%d ToArea=%d To=%d"),
+			static_cast<int32>(FromArea), FromIndex, static_cast<int32>(ToArea), ToIndex);
+		return false;
+	}
+
+	if (FromSlots == ToSlots && FromIndex == ToIndex)
+	{
+		return true;
+	}
+
+	EnsureSaveSlotIndex(*ToSlots, ToIndex);
+
+	FLSSessionItem& FromSlot = (*FromSlots)[FromIndex];
+	FLSSessionItem& ToSlot = (*ToSlots)[ToIndex];
+
+	if (!IsFilledSaveSlot(ToSlot))
+	{
+		ToSlot = FromSlot;
+		FromSlot = MakeEmptySaveSlot();
+		Save();
+		return true;
+	}
+
+	if (FromSlot.ItemRowName == ToSlot.ItemRowName)
+	{
+		const int32 MaxStack = ResolveItemMaxStackForSave(FromSlot.ItemRowName);
+		const int32 AddAmount = FMath::Min(FromSlot.Amount, MaxStack - ToSlot.Amount);
+		if (AddAmount <= 0)
+		{
+			return false;
+		}
+
+		ToSlot.Amount += AddAmount;
+		FromSlot.Amount -= AddAmount;
+		if (FromSlot.Amount <= 0)
+		{
+			FromSlot = MakeEmptySaveSlot();
+		}
+		Save();
+		return true;
+	}
+
+	Swap(FromSlot, ToSlot);
+	Save();
+	return true;
 }
 
 void ULSSaveSubsystem::BeginRaidSave(const TArray<FLSSessionItem>& Loadout)
@@ -417,18 +518,48 @@ void ULSSaveSubsystem::Load()
 		SaveData = Cast<ULSSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotName, 0));
 		if (SaveData)
 		{
-			NormalizeSlotArray(SaveData->Stash);
+			MigrateInventory();
+			NormalizeSlotArray(SaveData->Inventory);
+			NormalizeSlotArray(SaveData->WarehouseItems);
 			NormalizeSlotArray(SaveData->SafeStash);
 			ResolveInterruptedRaid();
 			Save();
 		}
-		UE_LOG(LogLS, Log, TEXT("[Save] Loaded stash slots: %d"),
-			SaveData ? SaveData->Stash.Num() : 0);
+		UE_LOG(LogLS, Log, TEXT("[Save] Loaded inventory slots: %d, warehouse slots: %d, safe slots: %d"),
+			SaveData ? SaveData->Inventory.Num() : 0,
+			SaveData ? SaveData->WarehouseItems.Num() : 0,
+			SaveData ? SaveData->SafeStash.Num() : 0);
 		return;
 	}
 
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	UE_LOG(LogLS, Log, TEXT("[Save] Created new save object"));
+}
+
+void ULSSaveSubsystem::MigrateInventory()
+{
+	if (!SaveData || SaveData->bInventoryMigrated)
+	{
+		return;
+	}
+
+	if (SaveData->Inventory.IsEmpty())
+	{
+		// Player1Inventory 있으면 우선, 없으면 Stash에서 마이그레이션
+		if (!SaveData->Player1Inventory.IsEmpty())
+		{
+			NormalizeSlotArray(SaveData->Player1Inventory);
+			SaveData->Inventory = SaveData->Player1Inventory;
+		}
+		else if (!SaveData->Stash.IsEmpty())
+		{
+			NormalizeSlotArray(SaveData->Stash);
+			SaveData->Inventory = SaveData->Stash;
+		}
+	}
+
+	SaveData->bInventoryMigrated = true;
+	UE_LOG(LogLS, Log, TEXT("[Save] Migrated legacy data into Inventory."));
 }
 
 void ULSSaveSubsystem::ResolveInterruptedRaid()
@@ -446,12 +577,12 @@ void ULSSaveSubsystem::ResolveInterruptedRaid()
 		RemoveItemsFromSlotArray(RecoveredStash, ConsumedItem.ItemRowName, ConsumedItem.Amount);
 	}
 
-	SaveData->Stash = RecoveredStash;
+	SaveData->Inventory = RecoveredStash;
 	SaveData->bRaidSaveActive = false;
 	SaveData->ActiveRaidLoadout.Reset();
 	SaveData->ActiveRaidConsumedItems.Reset();
 
-	UE_LOG(LogLS, Log, TEXT("[Save] Interrupted raid resolved. Recovered stash slots: %d"), SaveData->Stash.Num());
+	UE_LOG(LogLS, Log, TEXT("[Save] Interrupted raid resolved. Recovered inventory slots: %d"), SaveData->Inventory.Num());
 }
 
 void ULSSaveSubsystem::Save()
@@ -468,6 +599,31 @@ void ULSSaveSubsystem::Save()
 	UE_LOG(LogLS, Log, TEXT("[Save] Save completed"));
 }
 
+TArray<FLSSessionItem>& ULSSaveSubsystem::GetMutableInventory()
+{
+	return SaveData->Inventory;
+}
+
+TArray<FLSSessionItem>* ULSSaveSubsystem::GetMutableStoredSlots(const ELSInventorySlotArea SlotArea)
+{
+	if (!SaveData)
+	{
+		return nullptr;
+	}
+
+	switch (SlotArea)
+	{
+	case ELSInventorySlotArea::Inventory:
+		return &SaveData->Inventory;
+	case ELSInventorySlotArea::Safe:
+		return &SaveData->SafeStash;
+	case ELSInventorySlotArea::Warehouse:
+		return &SaveData->WarehouseItems;
+	default:
+		return nullptr;
+	}
+}
+
 void ULSSaveSubsystem::SaveDebugJson() const
 {
 	if (!SaveData)
@@ -479,32 +635,25 @@ void ULSSaveSubsystem::SaveDebugJson() const
 	RootObject->SetStringField(TEXT("slotName"), SlotName);
 	RootObject->SetBoolField(TEXT("raidSaveActive"), SaveData->bRaidSaveActive);
 
-	TArray<TSharedPtr<FJsonValue>> StashArray;
-	StashArray.Reserve(SaveData->Stash.Num());
-
-	for (const FLSSessionItem& Item : SaveData->Stash)
+	auto AddSlotArrayField = [&RootObject](const TCHAR* FieldName, const TArray<FLSSessionItem>& Items)
 	{
-		TSharedRef<FJsonObject> ItemObject = MakeShared<FJsonObject>();
-		ItemObject->SetNumberField(TEXT("slotIndex"), StashArray.Num());
-		ItemObject->SetStringField(TEXT("itemRowName"), Item.ItemRowName.ToString());
-		ItemObject->SetNumberField(TEXT("amount"), Item.Amount);
-		StashArray.Add(MakeShared<FJsonValueObject>(ItemObject));
-	}
+		TArray<TSharedPtr<FJsonValue>> JsonArray;
+		JsonArray.Reserve(Items.Num());
+		for (const FLSSessionItem& Item : Items)
+		{
+			TSharedRef<FJsonObject> ItemObject = MakeShared<FJsonObject>();
+			ItemObject->SetNumberField(TEXT("slotIndex"), JsonArray.Num());
+			ItemObject->SetStringField(TEXT("itemRowName"), Item.ItemRowName.ToString());
+			ItemObject->SetNumberField(TEXT("amount"), Item.Amount);
+			JsonArray.Add(MakeShared<FJsonValueObject>(ItemObject));
+		}
 
-	RootObject->SetArrayField(TEXT("stash"), StashArray);
+		RootObject->SetArrayField(FieldName, JsonArray);
+	};
 
-	TArray<TSharedPtr<FJsonValue>> SafeStashArray;
-	SafeStashArray.Reserve(SaveData->SafeStash.Num());
-	for (const FLSSessionItem& Item : SaveData->SafeStash)
-	{
-		TSharedRef<FJsonObject> ItemObject = MakeShared<FJsonObject>();
-		ItemObject->SetNumberField(TEXT("slotIndex"), SafeStashArray.Num());
-		ItemObject->SetStringField(TEXT("itemRowName"), Item.ItemRowName.ToString());
-		ItemObject->SetNumberField(TEXT("amount"), Item.Amount);
-		SafeStashArray.Add(MakeShared<FJsonValueObject>(ItemObject));
-	}
-
-	RootObject->SetArrayField(TEXT("safeStash"), SafeStashArray);
+	AddSlotArrayField(TEXT("inventory"), SaveData->Inventory);
+	AddSlotArrayField(TEXT("warehouseItems"), SaveData->WarehouseItems);
+	AddSlotArrayField(TEXT("safeStash"), SaveData->SafeStash);
 
 	TArray<TSharedPtr<FJsonValue>> ActiveRaidLoadoutArray;
 	ActiveRaidLoadoutArray.Reserve(SaveData->ActiveRaidLoadout.Num());
