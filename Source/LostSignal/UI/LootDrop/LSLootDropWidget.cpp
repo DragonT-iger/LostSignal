@@ -4,6 +4,7 @@
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Gameplay/LSLootBox.h"
+#include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
 
@@ -348,9 +349,7 @@ void ULSLootDropWidget::SetLootSlotFromSessionItem(const int32 SlotIndex, const 
 		return;
 	}
 
-	LootItems[SlotIndex].ItemRowName = SessionItem.ItemRowName;
-	LootItems[SlotIndex].Amount = SessionItem.Amount;
-	LootItems[SlotIndex].ItemText = FText::GetEmpty();
+	LSInventorySlotUtils::SetDropResultFromSessionItem(LootItems[SlotIndex], SessionItem);
 	if (HoveredLootSlotIndex == SlotIndex && (SessionItem.ItemRowName.IsNone() || SessionItem.Amount <= 0))
 	{
 		HoveredLootSlotIndex = INDEX_NONE;

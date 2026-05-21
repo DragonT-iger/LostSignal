@@ -5,6 +5,7 @@
 #include "Session/LSSessionSubsystem.h"
 #include "LSLobbyStorageWidget.generated.h"
 
+class ALSWorldDroppedItem;
 class UDragDropOperation;
 class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
@@ -40,6 +41,8 @@ public:
 	void RefreshStorage();
 
 	bool HandleStorageSlotDrop(ELSInventorySlotArea FromArea, int32 FromIndex, int32 ToWarehouseIndex);
+	bool TryDropStorageDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FPointerEvent& PointerEvent);
+	bool TransferStorageSlotToInventory(int32 WarehouseSlotIndex);
 
 protected:
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
@@ -77,6 +80,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Storage", meta=(ClampMin="0"))
 	int32 MaxStorageSlotCount = 100;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Storage")
+	TSubclassOf<ALSWorldDroppedItem> DroppedItemActorClass;
+
 private:
 	ELSStorageFilter CurrentFilter = ELSStorageFilter::All;
 
@@ -108,6 +114,6 @@ private:
 	void BuildFilteredItems(const TArray<FLSSessionItem>& StashItems, TArray<TPair<int32, FLSSessionItem>>& OutIndexedItems) const;
 	bool DoesItemMatchCurrentFilter(FName ItemRowName) const;
 	bool IsConsumableItem(FName ItemRowName) const;
+	bool IsPointerOverUserWidget(const FPointerEvent& PointerEvent) const;
 	ULSSaveSubsystem* GetSaveSubsystem() const;
-	static bool IsFilledStorageSlot(const FLSSessionItem& Item);
 };

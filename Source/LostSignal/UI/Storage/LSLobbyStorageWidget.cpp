@@ -3,9 +3,13 @@
 #include "Characters/LSPlayerCharacter.h"
 #include "Components/TextBlock.h"
 #include "Components/WrapBox.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSDropSettings.h"
 #include "Data/LSItemRow.h"
 #include "Engine/DataTable.h"
+#include "Gameplay/LSWorldDroppedItem.h"
+#include "Inventory/LSInventorySlotUtils.h"
+#include "Layout/WidgetPath.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
@@ -103,7 +107,7 @@ void ULSLobbyStorageWidget::RefreshStorage()
 				continue;
 			}
 
-			const bool bHasItemAtSlot = StashItems.IsValidIndex(VisualIndex) && IsFilledStorageSlot(StashItems[VisualIndex]);
+			const bool bHasItemAtSlot = StashItems.IsValidIndex(VisualIndex) && LSInventorySlotUtils::IsFilled(StashItems[VisualIndex]);
 			if (bHasItemAtSlot)
 			{
 				SlotWidget->SetItem(StashItems[VisualIndex].ItemRowName, StashItems[VisualIndex].Amount);
@@ -167,7 +171,7 @@ bool ULSLobbyStorageWidget::NativeOnDrop(const FGeometry& InGeometry, const FDra
 	int32 EmptyIndex = INDEX_NONE;
 	for (int32 i = 0; i < WarehouseItems.Num(); ++i)
 	{
-		if (!IsFilledStorageSlot(WarehouseItems[i]))
+		if (!LSInventorySlotUtils::IsFilled(WarehouseItems[i]))
 		{
 			EmptyIndex = i;
 			break;
@@ -201,6 +205,77 @@ bool ULSLobbyStorageWidget::HandleStorageSlotDrop(const ELSInventorySlotArea Fro
 		}
 	}
 	return bSuccess;
+}
+
+bool ULSLobbyStorageWidget::TryDropStorageDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FPointerEvent& PointerEvent)
+{
+	if (DragOperation.SourceLobbyStorageWidget != this)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop storage slot to world because source storage widget does not match."));
+		return false;
+	}
+
+	if (DragOperation.SourceSlotIndex == INDEX_NONE)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop storage slot to world because source slot index is invalid."));
+		return false;
+	}
+
+	if (IsPointerOverUserWidget(PointerEvent))
+	{
+		return false;
+	}
+
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop storage slot to world because owning player controller is invalid on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const bool bDropped = PlayerController->DropSessionSlotToWorld(
+		DragOperation.SourceSlotArea,
+		DragOperation.SourceSlotIndex,
+		DroppedItemActorClass);
+
+	if (bDropped)
+	{
+		RefreshStorage();
+		if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
+		{
+			PlayerCharacter->RebuildInventoryWidgetSlots();
+		}
+	}
+
+	return bDropped;
+}
+
+bool ULSLobbyStorageWidget::TransferStorageSlotToInventory(const int32 WarehouseSlotIndex)
+{
+	ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn());
+	if (!PlayerCharacter || !PlayerCharacter->IsInventoryWidgetOpen())
+	{
+		return false;
+	}
+
+	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot quick-transfer storage slot because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const bool bTransferred = SaveSubsystem->TransferStoredSlotToArea(
+		ELSInventorySlotArea::Warehouse,
+		WarehouseSlotIndex,
+		ELSInventorySlotArea::Inventory);
+	if (bTransferred)
+	{
+		RefreshStorage();
+		PlayerCharacter->RebuildInventoryWidgetSlots();
+	}
+
+	return bTransferred;
 }
 
 void ULSLobbyStorageWidget::HandleSortButtonClicked()
@@ -359,7 +434,7 @@ void ULSLobbyStorageWidget::UpdateStorageCountText(const TArray<FLSSessionItem>&
 	int32 FilledSlotCount = 0;
 	for (const FLSSessionItem& Item : StashItems)
 	{
-		if (IsFilledStorageSlot(Item))
+		if (LSInventorySlotUtils::IsFilled(Item))
 		{
 			++FilledSlotCount;
 		}
@@ -411,7 +486,7 @@ void ULSLobbyStorageWidget::BuildFilteredItems(const TArray<FLSSessionItem>& Sta
 	for (int32 i = 0; i < StashItems.Num(); ++i)
 	{
 		const FLSSessionItem& Item = StashItems[i];
-		if (IsFilledStorageSlot(Item) && DoesItemMatchCurrentFilter(Item.ItemRowName))
+		if (LSInventorySlotUtils::IsFilled(Item) && DoesItemMatchCurrentFilter(Item.ItemRowName))
 		{
 			OutIndexedItems.Add(TPair<int32, FLSSessionItem>(i, Item));
 		}
@@ -469,15 +544,31 @@ bool ULSLobbyStorageWidget::IsConsumableItem(const FName ItemRowName) const
 	return Row->Item_Type >= 4 && Row->Item_Type <= 9;
 }
 
+bool ULSLobbyStorageWidget::IsPointerOverUserWidget(const FPointerEvent& PointerEvent) const
+{
+	const FWidgetPath* EventPath = PointerEvent.GetEventPath();
+	if (!EventPath)
+	{
+		return false;
+	}
+
+	static const FName ObjectWidgetTypeName(TEXT("SObjectWidget"));
+	for (int32 WidgetIndex = 0; WidgetIndex < EventPath->Widgets.Num(); ++WidgetIndex)
+	{
+		const TSharedRef<SWidget>& Widget = EventPath->Widgets[WidgetIndex].Widget;
+		if (Widget->GetType() == ObjectWidgetTypeName)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 ULSSaveSubsystem* ULSLobbyStorageWidget::GetSaveSubsystem() const
 {
 	UGameInstance* GameInstance = GetGameInstance();
 	return GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-}
-
-bool ULSLobbyStorageWidget::IsFilledStorageSlot(const FLSSessionItem& Item)
-{
-	return !Item.ItemRowName.IsNone() && Item.Amount > 0;
 }
 
 #undef LOCTEXT_NAMESPACE

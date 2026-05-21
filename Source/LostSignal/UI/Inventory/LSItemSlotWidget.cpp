@@ -170,7 +170,7 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 	{
 		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 		{
-			if (PlayerController->TransferInventorySlotToLootDrop(SlotArea, SlotIndex))
+			if (PlayerController->TransferInventorySlotToOpenContainer(SlotArea, SlotIndex))
 			{
 				if (PlayerController->HasAuthority())
 				{
@@ -178,6 +178,16 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 					InventoryWidget->RebuildConfirmedStorageSlots();
 				}
 			}
+		}
+
+		return FReply::Handled();
+	}
+
+	if (LobbyStorageWidget.IsValid() && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
+	{
+		if (ULSLobbyStorageWidget* StorageWidget = LobbyStorageWidget.Get())
+		{
+			StorageWidget->TransferStorageSlotToInventory(SlotIndex);
 		}
 
 		return FReply::Handled();

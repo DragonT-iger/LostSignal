@@ -326,7 +326,7 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 		{
 			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
-				AppendSlotItems(SafeItems, SaveSubsystem->GetWarehouseItems());
+				AppendSlotItems(SafeItems, SaveSubsystem->GetSafeStash());
 			}
 		}
 	}
@@ -343,8 +343,7 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 			const bool bHasSlotItem = SafeItems.IsValidIndex(SlotIndex) &&
 				!SafeItems[SlotIndex].ItemRowName.IsNone() &&
 				SafeItems[SlotIndex].Amount > 0;
-			const ELSInventorySlotArea SlotArea = bUsingRaidInventory ? ELSInventorySlotArea::Safe : ELSInventorySlotArea::Warehouse;
-			SlotWidget->SetSlotContext(this, SlotArea, SlotIndex, bHasSlotItem);
+			SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Safe, SlotIndex, bHasSlotItem);
 			if (bHasSlotItem)
 			{
 				SlotWidget->SetItem(SafeItems[SlotIndex].ItemRowName, SafeItems[SlotIndex].Amount);
