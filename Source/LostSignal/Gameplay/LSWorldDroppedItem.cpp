@@ -12,6 +12,7 @@
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Net/UnrealNetwork.h"
+#include "Session/LSSaveSubsystem.h"
 #include "UI/Inventory/LSWorldDroppedItemIconWidget.h"
 
 ALSWorldDroppedItem::ALSWorldDroppedItem()
@@ -48,30 +49,37 @@ void ALSWorldDroppedItem::Interact_Implementation(APawn* Interactor)
 
 	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Interactor ? Interactor->GetController() : nullptr);
 	ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
+	FLSSessionItem RemainingItem;
 	if (RaidInventory && RaidInventory->IsRaidActive())
 	{
-		FLSSessionItem RemainingItem;
 		if (!RaidInventory->TryAddSessionItem(ItemRowName, Amount, RemainingItem))
 		{
 			return;
 		}
 
-		if (RemainingItem.ItemRowName.IsNone() || RemainingItem.Amount <= 0)
-		{
-			Destroy();
-		}
-		else
-		{
-			ItemRowName = RemainingItem.ItemRowName;
-			Amount = RemainingItem.Amount;
-			RefreshItemVisual();
-			ForceNetUpdate();
-		}
 		PlayerController->SyncRaidInventoryToClient();
+	}
+	else
+	{
+		UGameInstance* GameInstance = GetGameInstance();
+		ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+		if (!SaveSubsystem || !SaveSubsystem->TryAddToInventory(ItemRowName, Amount, RemainingItem))
+		{
+			UE_LOG(LogLS, Warning, TEXT("Cannot pick up dropped item because no inventory storage is available on %s."), *GetNameSafe(this));
+			return;
+		}
+	}
+
+	if (RemainingItem.ItemRowName.IsNone() || RemainingItem.Amount <= 0)
+	{
+		Destroy();
 		return;
 	}
 
-	UE_LOG(LogLS, Warning, TEXT("Cannot pick up dropped item because RaidInventoryComponent is missing or inactive on %s."), *GetNameSafe(this));
+	ItemRowName = RemainingItem.ItemRowName;
+	Amount = RemainingItem.Amount;
+	RefreshItemVisual();
+	ForceNetUpdate();
 }
 
 FText ALSWorldDroppedItem::GetInteractText_Implementation()

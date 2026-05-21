@@ -6,13 +6,17 @@
 #include "Camera/CameraComponent.h"
 #include "Characters/LSCharacterBase.h"
 #include "Characters/LSPlayerCharacter.h"
+#include "Core/LSFarmingGameMode.h"
+#include "Core/LSLobbyGameMode.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "Gameplay/LSLootBox.h"
 #include "Gameplay/LSWorldDroppedItem.h"
 #include "InputMappingContext.h"
+#include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
+#include "Session/LSSaveSubsystem.h"
 #include "UI/Debug/LSHpDebugWidget.h"
 #include "UI/LSPlayerHUDWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
@@ -100,6 +104,15 @@ void ALSPlayerControllerBase::InitializeRaidInventoryFromSessionSubsystem()
 		return;
 	}
 
+	if (RaidInventoryComponent->IsRaidActive())
+	{
+		if (HasAuthority())
+		{
+			SyncRaidInventoryToClient();
+		}
+		return;
+	}
+
 	UGameInstance* GameInstance = GetGameInstance();
 	ULSSessionSubsystem* SessionSub = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
 	if (!SessionSub || !SessionSub->IsRaidActive())
@@ -123,6 +136,13 @@ void ALSPlayerControllerBase::ClientStartRaidSession_Implementation(const TArray
 	}
 
 	RaidInventoryComponent->StartRaidInventory(Loadout, SafeItems);
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
+		{
+			SaveSubsystem->BeginRaidSave(Loadout);
+		}
+	}
 }
 
 void ALSPlayerControllerBase::ShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox)
@@ -234,6 +254,155 @@ void ALSPlayerControllerBase::SyncRaidInventoryToClient()
 		RaidInventoryComponent->GetSessionInventory(),
 		RaidInventoryComponent->GetSessionSafeInventory(),
 		TArray<FLSDropResult>());
+}
+
+void ALSPlayerControllerBase::RequestRaidEntryDataForRaidStart()
+{
+	ClearSubmittedRaidEntryData();
+	if (IsLocalPlayerController())
+	{
+		SubmitLocalRaidEntryData();
+		return;
+	}
+
+	ClientRequestRaidEntryData();
+}
+
+void ALSPlayerControllerBase::ClearSubmittedRaidEntryData()
+{
+	bHasSubmittedRaidEntryData = false;
+	SubmittedRaidLoadout.Reset();
+	SubmittedRaidSafeItems.Reset();
+}
+
+void ALSPlayerControllerBase::ClientRequestRaidEntryData_Implementation()
+{
+	SubmitLocalRaidEntryData();
+}
+
+void ALSPlayerControllerBase::ServerSubmitRaidEntryData_Implementation(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems)
+{
+	StoreSubmittedRaidEntryData(Loadout, SafeItems);
+
+	if (ALSLobbyGameMode* LobbyGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ALSLobbyGameMode>() : nullptr)
+	{
+		LobbyGameMode->NotifyRaidEntryDataSubmitted(this);
+	}
+}
+
+void ALSPlayerControllerBase::SubmitLocalRaidEntryData()
+{
+	TArray<FLSSessionItem> Loadout;
+	TArray<FLSSessionItem> SafeItems;
+
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (SaveSubsystem)
+	{
+		Loadout = SaveSubsystem->GetInventory();
+		SafeItems = SaveSubsystem->GetSafeStash();
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot submit raid entry data because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+	}
+
+	if (HasAuthority())
+	{
+		StoreSubmittedRaidEntryData(Loadout, SafeItems);
+		if (ALSLobbyGameMode* LobbyGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ALSLobbyGameMode>() : nullptr)
+		{
+			LobbyGameMode->NotifyRaidEntryDataSubmitted(this);
+		}
+		return;
+	}
+
+	ServerSubmitRaidEntryData(Loadout, SafeItems);
+}
+
+void ALSPlayerControllerBase::StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	SubmittedRaidLoadout = Loadout;
+	SubmittedRaidSafeItems = SafeItems;
+	LSInventorySlotUtils::NormalizeSlotArray(SubmittedRaidLoadout);
+	LSInventorySlotUtils::NormalizeSlotArray(SubmittedRaidSafeItems);
+	bHasSubmittedRaidEntryData = true;
+
+	UE_LOG(LogLS, Log, TEXT("Raid entry data submitted for %s. LoadoutSlots=%d SafeSlots=%d"),
+		*GetNameSafe(this),
+		SubmittedRaidLoadout.Num(),
+		SubmittedRaidSafeItems.Num());
+}
+
+void ALSPlayerControllerBase::RequestRaidResultSave(const ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const bool bSaveInventory, const bool bSaveSafeStash)
+{
+	if (IsLocalPlayerController())
+	{
+		ApplyRaidResultToLocalSave(Result, InventoryItems, SafeItems, bSaveInventory, bSaveSafeStash);
+		return;
+	}
+
+	ClientApplyRaidResult(Result, InventoryItems, SafeItems, bSaveInventory, bSaveSafeStash);
+}
+
+void ALSPlayerControllerBase::ClientApplyRaidResult_Implementation(const ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const bool bSaveInventory, const bool bSaveSafeStash)
+{
+	ApplyRaidResultToLocalSave(Result, InventoryItems, SafeItems, bSaveInventory, bSaveSafeStash);
+}
+
+void ALSPlayerControllerBase::ApplyRaidResultToLocalSave(const ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const bool bSaveInventory, const bool bSaveSafeStash)
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot apply raid result because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (bSaveInventory)
+	{
+		SaveSubsystem->ReplaceInventory(InventoryItems);
+	}
+
+	if (bSaveSafeStash)
+	{
+		SaveSubsystem->ReplaceSafeStash(SafeItems);
+	}
+
+	SaveSubsystem->ClearRaidSave();
+
+	UE_LOG(LogLS, Log, TEXT("Raid result applied locally on %s. Result=%d SaveInventory=%s SaveSafe=%s InventorySlots=%d SafeSlots=%d"),
+		*GetNameSafe(this),
+		static_cast<int32>(Result),
+		bSaveInventory ? TEXT("true") : TEXT("false"),
+		bSaveSafeStash ? TEXT("true") : TEXT("false"),
+		InventoryItems.Num(),
+		SafeItems.Num());
+
+	if (HasAuthority())
+	{
+		if (ALSFarmingGameMode* FarmingGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ALSFarmingGameMode>() : nullptr)
+		{
+			FarmingGameMode->NotifyRaidResultSaved(this);
+		}
+		return;
+	}
+
+	ServerConfirmRaidResultSaved();
+}
+
+void ALSPlayerControllerBase::ServerConfirmRaidResultSaved_Implementation()
+{
+	if (ALSFarmingGameMode* FarmingGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ALSFarmingGameMode>() : nullptr)
+	{
+		FarmingGameMode->NotifyRaidResultSaved(this);
+	}
 }
 
 void ALSPlayerControllerBase::ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox)
@@ -493,6 +662,42 @@ bool ALSPlayerControllerBase::TransferInventorySlotToLootDrop(const ELSInventory
 	return LootDropWidgetInstance->TransferInventorySlotToFirstEmptyLootSlot(FromSlotArea, FromSlotIndex);
 }
 
+bool ALSPlayerControllerBase::TransferInventorySlotToOpenContainer(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex)
+{
+	if (TransferInventorySlotToLootDrop(FromSlotArea, FromSlotIndex))
+	{
+		return true;
+	}
+
+	if (!LobbyStorageWidgetInstance || !LobbyStorageWidgetInstance->IsVisible())
+	{
+		return false;
+	}
+
+	if (ULSRaidInventoryComponent* InventoryComponent = GetRaidInventoryComponent())
+	{
+		if (InventoryComponent->IsRaidActive())
+		{
+			return false;
+		}
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot quick-transfer inventory slot because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const bool bTransferred = SaveSubsystem->TransferStoredSlotToArea(FromSlotArea, FromSlotIndex, ELSInventorySlotArea::Warehouse);
+	if (bTransferred)
+	{
+		LobbyStorageWidgetInstance->RefreshStorage();
+	}
+	return bTransferred;
+}
+
 bool ALSPlayerControllerBase::DropInventorySlot(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
 {
 	if (FromIndex == INDEX_NONE || ToIndex == INDEX_NONE)
@@ -678,44 +883,52 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 		return false;
 	}
 
-	if (SlotArea != ELSInventorySlotArea::Inventory)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot drop non-inventory slot to world. Area=%d Index=%d"), static_cast<int32>(SlotArea), SlotIndex);
-		return false;
-	}
-
 	ULSRaidInventoryComponent* InventoryComponent = GetRaidInventoryComponent();
-	if (!InventoryComponent || !InventoryComponent->IsRaidActive())
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because raid session is not active."));
-		return false;
-	}
+	const bool bUseRaidInventory = InventoryComponent && InventoryComponent->IsRaidActive() && SlotArea != ELSInventorySlotArea::Warehouse;
+	ULSSaveSubsystem* SaveSubsystem = nullptr;
 
 	FLSSessionItem SlotItem;
-	if (!InventoryComponent->GetSessionSlotItem(SlotArea, SlotIndex, SlotItem))
+	if (bUseRaidInventory)
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source slot is invalid. Area=%d Index=%d"),
-			static_cast<int32>(SlotArea), SlotIndex);
-		return false;
+		if (!InventoryComponent->GetSessionSlotItem(SlotArea, SlotIndex, SlotItem))
+		{
+			UE_LOG(LogLS, Warning, TEXT("Cannot drop raid slot to world because source slot is invalid. Area=%d Index=%d"),
+				static_cast<int32>(SlotArea), SlotIndex);
+			return false;
+		}
+	}
+	else
+	{
+		UGameInstance* GameInstance = GetGameInstance();
+		SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+		if (!SaveSubsystem || !SaveSubsystem->GetStoredSlotItem(SlotArea, SlotIndex, SlotItem))
+		{
+			UE_LOG(LogLS, Warning, TEXT("Cannot drop stored slot to world because source slot is invalid. Area=%d Index=%d"),
+				static_cast<int32>(SlotArea), SlotIndex);
+			return false;
+		}
 	}
 
 	FTransform SpawnTransform;
 	if (!ResolveServerDroppedItemTransform(SpawnTransform))
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because server drop transform is invalid."));
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop slot to world because server drop transform is invalid."));
 		return false;
 	}
 
 	UWorld* World = GetWorld();
 	if (!World)
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because World is missing."));
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop slot to world because World is missing."));
 		return false;
 	}
 
-	if (!InventoryComponent->ClearSessionSlot(SlotArea, SlotIndex))
+	const bool bClearedSourceSlot = bUseRaidInventory
+		? InventoryComponent->ClearSessionSlot(SlotArea, SlotIndex)
+		: SaveSubsystem && SaveSubsystem->ClearStoredSlot(SlotArea, SlotIndex);
+	if (!bClearedSourceSlot)
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source slot could not be cleared. Area=%d Index=%d"),
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop slot to world because source slot could not be cleared. Area=%d Index=%d"),
 			static_cast<int32>(SlotArea), SlotIndex);
 		return false;
 	}
@@ -739,13 +952,23 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 		UE_LOG(LogLS, Warning, TEXT("Failed to spawn dropped item for slot. Area=%d Index=%d"),
 			static_cast<int32>(SlotArea), SlotIndex);
 		FLSSessionItem IgnoredPreviousItem;
-		InventoryComponent->ReplaceSessionSlotItem(SlotArea, SlotIndex, SlotItem, IgnoredPreviousItem);
+		if (bUseRaidInventory)
+		{
+			InventoryComponent->ReplaceSessionSlotItem(SlotArea, SlotIndex, SlotItem, IgnoredPreviousItem);
+		}
+		else if (SaveSubsystem)
+		{
+			SaveSubsystem->ReplaceStoredSlotItem(SlotArea, SlotIndex, SlotItem, IgnoredPreviousItem);
+		}
 		return false;
 	}
 
 	DroppedItem->InitializeDroppedItem(SlotItem);
 	DroppedItem->FinishSpawning(SpawnTransform);
-	ClientSyncRaidSessionAndLoot(nullptr, InventoryComponent->GetSessionInventory(), InventoryComponent->GetSessionSafeInventory(), TArray<FLSDropResult>());
+	if (bUseRaidInventory)
+	{
+		ClientSyncRaidSessionAndLoot(nullptr, InventoryComponent->GetSessionInventory(), InventoryComponent->GetSessionSafeInventory(), TArray<FLSDropResult>());
+	}
 	return true;
 }
 

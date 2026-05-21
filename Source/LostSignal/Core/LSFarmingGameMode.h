@@ -3,7 +3,10 @@
 #include "CoreMinimal.h"
 #include "Core/LSGameModeBase.h"
 #include "Session/LSSessionSubsystem.h"
+#include "TimerManager.h"
 #include "LSFarmingGameMode.generated.h"
+
+class ALSPlayerControllerBase;
 
 UCLASS()
 class LOSTSIGNAL_API ALSFarmingGameMode : public ALSGameModeBase
@@ -23,8 +26,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Farming")
 	void OnQuit();
 
+	void NotifyRaidResultSaved(ALSPlayerControllerBase* PlayerController);
+
 private:
 	void EndRaid(ELSRaidResult Result);
+	void BeginRaidResultSave(ELSRaidResult Result);
+	bool BuildRaidResultForPlayer(const ALSPlayerControllerBase* PlayerController, ELSRaidResult Result, TArray<FLSSessionItem>& OutInventoryItems, TArray<FLSSessionItem>& OutSafeItems, bool& bOutSaveInventory, bool& bOutSaveSafeStash) const;
+	void HandleRaidResultSaveTimeout();
+	void TravelToResultLevel();
+	void ClearRaidResultSaveWait();
 
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Farming")
 	bool bRaidEnded = false;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Farming")
+	bool bWaitingForRaidResultSave = false;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Farming")
+	TArray<TObjectPtr<ALSPlayerControllerBase>> PendingRaidResultSaveControllers;
+
+	FTimerHandle RaidResultSaveTimeoutTimerHandle;
 };

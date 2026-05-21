@@ -224,7 +224,7 @@ void ALSPlayerCharacter::OnInteract()
 	{
 		if (PlayerController->IsLobbyStorageWidgetOpen())
 		{
-			PlayerController->HideLobbyStorageWidget();
+			HideInventoryWidget();
 			return;
 		}
 	}
@@ -397,6 +397,7 @@ void ALSPlayerCharacter::HideInventoryWidget()
 	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetController()))
 	{
 		PlayerController->HideLootDropWidget();
+		PlayerController->HideLobbyStorageWidget();
 	}
 
 	ActiveInventoryTarget.Reset();

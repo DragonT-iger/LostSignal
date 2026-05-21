@@ -1,76 +1,9 @@
 #include "Gameplay/LSLootBox.h"
 #include "Core/LSPlayerControllerBase.h"
-#include "Data/LSArmorRow.h"
-#include "Data/LSChipRow.h"
-#include "Data/LSDropSettings.h"
-#include "Data/LSItemRow.h"
-#include "Data/LSWeaponRow.h"
-#include "Engine/DataTable.h"
+#include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Net/UnrealNetwork.h"
-
-namespace
-{
-bool IsFilledLootSlot(const FLSDropResult& LootItem)
-{
-	return !LootItem.ItemRowName.IsNone() && LootItem.Amount > 0;
-}
-
-int32 ResolveItemMaxStackForLootBox(const FName ItemRowName)
-{
-	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
-	if (!Settings || ItemRowName.IsNone())
-	{
-		UE_LOG(LogLS, Warning, TEXT("[LootBox] Cannot resolve max stack. Row=%s"), *ItemRowName.ToString());
-		return 1;
-	}
-
-	const FString RowNameString = ItemRowName.ToString();
-	int32 MaxStack = 1;
-
-	if (RowNameString.StartsWith(TEXT("Chip_")))
-	{
-		UDataTable* Table = Settings->ChipTable.LoadSynchronous();
-		const FLSChipRow* Row = Table ? Table->FindRow<FLSChipRow>(ItemRowName, TEXT("ResolveItemMaxStackForLootBox")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("[LootBox] Chip row missing for max stack: %s"), *ItemRowName.ToString());
-	}
-	else if (RowNameString.StartsWith(TEXT("Weapon_")))
-	{
-		UDataTable* Table = Settings->WeaponTable.LoadSynchronous();
-		const FLSWeaponRow* Row = Table ? Table->FindRow<FLSWeaponRow>(ItemRowName, TEXT("ResolveItemMaxStackForLootBox")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("[LootBox] Weapon row missing for max stack: %s"), *ItemRowName.ToString());
-	}
-	else if (RowNameString.StartsWith(TEXT("Armor_")))
-	{
-		UDataTable* Table = Settings->ArmorTable.LoadSynchronous();
-		const FLSArmorRow* Row = Table ? Table->FindRow<FLSArmorRow>(ItemRowName, TEXT("ResolveItemMaxStackForLootBox")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("[LootBox] Armor row missing for max stack: %s"), *ItemRowName.ToString());
-	}
-	else if (RowNameString.StartsWith(TEXT("Item_")))
-	{
-		UDataTable* Table = Settings->ItemTable.LoadSynchronous();
-		const FLSItemRow* Row = Table ? Table->FindRow<FLSItemRow>(ItemRowName, TEXT("ResolveItemMaxStackForLootBox")) : nullptr;
-		MaxStack = Row ? Row->Item_Max : 1;
-		if (!Row) UE_LOG(LogLS, Warning, TEXT("[LootBox] Item row missing for max stack: %s"), *ItemRowName.ToString());
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("[LootBox] Unknown item row prefix for max stack: %s"), *ItemRowName.ToString());
-	}
-
-	if (MaxStack <= 0)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[LootBox] Invalid Item_Max for %s: %d. Falling back to 1."), *ItemRowName.ToString(), MaxStack);
-		return 1;
-	}
-
-	return MaxStack;
-}
-}
 
 void ALSLootBox::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -140,58 +73,19 @@ void ALSLootBox::OnRep_LootResults()
 
 bool ALSLootBox::DropLootSlot(const int32 FromLootSlotIndex, const int32 ToLootSlotIndex)
 {
-	if (!LootResults.IsValidIndex(FromLootSlotIndex) || !IsFilledLootSlot(LootResults[FromLootSlotIndex]) || !LootResults.IsValidIndex(ToLootSlotIndex))
+	if (!LootResults.IsValidIndex(FromLootSlotIndex) || !LSInventorySlotUtils::IsFilled(LootResults[FromLootSlotIndex]) || !LootResults.IsValidIndex(ToLootSlotIndex))
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot drop loot slot because slot data is invalid. From=%d To=%d"), FromLootSlotIndex, ToLootSlotIndex);
 		return false;
 	}
 
-	if (FromLootSlotIndex == ToLootSlotIndex)
+	const bool bChanged = LSInventorySlotUtils::DropResultSlot(LootResults, FromLootSlotIndex, ToLootSlotIndex);
+	if (bChanged)
 	{
-		return true;
-	}
-
-	FLSDropResult& FromSlot = LootResults[FromLootSlotIndex];
-	FLSDropResult& ToSlot = LootResults[ToLootSlotIndex];
-	if (!IsFilledLootSlot(ToSlot))
-	{
-		ToSlot = FromSlot;
-		ClearLootSlot(FromLootSlotIndex);
 		NotifyLootResultsChanged();
 		ForceNetUpdate();
-		return true;
 	}
-
-	if (FromSlot.ItemRowName == ToSlot.ItemRowName)
-	{
-		const int32 MaxStack = ResolveItemMaxStackForLootBox(FromSlot.ItemRowName);
-		const int32 AddAmount = FMath::Min(FromSlot.Amount, MaxStack - ToSlot.Amount);
-		if (AddAmount <= 0)
-		{
-			return false;
-		}
-
-		ToSlot.Amount += AddAmount;
-		FromSlot.Amount -= AddAmount;
-		ToSlot.ItemText = FText::GetEmpty();
-		if (FromSlot.Amount <= 0)
-		{
-			ClearLootSlot(FromLootSlotIndex);
-		}
-		else
-		{
-			FromSlot.ItemText = FText::GetEmpty();
-		}
-
-		NotifyLootResultsChanged();
-		ForceNetUpdate();
-		return true;
-	}
-
-	Swap(FromSlot, ToSlot);
-	NotifyLootResultsChanged();
-	ForceNetUpdate();
-	return true;
+	return bChanged;
 }
 
 bool ALSLootBox::TransferLootSlotToSession(const int32 LootSlotIndex, ULSRaidInventoryComponent* RaidInventory, FLSSessionItem& OutRemainingLootItem)
@@ -220,9 +114,7 @@ bool ALSLootBox::TransferLootSlotToSession(const int32 LootSlotIndex, ULSRaidInv
 	}
 	else
 	{
-		LootResults[LootSlotIndex].ItemRowName = OutRemainingLootItem.ItemRowName;
-		LootResults[LootSlotIndex].Amount = OutRemainingLootItem.Amount;
-		LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
+		LSInventorySlotUtils::SetDropResultFromSessionItem(LootResults[LootSlotIndex], OutRemainingLootItem);
 	}
 	NotifyLootResultsChanged();
 	ForceNetUpdate();
@@ -244,9 +136,7 @@ bool ALSLootBox::TransferLootSlotToSessionSlot(const int32 LootSlotIndex, ULSRai
 		return false;
 	}
 
-	FLSSessionItem ExternalItem;
-	ExternalItem.ItemRowName = LootResults[LootSlotIndex].ItemRowName;
-	ExternalItem.Amount = LootResults[LootSlotIndex].Amount;
+	FLSSessionItem ExternalItem = LSInventorySlotUtils::ToSessionItem(LootResults[LootSlotIndex]);
 	if (!RaidInventory->DropExternalItemToSessionSlot(ExternalItem, ToSlotArea, ToSlotIndex))
 	{
 		return false;
@@ -259,9 +149,7 @@ bool ALSLootBox::TransferLootSlotToSessionSlot(const int32 LootSlotIndex, ULSRai
 	}
 	else
 	{
-		LootResults[LootSlotIndex].ItemRowName = ExternalItem.ItemRowName;
-		LootResults[LootSlotIndex].Amount = ExternalItem.Amount;
-		LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
+		LSInventorySlotUtils::SetDropResultFromSessionItem(LootResults[LootSlotIndex], ExternalItem);
 	}
 
 	NotifyLootResultsChanged();
@@ -284,9 +172,7 @@ bool ALSLootBox::TransferSessionSlotToLootSlot(const int32 LootSlotIndex, ULSRai
 		return false;
 	}
 
-	FLSSessionItem CurrentLootItem;
-	CurrentLootItem.ItemRowName = LootResults[LootSlotIndex].ItemRowName;
-	CurrentLootItem.Amount = LootResults[LootSlotIndex].Amount;
+	FLSSessionItem CurrentLootItem = LSInventorySlotUtils::ToSessionItem(LootResults[LootSlotIndex]);
 
 	FLSSessionItem SourceItem;
 	if (!RaidInventory->GetSessionSlotItem(FromSlotArea, FromSlotIndex, SourceItem))
@@ -301,9 +187,7 @@ bool ALSLootBox::TransferSessionSlotToLootSlot(const int32 LootSlotIndex, ULSRai
 		return false;
 	}
 
-	LootResults[LootSlotIndex].ItemRowName = OutLootItem.ItemRowName;
-	LootResults[LootSlotIndex].Amount = OutLootItem.Amount;
-	LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
+	LSInventorySlotUtils::SetDropResultFromSessionItem(LootResults[LootSlotIndex], OutLootItem);
 	NotifyLootResultsChanged();
 	ForceNetUpdate();
 	return true;
@@ -316,9 +200,7 @@ void ALSLootBox::ClearLootSlot(const int32 LootSlotIndex)
 		return;
 	}
 
-	LootResults[LootSlotIndex].ItemRowName = NAME_None;
-	LootResults[LootSlotIndex].Amount = 0;
-	LootResults[LootSlotIndex].ItemText = FText::GetEmpty();
+	LSInventorySlotUtils::ClearDropResult(LootResults[LootSlotIndex]);
 }
 
 void ALSLootBox::NotifyLootResultsChanged()

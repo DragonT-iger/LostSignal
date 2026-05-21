@@ -47,6 +47,12 @@ public:
 
 	void RefreshLootDropWidgetForSource(ALSLootBox* SourceLootBox, const TArray<FLSDropResult>& Results);
 	void SyncRaidInventoryToClient();
+	void RequestRaidEntryDataForRaidStart();
+	void RequestRaidResultSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
+	void ClearSubmittedRaidEntryData();
+	bool HasSubmittedRaidEntryData() const { return bHasSubmittedRaidEntryData; }
+	const TArray<FLSSessionItem>& GetSubmittedRaidLoadout() const { return SubmittedRaidLoadout; }
+	const TArray<FLSSessionItem>& GetSubmittedRaidSafeItems() const { return SubmittedRaidSafeItems; }
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	bool TransferHoveredLootDropItemToInventory();
@@ -55,6 +61,7 @@ public:
 	void ClientStartRaidSession(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
 
 	bool TransferInventorySlotToLootDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex);
+	bool TransferInventorySlotToOpenContainer(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex);
 	bool DropInventorySlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool DropLootDropSlot(ALSLootBox* SourceLootBox, int32 FromLootSlotIndex, int32 ToLootSlotIndex);
 	bool SortRaidInventory();
@@ -94,6 +101,15 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
 	TObjectPtr<ULSRaidInventoryComponent> RaidInventoryComponent;
 
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
+	bool bHasSubmittedRaidEntryData = false;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
+	TArray<FLSSessionItem> SubmittedRaidLoadout;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
+	TArray<FLSSessionItem> SubmittedRaidSafeItems;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -123,6 +139,18 @@ private:
 	void ServerSortRaidInventory();
 
 	UFUNCTION(Client, Reliable)
+	void ClientRequestRaidEntryData();
+
+	UFUNCTION(Server, Reliable)
+	void ServerSubmitRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
+
+	UFUNCTION(Client, Reliable)
+	void ClientApplyRaidResult(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
+
+	UFUNCTION(Server, Reliable)
+	void ServerConfirmRaidResultSaved();
+
+	UFUNCTION(Client, Reliable)
 	void ClientShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 
 	UFUNCTION(Client, Reliable)
@@ -143,6 +171,9 @@ private:
 	void HideLobbyStorageWidgetLocal();
 	void CreatePlayerHUDWidgetLocal();
 	void InitializeRaidInventoryFromSessionSubsystem();
+	void SubmitLocalRaidEntryData();
+	void StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
+	void ApplyRaidResultToLocalSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);
 	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass);
 	bool ResolveServerDroppedItemTransform(FTransform& OutDropTransform) const;

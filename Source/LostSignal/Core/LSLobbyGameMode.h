@@ -2,7 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Core/LSGameModeBase.h"
+#include "TimerManager.h"
 #include "LSLobbyGameMode.generated.h"
+
+class ALSPlayerControllerBase;
 
 UCLASS()
 class LOSTSIGNAL_API ALSLobbyGameMode : public ALSGameModeBase
@@ -14,7 +17,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Lobby")
 	void StartRaid();
 
+	void NotifyRaidEntryDataSubmitted(ALSPlayerControllerBase* PlayerController);
+
 private:
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Lobby")
 	bool bRaidStartRequested = false;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Lobby")
+	bool bWaitingForRaidEntryData = false;
+
+	bool RequestRaidEntryDataFromPlayers();
+	bool AreRaidEntryDataReady() const;
+	void TryStartRaidWithSubmittedData();
+	void HandleRaidEntryDataTimeout();
+	void ClearRaidEntryDataWait();
+
+	FTimerHandle RaidEntryDataTimeoutTimerHandle;
 };
