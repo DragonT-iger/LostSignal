@@ -115,6 +115,8 @@ Content/LostSignal/
 
 - 아이템 저장/슬롯/네트워크 구조: `Docs/Systems/ItemSaveNetworkStructure.md`
 - 인벤토리 UI/슬롯 조작 로직: `Docs/Systems/InventoryLogic.md`
+- 루트 드랍/데이터 테이블 파이프라인: `Docs/Systems/LootDropDataTable.md`
+- 레이드 레벨 플로우/결과 저장 ACK: `Docs/Systems/RaidLevelFlow.md`
 
 ---
 

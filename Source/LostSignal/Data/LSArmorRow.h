@@ -13,12 +13,6 @@ struct LOSTSIGNAL_API FLSArmorRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	FText Item_Text;
 
-	// 아이템 인덱스
-
-	// 아이콘 에셋 경로
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
-	FString Icon_Path;
-
 	// 2 = 방어구
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Type = 2;

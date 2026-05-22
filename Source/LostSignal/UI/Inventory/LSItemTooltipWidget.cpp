@@ -214,14 +214,6 @@ void ULSItemTooltipWidget::PopulateChipTooltip(const FName ItemRowName)
 	SetCommonTexts(LOCTEXT("ChipTooltipType", "칩 설명창"), Row->Item_Text, Row->Item_Grade, Row->Item_Description, Row->Item_Cost);
 	AddExtraInfo(LOCTEXT("ChipMemoryCostExtraInfo", "메모리 할당량"), FText::AsNumber(Row->Item_MemoryCost));
 
-	const FString ChipUIValues[] = { Row->Item_Chip_UI_1, Row->Item_Chip_UI_2, Row->Item_Chip_UI_3 };
-	for (const FString& ChipUIValue : ChipUIValues)
-	{
-		if (!ChipUIValue.IsEmpty())
-		{
-			AddStat(LOCTEXT("ChipUISupportStat", "지원 UI"), GetChipUIDisplayText(ChipUIValue));
-		}
-	}
 	AddStatIfNonZero(LOCTEXT("ChipStatusCountStat", "전투 스탯 개수"), static_cast<float>(Row->Item_Chip_Status_Count));
 }
 
@@ -334,18 +326,6 @@ FText ULSItemTooltipWidget::GetEquipmentDisplayText(const FString& EquipmentName
 
 	UE_LOG(LogLS, Warning, TEXT("Unknown equipment display name '%s'."), *EquipmentName);
 	return FText::FromString(EquipmentName);
-}
-
-FText ULSItemTooltipWidget::GetChipUIDisplayText(const FString& ChipUIName)
-{
-	if (ChipUIName == TEXT("UI_Health")) return LOCTEXT("ChipUIHealth", "체력");
-	if (ChipUIName == TEXT("UI_Stamina")) return LOCTEXT("ChipUIStamina", "스태미나");
-	if (ChipUIName == TEXT("UI_Mini_Map")) return LOCTEXT("ChipUIMiniMap", "미니맵");
-	if (ChipUIName == TEXT("UI_Escape_Point")) return LOCTEXT("ChipUIEscapePoint", "탈출구");
-	if (ChipUIName == TEXT("UI_Inventory")) return LOCTEXT("ChipUIInventory", "인벤토리");
-
-	UE_LOG(LogLS, Warning, TEXT("Unknown chip UI display name '%s'."), *ChipUIName);
-	return FText::FromString(ChipUIName);
 }
 
 FText ULSItemTooltipWidget::NormalizeDescriptionText(const FText& Description)

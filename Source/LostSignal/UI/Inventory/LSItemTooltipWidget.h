@@ -61,7 +61,6 @@ private:
 
 	static FText GetGradeText(int32 ItemGrade);
 	static FText GetEquipmentDisplayText(const FString& EquipmentName);
-	static FText GetChipUIDisplayText(const FString& ChipUIName);
 	static FText NormalizeDescriptionText(const FText& Description);
 	static FText FormatNumber(float Value);
 	static int32 CountItems(const TArray<FLSSessionItem>& Items, FName ItemRowName);

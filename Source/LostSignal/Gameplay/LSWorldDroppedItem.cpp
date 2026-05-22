@@ -2,12 +2,6 @@
 
 #include "Components/WidgetComponent.h"
 #include "Core/LSPlayerControllerBase.h"
-#include "Data/LSArmorRow.h"
-#include "Data/LSChipRow.h"
-#include "Data/LSDropSettings.h"
-#include "Data/LSItemRow.h"
-#include "Data/LSWeaponRow.h"
-#include "Engine/DataTable.h"
 #include "Engine/Texture2D.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
@@ -138,52 +132,7 @@ void ALSWorldDroppedItem::RefreshItemVisual()
 
 UTexture2D* ALSWorldDroppedItem::LoadIconTextureByRowName(const FName InItemRowName) const
 {
-	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
-	if (!Settings)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot load dropped item icon because LS Drop Settings is missing."));
-		return nullptr;
-	}
-
-	const FString RowNameString = InItemRowName.ToString();
-	FString IconNameOrPath;
-
-	if (RowNameString.StartsWith(TEXT("Chip_")))
-	{
-		UDataTable* ChipTable = Settings->ChipTable.LoadSynchronous();
-		const FLSChipRow* Row = ChipTable ? ChipTable->FindRow<FLSChipRow>(InItemRowName, TEXT("LoadDroppedItemIconTextureByRowName")) : nullptr;
-		IconNameOrPath = Row ? Row->Icon_Path : FString();
-	}
-	else if (RowNameString.StartsWith(TEXT("Weapon_")))
-	{
-		UDataTable* WeaponTable = Settings->WeaponTable.LoadSynchronous();
-		const FLSWeaponRow* Row = WeaponTable ? WeaponTable->FindRow<FLSWeaponRow>(InItemRowName, TEXT("LoadDroppedItemIconTextureByRowName")) : nullptr;
-		IconNameOrPath = Row ? Row->Icon_Path : FString();
-	}
-	else if (RowNameString.StartsWith(TEXT("Armor_")))
-	{
-		UDataTable* ArmorTable = Settings->ArmorTable.LoadSynchronous();
-		const FLSArmorRow* Row = ArmorTable ? ArmorTable->FindRow<FLSArmorRow>(InItemRowName, TEXT("LoadDroppedItemIconTextureByRowName")) : nullptr;
-		IconNameOrPath = Row ? Row->Icon_Path : FString();
-	}
-	else if (RowNameString.StartsWith(TEXT("Item_")))
-	{
-		UDataTable* ItemTable = Settings->ItemTable.LoadSynchronous();
-		const FLSItemRow* Row = ItemTable ? ItemTable->FindRow<FLSItemRow>(InItemRowName, TEXT("LoadDroppedItemIconTextureByRowName")) : nullptr;
-		IconNameOrPath = Row ? Row->Icon_Path : FString();
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot load dropped item icon because row '%s' has an unknown prefix."), *InItemRowName.ToString());
-		return nullptr;
-	}
-
-	if (IconNameOrPath.IsEmpty())
-	{
-		IconNameOrPath = InItemRowName.ToString();
-	}
-
-	const FString IconObjectPath = BuildIconObjectPath(IconNameOrPath, GetIconBaseFolderByRowName(InItemRowName));
+	const FString IconObjectPath = BuildIconObjectPath(InItemRowName.ToString(), GetIconBaseFolderByRowName(InItemRowName));
 	UTexture2D* IconTexture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *IconObjectPath));
 	if (!IconTexture)
 	{

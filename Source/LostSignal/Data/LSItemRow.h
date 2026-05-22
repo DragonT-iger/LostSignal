@@ -13,10 +13,6 @@ struct LOSTSIGNAL_API FLSItemRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	FText Item_Text;
 
-	// 아이콘 에셋 경로
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
-	FString Icon_Path;
-
 	// 3=일반(판매용), 4~9=소모품(퀵슬롯), 11~19=퀘스트, 20~=재료(합성/강화)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Type = 3;
