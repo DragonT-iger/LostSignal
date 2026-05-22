@@ -35,6 +35,7 @@
 - **UI 로그:** 위젯 클래스, 필수 참조, 설정값이 미할당이면 `UE_LOG(LogLS, Warning, ...)`로 반드시 남긴다.
 - **DataTable:** 접두사 `DT_`, Row 구조체 `FLS~`. 수치 하드코딩 금지 — 기획자가 DataTable 편집
 - **로그:** `UE_LOG(LogLS, ...)` 카테고리 통일. `GEngine->AddOnScreenDebugMessage` 커밋 금지
+- **에셋 참조:** `ConstructorHelpers`로 WBP/에셋 경로 하드코딩 지양. `UPROPERTY(EditDefaultsOnly)`/`TSubclassOf`로 열고 BP에서 매핑
 - **초기화:** 초기화 로직은 C++ 생성자에서 처리. BP(블루프린트)에서는 메시·이펙트·사운드 등 에셋 경로 매핑만 수행
 
 ---
