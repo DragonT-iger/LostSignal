@@ -166,7 +166,7 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 		{
 			if (PlayerController->TransferInventorySlotToOpenContainer(SlotArea, SlotIndex))
 			{
-				if (PlayerController->HasAuthority())
+				if (PlayerController->HasAuthority() || PlayerController->IsLobbyStorageWidgetOpen())
 				{
 					InventoryWidget->RebuildInventorySlots();
 					InventoryWidget->RebuildConfirmedStorageSlots();

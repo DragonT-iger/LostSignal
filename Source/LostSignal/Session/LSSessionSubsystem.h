@@ -39,6 +39,16 @@ struct FLSLoadoutSnapshot
 	UPROPERTY(BlueprintReadOnly) TArray<FLSSessionItem> Items;
 };
 
+// ServerTravel 이후 플레이어별 인벤토리 복원용 큐 항목
+USTRUCT()
+struct FLSPendingRaidEntry
+{
+	GENERATED_BODY()
+
+	TArray<FLSSessionItem> Inventory;
+	TArray<FLSSessionItem> SafeInventory;
+};
+
 UCLASS()
 class LOSTSIGNAL_API ULSSessionSubsystem : public UGameInstanceSubsystem
 {
@@ -56,6 +66,11 @@ public:
 	void StartRaidClientMirror(const TArray<FLSSessionItem>& Loadout);
 	void MirrorRaidSessionState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems);
 	void ClearRaidSessionState();
+
+	// MO 레이드 입장 시 플레이어별 데이터를 큐에 저장. ServerTravel 후 각 PC가 순서대로 꺼내 씀.
+	void EnqueuePendingRaidEntry(const TArray<FLSSessionItem>& Inventory, const TArray<FLSSessionItem>& SafeInventory);
+	bool DequeuePendingRaidEntry(TArray<FLSSessionItem>& OutInventory, TArray<FLSSessionItem>& OutSafeInventory);
+	bool HasPendingRaidEntries() const;
 
 	// 레이드 종료 - 결과 처리 후 결과 레벨로 전환
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
@@ -115,6 +130,9 @@ private:
 	TArray<FLSSessionItem> ConsumedItems;
 	TArray<FLSSessionItem> ResolvedItems;
 	ELSRaidResult LastRaidResult = ELSRaidResult::Dead;
+
+	TArray<FLSPendingRaidEntry> PendingRaidEntries;
+	int32 PendingRaidEntryIndex = 0;
 
 	void StartRaidInternal(const TArray<FLSSessionItem>& Loadout, bool bPersistRaidSave);
 	TArray<FLSSessionItem> BuildQuitRecovery() const;

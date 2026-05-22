@@ -120,7 +120,16 @@ void ALSPlayerControllerBase::InitializeRaidInventoryFromSessionSubsystem()
 		return;
 	}
 
-	RaidInventoryComponent->MirrorRaidInventoryState(SessionSub->GetSessionInventory(), SessionSub->GetSessionSafeInventory());
+	TArray<FLSSessionItem> PendingInventory;
+	TArray<FLSSessionItem> PendingSafeInventory;
+	if (SessionSub->DequeuePendingRaidEntry(PendingInventory, PendingSafeInventory))
+	{
+		RaidInventoryComponent->StartRaidInventory(PendingInventory, PendingSafeInventory);
+	}
+	else
+	{
+		RaidInventoryComponent->MirrorRaidInventoryState(SessionSub->GetSessionInventory(), SessionSub->GetSessionSafeInventory());
+	}
 	if (HasAuthority())
 	{
 		SyncRaidInventoryToClient();

@@ -35,6 +35,36 @@ void ULSSessionSubsystem::ClearRaidSessionState()
 	ConsumedItems.Reset();
 	ResolvedItems.Reset();
 	bRaidActive = false;
+	PendingRaidEntries.Reset();
+	PendingRaidEntryIndex = 0;
+}
+
+void ULSSessionSubsystem::EnqueuePendingRaidEntry(
+	const TArray<FLSSessionItem>& Inventory,
+	const TArray<FLSSessionItem>& SafeInventory)
+{
+	FLSPendingRaidEntry& Entry = PendingRaidEntries.AddDefaulted_GetRef();
+	Entry.Inventory = Inventory;
+	Entry.SafeInventory = SafeInventory;
+}
+
+bool ULSSessionSubsystem::DequeuePendingRaidEntry(
+	TArray<FLSSessionItem>& OutInventory,
+	TArray<FLSSessionItem>& OutSafeInventory)
+{
+	if (PendingRaidEntryIndex >= PendingRaidEntries.Num())
+	{
+		return false;
+	}
+	const FLSPendingRaidEntry& Entry = PendingRaidEntries[PendingRaidEntryIndex++];
+	OutInventory = Entry.Inventory;
+	OutSafeInventory = Entry.SafeInventory;
+	return true;
+}
+
+bool ULSSessionSubsystem::HasPendingRaidEntries() const
+{
+	return PendingRaidEntryIndex < PendingRaidEntries.Num();
 }
 
 void ULSSessionSubsystem::StartRaidInternal(const TArray<FLSSessionItem>& Loadout, const bool bPersistRaidSave)

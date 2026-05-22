@@ -158,6 +158,9 @@ void ALSLobbyGameMode::TryStartRaidWithSubmittedData()
 				bHasLegacySessionLoadout = true;
 			}
 
+			// ServerTravel 이후 각 PC가 자신의 데이터를 꺼낼 수 있도록 순서대로 큐에 저장
+			SessionSub->EnqueuePendingRaidEntry(PlayerLoadout, PlayerSafeItems);
+
 			if (ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
 			{
 				RaidInventory->StartRaidInventory(PlayerLoadout, PlayerSafeItems);
