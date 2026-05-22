@@ -91,7 +91,7 @@ GroupTable (Group_XXX_숫자)
 | Name (Row Name) | FName | 접두사별 테이블 결정 |
 | Item_Text | FText | 아이템 이름 출력용 |
 | Item_Type | int32 | 분류 코드 (아래 참고) |
-| Item_Grade | int32 | 등급 인덱스 (아래 참고) |
+| Item_Grade | FString | 등급 이름 (아래 참고) |
 | Item_Max | int32 | 인벤토리 1칸 최대 보유량 |
 | Item_Description | FText | 아이템 설명 텍스트 |
 | Item_Cost | int32 | 상점 판매 가격 |
@@ -111,16 +111,14 @@ GroupTable (Group_XXX_숫자)
 
 ### Item_Grade 등급
 
-| 인덱스 | 기획명 | 색상 |
-|--------|--------|------|
-| 0 | Supply (보급) | 흰색 |
-| 1 | Standard (표준) | 초록색 |
-| 2 | Presision (정밀) | 파란색 |
-| 3 | Tuning (튜닝) | 보라색 |
-| 4 | Prototype (프로토타입) | 노란색 |
-| 5 | Masterpiece (마스터피스) | 빨간색 |
-
-**[기획/코드 차이]** 기획서에서는 등급을 FString(Supply/Standard/...)으로 정의하지만, 코드에서는 int32(0~5)로 구현되어 있다. 기획 등급명이 기준이고 코드의 int 매핑은 위 표를 따른다.
+| 값 (FString) | 한국어 | 색상 |
+|--------------|--------|------|
+| Supply | 보급 | 흰색 |
+| Standard | 표준 | 초록색 |
+| Presision | 정밀 | 파란색 |
+| Tuning | 튜닝 | 보라색 |
+| Prototype | 프로토타입 | 노란색 |
+| Masterpiece | 마스터피스 | 빨간색 |
 
 ### Weapon (무기 테이블)
 

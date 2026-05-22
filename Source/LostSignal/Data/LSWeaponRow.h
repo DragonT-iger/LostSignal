@@ -17,9 +17,9 @@ struct LOSTSIGNAL_API FLSWeaponRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Type = 1;
 
-	// 0=보급, 1=표준, 2=정밀, 3=튜닝, 4=프로토타입, 5=마스터피스
+	// Supply / Standard / Presision / Tuning / Prototype / Masterpiece
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
-	int32 Item_Grade = 0;
+	FString Item_Grade;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Max = 1;

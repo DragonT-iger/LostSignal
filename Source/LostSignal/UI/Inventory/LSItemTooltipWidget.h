@@ -53,13 +53,13 @@ private:
 	void AddStat(const FText& StatName, const FText& StatValue);
 	void AddStatIfNonZero(const FText& StatName, float Value);
 	void AddExtraInfo(const FText& ExtraInfoName, const FText& ExtraInfoValue);
-	void SetCommonTexts(const FText& TooltipType, const FText& ItemName, int32 ItemGrade, const FText& Description, int32 ItemCost);
+	void SetCommonTexts(const FText& TooltipType, const FText& ItemName, const FString& ItemGrade, const FText& Description, int32 ItemCost);
 	void PopulateChipTooltip(FName ItemRowName);
 	void PopulateWeaponTooltip(FName ItemRowName);
 	void PopulateArmorTooltip(FName ItemRowName);
 	void PopulateItemTooltip(FName ItemRowName, int32 HoveredSlotAmount);
 
-	static FText GetGradeText(int32 ItemGrade);
+	static FText GetGradeText(const FString& ItemGrade);
 	static FText GetEquipmentDisplayText(const FString& EquipmentName);
 	static FText NormalizeDescriptionText(const FText& Description);
 	static FText FormatNumber(float Value);

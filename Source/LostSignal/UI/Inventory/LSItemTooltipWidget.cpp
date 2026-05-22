@@ -146,7 +146,7 @@ void ULSItemTooltipWidget::AddExtraInfo(const FText& ExtraInfoName, const FText&
 	ExtraInfoBox->AddChild(ExtraInfoRow);
 }
 
-void ULSItemTooltipWidget::SetCommonTexts(const FText& TooltipType, const FText& ItemName, const int32 ItemGrade, const FText& Description, const int32 ItemCost)
+void ULSItemTooltipWidget::SetCommonTexts(const FText& TooltipType, const FText& ItemName, const FString& ItemGrade, const FText& Description, const int32 ItemCost)
 {
 	if (!TooltipTypeText)
 	{
@@ -300,18 +300,17 @@ void ULSItemTooltipWidget::PopulateItemTooltip(const FName ItemRowName, const in
 	AddExtraInfo(LOCTEXT("StashItemCountExtraInfo", "창고 아이템 개수"), FText::AsNumber(0));
 }
 
-FText ULSItemTooltipWidget::GetGradeText(const int32 ItemGrade)
+FText ULSItemTooltipWidget::GetGradeText(const FString& ItemGrade)
 {
-	switch (ItemGrade)
-	{
-	case 0: return LOCTEXT("GradeSupply", "보급");
-	case 1: return LOCTEXT("GradeStandard", "표준");
-	case 2: return LOCTEXT("GradePrecision", "정밀");
-	case 3: return LOCTEXT("GradeTuning", "튜닝");
-	case 4: return LOCTEXT("GradePrototype", "프로토타입");
-	case 5: return LOCTEXT("GradeMasterpiece", "마스터피스");
-	default: return FText::AsNumber(ItemGrade);
-	}
+	if (ItemGrade == TEXT("Supply"))       return LOCTEXT("GradeSupply", "보급");
+	if (ItemGrade == TEXT("Standard"))     return LOCTEXT("GradeStandard", "표준");
+	if (ItemGrade == TEXT("Presision"))    return LOCTEXT("GradePrecision", "정밀");
+	if (ItemGrade == TEXT("Tuning"))       return LOCTEXT("GradeTuning", "튜닝");
+	if (ItemGrade == TEXT("Prototype"))    return LOCTEXT("GradePrototype", "프로토타입");
+	if (ItemGrade == TEXT("Masterpiece"))  return LOCTEXT("GradeMasterpiece", "마스터피스");
+
+	UE_LOG(LogLS, Warning, TEXT("Unknown item grade '%s'."), *ItemGrade);
+	return FText::FromString(ItemGrade);
 }
 
 FText ULSItemTooltipWidget::GetEquipmentDisplayText(const FString& EquipmentName)

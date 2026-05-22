@@ -8,6 +8,7 @@
 #include "Policies\PrettyJsonPrintPolicy.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+#include "UObject/Package.h"
 
 const FString ULSSaveSubsystem::SlotName = TEXT("LostSignalSave");
 const FString ULSSaveSubsystem::DebugFileName = TEXT("LostSignalSave_Debug.json");
@@ -295,11 +296,41 @@ void ULSSaveSubsystem::ClearRaidSave()
 	Save();
 }
 
+FString ULSSaveSubsystem::GetResolvedSlotName() const
+{
+#if WITH_EDITOR
+	const UGameInstance* GameInstance = GetGameInstance();
+	const UWorld* World = GameInstance ? GameInstance->GetWorld() : nullptr;
+	const UPackage* WorldPackage = World ? World->GetPackage() : nullptr;
+	const int32 PIEInstanceId = WorldPackage ? WorldPackage->GetPIEInstanceID() : INDEX_NONE;
+	if (PIEInstanceId != INDEX_NONE)
+	{
+		return FString::Printf(TEXT("%s_PIE_%d"), *SlotName, PIEInstanceId);
+	}
+#endif
+
+	return SlotName;
+}
+
+FString ULSSaveSubsystem::GetResolvedDebugFileName() const
+{
+	const FString ResolvedSlotName = GetResolvedSlotName();
+	if (ResolvedSlotName == SlotName)
+	{
+		return DebugFileName;
+	}
+
+	return FString::Printf(TEXT("%s_Debug.json"), *ResolvedSlotName);
+}
+
 void ULSSaveSubsystem::Load()
 {
-	if (UGameplayStatics::DoesSaveGameExist(SlotName, 0))
+	const FString ResolvedSlotName = GetResolvedSlotName();
+	const FString LoadSlotName = UGameplayStatics::DoesSaveGameExist(ResolvedSlotName, 0) ? ResolvedSlotName : SlotName;
+
+	if (UGameplayStatics::DoesSaveGameExist(LoadSlotName, 0))
 	{
-		SaveData = Cast<ULSSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotName, 0));
+		SaveData = Cast<ULSSaveGame>(UGameplayStatics::LoadGameFromSlot(LoadSlotName, 0));
 		if (SaveData)
 		{
 			MigrateInventory();
@@ -309,7 +340,9 @@ void ULSSaveSubsystem::Load()
 			ResolveInterruptedRaid();
 			Save();
 		}
-		UE_LOG(LogLS, Log, TEXT("[Save] Loaded inventory slots: %d, warehouse slots: %d, safe slots: %d"),
+		UE_LOG(LogLS, Log, TEXT("[Save] Loaded slot %s into %s. Inventory slots: %d, warehouse slots: %d, safe slots: %d"),
+			*LoadSlotName,
+			*ResolvedSlotName,
 			SaveData ? SaveData->Inventory.Num() : 0,
 			SaveData ? SaveData->WarehouseItems.Num() : 0,
 			SaveData ? SaveData->SafeStash.Num() : 0);
@@ -317,7 +350,7 @@ void ULSSaveSubsystem::Load()
 	}
 
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
-	UE_LOG(LogLS, Log, TEXT("[Save] Created new save object"));
+	UE_LOG(LogLS, Log, TEXT("[Save] Created new save object for slot %s"), *ResolvedSlotName);
 }
 
 void ULSSaveSubsystem::MigrateInventory()
@@ -376,11 +409,12 @@ void ULSSaveSubsystem::Save()
 		return;
 	}
 
-	UGameplayStatics::SaveGameToSlot(SaveData, SlotName, 0);
+	const FString ResolvedSlotName = GetResolvedSlotName();
+	UGameplayStatics::SaveGameToSlot(SaveData, ResolvedSlotName, 0);
 #if !UE_BUILD_SHIPPING
 	SaveDebugJson();
 #endif
-	UE_LOG(LogLS, Log, TEXT("[Save] Save completed"));
+	UE_LOG(LogLS, Log, TEXT("[Save] Save completed: %s"), *ResolvedSlotName);
 }
 
 TArray<FLSSessionItem>& ULSSaveSubsystem::GetMutableInventory()
@@ -436,7 +470,7 @@ void ULSSaveSubsystem::SaveDebugJson() const
 	}
 
 	TSharedRef<FJsonObject> RootObject = MakeShared<FJsonObject>();
-	RootObject->SetStringField(TEXT("slotName"), SlotName);
+	RootObject->SetStringField(TEXT("slotName"), GetResolvedSlotName());
 	RootObject->SetBoolField(TEXT("raidSaveActive"), SaveData->bRaidSaveActive);
 
 	auto AddSlotArrayField = [&RootObject](const TCHAR* FieldName, const TArray<FLSSessionItem>& Items)
@@ -495,7 +529,7 @@ void ULSSaveSubsystem::SaveDebugJson() const
 		return;
 	}
 
-	const FString DebugFilePath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), DebugFileName);
+	const FString DebugFilePath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), GetResolvedDebugFileName());
 	if (!FFileHelper::SaveStringToFile(OutputString, *DebugFilePath))
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Save] Debug JSON write failed: %s"), *DebugFilePath);

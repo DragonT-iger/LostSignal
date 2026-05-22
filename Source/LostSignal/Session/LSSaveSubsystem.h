@@ -55,6 +55,8 @@ public:
 	bool ReplaceStoredSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem);
 
 private:
+	FString GetResolvedSlotName() const;
+	FString GetResolvedDebugFileName() const;
 	void Load();
 	void Save();
 	void SaveDebugJson() const;
