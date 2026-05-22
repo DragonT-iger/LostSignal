@@ -204,6 +204,19 @@ bool ALSPlayerControllerBase::IsLobbyStorageWidgetOpen() const
 	return LobbyStorageWidgetInstance && LobbyStorageWidgetInstance->IsVisible();
 }
 
+int32 ALSPlayerControllerBase::GetOpenLobbyStorageMaxSlotCount() const
+{
+	return IsLobbyStorageWidgetOpen() ? LobbyStorageWidgetInstance->GetMaxStorageSlotCount() : 0;
+}
+
+void ALSPlayerControllerBase::RefreshOpenLobbyStorageWidget()
+{
+	if (IsLobbyStorageWidgetOpen())
+	{
+		LobbyStorageWidgetInstance->RefreshStorage();
+	}
+}
+
 void ALSPlayerControllerBase::ClientShowLobbyStorageWidget_Implementation(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass)
 {
 	ShowLobbyStorageWidgetLocal(LobbyStorageWidgetClass);

@@ -155,6 +155,20 @@ Warehouse 슬롯 Shift+좌클릭
 
 중요한 의도는 "인벤토리만 켜져 있는 상태에서는 Shift-click이 동작하지 않는다"이다. 빠른 이동은 대상 컨테이너가 명확할 때만 처리한다.
 
+## 전부 보관
+
+전부 보관 버튼은 로비 창고가 인벤토리와 함께 열린 상태에서만 보이며, 레이아웃 공간 유지를 위해 다른 상황에서는 `Hidden`으로 숨긴다.
+
+```text
+Inventory StoreAllButton
+-> 로비 창고가 열려 있고 레이드가 아니면 Inventory에서 Warehouse로 이동
+-> 레이드 중이거나 창고가 열려 있지 않으면 동작하지 않음
+```
+
+보관 순서는 Inventory 슬롯 배열 순서다. UI 기준으로 첫 번째 줄 왼쪽부터 오른쪽으로 처리하고, 마지막 칸 뒤에는 다음 줄로 넘어가는 것과 같다.
+
+각 슬롯 아이템은 Warehouse에 같은 `ItemRowName` 슬롯이 있으면 먼저 `Item_Max`까지 스택하고, 남은 수량은 Warehouse의 앞쪽 빈 슬롯부터 채운다. Warehouse 최대 슬롯 수 안에 더 넣을 수 없으면 가능한 수량까지만 이동하고 즉시 중단한다. 남은 아이템은 원래 Inventory 슬롯에 남기며, 현재 구현에서는 경고 UI 대신 `UE_LOG(LogLS, Warning, ...)`만 남긴다.
+
 ## 루팅과 월드 드랍
 
 루트 박스는 `ALSLootBox`가 서버에서 열고, 결과는 `FLSDropResult` 배열로 관리한다.

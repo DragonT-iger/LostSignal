@@ -45,6 +45,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/UI")
 	bool IsLobbyStorageWidgetOpen() const;
 
+	int32 GetOpenLobbyStorageMaxSlotCount() const;
+	void RefreshOpenLobbyStorageWidget();
+
 	void RefreshLootDropWidgetForSource(ALSLootBox* SourceLootBox, const TArray<FLSDropResult>& Results);
 	void SyncRaidInventoryToClient();
 	void RequestRaidEntryDataForRaidStart();

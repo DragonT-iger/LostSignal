@@ -10,6 +10,8 @@
 #include "Serialization/JsonWriter.h"
 #include "UObject/Package.h"
 
+constexpr int32 DefaultMaxInventorySlotCount = 10;
+
 const FString ULSSaveSubsystem::SlotName = TEXT("LostSignalSave");
 const FString ULSSaveSubsystem::DebugFileName = TEXT("LostSignalSave_Debug.json");
 
@@ -45,7 +47,7 @@ bool ULSSaveSubsystem::TryAddToInventory(const FName ItemRowName, const int32 Am
 		return false;
 	}
 
-	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, MAX_int32, OutRemainingItem);
+	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, DefaultMaxInventorySlotCount, OutRemainingItem);
 	if (bChanged)
 	{
 		Save();
@@ -164,7 +166,8 @@ bool ULSSaveSubsystem::DropStoredSlot(const ELSInventorySlotArea FromArea, const
 		return true;
 	}
 
-	const bool bChanged = LSInventorySlotUtils::DropSlot(*FromSlots, FromIndex, *ToSlots, ToIndex);
+	const int32 ToMaxSlotCount = (ToArea == ELSInventorySlotArea::Inventory) ? DefaultMaxInventorySlotCount : INDEX_NONE;
+	const bool bChanged = LSInventorySlotUtils::DropSlot(*FromSlots, FromIndex, *ToSlots, ToIndex, ToMaxSlotCount);
 	if (bChanged)
 	{
 		Save();
@@ -196,7 +199,8 @@ bool ULSSaveSubsystem::TransferStoredSlotToArea(const ELSInventorySlotArea FromA
 
 	FLSSessionItem& FromSlot = (*FromSlots)[FromIndex];
 	FLSSessionItem RemainingItem;
-	if (!LSInventorySlotUtils::TryAddItemsToSlotArray(*ToSlots, FromSlot.ItemRowName, FromSlot.Amount, MAX_int32, RemainingItem))
+	const int32 ToMaxSlotCount = (ToArea == ELSInventorySlotArea::Inventory) ? DefaultMaxInventorySlotCount : MAX_int32;
+	if (!LSInventorySlotUtils::TryAddItemsToSlotArray(*ToSlots, FromSlot.ItemRowName, FromSlot.Amount, ToMaxSlotCount, RemainingItem))
 	{
 		return false;
 	}
@@ -204,6 +208,70 @@ bool ULSSaveSubsystem::TransferStoredSlotToArea(const ELSInventorySlotArea FromA
 	FromSlot = RemainingItem;
 	Save();
 	return true;
+}
+
+bool ULSSaveSubsystem::TransferAllInventoryToWarehouse(const int32 WarehouseMaxSlotCount, bool& bOutStoppedBecauseFull)
+{
+	bOutStoppedBecauseFull = false;
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot store all inventory items because SaveData is missing."));
+		return false;
+	}
+
+	if (WarehouseMaxSlotCount <= 0)
+	{
+		bOutStoppedBecauseFull = true;
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot store all inventory items because warehouse has no available slots."));
+		return false;
+	}
+
+	bool bChanged = false;
+	for (int32 InventoryIndex = 0; InventoryIndex < SaveData->Inventory.Num(); ++InventoryIndex)
+	{
+		FLSSessionItem& InventorySlot = SaveData->Inventory[InventoryIndex];
+		if (!LSInventorySlotUtils::IsFilled(InventorySlot))
+		{
+			continue;
+		}
+
+		FLSSessionItem RemainingItem;
+		const bool bAddedAny = LSInventorySlotUtils::TryAddItemsToSlotArray(
+			SaveData->WarehouseItems,
+			InventorySlot.ItemRowName,
+			InventorySlot.Amount,
+			WarehouseMaxSlotCount,
+			RemainingItem);
+
+		if (!bAddedAny)
+		{
+			bOutStoppedBecauseFull = true;
+			UE_LOG(LogLS, Warning, TEXT("[Save] Warehouse is full while storing all inventory items. InventoryIndex=%d Row=%s Amount=%d"),
+				InventoryIndex,
+				*InventorySlot.ItemRowName.ToString(),
+				InventorySlot.Amount);
+			break;
+		}
+
+		bChanged = true;
+		InventorySlot = RemainingItem;
+		if (LSInventorySlotUtils::IsFilled(RemainingItem))
+		{
+			bOutStoppedBecauseFull = true;
+			UE_LOG(LogLS, Warning, TEXT("[Save] Warehouse became full while storing all inventory items. InventoryIndex=%d Row=%s RemainingAmount=%d"),
+				InventoryIndex,
+				*RemainingItem.ItemRowName.ToString(),
+				RemainingItem.Amount);
+			break;
+		}
+	}
+
+	if (bChanged)
+	{
+		Save();
+	}
+
+	return bChanged;
 }
 
 bool ULSSaveSubsystem::GetStoredSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, FLSSessionItem& OutItem) const

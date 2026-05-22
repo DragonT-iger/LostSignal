@@ -35,6 +35,7 @@ void ULSInventoryWidget::NativeConstruct()
 	else
 	{
 		StoreAllButton->OnClicked.AddDynamic(this, &ULSInventoryWidget::HandleStoreAllButtonClicked);
+		SetStoreAllButtonVisible(false);
 	}
 
 	if (!SortButton)
@@ -361,9 +362,65 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 	}
 }
 
+void ULSInventoryWidget::SetStoreAllButtonVisible(const bool bVisible)
+{
+	if (!StoreAllButton)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot update StoreAllButton visibility because StoreAllButton is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	StoreAllButton->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+}
+
 void ULSInventoryWidget::HandleStoreAllButtonClicked()
 {
-	UE_LOG(LogLS, Warning, TEXT("StoreAllButton clicked on %s, but store-all behavior is not implemented yet."), *GetNameSafe(this));
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot store all inventory items because owning player controller is invalid on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
+	{
+		if (RaidInventory->IsRaidActive())
+		{
+			UE_LOG(LogLS, Warning, TEXT("Cannot store all inventory items during a raid on %s."), *GetNameSafe(this));
+			return;
+		}
+	}
+
+	if (!PlayerController->IsLobbyStorageWidgetOpen())
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot store all inventory items because lobby storage is not open on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot store all inventory items because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	bool bStoppedBecauseFull = false;
+	const bool bChanged = SaveSubsystem->TransferAllInventoryToWarehouse(
+		PlayerController->GetOpenLobbyStorageMaxSlotCount(),
+		bStoppedBecauseFull);
+
+	if (bChanged)
+	{
+		RebuildInventorySlots();
+		RebuildConfirmedStorageSlots();
+		PlayerController->RefreshOpenLobbyStorageWidget();
+	}
+
+	if (bStoppedBecauseFull)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Store all inventory items stopped because lobby storage is full on %s."), *GetNameSafe(this));
+	}
 }
 
 void ULSInventoryWidget::HandleSortButtonClicked()

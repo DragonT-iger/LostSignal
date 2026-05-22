@@ -377,6 +377,7 @@ void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
 	{
 		LSInventoryWidget->RebuildInventorySlots();
 		LSInventoryWidget->RebuildConfirmedStorageSlots();
+		LSInventoryWidget->SetStoreAllButtonVisible(Target->IsA<ALSLobbyStorageActor>());
 	}
 	else
 	{

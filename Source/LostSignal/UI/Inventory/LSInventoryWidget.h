@@ -34,6 +34,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void RebuildConfirmedStorageSlots();
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	void SetStoreAllButtonVisible(bool bVisible);
+
 	bool HandleInventorySlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 	bool HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 	bool TryDropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FPointerEvent& PointerEvent);

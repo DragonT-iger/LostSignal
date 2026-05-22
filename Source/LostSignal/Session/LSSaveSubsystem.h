@@ -50,6 +50,7 @@ public:
 
 	bool DropStoredSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool TransferStoredSlotToArea(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea);
+	bool TransferAllInventoryToWarehouse(int32 WarehouseMaxSlotCount, bool& bOutStoppedBecauseFull);
 	bool GetStoredSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, FLSSessionItem& OutItem) const;
 	bool ClearStoredSlot(ELSInventorySlotArea SlotArea, int32 SlotIndex);
 	bool ReplaceStoredSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem);

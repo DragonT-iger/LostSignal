@@ -40,6 +40,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Storage")
 	void RefreshStorage();
 
+	UFUNCTION(BlueprintPure, Category="LS/UI|Storage")
+	int32 GetMaxStorageSlotCount() const { return MaxStorageSlotCount; }
+
 	bool HandleStorageSlotDrop(ELSInventorySlotArea FromArea, int32 FromIndex, int32 ToWarehouseIndex);
 	bool TryDropStorageDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FPointerEvent& PointerEvent);
 	bool TransferStorageSlotToInventory(int32 WarehouseSlotIndex);
