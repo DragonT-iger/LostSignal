@@ -7,7 +7,7 @@
 
 namespace
 {
-constexpr int32 DefaultMaxInventorySlotCount = 10;
+constexpr int32 SessionDefaultMaxInventorySlotCount = 10;
 }
 
 void ULSSessionSubsystem::StartRaid(const TArray<FLSSessionItem>& Loadout)
@@ -344,7 +344,7 @@ bool ULSSessionSubsystem::ReplaceSessionSlotItem(const ELSInventorySlotArea Slot
 
 int32 ULSSessionSubsystem::GetMaxInventorySlotCount() const
 {
-	return DefaultMaxInventorySlotCount;
+	return SessionDefaultMaxInventorySlotCount;
 }
 
 void ULSSessionSubsystem::ConsumeItem(FName ItemRowName, int32 Amount)

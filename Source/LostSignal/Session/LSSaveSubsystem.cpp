@@ -10,7 +10,7 @@
 #include "Serialization/JsonWriter.h"
 #include "UObject/Package.h"
 
-constexpr int32 DefaultMaxInventorySlotCount = 10;
+constexpr int32 SaveDefaultMaxInventorySlotCount = 10;
 
 const FString ULSSaveSubsystem::SlotName = TEXT("LostSignalSave");
 const FString ULSSaveSubsystem::DebugFileName = TEXT("LostSignalSave_Debug.json");
@@ -47,7 +47,7 @@ bool ULSSaveSubsystem::TryAddToInventory(const FName ItemRowName, const int32 Am
 		return false;
 	}
 
-	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, DefaultMaxInventorySlotCount, OutRemainingItem);
+	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, SaveDefaultMaxInventorySlotCount, OutRemainingItem);
 	if (bChanged)
 	{
 		Save();
@@ -166,7 +166,7 @@ bool ULSSaveSubsystem::DropStoredSlot(const ELSInventorySlotArea FromArea, const
 		return true;
 	}
 
-	const int32 ToMaxSlotCount = (ToArea == ELSInventorySlotArea::Inventory) ? DefaultMaxInventorySlotCount : INDEX_NONE;
+	const int32 ToMaxSlotCount = (ToArea == ELSInventorySlotArea::Inventory) ? SaveDefaultMaxInventorySlotCount : INDEX_NONE;
 	const bool bChanged = LSInventorySlotUtils::DropSlot(*FromSlots, FromIndex, *ToSlots, ToIndex, ToMaxSlotCount);
 	if (bChanged)
 	{
@@ -199,7 +199,7 @@ bool ULSSaveSubsystem::TransferStoredSlotToArea(const ELSInventorySlotArea FromA
 
 	FLSSessionItem& FromSlot = (*FromSlots)[FromIndex];
 	FLSSessionItem RemainingItem;
-	const int32 ToMaxSlotCount = (ToArea == ELSInventorySlotArea::Inventory) ? DefaultMaxInventorySlotCount : MAX_int32;
+	const int32 ToMaxSlotCount = (ToArea == ELSInventorySlotArea::Inventory) ? SaveDefaultMaxInventorySlotCount : MAX_int32;
 	if (!LSInventorySlotUtils::TryAddItemsToSlotArray(*ToSlots, FromSlot.ItemRowName, FromSlot.Amount, ToMaxSlotCount, RemainingItem))
 	{
 		return false;
