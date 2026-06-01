@@ -78,38 +78,43 @@ void ULSMonsterSenseComponent::RegisterNoiseEvent(const FVector& NoiseLocation, 
 		return;
 	}
 
-	LastHeardLocation = NoiseLocation;
-	LastHeardTime = GetWorld()->GetTimeSeconds();
-	Suspicion = FMath::Max(Suspicion, 25.0f * Loudness);
+	InterestLocation = NoiseLocation;
+	bHasInterestLocation = true;
 }
 
 bool ULSMonsterSenseComponent::HasVisualTarget() const
 {
-	return CurrentTarget.IsValid() && LastSeenTime >= 0.0f && (GetWorld()->GetTimeSeconds() - LastSeenTime) <= InterestMemorySeconds;
+	return CurrentTarget.IsValid();
 }
 
 bool ULSMonsterSenseComponent::HasInterestLocation() const
 {
-	return HasVisualTarget() || IsNoiseFresh();
+	return bHasInterestLocation;
 }
 
 FVector ULSMonsterSenseComponent::GetInterestLocation() const
 {
-	if (HasVisualTarget())
-	{
-		return LastSeenLocation;
-	}
+	return bHasInterestLocation ? InterestLocation : HomeLocation;
+}
 
-	if (IsNoiseFresh())
-	{
-		return LastHeardLocation;
-	}
+float ULSMonsterSenseComponent::GetDistanceFromHome() const
+{
+	const AActor* OwnerActor = GetOwner();
+	return OwnerActor ? FVector::Dist2D(OwnerActor->GetActorLocation(), HomeLocation) : 0.0f;
+}
 
-	return HomeLocation;
+bool ULSMonsterSenseComponent::IsBeyondLeashDistance() const
+{
+	return LeashDistance > 0.0f && GetDistanceFromHome() > LeashDistance;
 }
 
 float ULSMonsterSenseComponent::GetCurrentSightRadius() const
 {
+	if (bForceMaxSightRadius)
+	{
+		return MaxSightRadius;
+	}
+
 	return FMath::Clamp(BaseSightRadius * ThreatMultiplier, BaseSightRadius, MaxSightRadius);
 }
 
@@ -118,14 +123,21 @@ void ULSMonsterSenseComponent::SetThreatMultiplier(float InThreatMultiplier)
 	ThreatMultiplier = FMath::Max(1.0f, InThreatMultiplier);
 }
 
+void ULSMonsterSenseComponent::SetForceMaxSightRadius(bool bInForceMaxSightRadius)
+{
+	bForceMaxSightRadius = bInForceMaxSightRadius;
+}
+
+void ULSMonsterSenseComponent::ClearVisualTarget()
+{
+	CurrentTarget.Reset();
+}
+
 void ULSMonsterSenseComponent::ClearInterest()
 {
 	CurrentTarget.Reset();
-	LastSeenTime = -1.0f;
-	LastHeardTime = -1.0f;
-	LastSeenLocation = FVector::ZeroVector;
-	LastHeardLocation = FVector::ZeroVector;
-	Suspicion = 0.0f;
+	InterestLocation = FVector::ZeroVector;
+	bHasInterestLocation = false;
 }
 
 bool ULSMonsterSenseComponent::CanSeeActor(const AActor* Actor) const
@@ -180,9 +192,8 @@ void ULSMonsterSenseComponent::UpdateSensing(float DeltaTime)
 	if (VisibleTarget)
 	{
 		CurrentTarget = VisibleTarget;
-		LastSeenLocation = VisibleTarget->GetActorLocation();
-		LastSeenTime = GetWorld()->GetTimeSeconds();
-		Suspicion = 100.0f;
+		InterestLocation = VisibleTarget->GetActorLocation();
+		bHasInterestLocation = true;
 
 		/*UE_LOG(LogLS, Warning, TEXT("Sense Hit: Owner=%s Target=%s HasVisual=%d"),
 			*GetNameSafe(GetOwner()),
@@ -192,12 +203,7 @@ void ULSMonsterSenseComponent::UpdateSensing(float DeltaTime)
 		return;
 	}
 
-	Suspicion = FMath::Max(0.0f, Suspicion - (SuspicionDecayPerSecond * DeltaTime));
-
-	if (!HasVisualTarget() && !IsNoiseFresh())
-	{
-		CurrentTarget.Reset();
-	}
+	CurrentTarget.Reset();
 }
 
 AActor* ULSMonsterSenseComponent::FindBestVisibleTarget() const
@@ -239,11 +245,6 @@ AActor* ULSMonsterSenseComponent::FindBestVisibleTarget() const
 	}
 
 	return BestTarget;
-}
-
-bool ULSMonsterSenseComponent::IsNoiseFresh() const
-{
-	return LastHeardTime >= 0.0f && (GetWorld()->GetTimeSeconds() - LastHeardTime) <= InterestMemorySeconds;
 }
 
 bool ULSMonsterSenseComponent::IsOwnerDead() const
@@ -294,8 +295,13 @@ void ULSMonsterSenseComponent::DrawSenseDebug() const
 
 	if (HasVisualTarget())
 	{
-		const FVector SeenLocation = LastSeenLocation + FVector(0.0f, 0.0f, SenseDebugDrawHeight);
-		DrawDebugLine(World, Origin, SeenLocation, FColor::Yellow, false, Duration, 0, 1.5f);
-		DrawDebugSphere(World, SeenLocation, 20.0f, 8, FColor::Yellow, false, Duration);
+		const FVector DebugInterestLocation = InterestLocation + FVector(0.0f, 0.0f, SenseDebugDrawHeight);
+		DrawDebugLine(World, Origin, DebugInterestLocation, FColor::Yellow, false, Duration, 0, 1.5f);
+		DrawDebugSphere(World, DebugInterestLocation, 20.0f, 8, FColor::Yellow, false, Duration);
+	}
+	else if (HasInterestLocation())
+	{
+		const FVector DebugInterestLocation = InterestLocation + FVector(0.0f, 0.0f, SenseDebugDrawHeight);
+		DrawDebugSphere(World, DebugInterestLocation, 20.0f, 8, FColor::Orange, false, Duration);
 	}
 }

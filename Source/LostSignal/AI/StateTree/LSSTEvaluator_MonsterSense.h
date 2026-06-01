@@ -44,6 +44,9 @@ struct FLSSTEvaluator_MonsterSenseInstanceData
 	float LeashDistance = 0.0f;
 
 	UPROPERTY(EditAnywhere, Category="LS/AI")
+	float DistanceFromHome = 0.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI")
 	float AlertDuration = 0.0f;
 
 	UPROPERTY(EditAnywhere, Category="LS/AI")
@@ -54,6 +57,9 @@ struct FLSSTEvaluator_MonsterSenseInstanceData
 
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bHasInterestLocation = false;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	bool bIsBeyondLeashDistance = false;
 
 	/** Mirrors the monster ASC dead tag so every state can transition into Dead with one shared bool. */
 	UPROPERTY(EditAnywhere, Category="LS/AI")

@@ -57,7 +57,7 @@ StateTree Condition
 
 StateTree Task
 - 상태 진입/유지 중 필요한 행동 실행
-- Focus 설정, Ability 요청, Ability 취소, Death 처리 같은 명령 수행
+- Focus 설정, Ability 요청, Ability 취소, InterestLocation 초기화, Death 처리 같은 명령 수행
 - 전이 조건 판단을 Task에 넣지 않는다
 
 GameplayAbility / GameplayEffect
@@ -136,10 +136,12 @@ Evaluator InstanceData
 -> HomeLocation
 -> DistanceToTarget
 -> LeashDistance
+-> DistanceFromHome
 -> AlertDuration
 -> AlertMoveSpeedMultiplier
 -> bHasVisualTarget
 -> bHasInterestLocation
+-> bIsBeyondLeashDistance
 -> bIsDead
 -> bIsKnockback
 ```
@@ -175,13 +177,22 @@ Idle
 - 관심 위치나 시야 타겟이 생기면 이동 상태로 전이
 
 Investigate
-- 소음 또는 마지막 목격 위치로 이동
+- InterestLocation으로 이동
+- 도착 후 StateTree Wait를 거쳐 LS Clear Interest 실행
 - 시야 타겟을 다시 얻으면 Chase로 전이
 
 Chase
 - 현재 시야 타겟 추적
 - 공격 거리 안이면 Attack으로 전이
-- 관심/시야가 끊기거나 Leash를 벗어나면 ReturnHome 또는 Investigate로 전이
+- 시야가 끊기면 마지막 InterestLocation으로 Investigate 전이
+- Leash를 벗어나면 ReturnHome 전이
+
+ReturnHome
+- 전투 중 시야에서 플레이어를 놓치고 Leash를 벗어났을 때 진입
+- HomeLocation 또는 순찰 복귀 지점으로 이동
+- 이동 속도를 AlertMoveSpeedMultiplier 기준으로 증가
+- 시야 반경을 MaxSightRadius로 고정
+- 복귀 중 플레이어를 다시 보면 Combat으로 전이
 
 Attack
 - GAS Ability 요청
@@ -195,7 +206,7 @@ Dead
 - LS.State.Dead 기반 터미널 상태
 - 죽음 처리 후 AI Brain 정지
 
-ReturnHome
+ReturnHome / Patrol 복귀
 - HomeLocation으로 복귀
 - 도착하면 Idle로 전이
 ```
@@ -205,7 +216,8 @@ ReturnHome
 ```text
 1. Dead
 2. Knockback
-3. 일반 전투/탐색/복귀 상태
+3. ReturnHome
+4. 일반 전투/탐색/순찰 상태
 ```
 
 `Dead`와 `Knockback`은 GAS 태그를 기준으로 전이한다. 별도 bool을 새로 만들어 중복 상태를 관리하지 않는다.
@@ -245,9 +257,13 @@ Tick
 -> 죽음 상태면 관심 정보 초기화 및 Tick 중지
 -> FindBestVisibleTarget
 -> CanSeeActor
--> CurrentTarget / LastSeenLocation / LastSeenTime 갱신
--> 시야 타겟이 없으면 Suspicion 감소
--> 관심 정보 만료 시 CurrentTarget 초기화
+-> 타겟이 보이면 CurrentTarget / InterestLocation 갱신
+-> 타겟이 안 보이면 CurrentTarget만 초기화
+-> InterestLocation은 StateTree가 LS Clear Interest를 호출할 때까지 유지
+
+RegisterNoiseEvent
+-> 청각 반경 안이면 InterestLocation 갱신
+-> 실제 사운드 재생 여부가 아니라 게임플레이 소음 이벤트 기준
 ```
 
 감지 로직을 확장할 때 지킬 규칙:
@@ -255,8 +271,43 @@ Tick
 - StateTree Condition에 감지 계산을 넣지 않는다.
 - 타겟 탐색은 SenseComponent에서 처리한다.
 - StateTree에는 결과값만 제공한다.
-- 시야/청각/속도 수치는 DataTable 행에서 받고, 기억 시간/Leash/시야각 같은 보조값은 별도 정책이 정해질 때까지 컴포넌트 UPROPERTY 기본값으로 관리한다.
+- 시야/청각/속도 수치는 DataTable 행에서 받고, Leash/시야각 같은 보조값은 별도 정책이 정해질 때까지 컴포넌트 UPROPERTY 기본값으로 관리한다.
+- 기억 시간은 SenseComponent가 관리하지 않는다. Investigate 상태의 Move/Wait/ClearInterest 흐름으로 관리한다.
 - 죽은 몬스터는 감지 Tick을 멈추고 관심 정보를 비운다.
+
+## ReturnHome 상태 규칙
+
+`ReturnHome`은 마지막 관심 위치 조사와 다르다. `InvestigateInterest`는 플레이어를 놓친 마지막 위치를 확인하는 상태이고, `ReturnHome`은 추적 거리를 벗어나 전투를 포기하고 복귀하는 경계 상태다.
+
+권장 전이:
+
+```text
+Combat -> ReturnHome
+조건:
+!bHasVisualTarget && bIsBeyondLeashDistance
+
+ReturnHome -> Combat
+조건:
+bHasVisualTarget
+
+ReturnHome -> Patrol
+조건:
+HomeLocation 또는 순찰 복귀 지점 도착
+```
+
+권장 Task:
+
+```text
+ReturnHome
+-> LS Set Return Home Mode
+   - Focus Clear
+   - SenseComponent ForceMaxSightRadius = true
+   - CharacterMovement MaxWalkSpeed *= AlertMoveSpeedMultiplier
+-> MoveTo HomeLocation 또는 순찰 복귀 지점
+-> LS Clear Interest
+```
+
+`LS Set Return Home Mode`는 State Enter에서 포커스와 현재 VisualTarget을 끊고, State Exit에서 시야 반경 강제와 이동 속도를 복구한다. 따라서 이 Task는 ReturnHome 상태에 머무는 동안 유지되는 Running Task로 둔다. ReturnHome 중 플레이어가 최대 시야 안에서 다시 보이면 `bHasVisualTarget`이 다시 true가 되며 Combat로 재진입한다.
 
 ## 상태 태그 규칙
 

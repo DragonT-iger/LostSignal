@@ -45,6 +45,12 @@ public:
 	float GetLeashDistance() const { return LeashDistance; }
 
 	UFUNCTION(BlueprintPure, Category="AI|Sense")
+	float GetDistanceFromHome() const;
+
+	UFUNCTION(BlueprintPure, Category="AI|Sense")
+	bool IsBeyondLeashDistance() const;
+
+	UFUNCTION(BlueprintPure, Category="AI|Sense")
 	float GetAlertMoveSpeedMultiplier() const { return AlertMoveSpeedMultiplier; }
 
 	UFUNCTION(BlueprintPure, Category="AI|Sense")
@@ -54,6 +60,12 @@ public:
 	void SetThreatMultiplier(float InThreatMultiplier);
 
 	UFUNCTION(BlueprintCallable, Category="AI|Sense")
+	void SetForceMaxSightRadius(bool bInForceMaxSightRadius);
+
+	UFUNCTION(BlueprintCallable, Category="AI|Sense")
+	void ClearVisualTarget();
+
+	UFUNCTION(BlueprintCallable, Category="AI|Sense")
 	void ClearInterest();
 
 	bool CanSeeActor(const AActor* Actor) const;
@@ -61,7 +73,6 @@ public:
 private:
 	void UpdateSensing(float DeltaTime);
 	AActor* FindBestVisibleTarget() const;
-	bool IsNoiseFresh() const;
 	bool IsOwnerDead() const;
 	void DrawSenseDebug() const;
 
@@ -76,12 +87,6 @@ private:
 
 	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float HearingRadius = 900.0f;
-
-	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
-	float InterestMemorySeconds = 4.0f;
-
-	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
-	float SuspicionDecayPerSecond = 30.0f;
 
 	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float AlertDuration = 5.0f;
@@ -102,20 +107,17 @@ private:
 	TWeakObjectPtr<AActor> CurrentTarget;
 
 	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
-	FVector LastSeenLocation = FVector::ZeroVector;
-
-	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
-	FVector LastHeardLocation = FVector::ZeroVector;
+	FVector InterestLocation = FVector::ZeroVector;
 
 	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	FVector HomeLocation = FVector::ZeroVector;
 
 	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
-	float Suspicion = 0.0f;
+	bool bHasInterestLocation = false;
 
 	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	float ThreatMultiplier = 1.0f;
 
-	float LastSeenTime = -1.0f;
-	float LastHeardTime = -1.0f;
+	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
+	bool bForceMaxSightRadius = false;
 };

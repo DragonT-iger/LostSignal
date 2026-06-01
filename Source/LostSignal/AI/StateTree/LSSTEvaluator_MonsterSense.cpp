@@ -45,6 +45,8 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 		InstanceData.bHasVisualTarget = false;
 		InstanceData.bHasInterestLocation = false;
 		InstanceData.DistanceToTarget = 0.0f;
+		InstanceData.DistanceFromHome = 0.0f;
+		InstanceData.bIsBeyondLeashDistance = false;
 		InstanceData.bIsDead = false;
 		InstanceData.bIsKnockback = false;
 		return;
@@ -54,10 +56,12 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 	InstanceData.InterestLocation = InstanceData.SenseComponent->GetInterestLocation();
 	InstanceData.HomeLocation = InstanceData.SenseComponent->GetHomeLocation();
 	InstanceData.LeashDistance = InstanceData.SenseComponent->GetLeashDistance();
+	InstanceData.DistanceFromHome = InstanceData.SenseComponent->GetDistanceFromHome();
 	InstanceData.AlertDuration = InstanceData.SenseComponent->GetAlertDuration();
 	InstanceData.AlertMoveSpeedMultiplier = InstanceData.SenseComponent->GetAlertMoveSpeedMultiplier();
 	InstanceData.bHasVisualTarget = InstanceData.SenseComponent->HasVisualTarget();
 	InstanceData.bHasInterestLocation = InstanceData.SenseComponent->HasInterestLocation();
+	InstanceData.bIsBeyondLeashDistance = InstanceData.SenseComponent->IsBeyondLeashDistance();
 	InstanceData.bIsDead = false;
 	InstanceData.bIsKnockback = false;
 
