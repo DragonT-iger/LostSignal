@@ -233,10 +233,14 @@ bool ULSLobbyStorageWidget::TryDropStorageDragToWorld(const ULSInventoryDragDrop
 		return false;
 	}
 
+	FVector DropDirection = FVector::ZeroVector;
+	PlayerController->ResolveDropDirectionFromSlatePosition(PointerEvent.GetScreenSpacePosition(), DropDirection);
+
 	const bool bDropped = PlayerController->DropSessionSlotToWorld(
 		DragOperation.SourceSlotArea,
 		DragOperation.SourceSlotIndex,
-		DroppedItemActorClass);
+		DroppedItemActorClass,
+		DropDirection);
 
 	if (bDropped)
 	{

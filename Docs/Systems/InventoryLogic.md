@@ -180,6 +180,7 @@ ALSLootBox::Interact (서버 권한에서만 드랍 생성)
 DropSessionSlotToWorld
 -> 레이드 중이면 RaidInventoryComponent 슬롯을 원본으로 사용
 -> 레이드가 아니면 SaveSubsystem 저장 슬롯을 원본으로 사용
+-> 드래그 취소 이벤트 위치에서 캐릭터 위치로 향하는 2D 단위 방향을 서버에 전달하고, 서버가 캐릭터 발 위치 기준으로 드랍 위치만 확정
 -> 슬롯을 먼저 비움
 -> WorldDroppedItem 스폰
 -> 스폰 실패 시 원래 슬롯 복구

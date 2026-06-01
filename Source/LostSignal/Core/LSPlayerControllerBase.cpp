@@ -2,6 +2,7 @@
 
 #include "Core/LSPlayerControllerBase.h"
 
+#include "Blueprint/SlateBlueprintLibrary.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "Characters/LSCharacterBase.h"
@@ -882,23 +883,26 @@ bool ALSPlayerControllerBase::DropLootDropSlotInternal(ALSLootBox* SourceLootBox
 	return SourceLootBox->DropLootSlot(FromLootSlotIndex, ToLootSlotIndex);
 }
 
-bool ALSPlayerControllerBase::DropSessionSlotToWorld(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass)
+bool ALSPlayerControllerBase::DropSessionSlotToWorld(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection)
 {
+	DropDirection.Z = 0.0f;
+	DropDirection = DropDirection.GetSafeNormal();
+
 	if (HasAuthority())
 	{
-		return DropSessionSlotToWorldInternal(SlotArea, SlotIndex, DroppedItemClass);
+		return DropSessionSlotToWorldInternal(SlotArea, SlotIndex, DroppedItemClass, DropDirection);
 	}
 
-	ServerDropSessionSlotToWorld(SlotArea, SlotIndex, DroppedItemClass);
+	ServerDropSessionSlotToWorld(SlotArea, SlotIndex, DroppedItemClass, DropDirection);
 	return true;
 }
 
-void ALSPlayerControllerBase::ServerDropSessionSlotToWorld_Implementation(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass)
+void ALSPlayerControllerBase::ServerDropSessionSlotToWorld_Implementation(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector_NetQuantizeNormal DropDirection)
 {
-	DropSessionSlotToWorldInternal(SlotArea, SlotIndex, DroppedItemClass);
+	DropSessionSlotToWorldInternal(SlotArea, SlotIndex, DroppedItemClass, FVector(DropDirection));
 }
 
-bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass)
+bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector DropDirection)
 {
 	if (!HasAuthority())
 	{
@@ -932,7 +936,7 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 	}
 
 	FTransform SpawnTransform;
-	if (!ResolveServerDroppedItemTransform(SpawnTransform))
+	if (!ResolveServerDroppedItemTransform(SpawnTransform, DropDirection))
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot drop slot to world because server drop transform is invalid."));
 		return false;
@@ -994,7 +998,49 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 	return true;
 }
 
-bool ALSPlayerControllerBase::ResolveServerDroppedItemTransform(FTransform& OutDropTransform) const
+bool ALSPlayerControllerBase::ResolveDropDirectionFromSlatePosition(const FVector2D SlatePosition, FVector& OutDropDirection) const
+{
+	const APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return false;
+	}
+
+	FVector2D PixelPosition = FVector2D::ZeroVector;
+	FVector2D ViewportPosition = FVector2D::ZeroVector;
+	USlateBlueprintLibrary::AbsoluteToViewport(this, SlatePosition, PixelPosition, ViewportPosition);
+
+	FVector WorldOrigin = FVector::ZeroVector;
+	FVector WorldDirection = FVector::ZeroVector;
+	if (!DeprojectScreenPositionToWorld(PixelPosition.X, PixelPosition.Y, WorldOrigin, WorldDirection))
+	{
+		return false;
+	}
+
+	if (FMath::IsNearlyZero(WorldDirection.Z))
+	{
+		return false;
+	}
+
+	float CollisionRadius = 0.0f;
+	float CollisionHalfHeight = 0.0f;
+	ControlledPawn->GetSimpleCollisionCylinder(CollisionRadius, CollisionHalfHeight);
+
+	const FVector PawnLocation = ControlledPawn->GetActorLocation();
+	const float TargetPlaneZ = PawnLocation.Z - CollisionHalfHeight;
+	const float RayDistance = (TargetPlaneZ - WorldOrigin.Z) / WorldDirection.Z;
+	if (RayDistance < 0.0f)
+	{
+		return false;
+	}
+
+	const FVector MouseWorldPoint = WorldOrigin + (WorldDirection * RayDistance);
+	OutDropDirection = MouseWorldPoint - PawnLocation;
+	OutDropDirection.Z = 0.0f;
+	return !OutDropDirection.IsNearlyZero();
+}
+
+bool ALSPlayerControllerBase::ResolveServerDroppedItemTransform(FTransform& OutDropTransform, FVector DropDirection) const
 {
 	constexpr float DroppedItemGroundTraceDistance = 100.0f;
 	constexpr float DroppedItemRandomGroundOffsetXY = 12.0f;
@@ -1013,14 +1059,22 @@ bool ALSPlayerControllerBase::ResolveServerDroppedItemTransform(FTransform& OutD
 	float CollisionHalfHeight = 0.0f;
 	ControlledPawn->GetSimpleCollisionCylinder(CollisionRadius, CollisionHalfHeight);
 
+	DropDirection.Z = 0.0f;
+	DropDirection = DropDirection.GetSafeNormal();
+	if (DropDirection.IsNearlyZero())
+	{
+		DropDirection = ControlledPawn->GetActorForwardVector().GetSafeNormal2D();
+	}
+
 	const FVector FootLocation = PawnLocation - FVector(0.0f, 0.0f, CollisionHalfHeight);
-	const FVector TraceStart = PawnLocation;
-	const FVector TraceEnd = FootLocation - FVector(0.0f, 0.0f, DroppedItemGroundTraceDistance);
+	const FVector TargetFootLocation = FootLocation + (DropDirection * DroppedItemForwardDistance);
+	const FVector TraceStart = TargetFootLocation + FVector(0.0f, 0.0f, DroppedItemGroundTraceDistance);
+	const FVector TraceEnd = TargetFootLocation - FVector(0.0f, 0.0f, DroppedItemGroundTraceDistance);
 
 	FHitResult HitResult;
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(LSDropInventoryItemToGround), false, ControlledPawn);
 	const bool bHitGround = World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams);
-	const FVector GroundLocation = bHitGround ? HitResult.ImpactPoint : FootLocation;
+	const FVector GroundLocation = bHitGround ? HitResult.ImpactPoint : TargetFootLocation;
 	const FVector2D RandomGroundOffset = FMath::RandPointInCircle(DroppedItemRandomGroundOffsetXY);
 	const FVector DropLocation = GroundLocation + FVector(
 		RandomGroundOffset.X,

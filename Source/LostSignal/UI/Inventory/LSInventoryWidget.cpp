@@ -280,7 +280,7 @@ bool ULSInventoryWidget::TryDropInventoryDragToWorld(const ULSInventoryDragDropO
 		return false;
 	}
 
-	return DropInventoryDragToWorld(DragOperation);
+	return DropInventoryDragToWorld(DragOperation, ScreenPosition);
 }
 
 void ULSInventoryWidget::RebuildConfirmedStorageSlots()
@@ -475,10 +475,10 @@ bool ULSInventoryWidget::HandleInventoryBackgroundDrop(const FGeometry& InGeomet
 		return false;
 	}
 
-	return DropInventoryDragToWorld(*DragOperation);
+	return DropInventoryDragToWorld(*DragOperation, InDragDropEvent.GetScreenSpacePosition());
 }
 
-bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation)
+bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FVector2D ScreenPosition)
 {
 	if (DragOperation.SourceInventoryWidget != this)
 	{
@@ -504,10 +504,14 @@ bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOper
 		UE_LOG(LogLS, Warning, TEXT("DroppedItemActorClass is not set on %s. Dropped item will use native class and may not show interact hint UI."), *GetNameSafe(this));
 	}
 
+	FVector DropDirection = FVector::ZeroVector;
+	PlayerController->ResolveDropDirectionFromSlatePosition(ScreenPosition, DropDirection);
+
 	const bool bDropped = PlayerController->DropSessionSlotToWorld(
 		DragOperation.SourceSlotArea,
 		DragOperation.SourceSlotIndex,
-		DroppedItemActorClass);
+		DroppedItemActorClass,
+		DropDirection);
 
 	if (bDropped)
 	{

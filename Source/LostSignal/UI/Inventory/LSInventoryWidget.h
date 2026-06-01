@@ -80,7 +80,7 @@ private:
 	void HandleSortButtonClicked();
 
 	bool HandleInventoryBackgroundDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation);
-	bool DropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation);
+	bool DropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation, FVector2D ScreenPosition);
 	bool IsPointerInsideInventoryWindow(FVector2D ScreenPosition) const;
 	bool IsPointerOverUserWidget(const FPointerEvent& PointerEvent) const;
 };

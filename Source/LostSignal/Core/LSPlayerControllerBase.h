@@ -71,7 +71,8 @@ public:
 	bool TransferLootDropSlotToSession(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FName ItemRowName, int32 Amount, FLSSessionItem& OutLootItem);
 	bool TransferLootDropSlotToSessionSlot(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
 	bool TransferSessionSlotToLootDropSlot(ALSLootBox* SourceLootBox, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, int32 LootSlotIndex, const FLSDropResult& CurrentLootItem, FLSSessionItem& OutLootItem);
-	bool DropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass);
+	bool DropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
+	bool ResolveDropDirectionFromSlatePosition(FVector2D SlatePosition, FVector& OutDropDirection) const;
 
 protected:
 	UPROPERTY(EditAnywhere, Category="LS/Input")
@@ -104,6 +105,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
 	TObjectPtr<ULSRaidInventoryComponent> RaidInventoryComponent;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Inventory", meta=(ClampMin="0"))
+	float DroppedItemForwardDistance = 100.0f;
+
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
 	bool bHasSubmittedRaidEntryData = false;
 
@@ -121,7 +125,7 @@ protected:
 
 private:
 	UFUNCTION(Server, Reliable)
-	void ServerDropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass);
+	void ServerDropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector_NetQuantizeNormal DropDirection);
 
 	UFUNCTION(Server, Reliable)
 	void ServerTransferLootDropSlotToSession(ALSLootBox* SourceLootBox, int32 LootSlotIndex);
@@ -178,8 +182,8 @@ private:
 	void StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
 	void ApplyRaidResultToLocalSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);
-	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass);
-	bool ResolveServerDroppedItemTransform(FTransform& OutDropTransform) const;
+	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
+	bool ResolveServerDroppedItemTransform(FTransform& OutDropTransform, FVector DropDirection) const;
 	bool TransferLootDropSlotToSessionInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FLSSessionItem& OutLootItem);
 	bool TransferLootDropSlotToSessionSlotInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
 	bool TransferSessionSlotToLootDropSlotInternal(ALSLootBox* SourceLootBox, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, int32 LootSlotIndex, FLSSessionItem& OutLootItem);
