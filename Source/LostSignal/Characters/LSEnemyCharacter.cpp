@@ -11,6 +11,8 @@
 #include "Data/LSMonsterArchetypeRow.h"
 #include "Engine/DataTable.h"
 #include "GAS/Abilities/LSGA_MonsterMelee.h"
+#include "GAS/LSCharacterAttributeSet.h"
+#include "GAS/LSCombatAttributeSet.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "LostSignal.h"
 #include "UI/Debug/LSHpDebugWidget.h"
@@ -34,6 +36,7 @@ ALSEnemyCharacter::ALSEnemyCharacter()
 
 	MonsterSenseComponent = CreateDefaultSubobject<ULSMonsterSenseComponent>(TEXT("MonsterSenseComponent"));
 	MonsterCombatComponent = CreateDefaultSubobject<ULSMonsterCombatComponent>(TEXT("MonsterCombatComponent"));
+	MonsterAttributeSet = CreateDefaultSubobject<ULSCharacterAttributeSet>(TEXT("MonsterAttributeSet"));
 }
 
 UAnimMontage* ALSEnemyCharacter::GetAbilityMontage(FGameplayTag AbilityTag) const
@@ -138,6 +141,30 @@ void ALSEnemyCharacter::InitializeMonsterArchetype()
 	{
 		MonsterCombatComponent->ApplyArchetype(*Row);
 	}
+
+	ApplyMonsterAttributes(*Row);
+}
+
+void ALSEnemyCharacter::ApplyMonsterAttributes(const FLSMonsterArchetypeRow& Row)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	ULSCombatAttributeSet* LocalCombatAttributeSet = GetCombatAttributeSet();
+	if (!LocalCombatAttributeSet || !MonsterAttributeSet)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s: missing monster AttributeSet, monster attributes were not initialized."), *GetNameSafe(this));
+		return;
+	}
+
+	const float MonsterHealth = FMath::Max(0.0f, Row.Monster_HP);
+	LocalCombatAttributeSet->InitMaxHealth(MonsterHealth);
+	LocalCombatAttributeSet->InitCurrentHealth(MonsterHealth);
+
+	MonsterAttributeSet->InitAttack(FMath::Max(0.0f, Row.Monster_ATK));
+	MonsterAttributeSet->InitDefence(FMath::Max(0.0f, Row.Monster_DEF));
 }
 
 void ALSEnemyCharacter::TryCreateDebugHpWidget()

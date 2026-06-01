@@ -10,6 +10,7 @@
 class UDataTable;
 class UGameplayAbility;
 class UAnimMontage;
+class ULSCharacterAttributeSet;
 class ULSHpDebugWidget;
 class ULSMonsterCombatComponent;
 class ULSMonsterSenseComponent;
@@ -49,6 +50,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/AI")
 	ULSMonsterCombatComponent* GetMonsterCombatComponent() const { return MonsterCombatComponent; }
+
+	UFUNCTION(BlueprintPure, Category="LS/GAS")
+	ULSCharacterAttributeSet* GetMonsterAttributeSet() const { return MonsterAttributeSet; }
 
 	/** Returns the montage authored for the requested ability tag, if any. */
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
@@ -91,6 +95,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/AI")
 	TObjectPtr<ULSMonsterCombatComponent> MonsterCombatComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/GAS")
+	TObjectPtr<ULSCharacterAttributeSet> MonsterAttributeSet;
+
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Debug")
 	bool bCreateDebugHpWidget = true;
 
@@ -109,6 +116,7 @@ protected:
 private:
 	const FLSMonsterArchetypeRow* FindMonsterArchetypeRow() const;
 	void InitializeMonsterArchetype();
+	void ApplyMonsterAttributes(const FLSMonsterArchetypeRow& Row);
 	void TryCreateDebugHpWidget();
 	void DestroyDebugHpWidget();
 

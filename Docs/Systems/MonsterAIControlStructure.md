@@ -96,8 +96,17 @@ Hearing_Radius
 Chase_Speed
 -> StateTree에 노출되는 AlertMoveSpeedMultiplier 계열 값
 
-Monster_HP / Monster_ATK / Monster_DEF / Monster_Guard
--> Row에는 보관하되, Attribute 초기화 경로가 생기기 전까지 직접 적용하지 않는다
+Monster_HP
+-> ALSEnemyCharacter가 서버에서 ULSCombatAttributeSet MaxHealth / CurrentHealth 초기화
+
+Monster_ATK
+-> ALSEnemyCharacter가 서버에서 ULSCharacterAttributeSet Attack 초기화
+
+Monster_DEF
+-> ALSEnemyCharacter가 서버에서 ULSCharacterAttributeSet Defence 초기화
+
+Monster_Guard
+-> Row에는 보관하되, Tenacity/Guard 적용 정책이 정해지기 전까지 직접 적용하지 않는다
 
 Action_Group
 -> Row에는 보관하되, AbilityTag 매핑 정책이 정해지기 전까지 직접 적용하지 않는다
