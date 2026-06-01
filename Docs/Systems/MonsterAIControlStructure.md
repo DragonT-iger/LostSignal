@@ -67,6 +67,44 @@ GameplayAbility / GameplayEffect
 - 수치 변경은 GameplayEffect를 통해 처리
 ```
 
+## 몬스터 DataTable 규칙
+
+`FLSMonsterArchetypeRow`는 기획 CSV의 영문 헤더와 1:1로 맞춘다. 첫 번째 `Name` 컬럼은 DataTable row key로 사용하고, UPROPERTY로 중복 선언하지 않는다.
+
+```text
+Monster_Name_KR
+Monster_Resource_Path
+Monster_Combat_Type
+Monster_HP
+Monster_ATK
+Monster_DEF
+Monster_Guard
+Sight_Radius
+Hearing_Radius
+Patrol_Speed
+Chase_Speed
+Action_Group
+```
+
+현재 코드 연결 기준:
+
+```text
+Sight_Radius
+-> ULSMonsterSenseComponent::BaseSightRadius
+
+Hearing_Radius
+-> ULSMonsterSenseComponent::HearingRadius
+
+Chase_Speed
+-> StateTree에 노출되는 AlertMoveSpeedMultiplier 계열 값
+
+Monster_HP / Monster_ATK / Monster_DEF / Monster_Guard
+-> Row에는 보관하되, Attribute 초기화 경로가 생기기 전까지 직접 적용하지 않는다
+
+Action_Group
+-> Row에는 보관하되, AbilityTag 매핑 정책이 정해지기 전까지 직접 적용하지 않는다
+```
+
 ## Transition 데이터 규칙
 
 Transition Condition은 Evaluator의 InstanceData만 읽는다.
@@ -210,7 +248,7 @@ Tick
 - StateTree Condition에 감지 계산을 넣지 않는다.
 - 타겟 탐색은 SenseComponent에서 처리한다.
 - StateTree에는 결과값만 제공한다.
-- 시야/청각/기억 시간/Leash 같은 수치는 DataTable 행 또는 컴포넌트 UPROPERTY로 관리한다.
+- 시야/청각/속도 수치는 DataTable 행에서 받고, 기억 시간/Leash/시야각 같은 보조값은 별도 정책이 정해질 때까지 컴포넌트 UPROPERTY 기본값으로 관리한다.
 - 죽은 몬스터는 감지 Tick을 멈추고 관심 정보를 비운다.
 
 ## 상태 태그 규칙

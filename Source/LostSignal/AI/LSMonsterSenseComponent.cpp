@@ -59,15 +59,9 @@ void ULSMonsterSenseComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 
 void ULSMonsterSenseComponent::ApplyArchetype(const FLSMonsterArchetypeRow& Row)
 {
-	BaseSightRadius = Row.SightRadius;
-	MaxSightRadius = Row.MaxSightRadius;
-	SightHalfAngleDegrees = Row.SightHalfAngleDegrees;
-	HearingRadius = Row.HearingRadius;
-	InterestMemorySeconds = Row.InterestMemorySeconds;
-	SuspicionDecayPerSecond = Row.SuspicionDecayPerSecond;
-	AlertDuration = Row.AlertDuration;
-	AlertMoveSpeedMultiplier = Row.AlertMoveSpeedMultiplier;
-	LeashDistance = Row.LeashDistance;
+	BaseSightRadius = Row.Sight_Radius;
+	HearingRadius = Row.Hearing_Radius;
+	AlertMoveSpeedMultiplier = Row.Chase_Speed;
 }
 
 void ULSMonsterSenseComponent::RegisterNoiseEvent(const FVector& NoiseLocation, float Loudness)

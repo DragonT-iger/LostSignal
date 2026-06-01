@@ -18,9 +18,7 @@ ULSMonsterCombatComponent::ULSMonsterCombatComponent()
 
 void ULSMonsterCombatComponent::ApplyArchetype(const FLSMonsterArchetypeRow& Row)
 {
-	DefaultAttackAbilityTag = Row.DefaultAttackAbilityTag;
-	LeashDistance = Row.LeashDistance;
-	AlertMoveSpeedMultiplier = Row.AlertMoveSpeedMultiplier;
+	AlertMoveSpeedMultiplier = Row.Chase_Speed;
 }
 
 bool ULSMonsterCombatComponent::RequestAbilityByTag(FGameplayTag AbilityTag) const
