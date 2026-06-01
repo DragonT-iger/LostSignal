@@ -10,8 +10,15 @@
 - **서버:** 싱글 먼저 → 3인 MO 데디케이티드
 - **클래스 접두사:** `LS` (예: `ALSCharacter`, `ULSCombatComponent`)
 
-> 프로그래머: 언리얼 첫 프로젝트, Unity/자체엔진 경력.
-> AI: 언리얼 개념 첫 등장 시 Unity 비교로 설명.
+---
+
+## 작업 원칙
+
+- **선 설계, 후 구현:** 코드를 바로 작성하지 않는다. 비자명한 작업은 구현 전에 설계 옵션·트레이드오프·세부 결정을 먼저 논의하고 승인을 받는다. (단순·자명한 수정은 바로 진행)
+- **모호하면 범위 확인:** 요청이 모호하면 코드를 짜기 전에 작업 범위를 먼저 확인한다.
+- **연구 우선:** 새로 짜기 전에 UE API나 기존 C++ 코드에 이미 있는지 먼저 찾는다. 있으면 재사용한다.
+- **Git:** 별도 작업 브랜치를 만들지 않고 `master`에 직접 작업한다. (git 명령은 사용자가 직접 실행)
+- **언어:** 응답·주석·커밋 메시지는 한국어로 작성한다.
 
 ---
 
@@ -21,13 +28,12 @@
 |------|------|------|
 | 프로그래머 | C++ 전용 | BP 로직 |
 | 아트 | WBP_* 레이아웃, UMG 타임라인 애니메이션 | 게임 로직 |
-| 기획자 | DataTable 수치, GameplayEffect 에셋 수치 | 새 노드 추가 |
+| 기획자 | DataTable 수치 | 새 노드 추가 |
 
 ---
 
 ## 코드 규칙
 
-- **네이밍:** `A`=Actor, `U`=UObject, `I`=Interface, `F`=Struct, `E`=Enum. UPROPERTY `Category` 필수.
 - **Category:** 모든 UPROPERTY의 Category는 반드시 `"LS/"` 하위로. 예: `Category="LS/Combat"`, `Category="LS/Stats"`. 루트 `"LS/"` 그대로 써도 됨.
 - **입력:** Enhanced Input System 전용 (Legacy 금지). `IA_Move/Attack/Dodge/Interact/Skill1~3`, `IMC_Default`
 - **네트워크:** 싱글에서도 `if (!HasAuthority()) return;` 습관화 (멀티 전환 대비)
@@ -37,76 +43,15 @@
 - **로그:** `UE_LOG(LogLS, ...)` 카테고리 통일. `GEngine->AddOnScreenDebugMessage` 커밋 금지
 - **에셋 참조:** `ConstructorHelpers`로 WBP/에셋 경로 하드코딩 지양. `UPROPERTY(EditDefaultsOnly)`/`TSubclassOf`로 열고 BP에서 매핑
 - **초기화:** 초기화 로직은 C++ 생성자에서 처리. BP(블루프린트)에서는 메시·이펙트·사운드 등 에셋 경로 매핑만 수행
+- **GAS:** 체력/스태미나/스킬/상태이상은 GAS로 처리. 구조·태그·컴포넌트 매핑은 [SkillSystemStructure.md](Docs/Systems/SkillSystemStructure.md) 참고. 수치 변경은 반드시 GameplayEffect로.
 
 ---
 
-## GAS 시스템 (핵심)
+## 파일 분리
 
-체력/스태미나/스킬/상태이상/멀티복제 전부 GAS로 처리.
-
-| 구성요소 | LostSignal 사용처 |
-|----------|-------------------|
-| `AbilitySystemComponent` | 모든 캐릭터에 부착 |
-| `ULSAttributeSet` | Health, MaxHealth, Stamina |
-| `GameplayAbility` | 콤보, 구르기, 스킬 |
-| `GameplayEffect` | 데미지, 힐, 쿨타임, 버프 |
-| `GameplayTag` | 상태 플래그 (아래 참고) |
-| `GameplayCue` | 비주얼/사운드 전용 (로직 금지) |
-
-**태그:** `LS.State.{Dash/Invincible/Dead}` · `LS.Combat.{ComboWindow/Attacking}` · `LS.Debuff.Stunned`
-**규칙:** 수치 변경은 반드시 GameplayEffect 통해서.
-
----
-
-## Core 클래스
-
-| 클래스 | 역할 |
-|--------|------|
-| `ALSGameMode` | 게임 규칙, 스폰, 탈출 판정 (서버 전용) |
-| `ALSGameState` | 게임 진행 상태 (복제) |
-| `ULSGameInstance` | 로비↔인게임 유지 데이터 |
-| `ALSPlayerState` | 개별 플레이어 정보 (복제) |
-| `ALSPlayerController` | 입력→캐릭터, UI 관리 |
-
----
-
-## 파일 구조
-
-**Source:**
-```
-Source/LostSignal/
-├── Core/        GameMode, GameState, GameInstance, PlayerState, PlayerController
-├── Characters/  ALSCharacter(베이스), Player, Enemy
-├── GAS/         AttributeSet, Abilities, Effects, Tags
-├── Combat/      CombatComponent, HitBox
-├── Weapons/     WeaponBase
-├── AI/          AIController, BT Tasks/Decorators/Services
-├── Camera/      쿼터뷰, CameraShake
-├── Input/       InputComponent, InputAction 바인딩
-├── UI/          HUD, Inventory, Shop, SkillTree, Lobby, Result
-├── Items/       ItemPickup, InventoryComponent
-└── Utils/
-```
-
-**Content:**
-```
-Content/LostSignal/
-├── Characters/  Mesh, AnimBP, Montage
-├── Weapons/     Mesh, 이펙트
-├── VFX/         Niagara, GameplayCue
-├── UI/          WBP_*, 아이콘, 폰트
-├── Maps/
-│   ├── MainMenu/   타이틀 레벨
-│   ├── Lobby/      매칭 전 로비
-│   └── Raid/       레이드 맵
-├── Sandbox/     담당자별 개인 작업 공간 (패키징 제외)
-├── Data/        DataTables/, GAS/(GE·GA 에셋), Input/(IA·IMC)
-├── Audio/       SFX/, Music/
-├── Materials/
-└── Textures/
-```
-
-> 에셋은 반드시 `Content/LostSignal/` 하위에. 루트 Content에 직접 넣지 말 것.
+- **함수:** 50줄 이하로 유지한다. 초과하면 분리한다.
+- **헤더(.h):** 250줄을 초과하면 분리를 검토한다.
+- **구현(.cpp):** 400줄을 초과하면 분리를 검토한다.
 
 ---
 
@@ -114,70 +59,52 @@ Content/LostSignal/
 
 이 섹션이 `Docs/`의 인덱스다. MD 파일을 추가/제거할 때 여기도 같이 갱신한다.
 
-- 아이템 저장/슬롯/네트워크 구조: `Docs/Systems/ItemSaveNetworkStructure.md`
-- 인벤토리 UI/슬롯 조작 로직: `Docs/Systems/InventoryLogic.md`
-- 루트 드랍/데이터 테이블 파이프라인: `Docs/Systems/LootDropDataTable.md`
-- 레이드 레벨 플로우/결과 저장 ACK: `Docs/Systems/RaidLevelFlow.md`
-- 스킬/GAS/DataAsset/쿨타임/강화 구조: `Docs/Systems/SkillSystemStructure.md`
-- 몬스터 AI 제어/StateTree 전이 구조: `Docs/Systems/MonsterAIControlStructure.md`
+### 문서별 담당 (각 문서가 그 주제의 단일 출처)
+
+| 문서 | 단일 출처로 담당하는 내용 |
+|------|---------------------------|
+| [Docs/Systems/ItemSaveNetworkStructure.md](Docs/Systems/ItemSaveNetworkStructure.md) | 아이템 저장·슬롯·네트워크 구조 |
+| [Docs/Systems/InventoryLogic.md](Docs/Systems/InventoryLogic.md) | 인벤토리 UI·슬롯 조작 로직 |
+| [Docs/Systems/LootDropDataTable.md](Docs/Systems/LootDropDataTable.md) | 루트 드랍·데이터 테이블 파이프라인 |
+| [Docs/Systems/RaidLevelFlow.md](Docs/Systems/RaidLevelFlow.md) | 레이드 레벨 플로우·결과 저장 ACK |
+| [Docs/Systems/SkillSystemStructure.md](Docs/Systems/SkillSystemStructure.md) | 스킬·GAS·DataAsset·쿨타임·강화 구조 |
+| [Docs/Systems/MonsterAIControlStructure.md](Docs/Systems/MonsterAIControlStructure.md) | 몬스터 AI 제어·StateTree 전이 구조 |
+| [Docs/Systems/DesignerNumberWorkflow.md](Docs/Systems/DesignerNumberWorkflow.md) | 기획자 수치 작성·임포트·튜닝 워크플로우 |
 
 ---
 
-## 문서 우선 워크플로우 (Doc-First)
+## 문서 워크플로우
 
-- 시스템 동작·데이터 구조·저장 포맷을 바꾸기 전에 관련 `Docs/*.md`를 먼저 수정한다.
-- MD에 명시되지 않은 흐름/필드를 코드에 추가하지 않는다. 추가가 필요하면 MD에 먼저 적고 코드를 작성.
-- 코드 변경 커밋은 관련 MD 변경을 같이 포함한다 (문서-코드 분리 커밋 금지).
-- 새 MD를 만들면 위 "참고 문서" 섹션에 한 줄 등록한다. 별도 인덱스 파일은 만들지 않는다.
+- 작업 전 관련 `Docs/*.md`가 있으면 먼저 읽는다.
+- 코드를 변경한 뒤 영향받는 문서를 같은 커밋에서 갱신한다 (문서-코드 분리 커밋 금지). 코드가 사실, 문서는 그 기록이다.
 - 기존 MD가 다루지 않는 새 시스템이면, 새 MD를 만들기 전에 어떤 파일명으로 어떤 범위를 담을지 먼저 합의한다.
-- MD가 코드와 어긋난 것을 발견하면 즉시 MD를 사실에 맞게 고친다 (코드가 사실, MD는 그 기록).
+- 새 MD를 만들면 위 "참고 문서" 표에 한 줄 등록한다. 별도 인덱스 파일은 만들지 않는다.
+- MD가 코드와 어긋난 것을 발견하면 즉시 MD를 사실에 맞게 고친다.
 
----
+### 단일 출처 (Single Source of Truth)
 
-## 기획자 수치 관리
-
-기획자는 수치 데이터를 **엑셀 테이블**로 작성하고, 프로그래머가 DataTable로 임포트한다.
-
-### 워크플로우
-1. 기획자 → 엑셀에서 수치 작성 → 프로그래머가 DataTable로 임포트
-2. 런타임에 DataTable 값 로드 → 각 캐릭터 인스턴스 컨트롤러의 UPROPERTY에 덮어씀 (캐릭터별 행 분리)
-3. DataTable 행이 없으면 블루프린트 기본값(UPROPERTY 초기값) 사용
-
-### PIE 튜닝
-- **어빌리티 수치** (속도, 지속시간 등): Outliner에서 PlayerController 선택 → Details 패널에서 직접 수정
-- **GE 수치** (쿨타임 등): GE Blueprint 에셋 열어서 Duration Magnitude 직접 수정 → 다음 발동부터 반영
+- 같은 사실을 여러 문서에 적지 않는다. **한 문서가 그 주제를 "소유"하고, 나머지는 값/내용을 복붙하지 않고 링크로 참조한다.**
+- 새 내용·변경은 그 주제의 소유처에만 적는다. 다른 문서에서는 수치·정의를 단정하지 말고 소유처를 가리키거나 의미만 정성적으로 쓴다.
+- 내용이 충돌하면 우선순위: **코드 > AGENTS.md(현행 동작·규칙) > `Docs/Systems/*.md`(설계 기록).**
+- 소유 맵:
+  - 게임 수치(스탯·경제·쿨타임 등) → DataTable(`DT_`, Row 구조체 `FLS~`). 문서엔 수치 복붙 금지, 의미만.
+  - 클래스/필드 구조 → C++ 헤더(`ALSCharacter.h` 등). 문서엔 코드 복붙 금지, 링크만.
+  - 프로젝트 규칙(작업 원칙·코드 규칙·역할 분리·금지 사항) → 이 AGENTS.md.
 
 ---
 
 ## Diff 최소화 규칙
 
-- 요청 범위 밖의 리팩터링, 정렬, 포맷 변경, 이름 변경을 하지 않는다.
-- 파일 전체 포맷팅 금지. 필요한 줄/함수만 수정한다.
-- 기존 코드 스타일이 마음에 들지 않아도 유지한다.
-- 큰 구조 변경이 필요해 보이면 바로 수정하지 말고 먼저 이유와 예상 diff 범위를 설명한다.
-- `git diff` 확인은 대규모 변경, 리팩터링, 여러 파일 수정, 사용자 요청이 있을 때만 수행한다.
-- 기존 로직을 대체하기 전에 먼저 현재 흐름을 설명하고, 동작을 바꾸는 경우 변경 전/후 흐름을 짧게 기록한다.
+- 요청 범위 밖의 리팩터링·정렬·포맷·이름 변경 금지. 필요한 줄/함수만 수정하고 기존 스타일은 유지한다.
+- 기존 로직을 대체하기 전에 현재 흐름을 먼저 설명한다. 동작이 바뀌면 변경 전/후를 짧게 기록한다. (큰 구조 변경은 "작업 원칙" 참고)
+- `git diff` 확인은 대규모·다중 파일 변경이나 요청이 있을 때만 한다.
 
 ---
 
 ## 금지 사항
 
-- GAS 수치 직접 변경 (GameplayEffect 우회 금지)
-- BP 이벤트그래프에 게임 로직
-- UI 텍스트에 FString
-- Tick에서 비싼 연산
-- `HasAuthority()` 없는 상태 변경
-- Legacy Input System 사용
-- Content 루트에 에셋 직접 배치
-- DataTable 값 코드에서 하드코딩 금지
-- Unreal MCP 하드코딩 금지 발견시 삭제
-- 안 쓰는 코드 커밋 (주석 처리된 코드, 미사용 #include, 빈 함수 등 — 발견 시 삭제)
+> 코드 규칙·역할 분리에서 이미 다룬 항목은 빼고, 그 외 금지만 모음.
 
----
+- Content 루트에 에셋 직접 배치 (반드시 `Content/LostSignal/` 하위)
+- 안 쓰는 코드 커밋 (주석 처리된 코드, 미사용 `#include`, 빈 함수 등 — 발견 시 삭제)
 
-## 토큰 절약
-
-- 코드 예시는 관련 함수/변수만 — 전체 클래스 금지
-- 설명은 Unity 비교 한 줄로 가능하면 그렇게
-- 에러 해결은 에러 줄 ±10줄만 참고
-- 긴 헤더 파일 통째로 붙여넣기 금지
