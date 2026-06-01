@@ -38,7 +38,7 @@ void ULSSaveSubsystem::AddToInventory(const TArray<FLSSessionItem>& Items)
 	Save();
 }
 
-bool ULSSaveSubsystem::TryAddToInventory(const FName ItemRowName, const int32 Amount, FLSSessionItem& OutRemainingItem)
+bool ULSSaveSubsystem::TryAddToInventory(const FName ItemRowName, const int32 Amount, const int32 StatSeed, FLSSessionItem& OutRemainingItem)
 {
 	OutRemainingItem = FLSSessionItem();
 	if (!SaveData)
@@ -47,7 +47,7 @@ bool ULSSaveSubsystem::TryAddToInventory(const FName ItemRowName, const int32 Am
 		return false;
 	}
 
-	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, SaveDefaultMaxInventorySlotCount, OutRemainingItem);
+	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, SaveDefaultMaxInventorySlotCount, StatSeed, OutRemainingItem);
 	if (bChanged)
 	{
 		Save();
@@ -200,7 +200,7 @@ bool ULSSaveSubsystem::TransferStoredSlotToArea(const ELSInventorySlotArea FromA
 	FLSSessionItem& FromSlot = (*FromSlots)[FromIndex];
 	FLSSessionItem RemainingItem;
 	const int32 ToMaxSlotCount = (ToArea == ELSInventorySlotArea::Inventory) ? SaveDefaultMaxInventorySlotCount : MAX_int32;
-	if (!LSInventorySlotUtils::TryAddItemsToSlotArray(*ToSlots, FromSlot.ItemRowName, FromSlot.Amount, ToMaxSlotCount, RemainingItem))
+	if (!LSInventorySlotUtils::TryAddItemsToSlotArray(*ToSlots, FromSlot.ItemRowName, FromSlot.Amount, ToMaxSlotCount, FromSlot.StatSeed, RemainingItem))
 	{
 		return false;
 	}
@@ -241,6 +241,7 @@ bool ULSSaveSubsystem::TransferAllInventoryToWarehouse(const int32 WarehouseMaxS
 			InventorySlot.ItemRowName,
 			InventorySlot.Amount,
 			WarehouseMaxSlotCount,
+			InventorySlot.StatSeed,
 			RemainingItem);
 
 		if (!bAddedAny)

@@ -84,7 +84,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void AddSessionItem(FName ItemRowName, int32 Amount);
 
-	bool TryAddSessionItem(FName ItemRowName, int32 Amount, FLSSessionItem& OutRemainingItem);
+	bool TryAddSessionItem(FName ItemRowName, int32 Amount, int32 StatSeed, FLSSessionItem& OutRemainingItem);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void SortSessionInventory();

@@ -39,9 +39,9 @@ int32 ULSRaidInventoryComponent::GetMaxInventorySlotCount() const
 	return DefaultMaxRaidInventorySlotCount;
 }
 
-bool ULSRaidInventoryComponent::TryAddSessionItem(const FName ItemRowName, const int32 Amount, FLSSessionItem& OutRemainingItem)
+bool ULSRaidInventoryComponent::TryAddSessionItem(const FName ItemRowName, const int32 Amount, const int32 StatSeed, FLSSessionItem& OutRemainingItem)
 {
-	return LSInventorySlotUtils::TryAddItemsToSlotArray(SessionInventory, ItemRowName, Amount, GetMaxInventorySlotCount(), OutRemainingItem);
+	return LSInventorySlotUtils::TryAddItemsToSlotArray(SessionInventory, ItemRowName, Amount, GetMaxInventorySlotCount(), StatSeed, OutRemainingItem);
 }
 
 void ULSRaidInventoryComponent::SortSessionInventory()

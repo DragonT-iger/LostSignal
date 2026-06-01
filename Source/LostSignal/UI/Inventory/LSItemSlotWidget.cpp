@@ -13,7 +13,7 @@
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
 
-void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount)
+void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, const int32 StatSeed)
 {
 	if (!ItemIconImage)
 	{
@@ -50,7 +50,7 @@ void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount)
 	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
 	AmountText->SetText(FText::AsNumber(Amount));
 	AmountText->SetVisibility(Amount > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-	SetTooltipItem(ItemRowName, Amount);
+	SetTooltipItem(ItemRowName, Amount, StatSeed);
 	bHasItem = true;
 }
 

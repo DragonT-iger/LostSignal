@@ -3,10 +3,11 @@
 #include "LostSignal.h"
 #include "UI/Inventory/LSItemTooltipWidget.h"
 
-void ULSItemTooltipSlotWidget::SetTooltipItem(const FName ItemRowName, const int32 Amount)
+void ULSItemTooltipSlotWidget::SetTooltipItem(const FName ItemRowName, const int32 Amount, const int32 StatSeed)
 {
 	CurrentTooltipItemRowName = ItemRowName;
 	CurrentTooltipAmount = Amount;
+	CurrentTooltipStatSeed = StatSeed;
 	bHasTooltipItem = !ItemRowName.IsNone();
 	RefreshItemTooltip();
 }
@@ -15,6 +16,7 @@ void ULSItemTooltipSlotWidget::ClearTooltipItem()
 {
 	CurrentTooltipItemRowName = NAME_None;
 	CurrentTooltipAmount = 0;
+	CurrentTooltipStatSeed = 0;
 	bHasTooltipItem = false;
 	SetToolTip(nullptr);
 }
@@ -51,6 +53,6 @@ void ULSItemTooltipSlotWidget::RefreshItemTooltip()
 		return;
 	}
 
-	ItemTooltipWidget->SetItem(CurrentTooltipItemRowName, CurrentTooltipAmount);
+	ItemTooltipWidget->SetItem(CurrentTooltipItemRowName, CurrentTooltipAmount, CurrentTooltipStatSeed);
 	SetToolTip(ItemTooltipWidget);
 }

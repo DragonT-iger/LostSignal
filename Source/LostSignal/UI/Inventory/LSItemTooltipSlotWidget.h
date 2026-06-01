@@ -13,7 +13,7 @@ class LOSTSIGNAL_API ULSItemTooltipSlotWidget : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
-	void SetTooltipItem(FName ItemRowName, int32 Amount);
+	void SetTooltipItem(FName ItemRowName, int32 Amount, int32 StatSeed = 0);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void ClearTooltipItem();
@@ -28,6 +28,7 @@ private:
 	TObjectPtr<ULSItemTooltipWidget> ItemTooltipWidget;
 	FName CurrentTooltipItemRowName;
 	int32 CurrentTooltipAmount = 0;
+	int32 CurrentTooltipStatSeed = 0;
 	bool bHasTooltipItem = false;
 
 	void RefreshItemTooltip();

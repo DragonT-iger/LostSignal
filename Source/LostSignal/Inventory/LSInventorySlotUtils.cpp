@@ -202,7 +202,7 @@ void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, const int32 SlotIndex)
 	}
 }
 
-bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount, const int32 MaxSlotCount, FLSSessionItem& OutRemainingItem)
+bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount, const int32 MaxSlotCount, const int32 StatSeed, FLSSessionItem& OutRemainingItem)
 {
 	OutRemainingItem = MakeEmptyItem();
 	if (ItemRowName.IsNone() || Amount <= 0)
@@ -215,6 +215,7 @@ bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowNa
 	{
 		OutRemainingItem.ItemRowName = ItemRowName;
 		OutRemainingItem.Amount = Amount;
+		OutRemainingItem.StatSeed = StatSeed;
 		return false;
 	}
 
@@ -230,7 +231,8 @@ bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowNa
 			break;
 		}
 
-		if (Slot.ItemRowName != ItemRowName || Slot.Amount >= MaxStack)
+		// 인스턴스 시드가 다르면 같은 RowName이라도 합치지 않는다. (칩 등 개체별 스탯 보존)
+		if (Slot.ItemRowName != ItemRowName || Slot.StatSeed != StatSeed || Slot.Amount >= MaxStack)
 		{
 			continue;
 		}
@@ -255,6 +257,7 @@ bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowNa
 
 		Slot.ItemRowName = ItemRowName;
 		Slot.Amount = FMath::Min(Amount, MaxStack);
+		Slot.StatSeed = StatSeed;
 		Amount -= Slot.Amount;
 	}
 
@@ -263,6 +266,7 @@ bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowNa
 		FLSSessionItem NewSlot;
 		NewSlot.ItemRowName = ItemRowName;
 		NewSlot.Amount = FMath::Min(Amount, MaxStack);
+		NewSlot.StatSeed = StatSeed;
 		Slots.Add(NewSlot);
 		Amount -= NewSlot.Amount;
 	}
@@ -271,6 +275,7 @@ bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowNa
 	{
 		OutRemainingItem.ItemRowName = ItemRowName;
 		OutRemainingItem.Amount = Amount;
+		OutRemainingItem.StatSeed = StatSeed;
 	}
 
 	return Amount < OriginalAmount;
@@ -287,7 +292,7 @@ void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName,
 	while (Amount > 0)
 	{
 		const int32 OriginalAmount = Amount;
-		TryAddItemsToSlotArray(Slots, ItemRowName, Amount, MAX_int32, RemainingItem);
+		TryAddItemsToSlotArray(Slots, ItemRowName, Amount, MAX_int32, /*StatSeed=*/0, RemainingItem);
 		Amount = RemainingItem.Amount;
 		if (Amount == OriginalAmount)
 		{

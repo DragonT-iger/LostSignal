@@ -161,7 +161,7 @@ void ULSInventoryWidget::RebuildInventorySlots()
 
 			if (bHasSlotItem)
 			{
-				SlotWidget->SetItem(InventoryItems[SlotIndex].ItemRowName, InventoryItems[SlotIndex].Amount);
+				SlotWidget->SetItem(InventoryItems[SlotIndex].ItemRowName, InventoryItems[SlotIndex].Amount, InventoryItems[SlotIndex].StatSeed);
 			}
 			else
 			{
@@ -347,7 +347,7 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 			SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Safe, SlotIndex, bHasSlotItem);
 			if (bHasSlotItem)
 			{
-				SlotWidget->SetItem(SafeItems[SlotIndex].ItemRowName, SafeItems[SlotIndex].Amount);
+				SlotWidget->SetItem(SafeItems[SlotIndex].ItemRowName, SafeItems[SlotIndex].Amount, SafeItems[SlotIndex].StatSeed);
 			}
 			else
 			{

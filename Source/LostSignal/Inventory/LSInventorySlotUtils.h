@@ -22,7 +22,7 @@ namespace LSInventorySlotUtils
 
 	void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, int32 SlotIndex);
 	void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount);
-	bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount, int32 MaxSlotCount, FLSSessionItem& OutRemainingItem);
+	bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount, int32 MaxSlotCount, int32 StatSeed, FLSSessionItem& OutRemainingItem);
 	void NormalizeSlotArray(TArray<FLSSessionItem>& Slots);
 	void RemoveItemsFromSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount);
 	void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots);
