@@ -197,7 +197,7 @@ Item_Equipment 값: `Processor`(머리), `Core`(몸), `Actuator`(손), `Frame`(�
 
 등급별(Supply~Masterpiece) 각 스탯의 Min/Max 범위를 정의한다. 칩 생성 시 이 범위에서 랜덤 수치가 결정된다.
 
-> 구체적인 스탯별 Min/Max 값과 등급별 스탯 개수(Chip_Setting)는 **`DT_Chip_Stat` DataTable이 단일 출처**다. 수치가 바뀌면 여기 표가 stale 되므로 문서에 복사하지 않는다. 실제 값은 DataTable을 본다.
+> 구체적인 스탯별 Min/Max 값과 등급별 스탯 개수(Chip_Setting)는 **`DT_ChipStat` DataTable이 단일 출처**다. 수치가 바뀌면 여기 표가 stale 되므로 문서에 복사하지 않는다. 실제 값은 DataTable을 본다.
 
 ---
 
@@ -307,20 +307,24 @@ UI 드랍 연출: 아이템은 등급이 높을수록 0.2초의 추가 대기시
 
 UE DeveloperSettings(`config=Game`)로 프로젝트 설정 > "LS Drop Settings"에서 등록.
 
-| 설정 | 대상 테이블 |
+실제 에셋 경로는 `Config/DefaultGame.ini`의 `[/Script/LostSignal.LSDropSettings]` 섹션에 기록된다.
+
+| 설정 | 대상 에셋 |
 |------|------------|
-| RootingObjectTable | DT_Looting_Object |
+| RootingObjectTable | DT_RootingObject |
 | DropTable | DT_DropTable |
 | GroupTable | DT_GroupTable |
-| ChipTable | DT_Chip |
+| ChipTable | DT_ChipRow |
 | WeaponTable | DT_Weapon |
 | ArmorTable | DT_Armor |
 | ItemTable | DT_Item |
-| ChipStatTable | DT_Chip_Stat |
+| ChipStatTable | DT_ChipStat |
 
 ### 로드 흐름
 
-`LSDropSubsystem::LoadTables`에서 각 SoftObjectPtr를 `LoadSynchronous()`로 로드한 뒤, `ExtractRowNamePrefix`로 그룹화하여 `DropTableMap` / `GroupTableMap`에 캐싱.
+`LSDropSubsystem::LoadTables`에서 RootingObject / Drop / Group / Chip / Weapon / Armor / Item **7개** SoftObjectPtr를 `LoadSynchronous()`로 로드한 뒤, `ExtractRowNamePrefix`로 그룹화하여 `DropTableMap` / `GroupTableMap`에 캐싱.
+
+`ChipStatTable`은 `LSDropSettings`에 등록되어 있지만 `LSDropSubsystem`은 로드하지 않는다(칩 스탯 생성 로직 미구현). 칩 스탯 시스템을 붙일 때 로드 대상에 추가해야 한다.
 
 ---
 

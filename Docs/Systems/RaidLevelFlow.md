@@ -37,8 +37,9 @@ ULSRaidInventoryComponent
 - 레이드 중 플레이어별 Inventory/Safe 상태의 서버 원본
 
 ULSSessionSubsystem
-- 1인/legacy 호환용 세션 미러 상태
-- 현재 MO 흐름에서는 PlayerController별 RaidInventoryComponent가 레이드 중 원본
+- ServerTravel 후 플레이어별 인벤토리 복원용 PendingRaidEntries 큐 보유
+- 1인/legacy 호환용 세션 미러 상태(SessionInventory/SessionSafeInventory)도 함께 보유
+- 레이드 중 아이템의 원본은 PlayerController별 RaidInventoryComponent
 ```
 
 ## 레벨 설정
@@ -114,13 +115,19 @@ ALSPlayerControllerBase::ServerSubmitRaidEntryData
 ```text
 ALSLobbyGameMode::TryStartRaidWithSubmittedData
 -> 모든 PlayerController의 HasSubmittedRaidEntryData 확인
--> 각 PlayerController의 RaidInventoryComponent->StartRaidInventory(PlayerLoadout, PlayerSafeItems)
--> 각 PlayerController에 ClientStartRaidSession(PlayerLoadout, PlayerSafeItems)
--> ULSSessionSubsystem::StartRaid / MirrorRaidSessionState 호출
+-> 각 PlayerController마다:
+   - SessionSubsystem->EnqueuePendingRaidEntry(PlayerLoadout, PlayerSafeItems)
+   - RaidInventoryComponent->StartRaidInventory(PlayerLoadout, PlayerSafeItems)
+   - ClientStartRaidSession(PlayerLoadout, PlayerSafeItems)
+-> ULSSessionSubsystem::StartRaid / MirrorRaidSessionState 호출 (첫 번째 제출 데이터)
 -> FarmingLevel로 ServerTravel
 ```
 
+각 `PlayerController`의 제출 payload는 `SessionSubsystem`의 `PendingRaidEntries` 큐에 순서대로 적재된다. ServerTravel로 컨트롤러/컴포넌트가 새로 생성되면 직접 주입한 `StartRaidInventory` 결과는 유실되므로, 이 큐가 ServerTravel 이후 플레이어별 인벤토리를 복원하는 실제 경로다 (아래 "레이드 중 상태 원본" 참고).
+
 `ULSSessionSubsystem`에는 첫 번째 제출 데이터를 legacy 세션 상태로 미러링한다. 2인 이상 MO 기준의 실제 레이드 중 원본은 각 `PlayerController`의 `ULSRaidInventoryComponent`다.
+
+`ClientStartRaidSession`은 클라이언트의 `RaidInventoryComponent`를 미러링한 뒤 로컬 `SaveSubsystem->BeginRaidSave(Loadout)`로 복구용 레이드 저장을 시작한다.
 
 ## 레이드 중 상태 원본
 
@@ -147,16 +154,20 @@ ULSRaidInventoryComponent
 -> 인벤토리/루팅 UI 갱신
 ```
 
-ServerTravel 이후 `BeginPlay`에서 기존 세션 상태를 복구해야 할 때:
+ServerTravel 이후 `BeginPlay`에서 각 `PlayerController`가 자기 인벤토리를 복원한다.
 
 ```text
 ALSPlayerControllerBase::InitializeRaidInventoryFromSessionSubsystem
--> RaidInventoryComponent가 비활성이고 SessionSubsystem이 active면
--> SessionSubsystem의 Inventory/Safe를 RaidInventoryComponent에 미러링
+-> RaidInventoryComponent가 이미 active면 (서버면 ClientSyncRaidSessionAndLoot 후) 종료
+-> SessionSubsystem이 active가 아니면 종료
+-> SessionSubsystem::DequeuePendingRaidEntry 성공하면
+   -> RaidInventoryComponent->StartRaidInventory(꺼낸 Inventory/Safe)   ← 정상 MO 복원 경로
+-> 큐가 비어 있으면 (fallback)
+   -> SessionSubsystem의 SessionInventory/SessionSafeInventory를 MirrorRaidInventoryState
 -> 서버면 ClientSyncRaidSessionAndLoot
 ```
 
-이 경로는 legacy/복구용이다. 정상 MO 입장 경로에서는 `ALSLobbyGameMode`가 각 플레이어별 제출 payload를 `RaidInventoryComponent`에 직접 주입한다.
+정상 MO 입장 경로에서는 `ALSLobbyGameMode`가 `EnqueuePendingRaidEntry`로 적재해 둔 플레이어별 payload를 각 `PlayerController`가 `DequeuePendingRaidEntry`로 꺼내 복원한다. 큐가 비는 경우(legacy/1인 미러 경로)에만 `SessionSubsystem`의 세션 미러 상태로 폴백한다.
 
 ## 레이드 종료 트리거
 
@@ -322,9 +333,11 @@ Lobby StartRaid
   -> Client reads local SaveSubsystem Inventory/SafeStash
   -> Server stores SubmittedRaidLoadout/SubmittedRaidSafeItems
   -> All submitted
+  -> Each payload enqueued to SessionSubsystem PendingRaidEntries
   -> Each RaidInventoryComponent starts with its own payload
-  -> ClientStartRaidSession mirrors local raid state
+  -> ClientStartRaidSession mirrors local raid state + BeginRaidSave
   -> ServerTravel(FarmingLevel)
+  -> Each PlayerController dequeues its payload to restore RaidInventoryComponent
 
 Farming Raid
   -> Server owns each RaidInventoryComponent

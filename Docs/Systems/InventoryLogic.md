@@ -164,10 +164,13 @@ Inventory StoreAllButton
 루트 박스는 `ALSLootBox`가 서버에서 열고, 결과는 `FLSDropResult` 배열로 관리한다.
 
 ```text
-ALSLootBox::Interact
--> 서버에서 드랍 결과 생성
--> ClientSyncRaidSessionAndLoot로 클라이언트 UI 미러링
+ALSLootBox::Interact (서버 권한에서만 드랍 생성)
+-> DropSubsystem::OpenRootingObject로 LootResults 생성
+-> LootResults는 Replicated로 클라이언트에 동기화
+-> PlayerController::ShowLootDropWidget(ClientShowLootDropWidget RPC)로 루팅 UI 표시
 ```
+
+박스를 연 뒤 슬롯을 옮기는 transfer/drop 조작은 서버에서 확정되고 `ClientSyncRaidSessionAndLoot`로 인벤토리/루팅 UI를 다시 미러링한다.
 
 루트 박스에서 인벤토리로 옮길 때는 `FLSDropResult`를 `FLSSessionItem` 형태로 변환하고, 레이드 중이면 서버의 `ULSRaidInventoryComponent`에 추가한다.
 
