@@ -6,8 +6,6 @@
 
 아이템 슬롯 구조와 저장/네트워크 경계는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)를 기준으로 보고, 인벤토리 UI 조작은 [InventoryLogic.md](InventoryLogic.md)를 기준으로 본다. 이 문서는 레벨 전환, 입장 데이터 제출, 결과 저장 ACK, 실패 처리에 집중한다.
 
-Unity식으로 보면 `ALSLobbyGameMode`와 `ALSFarmingGameMode`가 씬 전환을 결정하는 서버 전용 매니저이고, `ALSPlayerControllerBase`는 각 플레이어의 로컬 저장 데이터와 서버 세션 상태를 이어 주는 네트워크 중계자다.
-
 ## 관련 클래스
 
 ```text
@@ -137,7 +135,7 @@ ULSRaidInventoryComponent
 - ConsumedItems
 ```
 
-레이드 중 클라이언트는 자기 로컬 SaveGame 값을 다시 주장하지 않는다. UI는 서버에서 내려온 `RaidInventoryComponent` 미러 상태를 보여준다.
+레이드 중 클라이언트 값을 다시 신뢰하지 않고 서버 미러만 표시하는 신뢰 경계 원칙은 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)가 단일 출처다. 여기서는 UI가 서버에서 내려온 `RaidInventoryComponent` 미러 상태를 보여준다는 점만 짚는다.
 
 대표 동기화 흐름:
 

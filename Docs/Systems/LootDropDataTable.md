@@ -4,7 +4,7 @@
 
 루팅 오브젝트를 열었을 때 어떤 아이템이 떨어지는지를 결정하는 데이터 파이프라인을 정리한다. 인벤토리 저장/네트워크는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md), 슬롯 UI 조작은 [InventoryLogic.md](InventoryLogic.md)를 기준으로 본다.
 
-기획서 원본은 `Lost_signal 시스템 정리.xlsx`이고, 이 문서는 기획 의도와 실제 코드 구현을 하나로 합친 기준 문서다. 기획서와 코드가 다른 부분은 **[기획/코드 차이]** 로 표시한다.
+기획서와 코드가 다른 부분은 **[기획/코드 차이]** 로 표시한다.
 
 ---
 

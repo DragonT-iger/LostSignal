@@ -35,8 +35,6 @@
 - 기획 수치는 가능하면 `FLSCharacterSkillRow` DataTable에서 읽는다.
 - `ULSSkill` 기반 기존 클래스는 레거시 마이그레이션 대상으로만 본다.
 
-Unity식으로 보면 `ULSSkillDataAsset`은 ScriptableObject, `GameplayAbility`는 실제 실행 로직, `GameplayEffect`는 버프/데미지/쿨타임 적용 명령이다.
-
 ## 전체 구조
 
 ```text

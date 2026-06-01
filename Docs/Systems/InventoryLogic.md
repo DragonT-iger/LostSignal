@@ -6,8 +6,6 @@
 
 저장 구조, 레이드 네트워크, 클라이언트/서버 신뢰 경계는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)를 기준으로 본다. 이 문서는 그 위에서 실제 슬롯이 화면에서 어떻게 표시되고 이동하는지에 집중한다.
 
-Unity식으로 보면 `FLSSessionItem` 배열이 `List<ItemStack>`이고, 각 위젯은 그 배열을 보여주고 조작 요청을 보내는 View다. 레이드 중 실제 원본은 서버의 `ULSRaidInventoryComponent`이고, 로비의 영구 저장 원본은 로컬 `ULSSaveSubsystem`이다.
-
 ## 핵심 데이터와 영역
 
 슬롯의 최소 단위는 `FLSSessionItem`이다 (저장 포맷·필드 정의는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)가 소유).
@@ -219,8 +217,7 @@ Item   -> 300000 + DataTable row 순서
 
 인벤토리 로직 관점에서 지켜야 할 규칙은 다음과 같다.
 
-- 레이드 중 UI는 서버가 확정한 자기 `RaidInventoryComponent` 상태를 미러링해서 보여준다.
-- 레이드 중 클라이언트가 로컬 SaveGame 값을 다시 주장하지 않는다.
+- 레이드 중 UI 표시의 신뢰 경계(클라이언트 값 불신, 서버 `RaidInventoryComponent` 미러만 표시)는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)가 단일 출처다.
 - 레이드 종료 결과 저장은 `ALSFarmingGameMode`가 만든 결과 payload를 클라이언트가 로컬 `SaveGame`에 반영하는 흐름이다.
 - `ULSSessionSubsystem`은 아직 보조/레거시 API가 남아 있지만, 2인 이상 레이드의 플레이어별 원본으로 보지 않는다.
 

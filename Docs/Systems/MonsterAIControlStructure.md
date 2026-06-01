@@ -6,8 +6,6 @@
 
 몬스터 상태 변화는 StateTree가 담당한다. C++은 StateTree가 판단할 수 있는 데이터를 만들거나, StateTree Task가 요청한 행동을 실행하는 역할로 제한한다.
 
-Unity식으로 보면 `StateTree`는 상태 머신, `Evaluator`는 Blackboard 값 갱신기, `Task`는 상태 진입 시 실행되는 액션 노드다.
-
 ## 핵심 원칙
 
 ```text
