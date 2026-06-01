@@ -115,7 +115,7 @@ GroupTable (Group_XXX_숫자)
 |--------------|--------|------|
 | Supply | 보급 | 흰색 |
 | Standard | 표준 | 초록색 |
-| Presision | 정밀 | 파란색 |
+| Precision | 정밀 | 파란색 |
 | Tuning | 튜닝 | 보라색 |
 | Prototype | 프로토타입 | 노란색 |
 | Masterpiece | 마스터피스 | 빨간색 |
@@ -380,7 +380,7 @@ UE DeveloperSettings(`config=Game`)로 프로젝트 설정 > "LS Drop Settings"�
 3. RollDropTable("Drop_Chip_Chest")
    → Drop_Chip_Chest_1: Group_Chip_Supply,    Rate=100  → 확정
    → Drop_Chip_Chest_2: Group_Chip_Standard,  Rate=75   → 75% 확률
-   → Drop_Chip_Chest_3: Group_Chip_Presision,  Rate=25   → 25% 확률
+   → Drop_Chip_Chest_3: Group_Chip_Precision,  Rate=25   → 25% 확률
    → Drop_Chip_Chest_4: Group_Chip_Tuning,     Rate=5    → 5% 확률
    → Drop_Chip_Chest_5: Group_Chip_Prototype,  Rate=1    → 1% 확률
    → Drop_Chip_Chest_6: Group_Chip_Masterpiece, Rate=0.1 → 0.1% 확률

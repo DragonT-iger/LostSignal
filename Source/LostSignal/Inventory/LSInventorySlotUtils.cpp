@@ -10,6 +10,16 @@
 
 namespace
 {
+// 알려진 등급 토큰. Row Name 파싱과 정렬 순서의 기준.
+const TArray<FString>& GetKnownGrades()
+{
+	static const TArray<FString> KnownGrades = {
+		TEXT("Supply"), TEXT("Standard"), TEXT("Precision"),
+		TEXT("Tuning"), TEXT("Prototype"), TEXT("Masterpiece"),
+	};
+	return KnownGrades;
+}
+
 constexpr int32 SortGroupWeaponOffset = 100000;
 constexpr int32 SortGroupArmorOffset = 200000;
 constexpr int32 SortGroupItemOffset = 300000;
@@ -95,6 +105,7 @@ FLSSessionItem ToSessionItem(const FLSDropResult& Item)
 	FLSSessionItem Result;
 	Result.ItemRowName = Item.ItemRowName;
 	Result.Amount = Item.Amount;
+	Result.StatSeed = Item.StatSeed;
 	return Result;
 }
 
@@ -103,6 +114,7 @@ void SetDropResultFromSessionItem(FLSDropResult& TargetSlot, const FLSSessionIte
 	TargetSlot.ItemRowName = SourceItem.ItemRowName;
 	TargetSlot.Amount = SourceItem.Amount;
 	TargetSlot.ItemText = FText::GetEmpty();
+	TargetSlot.StatSeed = SourceItem.StatSeed;
 }
 
 void ClearDropResult(FLSDropResult& TargetSlot)
@@ -157,6 +169,29 @@ int32 ResolveItemMaxStack(const FName ItemRowName, const TCHAR* Context)
 	}
 
 	return MaxStack;
+}
+
+FString ResolveItemGradeFromRowName(const FName ItemRowName)
+{
+	if (ItemRowName.IsNone())
+	{
+		return FString();
+	}
+
+	TArray<FString> Tokens;
+	ItemRowName.ToString().ParseIntoArray(Tokens, TEXT("_"), /*InCullEmpty=*/true);
+
+	const TArray<FString>& KnownGrades = GetKnownGrades();
+	for (const FString& Token : Tokens)
+	{
+		if (KnownGrades.Contains(Token))
+		{
+			return Token;
+		}
+	}
+
+	UE_LOG(LogLS, Warning, TEXT("[Inventory] Cannot resolve grade from row name '%s' (no known grade token)."), *ItemRowName.ToString());
+	return FString();
 }
 
 void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, const int32 SlotIndex)

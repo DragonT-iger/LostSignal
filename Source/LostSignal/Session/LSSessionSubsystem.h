@@ -28,6 +28,10 @@ struct FLSSessionItem
 
 	UPROPERTY(BlueprintReadOnly) FName ItemRowName;
 	UPROPERTY(BlueprintReadOnly) int32 Amount = 0;
+
+	// 칩 인스턴스 스탯 롤링 시드. 0 = 미롤(비칩/레거시). 칩은 획득 시 비-0 시드를 받아
+	// (등급 + 시드)로 전투 스탯을 결정론적으로 재계산한다. 이동/저장/복제 시 그대로 보존.
+	UPROPERTY(BlueprintReadOnly) int32 StatSeed = 0;
 };
 
 // 레이드 입장 시점의 장비 스냅샷

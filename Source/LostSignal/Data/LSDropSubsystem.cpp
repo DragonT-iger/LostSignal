@@ -5,6 +5,7 @@
 #include "Data/LSDropTableRow.h"
 #include "Data/LSGroupTableRow.h"
 #include "Data/LSChipRow.h"
+#include "Data/LSChipStats.h"
 #include "Data/LSWeaponRow.h"
 #include "Data/LSArmorRow.h"
 #include "Data/LSItemRow.h"
@@ -150,6 +151,11 @@ TArray<FLSDropResult> ULSDropSubsystem::RollDropTable(FName DropTableName)
 		Result.ItemRowName = ItemRowName;
 		Result.Amount      = Entry->Drop_Amount;
 		Result.ItemText    = FindItemText(ItemRowName);
+		// 칩은 획득 시점에 인스턴스 스탯 시드를 부여한다. (등급+시드로 전투 스탯 결정론적 산출)
+		if (ItemRowName.ToString().StartsWith(TEXT("Chip_")))
+		{
+			Result.StatSeed = LSChipStats::RollNewChipSeed();
+		}
 		Results.Add(Result);
 
 		UE_LOG(LogLS, Log, TEXT("    [성공] 그룹 '%s' -> %s(%s) x%d"),

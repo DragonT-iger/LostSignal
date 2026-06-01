@@ -16,6 +16,10 @@ namespace LSInventorySlotUtils
 
 	int32 ResolveItemMaxStack(FName ItemRowName, const TCHAR* Context);
 
+	// 아이템 등급을 Row Name에서 파싱한다. (예: Chip_Supply_HP / Armor_Frame_Supply / Weapon_HF_Blade_Precision)
+	// Name 토큰 중 알려진 등급(Supply/Standard/Precision/Tuning/Prototype/Masterpiece)을 찾아 반환. 없으면 빈 문자열.
+	FString ResolveItemGradeFromRowName(FName ItemRowName);
+
 	void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, int32 SlotIndex);
 	void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount);
 	bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount, int32 MaxSlotCount, FLSSessionItem& OutRemainingItem);

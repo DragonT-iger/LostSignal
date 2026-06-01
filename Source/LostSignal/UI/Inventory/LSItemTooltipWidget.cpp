@@ -9,6 +9,7 @@
 #include "Data/LSWeaponRow.h"
 #include "Engine/DataTable.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "UI/Inventory/LSItemTooltipExtraInfoRowWidget.h"
@@ -211,7 +212,7 @@ void ULSItemTooltipWidget::PopulateChipTooltip(const FName ItemRowName)
 		return;
 	}
 
-	SetCommonTexts(LOCTEXT("ChipTooltipType", "칩 설명창"), Row->Item_Text, Row->Item_Grade, Row->Item_Description, Row->Item_Cost);
+	SetCommonTexts(LOCTEXT("ChipTooltipType", "칩 설명창"), Row->Item_Text, LSInventorySlotUtils::ResolveItemGradeFromRowName(ItemRowName), Row->Item_Description, Row->Item_Cost);
 	AddExtraInfo(LOCTEXT("ChipMemoryCostExtraInfo", "메모리 할당량"), FText::AsNumber(Row->Item_MemoryCost));
 
 	AddStatIfNonZero(LOCTEXT("ChipStatusCountStat", "전투 스탯 개수"), static_cast<float>(Row->Item_Chip_Status_Count));
@@ -234,7 +235,7 @@ void ULSItemTooltipWidget::PopulateWeaponTooltip(const FName ItemRowName)
 		return;
 	}
 
-	SetCommonTexts(LOCTEXT("EquipmentTooltipType", "장비 설명창"), Row->Item_Text, Row->Item_Grade, Row->Item_Description, Row->Item_Cost);
+	SetCommonTexts(LOCTEXT("EquipmentTooltipType", "장비 설명창"), Row->Item_Text, LSInventorySlotUtils::ResolveItemGradeFromRowName(ItemRowName), Row->Item_Description, Row->Item_Cost);
 	AddExtraInfo(LOCTEXT("EquipmentExtraInfo", "장착 가능"), GetEquipmentDisplayText(Row->Item_Equipment));
 	AddStatIfNonZero(LOCTEXT("AttackStat", "공격력"), Row->Item_Attack);
 	AddStatIfNonZero(LOCTEXT("AttackSpeedStat", "공격 속도"), Row->Item_Attack_Speed);
@@ -261,7 +262,7 @@ void ULSItemTooltipWidget::PopulateArmorTooltip(const FName ItemRowName)
 		return;
 	}
 
-	SetCommonTexts(LOCTEXT("ArmorTooltipType", "장비 설명창"), Row->Item_Text, Row->Item_Grade, Row->Item_Description, Row->Item_Cost);
+	SetCommonTexts(LOCTEXT("ArmorTooltipType", "장비 설명창"), Row->Item_Text, LSInventorySlotUtils::ResolveItemGradeFromRowName(ItemRowName), Row->Item_Description, Row->Item_Cost);
 	AddExtraInfo(LOCTEXT("ArmorExtraInfo", "장착 가능"), GetEquipmentDisplayText(Row->Item_Equipment));
 	AddStatIfNonZero(LOCTEXT("HealthStat", "체력"), Row->Item_Health);
 	AddStatIfNonZero(LOCTEXT("DefenseStat", "방어력"), Row->Item_Defense);
@@ -295,7 +296,7 @@ void ULSItemTooltipWidget::PopulateItemTooltip(const FName ItemRowName, const in
 		}
 	}
 
-	SetCommonTexts(LOCTEXT("ItemTooltipType", "일반 아이템 설명창"), Row->Item_Text, Row->Item_Grade, Row->Item_Description, Row->Item_Cost);
+	SetCommonTexts(LOCTEXT("ItemTooltipType", "일반 아이템 설명창"), Row->Item_Text, LSInventorySlotUtils::ResolveItemGradeFromRowName(ItemRowName), Row->Item_Description, Row->Item_Cost);
 	AddExtraInfo(LOCTEXT("CurrentItemCountExtraInfo", "현재 아이템 개수"), FText::AsNumber(CurrentCount));
 	AddExtraInfo(LOCTEXT("StashItemCountExtraInfo", "창고 아이템 개수"), FText::AsNumber(0));
 }
@@ -304,7 +305,7 @@ FText ULSItemTooltipWidget::GetGradeText(const FString& ItemGrade)
 {
 	if (ItemGrade == TEXT("Supply"))       return LOCTEXT("GradeSupply", "보급");
 	if (ItemGrade == TEXT("Standard"))     return LOCTEXT("GradeStandard", "표준");
-	if (ItemGrade == TEXT("Presision"))    return LOCTEXT("GradePrecision", "정밀");
+	if (ItemGrade == TEXT("Precision"))    return LOCTEXT("GradePrecision", "정밀");
 	if (ItemGrade == TEXT("Tuning"))       return LOCTEXT("GradeTuning", "튜닝");
 	if (ItemGrade == TEXT("Prototype"))    return LOCTEXT("GradePrototype", "프로토타입");
 	if (ItemGrade == TEXT("Masterpiece"))  return LOCTEXT("GradeMasterpiece", "마스터피스");

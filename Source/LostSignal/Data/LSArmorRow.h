@@ -17,9 +17,8 @@ struct LOSTSIGNAL_API FLSArmorRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Type = 2;
 
-	// Supply / Standard / Presision / Tuning / Prototype / Masterpiece
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
-	FString Item_Grade;
+	// 등급(Supply/Standard/Precision/Tuning/Prototype/Masterpiece)은 Row Name 끝 토큰에서 파싱한다.
+	// (LSInventorySlotUtils::ResolveItemGradeFromRowName)
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Max = 1;

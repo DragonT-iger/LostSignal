@@ -15,6 +15,9 @@ struct FLSDropResult
 	UPROPERTY(BlueprintReadOnly) FName ItemRowName;
 	UPROPERTY(BlueprintReadOnly) int32 Amount = 0;
 	UPROPERTY(BlueprintReadOnly) FText ItemText;
+
+	// 칩 드랍 시 부여되는 스탯 롤링 시드. 0 = 비칩. ToSessionItem으로 슬롯에 그대로 전달된다.
+	UPROPERTY(BlueprintReadOnly) int32 StatSeed = 0;
 };
 
 UCLASS()

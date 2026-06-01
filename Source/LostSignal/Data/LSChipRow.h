@@ -16,9 +16,8 @@ struct LOSTSIGNAL_API FLSChipRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Type = 0;
 
-	// Supply / Standard / Presision / Tuning / Prototype / Masterpiece
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
-	FString Item_Grade;
+	// 등급(Supply/Standard/Precision/Tuning/Prototype/Masterpiece)은 Row Name(Chip_{Grade}_{Func}) 토큰에서 파싱한다.
+	// (LSInventorySlotUtils::ResolveItemGradeFromRowName)
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Item")
 	int32 Item_Max = 1;
