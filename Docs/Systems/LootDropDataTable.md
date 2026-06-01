@@ -2,7 +2,7 @@
 
 ## 목적
 
-루팅 오브젝트를 열었을 때 어떤 아이템이 떨어지는지를 결정하는 데이터 파이프라인을 정리한다. 인벤토리 저장/네트워크는 `ItemSaveNetworkStructure.md`, 슬롯 UI 조작은 `InventoryLogic.md`를 기준으로 본다.
+루팅 오브젝트를 열었을 때 어떤 아이템이 떨어지는지를 결정하는 데이터 파이프라인을 정리한다. 인벤토리 저장/네트워크는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md), 슬롯 UI 조작은 [InventoryLogic.md](InventoryLogic.md)를 기준으로 본다.
 
 기획서 원본은 `Lost_signal 시스템 정리.xlsx`이고, 이 문서는 기획 의도와 실제 코드 구현을 하나로 합친 기준 문서다. 기획서와 코드가 다른 부분은 **[기획/코드 차이]** 로 표시한다.
 
@@ -195,31 +195,9 @@ Item_Equipment 값: `Processor`(머리), `Core`(몸), `Actuator`(손), `Frame`(�
 
 파일: `Source/LostSignal/Data/LSChipStatRow.h`
 
-등급별(Supply~Masterpiece) 각 스탯의 Min/Max 범위를 정의. 칩 생성 시 이 범위에서 랜덤 수치가 결정된다.
+등급별(Supply~Masterpiece) 각 스탯의 Min/Max 범위를 정의한다. 칩 생성 시 이 범위에서 랜덤 수치가 결정된다.
 
-| 스탯 | Supply | Standard | Presision | Tuning | Prototype | Masterpiece |
-|------|--------|----------|-----------|--------|-----------|-------------|
-| Attack | 10~15 | 12~18 | 15~20 | 18~24 | 20~25 | 23~30 |
-| Attack_Speed | 2~5 | 4~7 | 6~9 | 7~11 | 10~14 | 12~18 |
-| Skill_Haste | 2~5 | 4~7 | 6~9 | 7~11 | 10~14 | 12~18 |
-| Critical_Rate | 2~5 | 4~7 | 6~9 | 7~11 | 10~14 | 12~18 |
-| Critical_Damage | 2~5 | 4~7 | 6~9 | 7~11 | 10~14 | 12~18 |
-| Defense_Penetration | 2~5 | 4~7 | 6~9 | 7~11 | 10~14 | 12~18 |
-| Health | 100~120 | 110~140 | 120~160 | 140~180 | 160~200 | 180~250 |
-| Defense | 10~15 | 12~18 | 15~20 | 18~24 | 20~25 | 23~30 |
-| Recovery | 2~5 | 4~7 | 6~9 | 7~11 | 10~14 | 12~18 |
-| Move_Speed | 2~5 | 4~7 | 6~9 | 7~11 | 10~14 | 12~18 |
-
-칩 등급별 스탯 개수 범위 (Chip_Setting):
-
-| 등급 | 스탯 개수 |
-|------|----------|
-| Supply | 1~2 |
-| Standard | 1~3 |
-| Presision | 2~3 |
-| Tuning | 3~4 |
-| Prototype | 4~5 |
-| Masterpiece | 4~6 |
+> 구체적인 스탯별 Min/Max 값과 등급별 스탯 개수(Chip_Setting)는 **`DT_Chip_Stat` DataTable이 단일 출처**다. 수치가 바뀌면 여기 표가 stale 되므로 문서에 복사하지 않는다. 실제 값은 DataTable을 본다.
 
 ---
 

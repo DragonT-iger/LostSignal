@@ -4,21 +4,13 @@
 
 이 문서는 인벤토리 UI와 슬롯 조작 로직을 정리한다.
 
-저장 구조, 레이드 네트워크, 클라이언트/서버 신뢰 경계는 `Docs/ItemSaveNetworkStructure.md`를 기준으로 본다. 이 문서는 그 위에서 실제 슬롯이 화면에서 어떻게 표시되고 이동하는지에 집중한다.
+저장 구조, 레이드 네트워크, 클라이언트/서버 신뢰 경계는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)를 기준으로 본다. 이 문서는 그 위에서 실제 슬롯이 화면에서 어떻게 표시되고 이동하는지에 집중한다.
 
 Unity식으로 보면 `FLSSessionItem` 배열이 `List<ItemStack>`이고, 각 위젯은 그 배열을 보여주고 조작 요청을 보내는 View다. 레이드 중 실제 원본은 서버의 `ULSRaidInventoryComponent`이고, 로비의 영구 저장 원본은 로컬 `ULSSaveSubsystem`이다.
 
 ## 핵심 데이터와 영역
 
-슬롯의 최소 단위는 `FLSSessionItem`이다.
-
-```cpp
-struct FLSSessionItem
-{
-	FName ItemRowName;
-	int32 Amount = 0;
-};
-```
+슬롯의 최소 단위는 `FLSSessionItem`이다 (저장 포맷·필드 정의는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)가 소유).
 
 `ItemRowName`은 DataTable row id이고, 아이콘/이름/스탯/최대 스택 수는 DataTable에서 다시 읽는다. 같은 row가 여러 슬롯에 나뉘어 있을 수 있으며, 이는 `Item_Max`를 넘는 수량을 슬롯 단위로 표현하기 위한 정상 상태다.
 
@@ -223,7 +215,7 @@ Item   -> 300000 + DataTable row 순서
 
 ## 레이드와 저장 경계
 
-레이드 입장, 플레이어별 payload 제출, 결과 저장 ACK 정책은 `Docs/ItemSaveNetworkStructure.md`를 기준으로 한다.
+레이드 입장, 플레이어별 payload 제출, 결과 저장 ACK 정책은 [RaidLevelFlow.md](RaidLevelFlow.md)를 기준으로 한다.
 
 인벤토리 로직 관점에서 지켜야 할 규칙은 다음과 같다.
 
@@ -237,7 +229,7 @@ Item   -> 300000 + DataTable row 순서
 - `ItemRowName` 접두사 규칙에 의존한다. 새 아이템 타입을 추가하면 아이콘 로드, 최대 스택, 정렬 키 처리도 같이 추가해야 한다.
 - 아이콘과 DataTable은 UI 표시 중 동기 로드될 수 있다. 아이템 수가 많아지면 캐싱을 고려한다.
 - Quit 복구에서 플레이어별 소모품 차감이 필요하면 `ULSRaidInventoryComponent`에 `ConsumedItems` 기록을 추가해야 한다.
-- 로컬/PIE 다중 프로필 테스트가 필요하면 SaveGame을 `PlayerSaves[ProfileId]` 형태로 확장하는 설계는 `ItemSaveNetworkStructure.md`를 따른다.
+- 로컬/PIE 다중 프로필 테스트가 필요하면 SaveGame을 `PlayerSaves[ProfileId]` 형태로 확장하는 설계는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)를 따른다.
 
 ## 빠른 흐름도
 

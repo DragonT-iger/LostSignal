@@ -2,7 +2,7 @@
 
 ## 목적
 
-인벤토리 UI, 드래그 앤 드롭, Shift-click, 정렬 같은 화면 조작 규칙은 `Docs/InventoryLogic.md`를 기준으로 본다. 이 문서는 저장 구조, 레이드 네트워크, 클라이언트/서버 신뢰 경계를 중심으로 다룬다.
+인벤토리 UI, 드래그 앤 드롭, Shift-click, 정렬 같은 화면 조작 규칙은 [InventoryLogic.md](InventoryLogic.md)를 기준으로 본다. 이 문서는 저장 구조, 레이드 네트워크, 클라이언트/서버 신뢰 경계를 중심으로 다룬다.
 
 현재 방향은 다음 세 가지를 동시에 만족하는 것이다.
 
@@ -173,17 +173,7 @@ ULSRaidInventoryComponent
 - ConsumedItems
 ```
 
-레이드 시작 흐름:
-
-```text
-1. LobbyGameMode가 각 PlayerController에 레이드 입장 데이터 제출을 요청
-2. 로컬/싱글 플레이어는 서버에서 직접 SaveSubsystem의 Inventory/SafeStash를 읽음
-3. 원격 클라이언트는 ClientRequestRaidEntryData를 받고 자기 로컬 SaveSubsystem 데이터를 ServerSubmitRaidEntryData로 제출
-4. 서버는 제출받은 데이터를 PlayerController의 SubmittedRaidLoadout/SubmittedRaidSafeItems에 저장
-5. 모든 PlayerController 제출이 끝나면 각 RaidInventoryComponent에 플레이어별 Loadout/SafeStash 주입
-6. 클라이언트에는 ClientStartRaidSession으로 자기 데이터만 미러링
-7. 기존 SessionSubsystem 전역 1인 흐름은 첫 번째 제출 데이터를 legacy 시작 데이터로 사용
-```
+레이드 시작 시 입장 데이터 제출·주입의 단계별 흐름은 [RaidLevelFlow.md](RaidLevelFlow.md)가 단일 출처다. 저장 관점의 핵심만 적으면, 각 클라이언트가 자기 로컬 `SaveSubsystem`의 Inventory/SafeStash를 제출하고, 서버가 이를 플레이어별 `RaidInventoryComponent`로 복사한 뒤부터는 클라이언트 인벤토리 값을 다시 신뢰하지 않는다.
 
 주의할 점:
 
@@ -218,116 +208,17 @@ ALSFarmingGameMode::EndRaid
 
 현재 구조에서는 `ULSRaidInventoryComponent`가 레이드 중 실제 원본이고, 각 클라이언트의 `ULSSaveSubsystem`이 영구 저장 원본이다.
 
-```text
-Extracted
-- 해당 플레이어의 SessionInventory를 Inventory로 저장
-- 해당 플레이어의 SessionSafeInventory를 SafeStash로 저장
+결과(Extracted/Dead/Quit)별 저장 payload 규칙과 ACK 타임아웃 처리는 [RaidLevelFlow.md](RaidLevelFlow.md)가 단일 출처다. 여기서는 중복 기재하지 않는다.
 
-Dead
-- Inventory는 비움
-- 해당 플레이어의 SessionSafeInventory를 SafeStash로 저장
+저장 관점에서 알아둘 점:
 
-Quit
-- bAllowQuitRecovery가 true면 SubmittedRaidLoadout을 Inventory로 저장
-- bAllowQuitRecovery가 false면 빈 Inventory를 저장
-- SafeStash는 저장하지 않고 기존 로컬 값을 유지
-```
-
-주의할 점:
-
-- 결과 저장 ACK가 제한 시간 안에 오지 않으면 ResultLevel 이동을 중단하고 미응답 PlayerController를 로그로 남긴다.
-- 레이드 종료 성공 시 `ULSSessionSubsystem::ClearRaidSessionState`를 호출해 전역 1인 세션 상태가 다음 레벨에서 다시 미러링되지 않게 한다.
 - 현재 Quit 복구는 제출된 출발 Loadout 기준이다. 플레이어별 소모품 차감은 아직 별도 기록이 없으므로 추후 확장 지점이다.
 
-## UI/드래그 앤 드롭 흐름
+## UI/드래그 앤 드롭 / 월드 드랍 흐름
 
-공통 슬롯 위젯은 `ULSItemSlotWidget`이다. 슬롯이 어느 컨테이너 소속인지 context로 구분한다.
+슬롯 위젯(`ULSItemSlotWidget`), 드래그 데이터(`ULSInventoryDragDropOperation`), 지원 이동 목록, Shift-click, 드래그 취소 월드 드랍, 월드 드랍/픽업의 구체 조작 흐름은 [InventoryLogic.md](InventoryLogic.md)가 단일 출처다. 여기서는 중복 기재하지 않는다.
 
-```text
-SetSlotContext
-- 인벤토리/안전 보관 슬롯
-
-SetLootSlotContext
-- 루트 박스 슬롯
-
-SetWarehouseSlotContext
-- 로비 창고 슬롯
-```
-
-드래그 데이터는 `ULSInventoryDragDropOperation`에 담긴다.
-
-```text
-SourceInventoryWidget
-SourceLootDropWidget
-SourceLobbyStorageWidget
-SourceSlotWidget
-SourceSlotIndex
-SourceSlotArea
-```
-
-지원하는 주요 이동:
-
-```text
-Inventory -> Inventory
-Inventory -> Safe
-Safe -> Inventory
-Inventory/Safe -> LootBox
-LootBox -> Inventory/Safe
-Warehouse -> Inventory/Safe
-Inventory/Safe -> Warehouse
-Warehouse -> Warehouse
-Inventory/Safe/Warehouse -> WorldDroppedItem
-```
-
-Shift 클릭 동작:
-
-```text
-LootBox 슬롯 Shift+좌클릭
--> LootBox에서 인벤토리로 빠른 이동
-
-Inventory 슬롯 Shift+좌클릭
--> LootBox가 열려 있으면 LootBox로 이동 시도
--> 로비 창고가 같이 열려 있고 레이드가 아니면 Warehouse로 이동 시도
--> 인벤토리만 열려 있으면 아무 동작도 하지 않음
-
-Warehouse 슬롯 Shift+좌클릭
--> Inventory로 빠른 이동
-```
-
-드래그 취소 시 월드 드랍:
-
-```text
-InventoryWidget에서 시작한 드래그 취소
--> 인벤토리 창 밖이면 TryDropInventoryDragToWorld
-
-LobbyStorageWidget에서 시작한 드래그 취소
--> UI 위가 아니면 TryDropStorageDragToWorld
-```
-
-## 월드 드랍/픽업 흐름
-
-월드에 떨어진 아이템은 `ALSWorldDroppedItem`이 담당한다.
-
-드랍:
-
-```text
-ALSPlayerControllerBase::DropSessionSlotToWorld
--> 레이드 중이면 RaidInventoryComponent의 슬롯을 원본으로 사용
--> 레이드가 아니면 SaveSubsystem의 저장 슬롯을 원본으로 사용
--> 슬롯을 먼저 비움
--> ALSWorldDroppedItem 스폰
--> 스폰 실패 시 원래 슬롯 복구
-```
-
-픽업:
-
-```text
-ALSWorldDroppedItem::Interact
--> 레이드 중이면 RaidInventoryComponent::TryAddSessionItem
--> 레이드가 아니면 SaveSubsystem::TryAddToInventory
--> 다 들어가면 액터 Destroy
--> 일부만 들어가면 남은 수량으로 월드 아이템 갱신
-```
+저장 관점에서 알아둘 점은 다음 하나다: 월드 드랍/픽업의 슬롯 **원본 선택**은 이 문서의 신뢰 경계를 따른다 — 레이드 중이면 서버 `RaidInventoryComponent`, 레이드가 아니면 로비 `SaveSubsystem`을 원본으로 쓴다.
 
 ## MO 멀티 저장 원칙
 

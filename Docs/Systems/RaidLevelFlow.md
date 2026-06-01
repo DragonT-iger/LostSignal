@@ -4,7 +4,7 @@
 
 이 문서는 로비에서 레이드에 입장하고, 파밍 레벨에서 레이드 결과를 확정한 뒤, 결과 레벨로 이동하는 흐름을 정리한다.
 
-아이템 슬롯 구조와 저장/네트워크 경계는 `Docs/Systems/ItemSaveNetworkStructure.md`를 기준으로 보고, 인벤토리 UI 조작은 `Docs/Systems/InventoryLogic.md`를 기준으로 본다. 이 문서는 레벨 전환, 입장 데이터 제출, 결과 저장 ACK, 실패 처리에 집중한다.
+아이템 슬롯 구조와 저장/네트워크 경계는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)를 기준으로 보고, 인벤토리 UI 조작은 [InventoryLogic.md](InventoryLogic.md)를 기준으로 본다. 이 문서는 레벨 전환, 입장 데이터 제출, 결과 저장 ACK, 실패 처리에 집중한다.
 
 Unity식으로 보면 `ALSLobbyGameMode`와 `ALSFarmingGameMode`가 씬 전환을 결정하는 서버 전용 매니저이고, `ALSPlayerControllerBase`는 각 플레이어의 로컬 저장 데이터와 서버 세션 상태를 이어 주는 네트워크 중계자다.
 
