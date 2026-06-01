@@ -262,7 +262,7 @@ Tick
 -> InterestLocation은 StateTree가 LS Clear Interest를 호출할 때까지 유지
 
 RegisterNoiseEvent
--> 청각 반경 안이면 InterestLocation 갱신
+-> 소음 이벤트 반경과 몬스터 청각 반경이 모두 닿으면 InterestLocation 갱신
 -> 실제 사운드 재생 여부가 아니라 게임플레이 소음 이벤트 기준
 ```
 
@@ -274,6 +274,52 @@ RegisterNoiseEvent
 - 시야/청각/속도 수치는 DataTable 행에서 받고, Leash/시야각 같은 보조값은 별도 정책이 정해질 때까지 컴포넌트 UPROPERTY 기본값으로 관리한다.
 - 기억 시간은 SenseComponent가 관리하지 않는다. Investigate 상태의 Move/Wait/ClearInterest 흐름으로 관리한다.
 - 죽은 몬스터는 감지 Tick을 멈추고 관심 정보를 비운다.
+
+## 소음 이벤트 발생 구조
+
+캐릭터 행동 소음은 실제 사운드 재생과 분리된 게임플레이 이벤트다. 소음 발생자는 몬스터를 직접 찾지 않고 `ULSNoiseSubsystem`으로 이벤트를 발행한다.
+
+```text
+ULSNoiseEmitterComponent
+-> FLSNoiseEvent
+-> ULSNoiseSubsystem
+-> 등록된 ULSMonsterSenseComponent
+-> InterestLocation 갱신
+-> StateTree가 bHasInterestLocation으로 Investigate 전이
+```
+
+책임 분리:
+
+```text
+FLSNoiseProfileRow
+- 행동별 소음 태그, 반경, 지속 발생 주기 보관
+- 반경은 기획 기준 meter 단위로 작성
+
+ULSNoiseEmitterComponent
+- 플레이어 캐릭터에 부착
+- 이동 중 Walk/Run 지속 소음 발생
+- 상호작용 확정 시 Interact 1회 소음 발생
+- DataTable 행을 읽어 FLSNoiseEvent로 변환
+
+ULSNoiseSubsystem
+- 월드 단위 소음 브로커
+- MonsterSenseComponent 등록 목록 관리
+- 소음 이벤트를 등록된 감지 컴포넌트에 전달
+
+ULSMonsterSenseComponent
+- BeginPlay/EndPlay에서 NoiseSubsystem에 등록/해제
+- 소음 이벤트 반경과 Hearing_Radius를 모두 검사
+- 청각 감지는 CurrentTarget을 만들지 않고 InterestLocation만 갱신
+```
+
+판정 규칙:
+
+```text
+거리 <= NoiseEvent.RadiusCm
+거리 <= Monster Hearing_Radius
+```
+
+소음으로는 `bHasVisualTarget`을 true로 만들지 않는다. 시야로 실제 타겟을 본 경우에만 `CurrentTarget`을 설정한다.
 
 ## ReturnHome 상태 규칙
 

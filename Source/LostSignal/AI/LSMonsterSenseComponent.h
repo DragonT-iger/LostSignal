@@ -5,6 +5,7 @@
 #include "LSMonsterSenseComponent.generated.h"
 
 struct FLSMonsterArchetypeRow;
+struct FLSNoiseEvent;
 
 /** Server-side sight/hearing cache used by StateTree decisions. */
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
@@ -16,12 +17,12 @@ public:
 	ULSMonsterSenseComponent();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	void ApplyArchetype(const FLSMonsterArchetypeRow& Row);
 
-	UFUNCTION(BlueprintCallable, Category="AI|Sense")
-	void RegisterNoiseEvent(const FVector& NoiseLocation, float Loudness = 1.0f);
+	void RegisterNoiseEvent(const FLSNoiseEvent& NoiseEvent);
 
 	UFUNCTION(BlueprintPure, Category="AI|Sense")
 	AActor* GetCurrentTarget() const { return CurrentTarget.Get(); }

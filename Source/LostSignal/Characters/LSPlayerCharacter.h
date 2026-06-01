@@ -11,6 +11,7 @@ class UCameraComponent;
 class UInputAction;
 class ULSAimComponent;
 class ULSMPCVisionSourceComponent;
+class ULSNoiseEmitterComponent;
 class ULSPlayerCombatComponent;
 class ULSPlayerXRayComponent;
 class ULSPlayerSkillComponent;
@@ -44,6 +45,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	ULSPlayerCombatComponent* GetPlayerCombatComponent() const { return PlayerCombatComponent; }
 
+	UFUNCTION(BlueprintPure, Category="LS/Noise")
+	ULSNoiseEmitterComponent* GetNoiseEmitterComponent() const { return NoiseEmitterComponent; }
+
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	ULSPlayerSkillComponent* GetPlayerSkillComponent() const { return PlayerSkillComponent; }
 
@@ -55,6 +59,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/Input")
 	UInputAction* GetInteractAction() const { return InteractAction; }
+
+	UFUNCTION(BlueprintPure, Category="LS/Movement")
+	bool IsRunning() const { return bIsRunning; }
 
 	AActor* ResolveBestInteractTarget();
 
@@ -75,6 +82,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSPlayerXRayComponent> PlayerXRayComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Noise", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<ULSNoiseEmitterComponent> NoiseEmitterComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Combat", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSAimComponent> AimComponent;

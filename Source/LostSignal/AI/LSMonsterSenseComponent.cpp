@@ -7,6 +7,8 @@
 #include "Engine/World.h"
 #include "GAS/LSGameplayTags.h"
 #include "GameFramework/PlayerController.h"
+#include "Gameplay/LSNoiseSubsystem.h"
+#include "Gameplay/LSNoiseTypes.h"
 #include "LostSignal.h"
 
 ULSMonsterSenseComponent::ULSMonsterSenseComponent()
@@ -22,7 +24,28 @@ void ULSMonsterSenseComponent::BeginPlay()
 	if (const AActor* OwnerActor = GetOwner())
 	{
 		HomeLocation = OwnerActor->GetActorLocation();
+
+		if (OwnerActor->HasAuthority())
+		{
+			if (ULSNoiseSubsystem* NoiseSubsystem = GetWorld()->GetSubsystem<ULSNoiseSubsystem>())
+			{
+				NoiseSubsystem->RegisterListener(this);
+			}
+		}
 	}
+}
+
+void ULSMonsterSenseComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (ULSNoiseSubsystem* NoiseSubsystem = World->GetSubsystem<ULSNoiseSubsystem>())
+		{
+			NoiseSubsystem->UnregisterListener(this);
+		}
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void ULSMonsterSenseComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -64,21 +87,26 @@ void ULSMonsterSenseComponent::ApplyArchetype(const FLSMonsterArchetypeRow& Row)
 	AlertMoveSpeedMultiplier = Row.Chase_Speed;
 }
 
-void ULSMonsterSenseComponent::RegisterNoiseEvent(const FVector& NoiseLocation, float Loudness)
+void ULSMonsterSenseComponent::RegisterNoiseEvent(const FLSNoiseEvent& NoiseEvent)
 {
 	const AActor* OwnerActor = GetOwner();
-	if (!OwnerActor || !OwnerActor->HasAuthority())
+	if (!OwnerActor || !OwnerActor->HasAuthority() || NoiseEvent.RadiusCm <= 0.0f)
 	{
 		return;
 	}
 
-	const float EffectiveHearingRadius = HearingRadius * FMath::Max(Loudness, 0.0f);
-	if (FVector::DistSquared(OwnerActor->GetActorLocation(), NoiseLocation) > FMath::Square(EffectiveHearingRadius))
+	const float EffectiveHearingRadius = FMath::Min(HearingRadius, NoiseEvent.RadiusCm);
+	if (EffectiveHearingRadius <= 0.0f)
 	{
 		return;
 	}
 
-	InterestLocation = NoiseLocation;
+	if (FVector::DistSquared2D(OwnerActor->GetActorLocation(), NoiseEvent.Location) > FMath::Square(EffectiveHearingRadius))
+	{
+		return;
+	}
+
+	InterestLocation = NoiseEvent.Location;
 	bHasInterestLocation = true;
 }
 

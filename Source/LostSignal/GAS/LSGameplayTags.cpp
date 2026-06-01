@@ -28,6 +28,11 @@ namespace LSGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Event_Combat_BasicAttackHit, "LS.Event.Combat.BasicAttackHit")
 
+	UE_DEFINE_GAMEPLAY_TAG(Noise_Idle, "LS.Noise.Idle")
+	UE_DEFINE_GAMEPLAY_TAG(Noise_Walk, "LS.Noise.Walk")
+	UE_DEFINE_GAMEPLAY_TAG(Noise_Run, "LS.Noise.Run")
+	UE_DEFINE_GAMEPLAY_TAG(Noise_Interact, "LS.Noise.Interact")
+
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_Fixed, "LS.Data.Damage.Fixed")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_AttackCoefficient, "LS.Data.Damage.AttackCoefficient")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage_CanCrit, "LS.Data.Damage.CanCrit")

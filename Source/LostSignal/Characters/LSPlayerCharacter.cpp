@@ -15,6 +15,7 @@
 #include "Gameplay/LSInteractable.h"
 #include "Gameplay/LSLobbyStorageActor.h"
 #include "Gameplay/LSLootBox.h"
+#include "Gameplay/LSNoiseEmitterComponent.h"
 #include "InputActionValue.h"
 #include "LostSignal.h"
 #include "Skills/LSPlayerSkillComponent.h"
@@ -48,6 +49,7 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	MPCVisionSourceComponent = CreateDefaultSubobject<ULSMPCVisionSourceComponent>(TEXT("MPCVisionSourceComponent"));
 	VisionComponent = CreateDefaultSubobject<ULSVisionComponent>(TEXT("VisionComponent"));
 	PlayerXRayComponent = CreateDefaultSubobject<ULSPlayerXRayComponent>(TEXT("PlayerXRayComponent"));
+	NoiseEmitterComponent = CreateDefaultSubobject<ULSNoiseEmitterComponent>(TEXT("NoiseEmitterComponent"));
 	AimComponent = CreateDefaultSubobject<ULSAimComponent>(TEXT("AimComponent"));
 	PlayerCombatComponent = CreateDefaultSubobject<ULSPlayerCombatComponent>(TEXT("PlayerCombatComponent"));
 	SkillPreviewComponent = CreateDefaultSubobject<ULSSkillPreviewComponent>(TEXT("SkillPreviewComponent"));
@@ -525,6 +527,11 @@ void ALSPlayerCharacter::ServerRequestInteract_Implementation(AActor* Target)
 	if (!ILSInteractable::Execute_CanInteract(Target, this)) return;
 
 	ILSInteractable::Execute_Interact(Target, this);
+
+	if (NoiseEmitterComponent)
+	{
+		NoiseEmitterComponent->EmitInteractNoise();
+	}
 }
 
 void ALSPlayerCharacter::OnRunStart()

@@ -40,6 +40,12 @@ namespace LSGameplayTags
 	// Gameplay event tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Combat_BasicAttackHit)
 
+	// Gameplay noise tags
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Noise_Idle)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Noise_Walk)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Noise_Run)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Noise_Interact)
+
 	// SetByCaller damage data
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_Fixed)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage_AttackCoefficient)
