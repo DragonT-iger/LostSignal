@@ -6,7 +6,6 @@
 #include "Engine/DataTable.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
-#include "Math/RandomStream.h"
 
 namespace
 {
@@ -37,20 +36,7 @@ const TArray<FChipStatEntry>& GetChipStatSchema()
 
 namespace LSChipStats
 {
-int32 RollNewChipSeed()
-{
-	int32 Seed = 0;
-	while (Seed == 0)
-	{
-		// 15비트 rand 3개를 합쳐 int32 전 범위로 분산.
-		Seed = (FMath::Rand() & 0x7FFF)
-			| ((FMath::Rand() & 0x7FFF) << 15)
-			| ((FMath::Rand() & 0x3) << 30);
-	}
-	return Seed;
-}
-
-TArray<FLSChipResolvedStat> ResolveChipStats(const FName ChipRowName, const int32 StatSeed)
+TArray<FLSChipResolvedStat> RollChipStats(const FName ChipRowName)
 {
 	TArray<FLSChipResolvedStat> Out;
 	if (ChipRowName.IsNone())
@@ -67,7 +53,7 @@ TArray<FLSChipResolvedStat> ResolveChipStats(const FName ChipRowName, const int3
 		return Out;
 	}
 
-	const FLSChipRow* ChipRow = ChipTable->FindRow<FLSChipRow>(ChipRowName, TEXT("ResolveChipStats"));
+	const FLSChipRow* ChipRow = ChipTable->FindRow<FLSChipRow>(ChipRowName, TEXT("RollChipStats"));
 	if (!ChipRow)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[ChipStats] 칩 행 '%s' 없음."), *ChipRowName.ToString());
@@ -80,7 +66,7 @@ TArray<FLSChipResolvedStat> ResolveChipStats(const FName ChipRowName, const int3
 		return Out;
 	}
 
-	const FLSChipStatRow* StatRow = ChipStatTable->FindRow<FLSChipStatRow>(FName(*Grade), TEXT("ResolveChipStats"));
+	const FLSChipStatRow* StatRow = ChipStatTable->FindRow<FLSChipStatRow>(FName(*Grade), TEXT("RollChipStats"));
 	if (!StatRow)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[ChipStats] 등급 '%s' 의 ChipStat 행이 없음."), *Grade);
@@ -95,11 +81,6 @@ TArray<FLSChipResolvedStat> ResolveChipStats(const FName ChipRowName, const int3
 		return Out;
 	}
 
-	// 시드 0(미롤/레거시)이면 RowName 해시로 폴백 → 같은 칩끼리는 동일 스탯.
-	const int32 EffectiveSeed = (StatSeed != 0) ? StatSeed : static_cast<int32>(GetTypeHash(ChipRowName));
-	FRandomStream Stream(EffectiveSeed);
-
-	// Fisher-Yates로 인덱스를 섞어 N개를 중복 없이 선택.
 	TArray<int32> Indices;
 	Indices.Reserve(PoolSize);
 	for (int32 i = 0; i < PoolSize; ++i)
@@ -108,7 +89,7 @@ TArray<FLSChipResolvedStat> ResolveChipStats(const FName ChipRowName, const int3
 	}
 	for (int32 i = PoolSize - 1; i > 0; --i)
 	{
-		const int32 j = Stream.RandRange(0, i);
+		const int32 j = FMath::RandRange(0, i);
 		Indices.Swap(i, j);
 	}
 
@@ -125,7 +106,7 @@ TArray<FLSChipResolvedStat> ResolveChipStats(const FName ChipRowName, const int3
 
 		FLSChipResolvedStat Resolved;
 		Resolved.StatKey = Entry.Key;
-		Resolved.Value = Stream.RandRange(Lo, Hi);
+		Resolved.Value = FMath::RandRange(Lo, Hi);
 		Out.Add(Resolved);
 	}
 

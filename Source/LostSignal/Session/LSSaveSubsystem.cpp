@@ -31,14 +31,15 @@ void ULSSaveSubsystem::AddToInventory(const TArray<FLSSessionItem>& Items)
 	TArray<FLSSessionItem>& Inv = GetMutableInventory();
 	for (const FLSSessionItem& NewItem : Items)
 	{
-		LSInventorySlotUtils::AddItemsToSlotArray(Inv, NewItem.ItemRowName, NewItem.Amount);
+		FLSSessionItem IgnoredRemainingItem;
+		LSInventorySlotUtils::TryAddItemsToSlotArray(Inv, NewItem.ItemRowName, NewItem.Amount, MAX_int32, NewItem.ChipStats, IgnoredRemainingItem);
 	}
 
 	UE_LOG(LogLS, Log, TEXT("[Save] Inventory updated: added %d entries, total slots %d"), Items.Num(), Inv.Num());
 	Save();
 }
 
-bool ULSSaveSubsystem::TryAddToInventory(const FName ItemRowName, const int32 Amount, const int32 StatSeed, FLSSessionItem& OutRemainingItem)
+bool ULSSaveSubsystem::TryAddToInventory(const FName ItemRowName, const int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem)
 {
 	OutRemainingItem = FLSSessionItem();
 	if (!SaveData)
@@ -47,7 +48,7 @@ bool ULSSaveSubsystem::TryAddToInventory(const FName ItemRowName, const int32 Am
 		return false;
 	}
 
-	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, SaveDefaultMaxInventorySlotCount, StatSeed, OutRemainingItem);
+	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, SaveDefaultMaxInventorySlotCount, ChipStats, OutRemainingItem);
 	if (bChanged)
 	{
 		Save();
@@ -200,7 +201,7 @@ bool ULSSaveSubsystem::TransferStoredSlotToArea(const ELSInventorySlotArea FromA
 	FLSSessionItem& FromSlot = (*FromSlots)[FromIndex];
 	FLSSessionItem RemainingItem;
 	const int32 ToMaxSlotCount = (ToArea == ELSInventorySlotArea::Inventory) ? SaveDefaultMaxInventorySlotCount : MAX_int32;
-	if (!LSInventorySlotUtils::TryAddItemsToSlotArray(*ToSlots, FromSlot.ItemRowName, FromSlot.Amount, ToMaxSlotCount, FromSlot.StatSeed, RemainingItem))
+	if (!LSInventorySlotUtils::TryAddItemsToSlotArray(*ToSlots, FromSlot.ItemRowName, FromSlot.Amount, ToMaxSlotCount, FromSlot.ChipStats, RemainingItem))
 	{
 		return false;
 	}
@@ -241,7 +242,7 @@ bool ULSSaveSubsystem::TransferAllInventoryToWarehouse(const int32 WarehouseMaxS
 			InventorySlot.ItemRowName,
 			InventorySlot.Amount,
 			WarehouseMaxSlotCount,
-			InventorySlot.StatSeed,
+			InventorySlot.ChipStats,
 			RemainingItem);
 
 		if (!bAddedAny)
@@ -542,16 +543,35 @@ void ULSSaveSubsystem::SaveDebugJson() const
 	RootObject->SetStringField(TEXT("slotName"), GetResolvedSlotName());
 	RootObject->SetBoolField(TEXT("raidSaveActive"), SaveData->bRaidSaveActive);
 
-	auto AddSlotArrayField = [&RootObject](const TCHAR* FieldName, const TArray<FLSSessionItem>& Items)
+	auto AddSessionItemFields = [](const TSharedRef<FJsonObject>& ItemObject, const FLSSessionItem& Item, const int32 SlotIndex)
+	{
+		ItemObject->SetNumberField(TEXT("slotIndex"), SlotIndex);
+		ItemObject->SetStringField(TEXT("itemRowName"), Item.ItemRowName.ToString());
+		ItemObject->SetNumberField(TEXT("amount"), Item.Amount);
+
+		if (!Item.ChipStats.IsEmpty())
+		{
+			TArray<TSharedPtr<FJsonValue>> ChipStatsArray;
+			ChipStatsArray.Reserve(Item.ChipStats.Num());
+			for (const FLSChipResolvedStat& Stat : Item.ChipStats)
+			{
+				TSharedRef<FJsonObject> StatObject = MakeShared<FJsonObject>();
+				StatObject->SetStringField(TEXT("statKey"), Stat.StatKey.ToString());
+				StatObject->SetNumberField(TEXT("value"), Stat.Value);
+				ChipStatsArray.Add(MakeShared<FJsonValueObject>(StatObject));
+			}
+			ItemObject->SetArrayField(TEXT("chipStats"), ChipStatsArray);
+		}
+	};
+
+	auto AddSlotArrayField = [&RootObject, &AddSessionItemFields](const TCHAR* FieldName, const TArray<FLSSessionItem>& Items)
 	{
 		TArray<TSharedPtr<FJsonValue>> JsonArray;
 		JsonArray.Reserve(Items.Num());
 		for (const FLSSessionItem& Item : Items)
 		{
 			TSharedRef<FJsonObject> ItemObject = MakeShared<FJsonObject>();
-			ItemObject->SetNumberField(TEXT("slotIndex"), JsonArray.Num());
-			ItemObject->SetStringField(TEXT("itemRowName"), Item.ItemRowName.ToString());
-			ItemObject->SetNumberField(TEXT("amount"), Item.Amount);
+			AddSessionItemFields(ItemObject, Item, JsonArray.Num());
 			JsonArray.Add(MakeShared<FJsonValueObject>(ItemObject));
 		}
 
@@ -567,9 +587,7 @@ void ULSSaveSubsystem::SaveDebugJson() const
 	for (const FLSSessionItem& Item : SaveData->ActiveRaidLoadout)
 	{
 		TSharedRef<FJsonObject> ItemObject = MakeShared<FJsonObject>();
-		ItemObject->SetNumberField(TEXT("slotIndex"), ActiveRaidLoadoutArray.Num());
-		ItemObject->SetStringField(TEXT("itemRowName"), Item.ItemRowName.ToString());
-		ItemObject->SetNumberField(TEXT("amount"), Item.Amount);
+		AddSessionItemFields(ItemObject, Item, ActiveRaidLoadoutArray.Num());
 		ActiveRaidLoadoutArray.Add(MakeShared<FJsonValueObject>(ItemObject));
 	}
 
@@ -580,9 +598,7 @@ void ULSSaveSubsystem::SaveDebugJson() const
 	for (const FLSSessionItem& Item : SaveData->ActiveRaidConsumedItems)
 	{
 		TSharedRef<FJsonObject> ItemObject = MakeShared<FJsonObject>();
-		ItemObject->SetNumberField(TEXT("slotIndex"), ActiveRaidConsumedItemsArray.Num());
-		ItemObject->SetStringField(TEXT("itemRowName"), Item.ItemRowName.ToString());
-		ItemObject->SetNumberField(TEXT("amount"), Item.Amount);
+		AddSessionItemFields(ItemObject, Item, ActiveRaidConsumedItemsArray.Num());
 		ActiveRaidConsumedItemsArray.Add(MakeShared<FJsonValueObject>(ItemObject));
 	}
 

@@ -95,7 +95,7 @@ void ULSLootDropWidget::RebuildLootSlots()
 		SlotWidget->SetLootSlotContext(this, SlotIndex, bHasItem);
 		if (bHasItem)
 		{
-			SlotWidget->SetItem(Item.ItemRowName, Item.Amount, Item.StatSeed);
+			SlotWidget->SetItem(Item.ItemRowName, Item.Amount, Item.ChipStats);
 		}
 		else
 		{

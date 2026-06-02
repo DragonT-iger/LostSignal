@@ -162,12 +162,12 @@ void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
 void ULSSessionSubsystem::AddSessionItem(FName ItemRowName, int32 Amount)
 {
 	FLSSessionItem IgnoredRemainingItem;
-	TryAddSessionItem(ItemRowName, Amount, /*StatSeed=*/0, IgnoredRemainingItem);
+	TryAddSessionItem(ItemRowName, Amount, /*ChipStats=*/TArray<FLSChipResolvedStat>(), IgnoredRemainingItem);
 }
 
-bool ULSSessionSubsystem::TryAddSessionItem(FName ItemRowName, int32 Amount, int32 StatSeed, FLSSessionItem& OutRemainingItem)
+bool ULSSessionSubsystem::TryAddSessionItem(FName ItemRowName, int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem)
 {
-	return LSInventorySlotUtils::TryAddItemsToSlotArray(SessionInventory, ItemRowName, Amount, GetMaxInventorySlotCount(), StatSeed, OutRemainingItem);
+	return LSInventorySlotUtils::TryAddItemsToSlotArray(SessionInventory, ItemRowName, Amount, GetMaxInventorySlotCount(), ChipStats, OutRemainingItem);
 }
 
 void ULSSessionSubsystem::SortSessionInventory()

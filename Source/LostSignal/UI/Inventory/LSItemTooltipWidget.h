@@ -17,7 +17,7 @@ class LOSTSIGNAL_API ULSItemTooltipWidget : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
-	void SetItem(FName ItemRowName, int32 HoveredSlotAmount, int32 StatSeed = 0);
+	void SetItem(FName ItemRowName, int32 HoveredSlotAmount, const TArray<FLSChipResolvedStat>& ChipStats);
 
 protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
@@ -54,7 +54,7 @@ private:
 	void AddStatIfNonZero(const FText& StatName, float Value);
 	void AddExtraInfo(const FText& ExtraInfoName, const FText& ExtraInfoValue);
 	void SetCommonTexts(const FText& TooltipType, const FText& ItemName, const FString& ItemGrade, const FText& Description, int32 ItemCost);
-	void PopulateChipTooltip(FName ItemRowName, int32 StatSeed);
+	void PopulateChipTooltip(FName ItemRowName, const TArray<FLSChipResolvedStat>& ChipStats);
 	void PopulateWeaponTooltip(FName ItemRowName);
 	void PopulateArmorTooltip(FName ItemRowName);
 	void PopulateItemTooltip(FName ItemRowName, int32 HoveredSlotAmount);

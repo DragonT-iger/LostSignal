@@ -22,6 +22,7 @@
 #include "UI/LSPlayerHUDWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
+#include "UI/ChipSystem/LSChipStationWidget.h"
 
 ALSPlayerControllerBase::ALSPlayerControllerBase()
 {
@@ -227,6 +228,33 @@ void ALSPlayerControllerBase::RefreshOpenLobbyStorageWidget()
 	}
 }
 
+void ALSPlayerControllerBase::ShowChipStationWidget(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass)
+{
+	if (IsLocalPlayerController())
+	{
+		ShowChipStationWidgetLocal(ChipStationWidgetClass);
+		return;
+	}
+
+	ClientShowChipStationWidget(ChipStationWidgetClass);
+}
+
+void ALSPlayerControllerBase::HideChipStationWidget()
+{
+	if (IsLocalPlayerController())
+	{
+		HideChipStationWidgetLocal();
+		return;
+	}
+
+	ClientHideChipStationWidget();
+}
+
+bool ALSPlayerControllerBase::IsChipStationWidgetOpen() const
+{
+	return ChipStationWidgetInstance && ChipStationWidgetInstance->IsVisible();
+}
+
 void ALSPlayerControllerBase::ClientShowLobbyStorageWidget_Implementation(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass)
 {
 	ShowLobbyStorageWidgetLocal(LobbyStorageWidgetClass);
@@ -235,6 +263,16 @@ void ALSPlayerControllerBase::ClientShowLobbyStorageWidget_Implementation(TSubcl
 void ALSPlayerControllerBase::ClientHideLobbyStorageWidget_Implementation()
 {
 	HideLobbyStorageWidgetLocal();
+}
+
+void ALSPlayerControllerBase::ClientShowChipStationWidget_Implementation(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass)
+{
+	ShowChipStationWidgetLocal(ChipStationWidgetClass);
+}
+
+void ALSPlayerControllerBase::ClientHideChipStationWidget_Implementation()
+{
+	HideChipStationWidgetLocal();
 }
 
 void ALSPlayerControllerBase::ClientSyncRaidSessionAndLoot_Implementation(ALSLootBox* SourceLootBox, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSDropResult>& LootResults)
@@ -514,6 +552,52 @@ void ALSPlayerControllerBase::HideLobbyStorageWidgetLocal()
 	if (LobbyStorageWidgetInstance)
 	{
 		LobbyStorageWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass)
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	if (!ChipStationWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("ChipStationWidgetClass is not set on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (ChipStationWidgetInstance && ChipStationWidgetInstance->GetClass() != ChipStationWidgetClass)
+	{
+		ChipStationWidgetInstance->RemoveFromParent();
+		ChipStationWidgetInstance = nullptr;
+	}
+
+	if (!ChipStationWidgetInstance)
+	{
+		ChipStationWidgetInstance = CreateWidget<ULSChipStationWidget>(this, ChipStationWidgetClass);
+		if (!ChipStationWidgetInstance)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Failed to create chip station widget on %s."), *GetNameSafe(this));
+			return;
+		}
+	}
+
+	if (!ChipStationWidgetInstance->IsInViewport())
+	{
+		ChipStationWidgetInstance->AddToViewport();
+	}
+
+	ChipStationWidgetInstance->RefreshChipStation();
+	ChipStationWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+void ALSPlayerControllerBase::HideChipStationWidgetLocal()
+{
+	if (ChipStationWidgetInstance)
+	{
+		ChipStationWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 

@@ -12,6 +12,7 @@ class ALSLootBox;
 class ALSWorldDroppedItem;
 class UInputMappingContext;
 class ULSLobbyStorageWidget;
+class ULSChipStationWidget;
 class ULSRaidInventoryComponent;
 class ULSHpDebugWidget;
 class ULSLootDropWidget;
@@ -44,6 +45,15 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/UI")
 	bool IsLobbyStorageWidgetOpen() const;
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	void ShowChipStationWidget(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	void HideChipStationWidget();
+
+	UFUNCTION(BlueprintPure, Category="LS/UI")
+	bool IsChipStationWidgetOpen() const;
 
 	int32 GetOpenLobbyStorageMaxSlotCount() const;
 	void RefreshOpenLobbyStorageWidget();
@@ -98,6 +108,9 @@ protected:
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSLobbyStorageWidget> LobbyStorageWidgetInstance;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSChipStationWidget> ChipStationWidgetInstance;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Input")
 	bool bDefaultMappingContextsApplied = false;
@@ -170,12 +183,20 @@ private:
 	void ClientHideLobbyStorageWidget();
 
 	UFUNCTION(Client, Reliable)
+	void ClientShowChipStationWidget(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass);
+
+	UFUNCTION(Client, Reliable)
+	void ClientHideChipStationWidget();
+
+	UFUNCTION(Client, Reliable)
 	void ClientSyncRaidSessionAndLoot(ALSLootBox* SourceLootBox, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSDropResult>& LootResults);
 
 	void ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 	void HideLootDropWidgetLocal();
 	void ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass);
 	void HideLobbyStorageWidgetLocal();
+	void ShowChipStationWidgetLocal(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass);
+	void HideChipStationWidgetLocal();
 	void CreatePlayerHUDWidgetLocal();
 	void InitializeRaidInventoryFromSessionSubsystem();
 	void SubmitLocalRaidEntryData();

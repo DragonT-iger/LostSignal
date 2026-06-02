@@ -46,7 +46,7 @@ void ALSWorldDroppedItem::Interact_Implementation(APawn* Interactor)
 	FLSSessionItem RemainingItem;
 	if (RaidInventory && RaidInventory->IsRaidActive())
 	{
-		if (!RaidInventory->TryAddSessionItem(ItemRowName, Amount, StatSeed, RemainingItem))
+		if (!RaidInventory->TryAddSessionItem(ItemRowName, Amount, ChipStats, RemainingItem))
 		{
 			return;
 		}
@@ -57,7 +57,7 @@ void ALSWorldDroppedItem::Interact_Implementation(APawn* Interactor)
 	{
 		UGameInstance* GameInstance = GetGameInstance();
 		ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-		if (!SaveSubsystem || !SaveSubsystem->TryAddToInventory(ItemRowName, Amount, StatSeed, RemainingItem))
+		if (!SaveSubsystem || !SaveSubsystem->TryAddToInventory(ItemRowName, Amount, ChipStats, RemainingItem))
 		{
 			UE_LOG(LogLS, Warning, TEXT("Cannot pick up dropped item because no inventory storage is available on %s."), *GetNameSafe(this));
 			return;
@@ -72,7 +72,7 @@ void ALSWorldDroppedItem::Interact_Implementation(APawn* Interactor)
 
 	ItemRowName = RemainingItem.ItemRowName;
 	Amount = RemainingItem.Amount;
-	StatSeed = RemainingItem.StatSeed;
+	ChipStats = RemainingItem.ChipStats;
 	RefreshItemVisual();
 	ForceNetUpdate();
 }
@@ -88,14 +88,14 @@ void ALSWorldDroppedItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 	DOREPLIFETIME(ALSWorldDroppedItem, ItemRowName);
 	DOREPLIFETIME(ALSWorldDroppedItem, Amount);
-	DOREPLIFETIME(ALSWorldDroppedItem, StatSeed);
+	DOREPLIFETIME(ALSWorldDroppedItem, ChipStats);
 }
 
 void ALSWorldDroppedItem::InitializeDroppedItem(const FLSSessionItem& InItem)
 {
 	ItemRowName = InItem.ItemRowName;
 	Amount = InItem.Amount;
-	StatSeed = InItem.StatSeed;
+	ChipStats = InItem.ChipStats;
 	RefreshItemVisual();
 }
 

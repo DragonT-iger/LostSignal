@@ -110,7 +110,7 @@ void ULSLobbyStorageWidget::RefreshStorage()
 			const bool bHasItemAtSlot = StashItems.IsValidIndex(VisualIndex) && LSInventorySlotUtils::IsFilled(StashItems[VisualIndex]);
 			if (bHasItemAtSlot)
 			{
-				SlotWidget->SetItem(StashItems[VisualIndex].ItemRowName, StashItems[VisualIndex].Amount, StashItems[VisualIndex].StatSeed);
+				SlotWidget->SetItem(StashItems[VisualIndex].ItemRowName, StashItems[VisualIndex].Amount, StashItems[VisualIndex].ChipStats);
 			}
 			else
 			{
@@ -146,7 +146,7 @@ void ULSLobbyStorageWidget::RefreshStorage()
 				continue;
 			}
 
-			SlotWidget->SetItem(IndexedItem.Value.ItemRowName, IndexedItem.Value.Amount, IndexedItem.Value.StatSeed);
+			SlotWidget->SetItem(IndexedItem.Value.ItemRowName, IndexedItem.Value.Amount, IndexedItem.Value.ChipStats);
 			SlotWidget->SetWarehouseSlotContext(this, ELSInventorySlotArea::Warehouse, IndexedItem.Key, true);
 			StorageSlotWrapBox->AddChildToWrapBox(SlotWidget);
 		}

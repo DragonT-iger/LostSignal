@@ -22,9 +22,10 @@
 FLSSessionItem
 - ItemRowName
 - Amount
+- ChipStats
 ```
 
-즉, 저장되는 값은 “어떤 DataTable Row 아이템이 몇 개 있는가”이다. 아이템 이름, 아이콘, 스탯, 최대 스택 수는 `DT_Item`, `DT_Weapon`, `DT_Armor`, `DT_Chip` 같은 DataTable에서 런타임에 다시 읽는다.
+즉, 기본 저장 값은 “어떤 DataTable Row 아이템이 몇 개 있는가”이며, 칩처럼 개체별 확정 전투 스탯이 필요한 아이템은 `ChipStats` 스냅샷을 함께 저장한다. 아이템 이름, 아이콘, 최대 스택 수 같은 정적 값은 `DT_Item`, `DT_Weapon`, `DT_Armor`, `DT_Chip` 같은 DataTable에서 런타임에 다시 읽는다.
 
 루팅 결과는 별도 타입인 `FLSDropResult`를 사용한다.
 
@@ -33,9 +34,10 @@ FLSDropResult
 - ItemRowName
 - Amount
 - ItemText
+- ChipStats
 ```
 
-`FLSDropResult`는 루트 박스 UI/표시용 텍스트를 포함하지만, 인벤토리나 저장으로 이동할 때는 `ItemRowName + Amount`만 `FLSSessionItem`으로 변환해서 다룬다.
+`FLSDropResult`는 루트 박스 UI/표시용 텍스트를 포함한다. 인벤토리나 저장으로 이동할 때는 `ItemRowName + Amount + ChipStats`를 `FLSSessionItem`으로 변환해서 다룬다.
 
 ## 저장 영역
 

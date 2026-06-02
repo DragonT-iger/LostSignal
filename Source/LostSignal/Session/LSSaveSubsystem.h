@@ -18,7 +18,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void AddToInventory(const TArray<FLSSessionItem>& Items);
 
-	bool TryAddToInventory(FName ItemRowName, int32 Amount, int32 StatSeed, FLSSessionItem& OutRemainingItem);
+	bool TryAddToInventory(FName ItemRowName, int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void ReplaceInventory(const TArray<FLSSessionItem>& Items);

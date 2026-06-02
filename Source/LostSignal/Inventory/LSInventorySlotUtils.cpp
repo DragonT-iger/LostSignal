@@ -105,7 +105,7 @@ FLSSessionItem ToSessionItem(const FLSDropResult& Item)
 	FLSSessionItem Result;
 	Result.ItemRowName = Item.ItemRowName;
 	Result.Amount = Item.Amount;
-	Result.StatSeed = Item.StatSeed;
+	Result.ChipStats = Item.ChipStats;
 	return Result;
 }
 
@@ -114,7 +114,7 @@ void SetDropResultFromSessionItem(FLSDropResult& TargetSlot, const FLSSessionIte
 	TargetSlot.ItemRowName = SourceItem.ItemRowName;
 	TargetSlot.Amount = SourceItem.Amount;
 	TargetSlot.ItemText = FText::GetEmpty();
-	TargetSlot.StatSeed = SourceItem.StatSeed;
+	TargetSlot.ChipStats = SourceItem.ChipStats;
 }
 
 void ClearDropResult(FLSDropResult& TargetSlot)
@@ -122,6 +122,7 @@ void ClearDropResult(FLSDropResult& TargetSlot)
 	TargetSlot.ItemRowName = NAME_None;
 	TargetSlot.Amount = 0;
 	TargetSlot.ItemText = FText::GetEmpty();
+	TargetSlot.ChipStats.Reset();
 }
 
 int32 ResolveItemMaxStack(const FName ItemRowName, const TCHAR* Context)
@@ -202,7 +203,7 @@ void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, const int32 SlotIndex)
 	}
 }
 
-bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount, const int32 MaxSlotCount, const int32 StatSeed, FLSSessionItem& OutRemainingItem)
+bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName, int32 Amount, const int32 MaxSlotCount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem)
 {
 	OutRemainingItem = MakeEmptyItem();
 	if (ItemRowName.IsNone() || Amount <= 0)
@@ -215,31 +216,35 @@ bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowNa
 	{
 		OutRemainingItem.ItemRowName = ItemRowName;
 		OutRemainingItem.Amount = Amount;
-		OutRemainingItem.StatSeed = StatSeed;
+		OutRemainingItem.ChipStats = ChipStats;
 		return false;
 	}
 
+	// 확정 스탯 스냅샷을 가진 아이템(칩)은 개체별로 고유하므로 다른 슬롯과 절대 합치지 않는다.
+	const bool bHasInstanceStats = ChipStats.Num() > 0;
 	const int32 OriginalAmount = Amount;
 	const int32 MaxStack = ResolveItemMaxStack(ItemRowName, TEXT("TryAddItemsToSlotArray"));
 	const int32 ExistingSlotLimit = FMath::Min(Slots.Num(), MaxSlotCount);
 
-	for (int32 SlotIndex = 0; SlotIndex < ExistingSlotLimit; ++SlotIndex)
+	if (!bHasInstanceStats)
 	{
-		FLSSessionItem& Slot = Slots[SlotIndex];
-		if (Amount <= 0)
+		for (int32 SlotIndex = 0; SlotIndex < ExistingSlotLimit; ++SlotIndex)
 		{
-			break;
-		}
+			FLSSessionItem& Slot = Slots[SlotIndex];
+			if (Amount <= 0)
+			{
+				break;
+			}
 
-		// 인스턴스 시드가 다르면 같은 RowName이라도 합치지 않는다. (칩 등 개체별 스탯 보존)
-		if (Slot.ItemRowName != ItemRowName || Slot.StatSeed != StatSeed || Slot.Amount >= MaxStack)
-		{
-			continue;
-		}
+			if (Slot.ItemRowName != ItemRowName || Slot.ChipStats.Num() > 0 || Slot.Amount >= MaxStack)
+			{
+				continue;
+			}
 
-		const int32 AddAmount = FMath::Min(Amount, MaxStack - Slot.Amount);
-		Slot.Amount += AddAmount;
-		Amount -= AddAmount;
+			const int32 AddAmount = FMath::Min(Amount, MaxStack - Slot.Amount);
+			Slot.Amount += AddAmount;
+			Amount -= AddAmount;
+		}
 	}
 
 	for (int32 SlotIndex = 0; SlotIndex < ExistingSlotLimit; ++SlotIndex)
@@ -257,7 +262,7 @@ bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowNa
 
 		Slot.ItemRowName = ItemRowName;
 		Slot.Amount = FMath::Min(Amount, MaxStack);
-		Slot.StatSeed = StatSeed;
+		Slot.ChipStats = ChipStats;
 		Amount -= Slot.Amount;
 	}
 
@@ -266,7 +271,7 @@ bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowNa
 		FLSSessionItem NewSlot;
 		NewSlot.ItemRowName = ItemRowName;
 		NewSlot.Amount = FMath::Min(Amount, MaxStack);
-		NewSlot.StatSeed = StatSeed;
+		NewSlot.ChipStats = ChipStats;
 		Slots.Add(NewSlot);
 		Amount -= NewSlot.Amount;
 	}
@@ -275,7 +280,7 @@ bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowNa
 	{
 		OutRemainingItem.ItemRowName = ItemRowName;
 		OutRemainingItem.Amount = Amount;
-		OutRemainingItem.StatSeed = StatSeed;
+		OutRemainingItem.ChipStats = ChipStats;
 	}
 
 	return Amount < OriginalAmount;
@@ -292,7 +297,7 @@ void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRowName,
 	while (Amount > 0)
 	{
 		const int32 OriginalAmount = Amount;
-		TryAddItemsToSlotArray(Slots, ItemRowName, Amount, MAX_int32, /*StatSeed=*/0, RemainingItem);
+		TryAddItemsToSlotArray(Slots, ItemRowName, Amount, MAX_int32, /*ChipStats=*/TArray<FLSChipResolvedStat>(), RemainingItem);
 		Amount = RemainingItem.Amount;
 		if (Amount == OriginalAmount)
 		{
@@ -318,12 +323,14 @@ void NormalizeSlotArray(TArray<FLSSessionItem>& Slots)
 		FLSSessionItem NormalizedSlot;
 		NormalizedSlot.ItemRowName = OldSlot.ItemRowName;
 		NormalizedSlot.Amount = FMath::Min(OldSlot.Amount, MaxStack);
+		NormalizedSlot.ChipStats = OldSlot.ChipStats;
 		Slots.Add(NormalizedSlot);
 
 		const int32 OverflowAmount = OldSlot.Amount - NormalizedSlot.Amount;
 		if (OverflowAmount > 0)
 		{
-			AddItemsToSlotArray(Slots, OldSlot.ItemRowName, OverflowAmount);
+			FLSSessionItem RemainingItem;
+			TryAddItemsToSlotArray(Slots, OldSlot.ItemRowName, OverflowAmount, MAX_int32, OldSlot.ChipStats, RemainingItem);
 		}
 	}
 }
@@ -342,7 +349,7 @@ void RemoveItemsFromSlotArray(TArray<FLSSessionItem>& Slots, const FName ItemRow
 			break;
 		}
 
-		if (Slot.ItemRowName != ItemRowName || Slot.Amount <= 0)
+		if (Slot.ItemRowName != ItemRowName || Slot.ChipStats.Num() > 0 || Slot.Amount <= 0)
 		{
 			continue;
 		}
@@ -365,11 +372,19 @@ void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots)
 {
 	const int32 OriginalSlotCount = Slots.Num();
 	TMap<FName, int32> AmountByRowName;
+	TArray<FLSSessionItem> InstanceItems;
 	for (const FLSSessionItem& Slot : Slots)
 	{
 		if (IsFilled(Slot))
 		{
-			AmountByRowName.FindOrAdd(Slot.ItemRowName) += Slot.Amount;
+			if (Slot.ChipStats.Num() > 0)
+			{
+				InstanceItems.Add(Slot);
+			}
+			else
+			{
+				AmountByRowName.FindOrAdd(Slot.ItemRowName) += Slot.Amount;
+			}
 		}
 	}
 
@@ -379,6 +394,7 @@ void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots)
 	{
 		MergedItems.Add({ Pair.Key, Pair.Value });
 	}
+	MergedItems.Append(InstanceItems);
 
 	MergedItems.Sort([](const FLSSessionItem& Left, const FLSSessionItem& Right)
 	{
@@ -390,7 +406,8 @@ void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots)
 	Slots.Reset();
 	for (const FLSSessionItem& MergedItem : MergedItems)
 	{
-		AddItemsToSlotArray(Slots, MergedItem.ItemRowName, MergedItem.Amount);
+		FLSSessionItem IgnoredRemainingItem;
+		TryAddItemsToSlotArray(Slots, MergedItem.ItemRowName, MergedItem.Amount, MAX_int32, MergedItem.ChipStats, IgnoredRemainingItem);
 	}
 
 	while (Slots.Num() < OriginalSlotCount)
@@ -469,7 +486,7 @@ bool DropSlot(TArray<FLSSessionItem>& FromSlots, const int32 FromIndex, TArray<F
 		return true;
 	}
 
-	if (FromSlot.ItemRowName == ToSlot.ItemRowName)
+	if (FromSlot.ItemRowName == ToSlot.ItemRowName && FromSlot.ChipStats == ToSlot.ChipStats)
 	{
 		const int32 MaxStack = ResolveItemMaxStack(FromSlot.ItemRowName, TEXT("DropSlot"));
 		const int32 AddAmount = FMath::Min(FromSlot.Amount, MaxStack - ToSlot.Amount);
@@ -512,7 +529,7 @@ bool DropExternalItemToSlot(FLSSessionItem& InOutExternalItem, TArray<FLSSession
 		return true;
 	}
 
-	if (InOutExternalItem.ItemRowName == ToSlot.ItemRowName)
+	if (InOutExternalItem.ItemRowName == ToSlot.ItemRowName && InOutExternalItem.ChipStats == ToSlot.ChipStats)
 	{
 		const int32 MaxStack = ResolveItemMaxStack(InOutExternalItem.ItemRowName, TEXT("DropExternalItemToSlot"));
 		const int32 AddAmount = FMath::Min(InOutExternalItem.Amount, MaxStack - ToSlot.Amount);
@@ -555,7 +572,7 @@ bool DropResultSlot(TArray<FLSDropResult>& Slots, const int32 FromIndex, const i
 		return true;
 	}
 
-	if (FromSlot.ItemRowName == ToSlot.ItemRowName)
+	if (FromSlot.ItemRowName == ToSlot.ItemRowName && FromSlot.ChipStats == ToSlot.ChipStats)
 	{
 		const int32 MaxStack = ResolveItemMaxStack(FromSlot.ItemRowName, TEXT("DropResultSlot"));
 		const int32 AddAmount = FMath::Min(FromSlot.Amount, MaxStack - ToSlot.Amount);

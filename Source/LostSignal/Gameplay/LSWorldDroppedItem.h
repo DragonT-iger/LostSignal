@@ -42,9 +42,8 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_ItemData)
 	int32 Amount = 0;
 
-	// 칩 등 인스턴스 스탯 시드. 0 = 미롤/비칩. 줍기 시 인벤토리로 전달해 스탯을 보존한다.
 	UPROPERTY(ReplicatedUsing=OnRep_ItemData)
-	int32 StatSeed = 0;
+	TArray<FLSChipResolvedStat> ChipStats;
 
 	UFUNCTION()
 	void OnRep_ItemData();

@@ -151,10 +151,10 @@ TArray<FLSDropResult> ULSDropSubsystem::RollDropTable(FName DropTableName)
 		Result.ItemRowName = ItemRowName;
 		Result.Amount      = Entry->Drop_Amount;
 		Result.ItemText    = FindItemText(ItemRowName);
-		// 칩은 획득 시점에 인스턴스 스탯 시드를 부여한다. (등급+시드로 전투 스탯 결정론적 산출)
+		// 칩은 획득 시점에 전투 스탯을 롤링해 인스턴스 스냅샷으로 저장한다.
 		if (ItemRowName.ToString().StartsWith(TEXT("Chip_")))
 		{
-			Result.StatSeed = LSChipStats::RollNewChipSeed();
+			Result.ChipStats = LSChipStats::RollChipStats(ItemRowName);
 		}
 		Results.Add(Result);
 

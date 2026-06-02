@@ -23,7 +23,7 @@ public:
 	const TArray<FLSSessionItem>& GetSessionInventory() const { return SessionInventory; }
 	const TArray<FLSSessionItem>& GetSessionSafeInventory() const { return SessionSafeInventory; }
 
-	bool TryAddSessionItem(FName ItemRowName, int32 Amount, int32 StatSeed, FLSSessionItem& OutRemainingItem);
+	bool TryAddSessionItem(FName ItemRowName, int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem);
 	void SortSessionInventory();
 	bool DropSessionSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool DropExternalItemToSessionSlot(FLSSessionItem& InOutExternalItem, ELSInventorySlotArea ToArea, int32 ToIndex);

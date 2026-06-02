@@ -52,11 +52,11 @@
 | 설정 참조 | `ChipTable`, `ChipStatTable` 소프트 참조 | `Source/LostSignal/Data/LSDropSettings.h` |
 | 보관함 | 칩 탭 필터(`ELSStorageFilter::Chip`) + `WBP_ChipStorage` | `Source/LostSignal/UI/Storage/LSLobbyStorageWidget.*` |
 | 아이콘 | 칩 아이콘 경로(`/Game/LostSignal/UI/Icons/Chips/`) | `Source/LostSignal/UI/Inventory/LSItemSlotWidget.cpp:465` |
-| 툴팁(부분) | 칩 툴팁: 이름/등급/설명/가격/메모리/스탯 개수 | `Source/LostSignal/UI/Inventory/LSItemTooltipWidget.cpp:197` |
+| 툴팁(부분) | 칩 툴팁: 이름/등급/설명/가격/메모리/확정 전투 스탯 | `Source/LostSignal/UI/Inventory/LSItemTooltipWidget.cpp:197` |
 
 ### ⚠️ 부분 구현
 
-- **칩 툴팁** (`PopulateChipTooltip`): 메모리 할당량과 "전투 스탯 개수"는 표시하지만, **실제 전투 스탯 값**(ChipStat 테이블 참조)과 **프로토콜 수치**는 표시하지 않는다.
+- **칩 툴팁** (`PopulateChipTooltip`): 메모리 할당량과 저장된 `ChipStats`의 **확정 전투 스탯 값**은 표시하지만, **프로토콜 수치**는 표시하지 않는다.
 
 ### ❌ 미구현
 
@@ -132,7 +132,7 @@
 
 ## 4. 확인 필요 사항 (기획 결정 대기)
 
-1. ~~**스탯 산출 방식**~~: **확정 — 인스턴스 롤링.** 칩 획득 시 범위 내 랜덤값을 굴려 그 칩에 고정(같은 등급도 개체마다 다름). 확정 스탯을 **칩 인스턴스에 저장**해야 함 → 저장 단위(`FLSSessionItem`)에 인스턴스 데이터 필요. 권장: 전체 스탯을 들지 말고 **시드(int32 StatSeed) 1개만 저장 + 런타임 재계산**(저장 구조 최소 변경). → [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md).
+1. ~~**스탯 산출 방식**~~: **확정 — 인스턴스 롤링 + 스냅샷 저장.** 칩 획득 시 범위 내 랜덤값을 굴려 그 칩에 고정(같은 등급도 개체마다 다름). 확정 스탯은 `FLSSessionItem` / `FLSDropResult`의 `ChipStats` 배열에 저장하며, DataTable 변경 후에도 기존 칩 값은 바뀌지 않는다. → [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md).
 
 2. ~~**스탯 선택 규칙**~~: **확정 — 랜덤 N개.** 등급별 10개 스탯 풀에서 `Item_Chip_Status_Count`개를 무작위 선택하고, 각 값은 해당 스탯의 `min~max`에서 롤링. (선택된 스탯 종류 + 값 모두 시드로 결정론적 재현)
 
@@ -151,16 +151,16 @@
 ### Phase 1 — 칩 스탯 산출 로직 + 툴팁 보강
 
 **1-A 롤링 본체 (백엔드) — ✅ 완료**
-- `FLSSessionItem` / `FLSDropResult`에 `int32 StatSeed` 추가 (0 = 비칩/미롤). 값 복사로 이동·저장·복제 시 보존, `ToSessionItem`/`SetDropResultFromSessionItem`이 시드 전달.
-- 드랍 생성(`ULSDropSubsystem::RollDropTable`)에서 칩(`Chip_` 접두사)에 비-0 시드 부여 → **서버 권위 지점에서 1회 롤**.
-- 리졸버 `LSChipStats::ResolveChipStats(RowName, StatSeed)` (`Source/LostSignal/Data/LSChipStats.{h,cpp}`):
+- `FLSSessionItem` / `FLSDropResult`에 `TArray<FLSChipResolvedStat> ChipStats` 저장. 값 복사로 이동·저장·복제 시 보존, `ToSessionItem`/`SetDropResultFromSessionItem`이 배열을 전달.
+- 드랍 생성(`ULSDropSubsystem::RollDropTable`)에서 칩(`Chip_` 접두사)에 `LSChipStats::RollChipStats(RowName)` 결과를 부여 → **서버 권위 지점에서 1회 롤**.
+- 롤러 `LSChipStats::RollChipStats(RowName)` (`Source/LostSignal/Data/LSChipStats.{h,cpp}`):
   - 등급 = Name 파싱, 개수 = `Item_Chip_Status_Count`, 범위 = ChipStat 등급 행(`FLSStatRange`).
-  - `FRandomStream(seed)`로 10개 스탯 풀에서 **N개 무작위 선택(Fisher-Yates) + 각 값 범위 내 롤**. 같은 (RowName, Seed)는 항상 동일 결과(결정론적). Seed==0이면 RowName 해시 폴백.
+  - 10개 스탯 풀에서 **N개 무작위 선택(Fisher-Yates) + 각 값 범위 내 롤**. 결과는 칩 인스턴스의 `ChipStats` 배열에 스냅샷으로 저장.
   - 표시용 `GetChipStatLabel(StatKey)` 동봉.
 
 **1-B 툴팁 표시 (UI 배선) — ⬜ 다음 슬라이스**
-- 슬롯/툴팁이 `StatSeed`를 받도록 시그니처 확장(`ULSItemSlotWidget::SetItem` → `ULSItemTooltipWidget::SetItem`)하고 호출부 갱신.
-- 칩 툴팁이 `ResolveChipStats` 결과(확정 전투 스탯)와 프로토콜 수치를 표시.
+- 슬롯/툴팁이 `ChipStats`를 받도록 시그니처 확장(`ULSItemSlotWidget::SetItem` → `ULSItemTooltipWidget::SetItem`)하고 호출부 갱신.
+- 칩 툴팁이 저장된 `ChipStats` 결과(확정 전투 스탯)와 프로토콜 수치를 표시.
 - **검증**: 칩 드랍/보관 시 개체별로 다른 스탯이 툴팁에 노출, 같은 칩은 재오픈해도 동일.
 
 ### Phase 2 — 칩 장착 데이터 모델 (하드웨어 백엔드)

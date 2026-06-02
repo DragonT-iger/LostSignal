@@ -103,7 +103,7 @@ bool ALSLootBox::TransferLootSlotToSession(const int32 LootSlotIndex, ULSRaidInv
 		return false;
 	}
 
-	if (!RaidInventory->TryAddSessionItem(LootResults[LootSlotIndex].ItemRowName, LootResults[LootSlotIndex].Amount, LootResults[LootSlotIndex].StatSeed, OutRemainingLootItem))
+	if (!RaidInventory->TryAddSessionItem(LootResults[LootSlotIndex].ItemRowName, LootResults[LootSlotIndex].Amount, LootResults[LootSlotIndex].ChipStats, OutRemainingLootItem))
 	{
 		return false;
 	}

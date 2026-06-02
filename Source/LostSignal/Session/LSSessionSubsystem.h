@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/LSChipStats.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "LSSessionSubsystem.generated.h"
 
@@ -29,9 +30,10 @@ struct FLSSessionItem
 	UPROPERTY(BlueprintReadOnly) FName ItemRowName;
 	UPROPERTY(BlueprintReadOnly) int32 Amount = 0;
 
-	// 칩 인스턴스 스탯 롤링 시드. 0 = 미롤(비칩/레거시). 칩은 획득 시 비-0 시드를 받아
-	// (등급 + 시드)로 전투 스탯을 결정론적으로 재계산한다. 이동/저장/복제 시 그대로 보존.
-	UPROPERTY(BlueprintReadOnly) int32 StatSeed = 0;
+	// 칩 인스턴스 확정 전투 스탯 스냅샷. 비어 있으면 비칩.
+	// 획득 시점에 1회 롤링해 고정한 값이라 데이터 테이블을 패치해도 변하지 않는다.
+	// 이동/저장/복제 시 값 복사로 그대로 보존.
+	UPROPERTY(BlueprintReadOnly) TArray<FLSChipResolvedStat> ChipStats;
 };
 
 // 레이드 입장 시점의 장비 스냅샷
@@ -84,7 +86,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void AddSessionItem(FName ItemRowName, int32 Amount);
 
-	bool TryAddSessionItem(FName ItemRowName, int32 Amount, int32 StatSeed, FLSSessionItem& OutRemainingItem);
+	bool TryAddSessionItem(FName ItemRowName, int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void SortSessionInventory();

@@ -18,7 +18,7 @@
 
 #define LOCTEXT_NAMESPACE "LSItemTooltipWidget"
 
-void ULSItemTooltipWidget::SetItem(const FName ItemRowName, const int32 HoveredSlotAmount, const int32 StatSeed)
+void ULSItemTooltipWidget::SetItem(const FName ItemRowName, const int32 HoveredSlotAmount, const TArray<FLSChipResolvedStat>& ChipStats)
 {
 	ClearStats();
 	ClearExtraInfos();
@@ -32,7 +32,7 @@ void ULSItemTooltipWidget::SetItem(const FName ItemRowName, const int32 HoveredS
 	const FString RowNameString = ItemRowName.ToString();
 	if (RowNameString.StartsWith(TEXT("Chip_")))
 	{
-		PopulateChipTooltip(ItemRowName, StatSeed);
+		PopulateChipTooltip(ItemRowName, ChipStats);
 	}
 	else if (RowNameString.StartsWith(TEXT("Weapon_")))
 	{
@@ -192,11 +192,11 @@ void ULSItemTooltipWidget::SetCommonTexts(const FText& TooltipType, const FText&
 	}
 	else
 	{
-		PriceText->SetText(FText::Format(LOCTEXT("PriceFormat", "C{0}"), FText::AsNumber(ItemCost)));
+		PriceText->SetText(FText::Format(LOCTEXT("PriceFormat", "C {0}"), FText::AsNumber(ItemCost)));
 	}
 }
 
-void ULSItemTooltipWidget::PopulateChipTooltip(const FName ItemRowName, const int32 StatSeed)
+void ULSItemTooltipWidget::PopulateChipTooltip(const FName ItemRowName, const TArray<FLSChipResolvedStat>& ChipStats)
 {
 	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
 	UDataTable* ChipTable = Settings ? Settings->ChipTable.LoadSynchronous() : nullptr;
@@ -216,11 +216,8 @@ void ULSItemTooltipWidget::PopulateChipTooltip(const FName ItemRowName, const in
 	SetCommonTexts(LOCTEXT("ChipTooltipType", "칩 설명창"), Row->Item_Text, LSInventorySlotUtils::ResolveItemGradeFromRowName(ItemRowName), Row->Item_Description, Row->Item_Cost);
 	AddExtraInfo(LOCTEXT("ChipMemoryCostExtraInfo", "메모리 할당량"), FText::AsNumber(Row->Item_MemoryCost));
 
-	AddStatIfNonZero(LOCTEXT("ChipStatusCountStat", "전투 스탯 개수"), static_cast<float>(Row->Item_Chip_Status_Count));
-
-	// 인스턴스 시드로 확정된 추가 전투 스탯을 표시한다.
-	const TArray<FLSChipResolvedStat> ResolvedStats = LSChipStats::ResolveChipStats(ItemRowName, StatSeed);
-	for (const FLSChipResolvedStat& Stat : ResolvedStats)
+	// 인스턴스 스냅샷에 저장된 추가 전투 스탯을 표시한다.
+	for (const FLSChipResolvedStat& Stat : ChipStats)
 	{
 		AddStat(LSChipStats::GetChipStatLabel(Stat.StatKey), FText::AsNumber(Stat.Value));
 	}

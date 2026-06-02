@@ -20,7 +20,7 @@ class LOSTSIGNAL_API ULSItemSlotWidget : public ULSItemTooltipSlotWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
-	void SetItem(FName ItemRowName, int32 Amount, int32 StatSeed = 0);
+	void SetItem(FName ItemRowName, int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void ClearItem();
