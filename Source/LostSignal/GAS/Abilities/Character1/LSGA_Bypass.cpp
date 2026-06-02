@@ -392,6 +392,22 @@ void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLo
 		return;
 	}
 
+	FLSCharacterSkillRow Row;
+	const bool bHasRow = BypassData->TryGetSkillRow(Row);
+	const bool bRowHasCCType = bHasRow && Row.CC_Type != ELSCharacterSkillCrowdControlType::None;
+	if (bRowHasCCType && Row.CC_Type != ELSCharacterSkillCrowdControlType::Pull)
+	{
+		return;
+	}
+
+	const float PullSpeed = bHasRow && Row.CC_Value > 0.0f ? Row.CC_Value : BypassData->PullSpeed;
+	const ELSBreakPowerTier PullBreakPower = bHasRow
+		? static_cast<ELSBreakPowerTier>(FMath::Clamp(
+			Row.Skill_Impact,
+			static_cast<int32>(ELSBreakPowerTier::NormalAttack),
+			static_cast<int32>(ELSBreakPowerTier::HardCrowdControl)))
+		: BypassData->PullBreakPower;
+
 	TArray<AActor*> OverlappedActors;
 	TArray<AActor*> ActorsToIgnore;
 	ActorsToIgnore.Add(SourceActor);
@@ -412,14 +428,14 @@ void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLo
 	for (AActor* TargetActor : OverlappedActors)
 	{
 		ULSCharacterCombatComponent* TargetCombatComponent = TargetActor ? TargetActor->FindComponentByClass<ULSCharacterCombatComponent>() : nullptr;
-		if (!TargetCombatComponent || !TargetCombatComponent->CanApplyCrowdControl(BypassData->PullBreakPower))
+		if (!TargetCombatComponent || !TargetCombatComponent->CanApplyCrowdControl(PullBreakPower))
 		{
 			continue;
 		}
 
 		FVector PullDirection = HologramLocation - TargetActor->GetActorLocation();
 		PullDirection.Z = 0.0f;
-		if (TargetCombatComponent->ApplyKnockback(PullDirection, BypassData->PullSpeed, BypassData->PullDuration, BypassData->PullUpSpeed))
+		if (TargetCombatComponent->ApplyKnockback(PullDirection, PullSpeed, BypassData->PullDuration, BypassData->PullUpSpeed))
 		{
 			++PulledCount;
 			ScheduleSpoofingStun(TargetActor, BypassData);

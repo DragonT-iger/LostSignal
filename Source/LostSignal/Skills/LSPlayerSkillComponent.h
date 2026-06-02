@@ -87,6 +87,7 @@ private:
 
 	bool CanUseLocalPreview() const;
 	bool ActivateSkillOnServer(ELSPlayerSkillSlot Slot, const FVector& TargetLocation, float AimYaw);
+	FVector ClampTargetLocationToCastRange(const ULSSkillDataAsset* SkillData, const FVector& TargetLocation) const;
 	void LogSkillCooldownBlocked(const ULSSkillDataAsset* SkillData, const TCHAR* Phase) const;
 	bool TryActivateGameplayAbility(ULSSkillDataAsset* SkillData, const FLSSkillActivationContext& Context);
 	bool TrySendPassiveGameplayEvent(ULSSkillDataAsset* SkillData, int32 ComboIndex) const;

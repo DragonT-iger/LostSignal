@@ -11,6 +11,45 @@
 #include "GAS/Effects/LSGE_PlayerBasicDamage.h"
 #include "GAS/LSGameplayTags.h"
 
+namespace
+{
+	void ApplySkillRowRangeToPreviewSpec(const FLSCharacterSkillRow& Row, FLSSkillAreaPreviewSpec& InOutSpec)
+	{
+		switch (Row.Range_Shape)
+		{
+		case ELSCharacterSkillRangeShape::Cone:
+			InOutSpec.Shape = ELSSkillAreaShape::Circle;
+			InOutSpec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
+			InOutSpec.Radius = Row.Range_X;
+			InOutSpec.Degrees = Row.Range_Y;
+			break;
+
+		case ELSCharacterSkillRangeShape::Circle:
+			InOutSpec.Shape = ELSSkillAreaShape::Circle;
+			InOutSpec.Radius = Row.Range_X;
+			InOutSpec.Degrees = 360.0f;
+			break;
+
+		case ELSCharacterSkillRangeShape::Box:
+			InOutSpec.Shape = ELSSkillAreaShape::Box;
+			InOutSpec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
+			InOutSpec.BoxLength = Row.Range_X;
+			InOutSpec.BoxWidth = Row.Range_Y;
+			if (InOutSpec.LocationOffset.IsNearlyZero() && Row.Range_X > 0.0f)
+			{
+				InOutSpec.LocationOffset.X = Row.Range_X * 0.5f;
+			}
+			break;
+
+		case ELSCharacterSkillRangeShape::None:
+		default:
+			break;
+		}
+
+		InOutSpec.WorldZOffset = 0;
+	}
+}
+
 ULSSkillDataAsset::ULSSkillDataAsset()
 {
 	DamageEffectClass = ULSGE_PlayerBasicDamage::StaticClass();
@@ -26,41 +65,7 @@ FLSSkillAreaPreviewSpec ULSSkillDataAsset::BuildPreviewSpec() const
 		return ResolvedSpec;
 	}
 
-	switch (Row->Range_Shape)
-	{
-	case ELSCharacterSkillRangeShape::Cone:
-		ResolvedSpec.Shape = ELSSkillAreaShape::Circle;
-		ResolvedSpec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
-		ResolvedSpec.Radius = Row->Range_X;
-		ResolvedSpec.Degrees = Row->Range_Y > 0.0f ? Row->Range_Y : ResolvedSpec.Degrees;
-		break;
-
-	case ELSCharacterSkillRangeShape::Circle:
-		ResolvedSpec.Shape = ELSSkillAreaShape::Circle;
-		ResolvedSpec.Radius = Row->Range_X;
-		ResolvedSpec.Degrees = 360.0f;
-		break;
-
-	case ELSCharacterSkillRangeShape::Box:
-		ResolvedSpec.Shape = ELSSkillAreaShape::Box;
-		ResolvedSpec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
-		ResolvedSpec.BoxLength = Row->Range_X;
-		ResolvedSpec.BoxWidth = Row->Range_Y;
-		if (ResolvedSpec.LocationOffset.IsNearlyZero() && Row->Range_X > 0.0f)
-		{
-			ResolvedSpec.LocationOffset.X = Row->Range_X * 0.5f;
-		}
-		break;
-
-	default:
-		break;
-	}
-
-	if (Row->Range_Z > 0.0f)
-	{
-		ResolvedSpec.WorldZOffset = Row->Range_Z;
-	}
-
+	ApplySkillRowRangeToPreviewSpec(*Row, ResolvedSpec);
 	return ResolvedSpec;
 }
 

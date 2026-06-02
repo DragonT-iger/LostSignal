@@ -17,7 +17,7 @@ struct LOSTSIGNAL_API FLSCharacterStatRow : public FTableRowBase
 	float Char_Attack = 100.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="공격속도")
-	float Char_Atkspead = 1.0f;
+	float Char_Atkspeed = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Stats", DisplayName="스킬가속")
 	float Char_Cal = 0.0f;

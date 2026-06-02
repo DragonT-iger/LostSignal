@@ -48,7 +48,7 @@ void ALSTestPlayerCharacter::LoadStatsFromDataTable()
 	}
 
 	BaseAttack = Row->Char_Attack;
-	BaseAttackSpeed = Row->Char_Atkspead;
+	BaseAttackSpeed = Row->Char_Atkspeed;
 	BaseCooldownReduction = Row->Char_Cal;
 	BaseCritChance = Row->Char_Crit;
 	BaseCritDamage = Row->Char_CritDmg;

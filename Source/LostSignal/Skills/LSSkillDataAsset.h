@@ -9,7 +9,6 @@
 #include "Skills/LSSkillTypes.h"
 #include "LSSkillDataAsset.generated.h"
 
-class ULSSkill;
 class UGameplayAbility;
 class UGameplayEffect;
 struct FLSCharacterSkillRow;
@@ -39,10 +38,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill|Enhancement")
 	ULSSkillDataAsset* GetEnhancementVariant(int32 Index) const;
-
-	/** Legacy migration-only field. Runtime skill execution must use AbilityClass/DataAsset fields. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
-	TSubclassOf<ULSSkill> SkillClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TSubclassOf<UGameplayAbility> AbilityClass;

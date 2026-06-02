@@ -6,6 +6,7 @@
 #include "Abilities/GameplayAbilityTypes.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Components/CapsuleComponent.h"
+#include "Data/LSCharacterSkillRow.h"
 #include "Engine/EngineTypes.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Character.h"
@@ -73,7 +74,7 @@ void ULSPlayerSkillComponent::UpdateActiveSkillPreview(const FVector& WorldLocat
 
 	if (ULSSkillPreviewComponent* PreviewComponent = ResolvePreviewComponent())
 	{
-		PreviewComponent->UpdateAreaPreview(WorldLocation, WorldRotation);
+		PreviewComponent->UpdateAreaPreview(ClampTargetLocationToCastRange(ActiveSkillData, WorldLocation), WorldRotation);
 	}
 }
 
@@ -101,6 +102,9 @@ bool ULSPlayerSkillComponent::ConfirmAnyActiveSkillPreview(const FVector& Target
 	}
 
 	const ELSPlayerSkillSlot SlotToActivate = ActiveSlot;
+	ULSSkillDataAsset* SkillData = GetSkillData(SlotToActivate);
+	const FVector ClampedTargetLocation = ClampTargetLocationToCastRange(SkillData, TargetLocation);
+
 	const bool bConfirmed = ConfirmActiveSkillPreview(SlotToActivate);
 	if (!bConfirmed)
 	{
@@ -111,11 +115,11 @@ bool ULSPlayerSkillComponent::ConfirmAnyActiveSkillPreview(const FVector& Target
 	{
 		if (OwnerActor->HasAuthority())
 		{
-			return ActivateSkillOnServer(SlotToActivate, TargetLocation, AimRotation.Yaw);
+			return ActivateSkillOnServer(SlotToActivate, ClampedTargetLocation, AimRotation.Yaw);
 		}
 
-		TryPredictFastMovementSkill(GetSkillData(SlotToActivate), TargetLocation, AimRotation.Yaw);
-		ServerRequestActivateSkill(SlotToActivate, TargetLocation, AimRotation.Yaw);
+		TryPredictFastMovementSkill(SkillData, ClampedTargetLocation, AimRotation.Yaw);
+		ServerRequestActivateSkill(SlotToActivate, ClampedTargetLocation, AimRotation.Yaw);
 	}
 
 	return true;
@@ -353,10 +357,12 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 		return false;
 	}
 
+	const FVector ClampedTargetLocation = ClampTargetLocationToCastRange(SkillData, TargetLocation);
+
 	FLSSkillActivationContext Context;
 	Context.SourceActor = OwnerActor;
 	Context.SkillData = SkillData;
-	Context.TargetLocation = TargetLocation;
+	Context.TargetLocation = ClampedTargetLocation;
 	Context.AimYaw = AimYaw;
 
 	if (SkillData->GetAbilityClass())
@@ -368,6 +374,34 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 		*GetNameSafe(OwnerActor),
 		*GetNameSafe(SkillData));
 	return false;
+}
+
+FVector ULSPlayerSkillComponent::ClampTargetLocationToCastRange(const ULSSkillDataAsset* SkillData, const FVector& TargetLocation) const
+{
+	FLSCharacterSkillRow Row;
+	if (!SkillData || !SkillData->TryGetSkillRow(Row) || Row.Cast_Range <= 0.0f)
+	{
+		return TargetLocation;
+	}
+
+	const AActor* OwnerActor = GetOwner();
+	if (!OwnerActor)
+	{
+		return TargetLocation;
+	}
+
+	const FVector OwnerLocation = OwnerActor->GetActorLocation();
+	FVector ToTarget = TargetLocation - OwnerLocation;
+	ToTarget.Z = 0.0f;
+	const float Distance = ToTarget.Size2D();
+	if (Distance <= Row.Cast_Range || Distance <= KINDA_SMALL_NUMBER)
+	{
+		return TargetLocation;
+	}
+
+	FVector ClampedLocation = OwnerLocation + (ToTarget / Distance * Row.Cast_Range);
+	ClampedLocation.Z = TargetLocation.Z;
+	return ClampedLocation;
 }
 
 void ULSPlayerSkillComponent::LogSkillCooldownBlocked(const ULSSkillDataAsset* SkillData, const TCHAR* Phase) const

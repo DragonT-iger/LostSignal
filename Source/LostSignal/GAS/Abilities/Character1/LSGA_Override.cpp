@@ -119,6 +119,20 @@ namespace
 			return Distance <= Radius;
 		}
 	}
+
+	bool ShouldApplyOverrideAttackSpeedBuff(const FLSCharacterSkillRow& Row, bool bHasRow)
+	{
+		return !bHasRow
+			|| Row.Skill_Effect_Type == ELSCharacterSkillEffectType::None
+			|| Row.Skill_Effect_Type == ELSCharacterSkillEffectType::Char_Atkspead;
+	}
+
+	bool ShouldApplyOverrideSelfEffect(const FLSCharacterSkillRow& Row, bool bHasRow)
+	{
+		return !bHasRow
+			|| Row.Effect_Target == ELSCharacterSkillEffectTarget::None
+			|| Row.Effect_Target == ELSCharacterSkillEffectTarget::Self;
+	}
 }
 
 ULSGA_Override::ULSGA_Override()
@@ -195,8 +209,13 @@ void ULSGA_Override::ActivateAbility(
 	const float ResolvedKnockbackDuration = bHasRow && Row.Skill_Time > 0.0f
 		? Row.Skill_Time
 		: OverrideData ? OverrideData->FallbackKnockbackDuration : FallbackKnockbackDuration;
-	const float ResolvedKnockbackSpeed = OverrideData && OverrideData->FallbackKnockbackSpeed > 0.0f ? OverrideData->FallbackKnockbackSpeed : KnockbackSpeed;
+	const float ResolvedKnockbackSpeed = bHasRow && Row.CC_Value > 0.0f
+		? Row.CC_Value
+		: OverrideData && OverrideData->FallbackKnockbackSpeed > 0.0f ? OverrideData->FallbackKnockbackSpeed : KnockbackSpeed;
 	const float ResolvedKnockbackUpSpeed = OverrideData ? OverrideData->FallbackKnockbackUpSpeed : KnockbackUpSpeed;
+	const ELSCharacterSkillCrowdControlType ResolvedCCType = bHasRow && Row.CC_Type != ELSCharacterSkillCrowdControlType::None
+		? Row.CC_Type
+		: ELSCharacterSkillCrowdControlType::KnockBack;
 	const FVector AimDirection = ResolveOverrideAimDirection(SourceActor, SkillContext);
 	const float QueryRadius = ResolvedShape == ELSCharacterSkillRangeShape::Box
 		? FMath::Sqrt(FMath::Square(Length) + FMath::Square(Width * 0.5f))
@@ -251,6 +270,11 @@ void ULSGA_Override::ActivateAbility(
 
 		++ValidHitCount;
 
+		if (ResolvedCCType == ELSCharacterSkillCrowdControlType::None)
+		{
+			continue;
+		}
+
 		ULSCharacterCombatComponent* TargetCombatComponent = TargetActor->FindComponentByClass<ULSCharacterCombatComponent>();
 		if (TargetCombatComponent && !TargetCombatComponent->CanApplyCrowdControl(ResolvedBreakPower))
 		{
@@ -263,7 +287,11 @@ void ULSGA_Override::ActivateAbility(
 		}
 
 		FVector KnockbackDirection = AimDirection;
-		if (ResolvedShape == ELSCharacterSkillRangeShape::Circle)
+		if (ResolvedCCType == ELSCharacterSkillCrowdControlType::Pull)
+		{
+			KnockbackDirection = SourceLocation - TargetActor->GetActorLocation();
+		}
+		else if (ResolvedShape == ELSCharacterSkillRangeShape::Circle)
 		{
 			KnockbackDirection = TargetActor->GetActorLocation() - SourceLocation;
 			KnockbackDirection.Z = 0.0f;
@@ -280,7 +308,7 @@ void ULSGA_Override::ActivateAbility(
 		}
 	}
 
-	if (OverrideData && OverrideData->bApplyAttackSpeedBuff)
+	if (OverrideData && OverrideData->bApplyAttackSpeedBuff && ShouldApplyOverrideAttackSpeedBuff(Row, bHasRow) && ShouldApplyOverrideSelfEffect(Row, bHasRow))
 	{
 		UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
 		const float AttackSpeedBonus = bHasRow && Row.Skill_Effect_Value > 0.0f ? Row.Skill_Effect_Value : OverrideData->FallbackAttackSpeedBonus;

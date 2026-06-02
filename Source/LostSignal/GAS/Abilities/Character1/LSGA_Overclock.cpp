@@ -93,7 +93,7 @@ void ULSGA_Overclock::ActivateAbility(
 	const float ConeDegrees = bHasRow && Row.Range_Y > 0.0f ? Row.Range_Y : FallbackConeDegrees;
 	const float DataAssetAttackCoefficient = SkillContext.SkillData->AttackCoefficient > 0.0f ? SkillContext.SkillData->AttackCoefficient : FallbackAttackCoefficient;
 	const float BaseAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : DataAssetAttackCoefficient;
-	const float AdditionalCoefficientPerStack = bHasRow && Row.Skill_Count_Multiplier > 0.0f ? Row.Skill_Count_Multiplier : FallbackAdditionalAttackCoefficientPerStack;
+	const float AdditionalCoefficientPerStack = bHasRow && Row.Res_Multiplier > 0.0f ? Row.Res_Multiplier : FallbackAdditionalAttackCoefficientPerStack;
 	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverclockAbilityBreakPowerTier(Row.Skill_Impact, SkillContext.SkillData->BreakPower) : SkillContext.SkillData->BreakPower;
 
 	const FVector SourceLocation = SourceActor->GetActorLocation();

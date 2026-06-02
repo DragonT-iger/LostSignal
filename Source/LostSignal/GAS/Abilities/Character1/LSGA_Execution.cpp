@@ -70,6 +70,8 @@ bool ULSGA_Execution::ResolveMovementParams(const ULSSkillDataAsset* InSkillData
 		? Row.Skill_Time
 		: InExecutionData ? InExecutionData->FallbackDashDuration : 0.25f;
 
+	UE_LOG(LogLS, Warning, TEXT("Excution Distance = %.2f, Duration = %.2f"), OutDistance, OutDuration)
+
 	return OutDistance > 0.0f && OutDuration > 0.0f;
 }
 
@@ -158,7 +160,7 @@ void ULSGA_Execution::ActivateAbility(
 	CachedStartLocation = SourceActor->GetActorLocation();
 	CachedConsumedAccelerationStacks = ConsumeCombatAccelerationStacks(SourceActor);
 	const float DataAssetAdditionalCoefficient = ExecutionData ? ExecutionData->AdditionalAttackCoefficientPerAccelerationStack : 0.25f;
-	const float AdditionalCoefficient = bHasRow && Row.Skill_Count_Multiplier > 0.0f ? Row.Skill_Count_Multiplier : DataAssetAdditionalCoefficient;
+	const float AdditionalCoefficient = bHasRow && Row.Res_Multiplier > 0.0f ? Row.Res_Multiplier : DataAssetAdditionalCoefficient;
 	CachedAttackCoefficient = BaseAttackCoefficient + (AdditionalCoefficient * CachedConsumedAccelerationStacks);
 	IgnoreEnemiesForDash(SourceCharacter);
 

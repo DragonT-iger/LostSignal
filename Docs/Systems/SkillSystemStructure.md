@@ -33,7 +33,6 @@
 - 수치 변경은 `GameplayEffect`를 통해 처리한다.
 - 스킬별 설정은 `ULSSkillDataAsset` 또는 스킬 전용 DataAsset에 둔다.
 - 기획 수치는 가능하면 `FLSCharacterSkillRow` DataTable에서 읽는다.
-- `ULSSkill` 기반 기존 클래스는 레거시 마이그레이션 대상으로만 본다.
 
 ## 전체 구조
 
@@ -90,10 +89,6 @@ GameplayEffect
 스킬 공통 데이터의 기준 클래스다.
 
 ```text
-SkillClass
-- 레거시 마이그레이션용
-- 신규 런타임 실행 기준으로 사용하지 않는다
-
 AbilityClass
 - 실제 실행할 GameplayAbility
 
@@ -114,7 +109,8 @@ SkillRow
 
 PreviewSpec
 - 프리뷰 표시 기본값
-- DataTable Range_Shape / Range_X / Range_Y / Range_Z가 있으면 일부 값이 덮어써진다
+- DataTable Range_Shape / Range_X / Range_Y / Range_Z가 있으면 프리뷰 범위는 DataTable 값을 우선한다.
+- Range_Shape가 Cone이면 원형 프리뷰 머티리얼을 쓰고 Degrees는 Range_Y 값을 그대로 사용한다.
 
 DamageEffectClass
 - 데미지 적용용 GameplayEffect
@@ -481,7 +477,6 @@ Ability BP 또는 C++ 기본값:
 
 ## 금지/주의 사항
 
-- 신규 스킬을 `ULSSkill` 실행 중심으로 만들지 않는다.
 - HP, 공격력, 공격속도 같은 수치를 직접 수정하지 않는다.
 - 스킬별 특수 필드를 공통 `ULSSkillDataAsset`에 무한히 추가하지 않는다.
 - 쿨타임 태그를 공유할지 분리할지 명확히 정하지 않고 추가하지 않는다.
