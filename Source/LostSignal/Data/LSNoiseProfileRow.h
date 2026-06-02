@@ -17,6 +17,7 @@ struct LOSTSIGNAL_API FLSNoiseProfileRow : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Noise", meta=(ClampMin="0.0"))
 	float RadiusMeters = 0.0f;
 
+	//지속 발생 소음일 시 소음 이벤트 발생 주기
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Noise", meta=(ClampMin="0.0"))
 	float EmitIntervalSeconds = 0.0f;
 };

@@ -92,21 +92,74 @@ void ULSMonsterSenseComponent::RegisterNoiseEvent(const FLSNoiseEvent& NoiseEven
 	const AActor* OwnerActor = GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority() || NoiseEvent.RadiusCm <= 0.0f)
 	{
+		if (bLogNoiseDebug)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[MonsterSense] Noise ignored before distance check. Owner=%s HasAuthority=%d Instigator=%s RadiusCm=%.2f"),
+				*GetNameSafe(OwnerActor),
+				OwnerActor ? OwnerActor->HasAuthority() : false,
+				*GetNameSafe(NoiseEvent.NoiseInstigator),
+				NoiseEvent.RadiusCm);
+		}
 		return;
 	}
 
-	const float EffectiveHearingRadius = FMath::Min(HearingRadius, NoiseEvent.RadiusCm);
+	const float EffectiveHearingRadius = HearingRadius + NoiseEvent.RadiusCm;
 	if (EffectiveHearingRadius <= 0.0f)
 	{
+		if (bLogNoiseDebug)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[MonsterSense] Noise rejected by invalid hearing radius. Owner=%s HearingRadius=%.2f NoiseRadius=%.2f Instigator=%s"),
+				*GetNameSafe(OwnerActor),
+				HearingRadius,
+				NoiseEvent.RadiusCm,
+				*GetNameSafe(NoiseEvent.NoiseInstigator));
+		}
 		return;
 	}
 
-	if (FVector::DistSquared2D(OwnerActor->GetActorLocation(), NoiseEvent.Location) > FMath::Square(EffectiveHearingRadius))
+	const float Distance2D = FVector::Dist2D(OwnerActor->GetActorLocation(), NoiseEvent.Location);
+	if (Distance2D > EffectiveHearingRadius)
 	{
+		if (bLogNoiseDebug)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[MonsterSense] Noise rejected by distance. Owner=%s Instigator=%s Tag=%s Distance=%.2f CombinedRadius=%.2f HearingRadius=%.2f NoiseRadius=%.2f Location=%s"),
+				*GetNameSafe(OwnerActor),
+				*GetNameSafe(NoiseEvent.NoiseInstigator),
+				NoiseEvent.NoiseTag.IsValid() ? *NoiseEvent.NoiseTag.ToString() : TEXT("None"),
+				Distance2D,
+				EffectiveHearingRadius,
+				HearingRadius,
+				NoiseEvent.RadiusCm,
+				*NoiseEvent.Location.ToCompactString());
+		}
 		return;
 	}
 
 	InterestLocation = NoiseEvent.Location;
+	bHasInterestLocation = true;
+
+	if (bLogNoiseDebug)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[MonsterSense] Noise accepted. Owner=%s Instigator=%s Tag=%s Distance=%.2f CombinedRadius=%.2f InterestLocation=%s"),
+			*GetNameSafe(OwnerActor),
+			*GetNameSafe(NoiseEvent.NoiseInstigator),
+			NoiseEvent.NoiseTag.IsValid() ? *NoiseEvent.NoiseTag.ToString() : TEXT("None"),
+			Distance2D,
+			EffectiveHearingRadius,
+			*InterestLocation.ToCompactString());
+	}
+}
+
+void ULSMonsterSenseComponent::SetCurrentTargetFromDamage(AActor* DamageInstigator)
+{
+	const AActor* OwnerActor = GetOwner();
+	if (!OwnerActor || !OwnerActor->HasAuthority() || !DamageInstigator || DamageInstigator == OwnerActor)
+	{
+		return;
+	}
+
+	CurrentTarget = DamageInstigator;
+	InterestLocation = DamageInstigator->GetActorLocation();
 	bHasInterestLocation = true;
 }
 
@@ -308,6 +361,11 @@ void ULSMonsterSenseComponent::DrawSenseDebug() const
 
 	DrawDebugLine(World, Origin, Origin + (LeftEdge * Radius), SightColor, false, Duration, 0, 2.0f);
 	DrawDebugLine(World, Origin, Origin + (RightEdge * Radius), SightColor, false, Duration, 0, 2.0f);
+
+	if (HearingRadius > 0.0f)
+	{
+		DrawDebugCircle(World, Origin, HearingRadius, 48, FColor::Blue, false, Duration, 0, 1.5f, FVector::ForwardVector, FVector::RightVector, false);
+	}
 
 	FVector PreviousPoint = Origin + (LeftEdge * Radius);
 	for (int32 SegmentIndex = 1; SegmentIndex <= SegmentCount; ++SegmentIndex)

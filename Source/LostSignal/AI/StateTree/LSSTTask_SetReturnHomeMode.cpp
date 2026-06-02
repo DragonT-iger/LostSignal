@@ -5,6 +5,7 @@
 #include "Characters/LSEnemyCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "StateTreeExecutionContext.h"
+#include "LostSignal.h"
 
 FLSSTTask_SetReturnHomeMode::FLSSTTask_SetReturnHomeMode()
 {
@@ -32,6 +33,7 @@ EStateTreeRunStatus FLSSTTask_SetReturnHomeMode::EnterState(FStateTreeExecutionC
 
 	if (!InstanceData.EnemyCharacter || !InstanceData.SenseComponent)
 	{
+		UE_LOG(LogLS, Warning, TEXT("Failed To Enter ReturnHome State"))
 		return EStateTreeRunStatus::Failed;
 	}
 
@@ -55,6 +57,8 @@ EStateTreeRunStatus FLSSTTask_SetReturnHomeMode::EnterState(FStateTreeExecutionC
 void FLSSTTask_SetReturnHomeMode::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+
+	UE_LOG(LogLS, Warning, TEXT("Exit ReturnHome"))
 
 	if (InstanceData.SenseComponent)
 	{

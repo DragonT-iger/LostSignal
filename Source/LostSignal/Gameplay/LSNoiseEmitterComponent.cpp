@@ -2,12 +2,21 @@
 
 #include "Characters/LSPlayerCharacter.h"
 #include "Data/LSNoiseProfileRow.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/DataTable.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "Gameplay/LSNoiseSubsystem.h"
 #include "Gameplay/LSNoiseTypes.h"
 #include "LostSignal.h"
+
+namespace
+{
+	FString GetNoiseTagDebugString(const FLSNoiseProfileRow& Profile)
+	{
+		return Profile.NoiseTag.IsValid() ? Profile.NoiseTag.ToString() : TEXT("None");
+	}
+}
 
 ULSNoiseEmitterComponent::ULSNoiseEmitterComponent()
 {
@@ -33,6 +42,13 @@ void ULSNoiseEmitterComponent::EmitNoiseByRow(FName NoiseRowName)
 	const AActor* OwnerActor = GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority())
 	{
+		if (bLogNoiseDebug)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[NoiseEmitter] Emit skipped. Owner=%s HasAuthority=%d Row=%s"),
+				*GetNameSafe(OwnerActor),
+				OwnerActor ? OwnerActor->HasAuthority() : false,
+				*NoiseRowName.ToString());
+		}
 		return;
 	}
 
@@ -59,6 +75,12 @@ void ULSNoiseEmitterComponent::UpdateMovementNoise(float DeltaTime)
 	const FLSNoiseProfileRow* Profile = FindNoiseProfile(NoiseRowName);
 	if (!Profile || Profile->EmitIntervalSeconds <= 0.0f)
 	{
+		if (bLogNoiseDebug && !Profile)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[NoiseEmitter] Movement noise profile missing. Owner=%s Row=%s"),
+				*GetNameSafe(GetOwner()),
+				*NoiseRowName.ToString());
+		}
 		return;
 	}
 
@@ -78,6 +100,14 @@ void ULSNoiseEmitterComponent::EmitNoiseFromProfile(const FLSNoiseProfileRow& Pr
 	UWorld* World = GetWorld();
 	if (!OwnerActor || !World || Profile.RadiusMeters <= 0.0f)
 	{
+		if (bLogNoiseDebug)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[NoiseEmitter] Noise skipped. Owner=%s World=%d RadiusMeters=%.2f Tag=%s"),
+				*GetNameSafe(OwnerActor),
+				World != nullptr,
+				Profile.RadiusMeters,
+				*GetNoiseTagDebugString(Profile));
+		}
 		return;
 	}
 
@@ -87,9 +117,26 @@ void ULSNoiseEmitterComponent::EmitNoiseFromProfile(const FLSNoiseProfileRow& Pr
 	NoiseEvent.RadiusCm = Profile.RadiusMeters * 100.0f;
 	NoiseEvent.NoiseTag = Profile.NoiseTag;
 
+#if !UE_BUILD_SHIPPING
+	DrawNoiseDebug(NoiseEvent.Location, NoiseEvent.RadiusCm);
+#endif
+
+	if (bLogNoiseDebug)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[NoiseEmitter] Noise emitted. Owner=%s Tag=%s Location=%s RadiusCm=%.2f"),
+			*GetNameSafe(OwnerActor),
+			*GetNoiseTagDebugString(Profile),
+			*NoiseEvent.Location.ToCompactString(),
+			NoiseEvent.RadiusCm);
+	}
+
 	if (ULSNoiseSubsystem* NoiseSubsystem = World->GetSubsystem<ULSNoiseSubsystem>())
 	{
 		NoiseSubsystem->EmitNoise(NoiseEvent);
+	}
+	else if (bLogNoiseDebug)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[NoiseEmitter] NoiseSubsystem missing. Owner=%s"), *GetNameSafe(OwnerActor));
 	}
 }
 
@@ -103,10 +150,23 @@ const FLSNoiseProfileRow* ULSNoiseEmitterComponent::FindNoiseProfile(FName Noise
 
 	if (NoiseRowName.IsNone())
 	{
+		if (bLogNoiseDebug)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[NoiseEmitter] Noise row name is None. Owner=%s"), *GetNameSafe(GetOwner()));
+		}
 		return nullptr;
 	}
 
-	return NoiseProfileTable->FindRow<FLSNoiseProfileRow>(NoiseRowName, TEXT("LSNoiseEmitterComponent"));
+	const FLSNoiseProfileRow* Row = NoiseProfileTable->FindRow<FLSNoiseProfileRow>(NoiseRowName, TEXT("LSNoiseEmitterComponent"));
+	if (!Row && bLogNoiseDebug)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[NoiseEmitter] Noise row not found. Owner=%s Table=%s Row=%s"),
+			*GetNameSafe(GetOwner()),
+			*GetNameSafe(NoiseProfileTable),
+			*NoiseRowName.ToString());
+	}
+
+	return Row;
 }
 
 bool ULSNoiseEmitterComponent::IsOwnerMoving() const
@@ -120,6 +180,24 @@ bool ULSNoiseEmitterComponent::IsOwnerRunning() const
 {
 	const ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwner());
 	return PlayerCharacter && PlayerCharacter->IsRunning();
+}
+
+void ULSNoiseEmitterComponent::DrawNoiseDebug(const FVector& Location, float RadiusCm) const
+{
+	if (!bDrawNoiseDebug || RadiusCm <= 0.0f)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const FVector DebugLocation = Location + FVector(0.0f, 0.0f, NoiseDebugDrawHeight);
+	DrawDebugCircle(World, DebugLocation, RadiusCm, 48, FColor::Cyan, false, NoiseDebugDuration, 0, 2.0f, FVector::ForwardVector, FVector::RightVector, false);
+	DrawDebugSphere(World, DebugLocation, 16.0f, 8, FColor::Cyan, false, NoiseDebugDuration);
 }
 
 void ULSNoiseEmitterComponent::LogMissingNoiseProfileTableOnce()

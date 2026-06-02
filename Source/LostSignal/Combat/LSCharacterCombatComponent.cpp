@@ -5,6 +5,7 @@
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "AI/LSAIController.h"
+#include "AI/LSMonsterSenseComponent.h"
 #include "Characters/LSCharacterBase.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Characters/LSPlayerCharacter.h"
@@ -231,6 +232,17 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 		BeforeHealth,
 		AfterHealth,
 		AfterHealth - BeforeHealth);
+
+	if (ALSEnemyCharacter* EnemyTarget = Cast<ALSEnemyCharacter>(TargetActor))
+	{
+		if (ALSPlayerCharacter* PlayerSource = Cast<ALSPlayerCharacter>(GetOwner()))
+		{
+			if (ULSMonsterSenseComponent* SenseComponent = EnemyTarget->GetMonsterSenseComponent())
+			{
+				SenseComponent->SetCurrentTargetFromDamage(PlayerSource);
+			}
+		}
+	}
 
 	return true;
 }

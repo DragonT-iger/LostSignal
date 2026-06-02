@@ -264,6 +264,11 @@ Tick
 RegisterNoiseEvent
 -> 소음 이벤트 반경과 몬스터 청각 반경이 모두 닿으면 InterestLocation 갱신
 -> 실제 사운드 재생 여부가 아니라 게임플레이 소음 이벤트 기준
+
+SetCurrentTargetFromDamage
+-> 몬스터가 플레이어에게 데미지를 받으면 공격한 플레이어를 CurrentTarget으로 설정
+-> InterestLocation도 공격자 위치로 갱신
+-> StateTree 전이를 직접 실행하지 않고 Evaluator 값 갱신으로 Combat 판단을 유도
 ```
 
 감지 로직을 확장할 때 지킬 규칙:
@@ -310,16 +315,41 @@ ULSMonsterSenseComponent
 - BeginPlay/EndPlay에서 NoiseSubsystem에 등록/해제
 - 소음 이벤트 반경과 Hearing_Radius를 모두 검사
 - 청각 감지는 CurrentTarget을 만들지 않고 InterestLocation만 갱신
+- bDrawSenseDebug가 켜지면 몬스터 청각 반경을 파란색 원으로 표시
 ```
 
 판정 규칙:
 
 ```text
-거리 <= NoiseEvent.RadiusCm
-거리 <= Monster Hearing_Radius
+몬스터 위치와 소음 발생 위치 거리 <= NoiseEvent.RadiusCm + Monster Hearing_Radius
 ```
 
 소음으로는 `bHasVisualTarget`을 true로 만들지 않는다. 시야로 실제 타겟을 본 경우에만 `CurrentTarget`을 설정한다.
+
+디버그 표시는 아래 색상을 기준으로 한다.
+
+```text
+플레이어 소음 이벤트 반경: Cyan
+몬스터 청각 반경: Blue
+소음으로 갱신된 InterestLocation: Orange
+시야 타겟 InterestLocation: Yellow
+```
+
+소음 감지가 예상대로 동작하지 않으면 아래 로그를 켜서 단계별로 확인한다.
+
+```text
+ULSNoiseEmitterComponent::bLogNoiseDebug
+- 플레이어가 소음 이벤트를 실제 발행했는지 확인
+- DataTable / RowName / RadiusMeters 문제 확인
+
+ULSNoiseSubsystem::SetLogNoiseDebug(true)
+- 소음 이벤트가 등록된 리스너 수만큼 전달되는지 확인
+
+ULSMonsterSenseComponent::bLogNoiseDebug
+- 몬스터가 소음을 받았는지 확인
+- HearingRadius / NoiseRadius / Distance 판정으로 거절됐는지 확인
+- 수락 시 InterestLocation 갱신 위치 확인
+```
 
 ## ReturnHome 상태 규칙
 
@@ -331,6 +361,8 @@ ULSMonsterSenseComponent
 Combat -> ReturnHome
 조건:
 !bHasVisualTarget && bIsBeyondLeashDistance
+사용 Condition:
+LS Has Visual Target(bInvert=true) && LS Is Beyond Leash Distance
 
 ReturnHome -> Combat
 조건:

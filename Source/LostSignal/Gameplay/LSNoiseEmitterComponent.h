@@ -30,6 +30,7 @@ private:
 	const FLSNoiseProfileRow* FindNoiseProfile(FName NoiseRowName) const;
 	bool IsOwnerMoving() const;
 	bool IsOwnerRunning() const;
+	void DrawNoiseDebug(const FVector& Location, float RadiusCm) const;
 	void LogMissingNoiseProfileTableOnce();
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Noise")
@@ -46,6 +47,18 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Noise", meta=(ClampMin="0.0"))
 	float MinimumMovementSpeed = 10.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Noise|Debug")
+	bool bDrawNoiseDebug = true;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Noise|Debug")
+	bool bLogNoiseDebug = false;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Noise|Debug", meta=(ClampMin="0.0"))
+	float NoiseDebugDuration = 0.35f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Noise|Debug", meta=(ClampMin="0.0"))
+	float NoiseDebugDrawHeight = 25.0f;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Noise")
 	float MovementNoiseElapsedSeconds = 0.0f;
