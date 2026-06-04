@@ -2,6 +2,8 @@
 
 #include "Abilities/GameplayAbility.h"
 #include "Data/LSCharacterSkillRow.h"
+#include "Data/LSGameDataSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "GAS/Abilities/Character1/LSGA_Bypass.h"
 #include "GAS/Abilities/Character1/LSGA_Execution.h"
 #include "GAS/Abilities/Character1/LSGA_Overclock.h"
@@ -69,9 +71,33 @@ FLSSkillAreaPreviewSpec ULSSkillDataAsset::BuildPreviewSpec() const
 	return ResolvedSpec;
 }
 
+FLSSkillAreaPreviewSpec ULSSkillDataAsset::BuildPreviewSpecForWorld(const UObject* WorldContextObject) const
+{
+	FLSSkillAreaPreviewSpec ResolvedSpec = PreviewSpec;
+	const FLSCharacterSkillRow* Row = ResolveSkillRowForWorld(WorldContextObject);
+	if (!Row)
+	{
+		return ResolvedSpec;
+	}
+
+	ApplySkillRowRangeToPreviewSpec(*Row, ResolvedSpec);
+	return ResolvedSpec;
+}
+
 bool ULSSkillDataAsset::TryGetSkillRow(FLSCharacterSkillRow& OutRow) const
 {
 	if (const FLSCharacterSkillRow* Row = ResolveSkillRow())
+	{
+		OutRow = *Row;
+		return true;
+	}
+
+	return false;
+}
+
+bool ULSSkillDataAsset::TryGetSkillRowForWorld(const UObject* WorldContextObject, FLSCharacterSkillRow& OutRow) const
+{
+	if (const FLSCharacterSkillRow* Row = ResolveSkillRowForWorld(WorldContextObject))
 	{
 		OutRow = *Row;
 		return true;
@@ -89,6 +115,17 @@ float ULSSkillDataAsset::GetCooldownDuration() const
 {
 	FLSCharacterSkillRow Row;
 	if (TryGetSkillRow(Row) && Row.Skill_Cooldown > 0.0f)
+	{
+		return Row.Skill_Cooldown;
+	}
+
+	return FallbackCooldown;
+}
+
+float ULSSkillDataAsset::GetCooldownDurationForWorld(const UObject* WorldContextObject) const
+{
+	FLSCharacterSkillRow Row;
+	if (TryGetSkillRowForWorld(WorldContextObject, Row) && Row.Skill_Cooldown > 0.0f)
 	{
 		return Row.Skill_Cooldown;
 	}
@@ -131,6 +168,11 @@ FGameplayTag ULSSkillDataAsset::GetCooldownTag() const
 	return FGameplayTag();
 }
 
+FName ULSSkillDataAsset::GetSkillRowName() const
+{
+	return SkillRow.RowName;
+}
+
 ULSSkillDataAsset* ULSSkillDataAsset::GetEnhancementVariant(int32 Index) const
 {
 	return EnhancementVariants.IsValidIndex(Index) ? EnhancementVariants[Index].Get() : nullptr;
@@ -138,5 +180,33 @@ ULSSkillDataAsset* ULSSkillDataAsset::GetEnhancementVariant(int32 Index) const
 
 const FLSCharacterSkillRow* ULSSkillDataAsset::ResolveSkillRow() const
 {
-	return SkillRow.GetRow<FLSCharacterSkillRow>(TEXT("LSSkillDataAsset"));
+	const FLSCharacterSkillRow* Row = SkillRow.GetRow<FLSCharacterSkillRow>(TEXT("LSSkillDataAsset"));
+	if (Row)
+	{
+		const_cast<FLSCharacterSkillRow*>(Row)->NormalizeSkillIDFromRowName(SkillRow.RowName);
+	}
+
+	return Row;
+}
+
+const FLSCharacterSkillRow* ULSSkillDataAsset::ResolveSkillRowForWorld(const UObject* WorldContextObject) const
+{
+	if (WorldContextObject)
+	{
+		if (const UWorld* World = WorldContextObject->GetWorld())
+		{
+			if (UGameInstance* GameInstance = World->GetGameInstance())
+			{
+				if (const ULSGameDataSubsystem* GameDataSubsystem = GameInstance->GetSubsystem<ULSGameDataSubsystem>())
+				{
+					if (const FLSCharacterSkillRow* Row = GameDataSubsystem->FindActiveSkillRow(GetSkillRowName(), TEXT("LSSkillDataAsset")))
+					{
+						return Row;
+					}
+				}
+			}
+		}
+	}
+
+	return ResolveSkillRow();
 }

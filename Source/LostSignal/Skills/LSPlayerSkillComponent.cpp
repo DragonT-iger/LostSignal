@@ -56,7 +56,7 @@ bool ULSPlayerSkillComponent::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 	ActiveSkillData = nullptr;
 	ActiveSlot = Slot;
 
-	if (!PreviewComponent->BeginAreaPreview(SkillData->BuildPreviewSpec()))
+	if (!PreviewComponent->BeginAreaPreview(SkillData->BuildPreviewSpecForWorld(this)))
 	{
 		return false;
 	}
@@ -198,7 +198,7 @@ bool ULSPlayerSkillComponent::GetActivePreviewSpec(FLSSkillAreaPreviewSpec& OutP
 		return false;
 	}
 
-	OutPreviewSpec = ActiveSkillData->BuildPreviewSpec();
+	OutPreviewSpec = ActiveSkillData->BuildPreviewSpecForWorld(this);
 	return true;
 }
 
@@ -244,7 +244,7 @@ bool ULSPlayerSkillComponent::ApplySkillCooldown(const ULSSkillDataAsset* SkillD
 	}
 
 	const FGameplayTag CooldownTag = SkillData->GetCooldownTag();
-	const float BaseDuration = SkillData->GetCooldownDuration();
+	const float BaseDuration = SkillData->GetCooldownDurationForWorld(this);
 	if (!CooldownTag.IsValid() || BaseDuration <= 0.0f || !SkillData->CooldownEffectClass)
 	{
 		return false;
@@ -351,6 +351,16 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 		return false;
 	}
 
+	FLSCharacterSkillRow SkillRow;
+	if (!SkillData->TryGetSkillRowForWorld(this, SkillRow))
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s skill activation rejected because %s has no active skill row. RowName=%s"),
+			*GetNameSafe(OwnerActor),
+			*GetNameSafe(SkillData),
+			*SkillData->GetSkillRowName().ToString());
+		return false;
+	}
+
 	if (IsSkillCooldownActive(SkillData))
 	{
 		LogSkillCooldownBlocked(SkillData, TEXT("ServerActivate"));
@@ -379,7 +389,7 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 FVector ULSPlayerSkillComponent::ClampTargetLocationToCastRange(const ULSSkillDataAsset* SkillData, const FVector& TargetLocation) const
 {
 	FLSCharacterSkillRow Row;
-	if (!SkillData || !SkillData->TryGetSkillRow(Row) || Row.Cast_Range <= 0.0f)
+	if (!SkillData || !SkillData->TryGetSkillRowForWorld(this, Row) || Row.Cast_Range <= 0.0f)
 	{
 		return TargetLocation;
 	}

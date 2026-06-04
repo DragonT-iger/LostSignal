@@ -25,7 +25,13 @@ public:
 	FLSSkillAreaPreviewSpec BuildPreviewSpec() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
+	FLSSkillAreaPreviewSpec BuildPreviewSpecForWorld(const UObject* WorldContextObject) const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	bool TryGetSkillRow(FLSCharacterSkillRow& OutRow) const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Skill")
+	bool TryGetSkillRowForWorld(const UObject* WorldContextObject, FLSCharacterSkillRow& OutRow) const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	TSubclassOf<UGameplayAbility> GetAbilityClass() const;
@@ -34,7 +40,13 @@ public:
 	float GetCooldownDuration() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill|Cooldown")
+	float GetCooldownDurationForWorld(const UObject* WorldContextObject) const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Skill|Cooldown")
 	FGameplayTag GetCooldownTag() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Skill|DataTable")
+	FName GetSkillRowName() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill|Enhancement")
 	ULSSkillDataAsset* GetEnhancementVariant(int32 Index) const;
@@ -92,4 +104,5 @@ public:
 
 private:
 	const FLSCharacterSkillRow* ResolveSkillRow() const;
+	const FLSCharacterSkillRow* ResolveSkillRowForWorld(const UObject* WorldContextObject) const;
 };

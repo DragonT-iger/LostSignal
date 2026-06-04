@@ -14,12 +14,6 @@ enum class ELSCharacterSkillInputType : uint8
 };
 
 UENUM(BlueprintType)
-enum class ELSCharacterSkillUnlockType : uint8
-{
-	None
-};
-
-UENUM(BlueprintType)
 enum class ELSCharacterSkillType : uint8
 {
 	None,
@@ -56,22 +50,12 @@ enum class ELSCharacterSkillCrowdControlType : uint8
 };
 
 UENUM(BlueprintType)
-enum class ELSCharacterSkillEffectType : uint8
-{
-	None,
-	Char_Atkspead,
-	Char_Speed,
-	Char_Attack,
-	Char_Defence,
-	AttackModeChange
-};
-
-UENUM(BlueprintType)
 enum class ELSCharacterSkillEffectTarget : uint8
 {
 	None,
 	Self,
-	Ally
+	Ally,
+	Target
 };
 
 /** 캐릭터 액티브 스킬 DataTable Row */
@@ -79,6 +63,35 @@ USTRUCT(BlueprintType)
 struct LOSTSIGNAL_API FLSCharacterSkillRow : public FTableRowBase
 {
 	GENERATED_BODY()
+
+	virtual void OnPostDataImport(const UDataTable* InDataTable, const FName InRowName, TArray<FString>& OutCollectedImportProblems) override
+	{
+		NormalizeSkillIDFromRowName(InRowName);
+	}
+
+	virtual void OnDataTableChanged(const UDataTable* InDataTable, const FName InRowName) override
+	{
+		NormalizeSkillIDFromRowName(InRowName);
+	}
+
+	void NormalizeSkillIDFromRowName(const FName InRowName)
+	{
+		const FString RowNameString = InRowName.ToString();
+		if (RowNameString.IsEmpty())
+		{
+			return;
+		}
+
+		for (const TCHAR Character : RowNameString)
+		{
+			if (!FChar::IsDigit(Character))
+			{
+				return;
+			}
+		}
+
+		Skill_ID = FCString::Atoi(*RowNameString);
+	}
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill")
 	int32 Skill_ID = 0;
@@ -94,9 +107,6 @@ struct LOSTSIGNAL_API FLSCharacterSkillRow : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill")
 	FText Skill_Info;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill")
-	ELSCharacterSkillUnlockType Skill_Unlock = ELSCharacterSkillUnlockType::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill")
 	ELSCharacterSkillInputType Skill_Input = ELSCharacterSkillInputType::None;
@@ -153,28 +163,34 @@ struct LOSTSIGNAL_API FLSCharacterSkillRow : public FTableRowBase
 	int32 Consume_Res_ID = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Resource")
+	float Consume_Res_Value = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Resource")
 	float Res_Multiplier = 0.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Movement")
+	float Move_Distance = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Movement")
+	float Move_Duration = 0.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Effect")
-	ELSCharacterSkillEffectType Skill_Effect_Type = ELSCharacterSkillEffectType::None;
+	FString Skill_Effects;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Effect")
+	int32 Status_ID = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Effect")
 	ELSCharacterSkillEffectTarget Effect_Target = ELSCharacterSkillEffectTarget::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Effect")
-	float Skill_Effect_Value = 0.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Effect")
 	float Skill_Effect_Duration = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Effect")
-	ELSCharacterSkillEffectType Skill_Effect_Type_2 = ELSCharacterSkillEffectType::None;
+	int32 Status_ID_2 = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Effect")
 	ELSCharacterSkillEffectTarget Effect_Target_2 = ELSCharacterSkillEffectTarget::None;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Effect")
-	float Skill_Effect_Value_2 = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill/Effect")
 	float Skill_Effect_Duration_2 = 0.0f;

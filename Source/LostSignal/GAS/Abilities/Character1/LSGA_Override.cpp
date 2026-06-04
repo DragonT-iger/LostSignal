@@ -120,13 +120,6 @@ namespace
 		}
 	}
 
-	bool ShouldApplyOverrideAttackSpeedBuff(const FLSCharacterSkillRow& Row, bool bHasRow)
-	{
-		return !bHasRow
-			|| Row.Skill_Effect_Type == ELSCharacterSkillEffectType::None
-			|| Row.Skill_Effect_Type == ELSCharacterSkillEffectType::Char_Atkspead;
-	}
-
 	bool ShouldApplyOverrideSelfEffect(const FLSCharacterSkillRow& Row, bool bHasRow)
 	{
 		return !bHasRow
@@ -308,10 +301,10 @@ void ULSGA_Override::ActivateAbility(
 		}
 	}
 
-	if (OverrideData && OverrideData->bApplyAttackSpeedBuff && ShouldApplyOverrideAttackSpeedBuff(Row, bHasRow) && ShouldApplyOverrideSelfEffect(Row, bHasRow))
+	if (OverrideData && OverrideData->bApplyAttackSpeedBuff && ShouldApplyOverrideSelfEffect(Row, bHasRow))
 	{
 		UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
-		const float AttackSpeedBonus = bHasRow && Row.Skill_Effect_Value > 0.0f ? Row.Skill_Effect_Value : OverrideData->FallbackAttackSpeedBonus;
+		const float AttackSpeedBonus = OverrideData->FallbackAttackSpeedBonus;
 		const float AttackSpeedDuration = bHasRow && Row.Skill_Effect_Duration > 0.0f ? Row.Skill_Effect_Duration : OverrideData->FallbackAttackSpeedDuration;
 		if (ASC && OverrideData->AttackSpeedBuffEffectClass && AttackSpeedBonus > 0.0f && AttackSpeedDuration > 0.0f)
 		{

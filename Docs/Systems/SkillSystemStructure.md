@@ -239,22 +239,30 @@ Parent_Skill_ID
 Skill_Char
 Skill_Name
 Skill_Info
+Skill_Input
 Skill_Type
 Skill_Target
 Skill_Time
 Range_Shape
 Range_X / Range_Y / Range_Z
+Cast_Range
 Skill_HitCount
 Skill_HitRate
 Skill_Multiplier
+CC_Type / CC_Value
 Skill_Cooldown
 Skill_Guard
 Skill_Impact
-Skill_Count
-Skill_Count_Multiplier
-Skill_Effect_Type / Value / Duration
-Skill_Effect_Type_2 / Value_2 / Duration_2
+Consume_Res_ID
+Consume_Res_Value
+Res_Multiplier
+Move_Distance / Move_Duration
+Skill_Effects
+Status_ID / Effect_Target / Skill_Effect_Duration
+Status_ID_2 / Effect_Target_2 / Skill_Effect_Duration_2
 ```
+
+UE DataTable CSV import에서는 첫 컬럼이 RowName으로 소비된다. 액티브 스킬 테이블은 `Skill_ID`를 첫 컬럼 RowName으로 사용하되, `FLSCharacterSkillRow`가 import/change 시 RowName 숫자를 `Skill_ID` 프로퍼티에도 보정한다.
 
 권장 기준:
 
@@ -278,6 +286,63 @@ Skill_Effect_Type_2 / Value_2 / Duration_2
 -> DataTable Skill_Multiplier 우선
 -> 없으면 SkillData.AttackCoefficient
 ```
+
+## 전역 데이터 조회와 상태이상 적용 구조
+
+데이터테이블 구조체가 정리되면 스킬, 패시브, 상태이상 row 조회는 전역 데이터 조회 객체가 담당한다.
+
+권장 구조:
+
+- `ULSGameDataSettings`: 액티브 스킬, 패시브 스킬, 상태이상 등 전역 DataTable 참조를 들고 있는 `UDeveloperSettings`
+- `ULSGameDataSubsystem`: DataTable 로드, 캐싱, row 조회, 누락 row 검증만 담당하는 `UGameInstanceSubsystem`
+- `ULSStatusEffectComponent`: 상태이상 적용, 제거, 스택, 지속시간, UI/FX 훅을 담당하는 대상 Actor 컴포넌트
+- `GameplayAbility`: 스킬 발동, 명중 판정, 적용 대상 결정, 적용 타이밍만 담당
+- `ULSSkillDataAsset`: AbilityClass, 에셋 참조, fallback 값, 프리뷰 기본값만 담당
+
+`ULSGameDataSubsystem`은 GameplayEffect를 직접 적용하지 않는다. Subsystem이 GE까지 적용하면 데이터 조회, 게임 규칙, 대상 ASC 처리, 서버 권한 처리가 한 곳에 섞여 테스트와 멀티 전환이 어려워진다.
+
+상태이상 적용 흐름:
+
+```text
+GameplayAbility 서버 권한에서 명중/대상 확정
+-> Skill row의 Status_ID / Effect_Target / Skill_Effect_Duration 확인
+-> ULSGameDataSubsystem에서 FLSStatusEffectRow 조회
+-> 대상 Actor의 ULSStatusEffectComponent에 적용 요청
+-> ULSStatusEffectComponent가 Source ASC / Target ASC 확인
+-> FLSStatusEffectRow의 Stack_Rule / Max_Stack / Stat_Modifiers 기준으로 GameplayEffect Spec 생성
+-> Target ASC에 GameplayEffect 적용
+```
+
+책임 분리:
+
+- `ULSGameDataSubsystem`: `FindActiveSkillRow`, `FindPassiveSkillRow`, `FindStatusEffectRow` 같은 순수 조회 API만 제공한다.
+- `ULSSkillDataAsset`: `TryGetSkillRowForWorld`, `BuildPreviewSpecForWorld`, `GetCooldownDurationForWorld`에서 `ULSGameDataSubsystem` 조회를 우선 사용하고, 테이블 미설정 시 기존 `SkillRow` 핸들을 fallback으로 사용한다.
+- `ULSPlayerSkillComponent`: 클라이언트 입력을 `ServerRequestActivateSkill`로 서버에 보내고, 서버의 `ActivateSkillOnServer`에서 스킬 row 존재 여부, 사거리, 쿨타임을 검증한다.
+- `ULSStatusEffectComponent`: 상태이상 적용 가능 여부, 중복 스택 처리, 지속시간 override, 제거, UI/FX 이벤트를 관리한다.
+- 클라이언트는 프리뷰와 UI 표시용으로 DataTable을 읽을 수 있지만, 데미지와 상태이상 적용 확정은 서버 권한에서만 수행한다.
+- 캐릭터마다 상태이상 DataTable을 직접 들고 있지 않는다. 모든 캐릭터가 같은 전역 테이블을 조회하되, 실제 적용 상태는 각 대상의 `ULSStatusEffectComponent`가 보유한다.
+
+스킬 발동 시 현재 조회 흐름:
+
+```text
+클라이언트 ConfirmAnyActiveSkillPreview
+-> ServerRequestActivateSkill(Slot, TargetLocation, AimYaw)
+-> 서버 ActivateSkillOnServer
+-> SkillData.TryGetSkillRowForWorld
+-> ULSGameDataSubsystem.FindActiveSkillRow(SkillRow.RowName)
+-> row 없으면 기존 SkillRow handle fallback
+-> row가 끝까지 없으면 서버에서 발동 거부
+-> 사거리 Clamp / 쿨타임 검증 / GameplayAbility 활성화
+```
+
+초기 구현 순서:
+
+1. 액티브 스킬 row 구조는 `FLSCharacterSkillRow`를 액티브 전용으로 사용한다.
+2. 패시브 스킬 row는 `FLSCharacterPassiveSkillRow`로 분리한다.
+3. 상태이상 row는 `FLSStatusEffectRow`로 분리한다.
+4. `ULSGameDataSettings`와 `ULSGameDataSubsystem`으로 액티브, 패시브, 상태이상 테이블 조회를 연결한다.
+5. `ULSStatusEffectComponent`를 추가하고 `Self` / `Target` 상태이상 적용만 우선 구현한다.
+6. 이후 패시브, Resource, Combo Attack 테이블 조회를 같은 Subsystem 구조로 확장한다.
 
 ## 데미지 구조
 

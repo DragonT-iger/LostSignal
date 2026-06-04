@@ -1,0 +1,22 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Engine/DataTable.h"
+#include "Engine/DeveloperSettings.h"
+#include "LSGameDataSettings.generated.h"
+
+UCLASS(config=Game, defaultconfig, meta=(DisplayName="LS Game Data Settings"))
+class LOSTSIGNAL_API ULSGameDataSettings : public UDeveloperSettings
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
+	TSoftObjectPtr<UDataTable> CharacterActiveSkillTable;
+
+	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
+	TSoftObjectPtr<UDataTable> CharacterPassiveSkillTable;
+
+	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
+	TSoftObjectPtr<UDataTable> StatusEffectTable;
+};
