@@ -38,6 +38,8 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact")
 	FText InteractText;
 
+	virtual void HandleLocalPawnEndOverlap(APawn* Pawn);
+
 private:
 	TWeakObjectPtr<APawn> FocusedLocalPawn;
 	bool bLoggedMissingInteractWidget = false;

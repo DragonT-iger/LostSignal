@@ -6,6 +6,7 @@
 #include "Engine/DataTable.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
+#include "Session/LSSessionSubsystem.h"
 
 namespace
 {
@@ -31,6 +32,32 @@ const TArray<FChipStatEntry>& GetChipStatSchema()
 		{ TEXT("Chip_Move_Speed"),          &FLSChipStatRow::Chip_Move_Speed },
 	};
 	return Schema;
+}
+
+void AddFallbackProtocolValue(const FName ChipRowName, const int32 Value, FLSChipProtocolTotals& Totals)
+{
+	if (Value <= 0)
+	{
+		return;
+	}
+
+	const FString RowNameString = ChipRowName.ToString();
+	if (RowNameString.Contains(TEXT("_HP")) || RowNameString.Contains(TEXT("_SP")))
+	{
+		Totals.Survival += Value;
+	}
+	else if (RowNameString.Contains(TEXT("_Inventory")))
+	{
+		Totals.Carrying += Value;
+	}
+	else if (RowNameString.Contains(TEXT("_Minimap")) || RowNameString.Contains(TEXT("_Exitpoint")))
+	{
+		Totals.Navigation += Value;
+	}
+	else if (RowNameString.Contains(TEXT("_Battle")) || RowNameString.Contains(TEXT("_Skill")))
+	{
+		Totals.Battle += Value;
+	}
 }
 }
 
@@ -111,6 +138,79 @@ TArray<FLSChipResolvedStat> RollChipStats(const FName ChipRowName)
 	}
 
 	return Out;
+}
+
+TMap<FName, int32> AggregateChipStatTotals(const TArray<FLSSessionItem>& Items)
+{
+	TMap<FName, int32> Totals;
+
+	for (const FLSSessionItem& Item : Items)
+	{
+		if (!LSInventorySlotUtils::IsFilled(Item))
+		{
+			continue;
+		}
+
+		for (const FLSChipResolvedStat& Stat : Item.ChipStats)
+		{
+			if (Stat.StatKey.IsNone())
+			{
+				continue;
+			}
+
+			int32& Total = Totals.FindOrAdd(Stat.StatKey);
+			Total += Stat.Value;
+		}
+	}
+
+	return Totals;
+}
+
+FLSChipProtocolTotals AggregateChipProtocolTotals(const TArray<FLSSessionItem>& Items, const UObject* LogContext)
+{
+	FLSChipProtocolTotals Totals;
+
+	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
+	UDataTable* ChipTable = Settings ? Settings->ChipTable.LoadSynchronous() : nullptr;
+	if (!ChipTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[ChipStats] Cannot aggregate chip protocols because ChipTable is not set on %s."), *GetNameSafe(LogContext));
+		return Totals;
+	}
+
+	for (const FLSSessionItem& Item : Items)
+	{
+		if (!LSInventorySlotUtils::IsFilled(Item))
+		{
+			continue;
+		}
+
+		const FLSChipRow* ChipRow = ChipTable->FindRow<FLSChipRow>(Item.ItemRowName, TEXT("AggregateChipProtocolTotals"));
+		if (!ChipRow)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[ChipStats] Cannot aggregate chip protocol because chip '%s' is missing on %s."),
+				*Item.ItemRowName.ToString(), *GetNameSafe(LogContext));
+			continue;
+		}
+
+		const int32 ExplicitProtocolTotal =
+			ChipRow->Chip_Protocol_Survival +
+			ChipRow->Chip_Protocol_Carrying +
+			ChipRow->Chip_Protocol_Battle +
+			ChipRow->Chip_Protocol_Navigation;
+		if (ExplicitProtocolTotal > 0)
+		{
+			Totals.Survival += ChipRow->Chip_Protocol_Survival;
+			Totals.Carrying += ChipRow->Chip_Protocol_Carrying;
+			Totals.Battle += ChipRow->Chip_Protocol_Battle;
+			Totals.Navigation += ChipRow->Chip_Protocol_Navigation;
+			continue;
+		}
+
+		AddFallbackProtocolValue(Item.ItemRowName, ChipRow->Item_Chip_Status_Count, Totals);
+	}
+
+	return Totals;
 }
 
 FText GetChipStatLabel(const FName StatKey)

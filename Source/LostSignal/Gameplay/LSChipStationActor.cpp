@@ -73,4 +73,15 @@ void ALSChipStationActor::Interact_Implementation(APawn* Interactor)
 	PlayerController->ShowChipStationWidget(ChipStationWidgetClass);
 }
 
+void ALSChipStationActor::HandleLocalPawnEndOverlap(APawn* Pawn)
+{
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Pawn ? Pawn->GetController() : nullptr);
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	PlayerController->HideChipStationWidget();
+}
+
 #undef LOCTEXT_NAMESPACE

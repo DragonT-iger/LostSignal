@@ -21,6 +21,8 @@ public:
 	virtual void Interact_Implementation(APawn* Interactor) override;
 
 protected:
+	virtual void HandleLocalPawnEndOverlap(APawn* Pawn) override;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Chip")
 	TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass;
 

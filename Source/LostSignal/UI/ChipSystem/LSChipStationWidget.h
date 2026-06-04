@@ -8,11 +8,14 @@ enum class ELSInventorySlotArea : uint8;
 
 class UBorder;
 class UDragDropOperation;
+class UProgressBar;
+class UTextBlock;
 class ULSChipStatWidget;
 class ULSChipEquipmentSlotWidget;
 class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
 class ULSProtocolWidget;
+class USlider;
 class UWrapBox;
 
 UCLASS(BlueprintType, Blueprintable)
@@ -33,6 +36,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Chip")
 	void SetChipStat(FName StatKey, int32 StatValue, int32 SignalLoss);
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Chip")
+	void SetSignalGaugePercent(float Percent);
+
 	bool EquipChipToHardwareSlot(const ULSInventoryDragDropOperation& DragOperation, int32 EquipmentSlotIndex);
 	bool DropEquippedChipToHardwareSlot(const ULSInventoryDragDropOperation& DragOperation, int32 TargetEquipmentSlotIndex);
 	bool UnequipChipToWarehouse(const ULSInventoryDragDropOperation& DragOperation);
@@ -46,9 +52,18 @@ protected:
 	void SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, const TCHAR* ProtocolName, int32 Level, int32 SynergyStage) const;
 	void RefreshChipSlots();
 	void RefreshEquipmentSlots();
+	void RefreshEquippedChipSummary();
+	void SetEquippedChipMemoryText(int32 CurrentMemory);
+	void QueueRefreshChipStation();
 	ULSItemSlotWidget* CreateChipSlotWidget() const;
 	void InitializeEquipmentSlots();
 	bool IsPointerInsideChipSlotBorder(FVector2D ScreenPosition) const;
+	float GetSignalGaugePercent() const;
+	int32 GetInactiveSignalSlotCount() const;
+	void SynchronizeSignalGauge(float Percent);
+
+	UFUNCTION()
+	void HandleSignalSliderValueChanged(float Value);
 
 	// ---- 8개 ChipStat 칸 (WBP_ChipStat) ----
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
@@ -73,6 +88,12 @@ protected:
 	TObjectPtr<ULSChipStatWidget> ChipStat_AttackSpeed;        // 공격 속도
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSChipStatWidget> ChipStat_Skill_Haste;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSChipStatWidget> ChipStat_Recovery;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSChipStatWidget> ChipStat_MoveSpeed;          // 이동 속도
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSProtocolWidget> Protocol_Survival;
@@ -91,6 +112,18 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
 	TObjectPtr<UBorder> ChipSlotBorder;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
+	TObjectPtr<UProgressBar> SignalProgressBar;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
+	TObjectPtr<USlider> SignalSlider;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
+	TObjectPtr<UTextBlock> MemoryText;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip", meta=(ClampMin="0"))
+	int32 MaxChipMemory = 100;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip")
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;

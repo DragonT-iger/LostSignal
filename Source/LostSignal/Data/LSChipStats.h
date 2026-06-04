@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "LSChipStats.generated.h"
 
+struct FLSSessionItem;
+
 // 칩 인스턴스에서 확정된 전투 스탯 하나.
 USTRUCT(BlueprintType)
 struct LOSTSIGNAL_API FLSChipResolvedStat
@@ -23,11 +25,22 @@ struct LOSTSIGNAL_API FLSChipResolvedStat
 	}
 };
 
+struct LOSTSIGNAL_API FLSChipProtocolTotals
+{
+	int32 Survival = 0;
+	int32 Carrying = 0;
+	int32 Battle = 0;
+	int32 Navigation = 0;
+};
+
 namespace LSChipStats
 {
 	// 칩 획득 시점에 전투 스탯을 굴려 스냅샷 배열로 반환한다.
 	// (등급은 RowName에서 파싱, 스탯 개수는 ChipRow.Item_Chip_Status_Count, 값 범위는 ChipStat 등급 행)
 	LOSTSIGNAL_API TArray<FLSChipResolvedStat> RollChipStats(FName ChipRowName);
+
+	LOSTSIGNAL_API TMap<FName, int32> AggregateChipStatTotals(const TArray<FLSSessionItem>& Items);
+	LOSTSIGNAL_API FLSChipProtocolTotals AggregateChipProtocolTotals(const TArray<FLSSessionItem>& Items, const UObject* LogContext);
 
 	// 스탯 키 → 표시용 라벨 (예: "Chip_Attack" → "공격력").
 	LOSTSIGNAL_API FText GetChipStatLabel(FName StatKey);

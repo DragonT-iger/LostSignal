@@ -109,6 +109,11 @@ void ULSChipEquipmentSlotWidget::SetEquipmentItem(const FLSSessionItem& Item)
 	ItemSlot->SetChipEquipmentSlotContext(this, ChipStationWidget.Get(), EquipmentSlotIndex);
 }
 
+void ULSChipEquipmentSlotWidget::SetSignalActive(const bool bInSignalActive)
+{
+	SetRenderOpacity(bInSignalActive ? 1.0f : 0.35f);
+}
+
 void ULSChipEquipmentSlotWidget::ClearEquipmentSlot()
 {
 	if (!ItemSlot)

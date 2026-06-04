@@ -20,6 +20,7 @@ public:
 
 	void SetEquipmentSlotContext(ULSChipStationWidget* InChipStationWidget, int32 InEquipmentSlotIndex);
 	void SetEquipmentItem(const FLSSessionItem& Item);
+	void SetSignalActive(bool bInSignalActive);
 	bool HandleChipDrop(const ULSInventoryDragDropOperation& DragOperation);
 	void ClearEquipmentSlot();
 

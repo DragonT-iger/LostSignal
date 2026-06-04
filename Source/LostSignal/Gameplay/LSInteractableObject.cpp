@@ -65,6 +65,10 @@ FText ALSInteractableObject::GetInteractText_Implementation()
 	return InteractText;
 }
 
+void ALSInteractableObject::HandleLocalPawnEndOverlap(APawn* Pawn)
+{
+}
+
 void ALSInteractableObject::RefreshWidgetVisibility()
 {
 	APawn* Pawn = FocusedLocalPawn.Get();
@@ -107,6 +111,8 @@ void ALSInteractableObject::OnSphereEndOverlap(UPrimitiveComponent* OverlappedCo
 {
 	APawn* Pawn = Cast<APawn>(OtherActor);
 	if (!Pawn || !Pawn->IsLocallyControlled()) return;
+
+	HandleLocalPawnEndOverlap(Pawn);
 
 	if (FocusedLocalPawn.Get() == Pawn)
 	{

@@ -1,5 +1,8 @@
 #include "UI/Protocol/LSProtocolUIWidget.h"
 
+#include "Data/LSChipStats.h"
+#include "LostSignal.h"
+#include "Session/LSSaveSubsystem.h"
 #include "UI/Protocol/LSProtocolWidget.h"
 
 void ULSProtocolUIWidget::NativeConstruct()
@@ -11,22 +14,29 @@ void ULSProtocolUIWidget::NativeConstruct()
 
 void ULSProtocolUIWidget::RefreshProtocolUI()
 {
-	// [임시 테스트] 4종 프로토콜을 임의값(Level, SynergyStage)으로 채워 표시 확인.
-	// 실제 칩 합산/시너지 계산 연동 전까지의 더미 데이터다.
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot refresh protocol UI because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	const FLSChipProtocolTotals ProtocolTotals = LSChipStats::AggregateChipProtocolTotals(SaveSubsystem->GetChipEquipmentSlots(), this);
 	if (Protocol_Survival)
 	{
-		Protocol_Survival->SetProtocol(3, 3);   // 생존
+		Protocol_Survival->SetProtocol(ProtocolTotals.Survival, ProtocolTotals.Survival);
 	}
 	if (Protocol_Carrying)
 	{
-		Protocol_Carrying->SetProtocol(2, 1);   // 적재
+		Protocol_Carrying->SetProtocol(ProtocolTotals.Carrying, ProtocolTotals.Carrying);
 	}
 	if (Protocol_Battle)
 	{
-		Protocol_Battle->SetProtocol(5, 6);     // 전투
+		Protocol_Battle->SetProtocol(ProtocolTotals.Battle, ProtocolTotals.Battle);
 	}
 	if (Protocol_Navigation)
 	{
-		Protocol_Navigation->SetProtocol(1, 0); // 탐색
+		Protocol_Navigation->SetProtocol(ProtocolTotals.Navigation, ProtocolTotals.Navigation);
 	}
 }

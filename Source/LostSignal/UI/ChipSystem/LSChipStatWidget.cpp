@@ -5,42 +5,126 @@
 #include "Components/TextBlock.h"
 #include "LostSignal.h"
 
-void ULSChipStatWidget::SetStat(const FText& StatName, int32 StatValue, int32 SignalLoss)
+void ULSChipStatWidget::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
 {
-	UE_LOG(LogLS, Warning,
-	       TEXT("[ChipStat] SetStat '%s' (Stat=%d, Signal=%d) | NameText=%d ValueText=%d SignalText=%d | GaugeStat=%d GaugeSignal=%d GaugeEmpty=%d"),
-	       *StatName.ToString(), StatValue, SignalLoss,
-	       StatNameText != nullptr, StatValueText != nullptr, SignalLossText != nullptr,
-	       GaugeStat != nullptr, GaugeSignal != nullptr, GaugeEmpty != nullptr);
+	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	if (!bHasAnimatedState || !bIsAnimating)
+	{
+		return;
+	}
+
+	AnimationElapsed += InDeltaTime;
+	const float Alpha = GetAnimationAlpha();
+
+	AnimatedStatValue = FMath::Lerp(StartStatValue, static_cast<float>(TargetStatValue), Alpha);
+	AnimatedSignalLoss = FMath::Lerp(StartSignalLoss, static_cast<float>(TargetSignalLoss), Alpha);
+	AnimatedStatFill = FMath::Lerp(StartStatFill, TargetStatFill, Alpha);
+	AnimatedSignalFill = FMath::Lerp(StartSignalFill, TargetSignalFill, Alpha);
+	AnimatedEmptyFill = FMath::Lerp(StartEmptyFill, TargetEmptyFill, Alpha);
+
+	if (Alpha >= 1.f)
+	{
+		SetAnimatedValuesToTarget();
+		bIsAnimating = false;
+	}
+
+	ApplyAnimatedValues();
+}
+
+void ULSChipStatWidget::SetStat(const FText& StatName, const int32 StatValue, const int32 SignalLoss)
+{
+	const bool bWasInitialized = bHasAnimatedState;
+	const int32 PreviousTargetStatValue = TargetStatValue;
+	const int32 PreviousTargetSignalLoss = TargetSignalLoss;
+	TargetStatValue = FMath::Max(0, StatValue);
+	TargetSignalLoss = FMath::Max(0, SignalLoss);
 
 	const int32 Max = FMath::Max(0, GaugeMax);
-	const int32 StatFill = FMath::Clamp(StatValue, 0, Max);
-	const int32 SignalFill = FMath::Clamp(SignalLoss, 0, Max - StatFill);
-	const int32 EmptyFill = FMath::Max(0, Max - StatFill - SignalFill);
+	TargetStatFill = FMath::Clamp(static_cast<float>(TargetStatValue), 0.f, static_cast<float>(Max));
+	TargetSignalFill = FMath::Clamp(static_cast<float>(TargetSignalLoss), 0.f, static_cast<float>(Max) - TargetStatFill);
+	TargetEmptyFill = FMath::Max(0.f, static_cast<float>(Max) - TargetStatFill - TargetSignalFill);
 
-	// ---- 텍스트 ----
 	if (StatNameText)
 	{
 		StatNameText->SetText(StatName);
 	}
+
+	if (!bHasAnimatedState)
+	{
+		bHasAnimatedState = true;
+		SetAnimatedValuesToTarget();
+	}
+	else if (bWasInitialized)
+	{
+		const bool bTargetChanged = PreviousTargetStatValue != TargetStatValue || PreviousTargetSignalLoss != TargetSignalLoss;
+		if (bTargetChanged)
+		{
+			CacheAnimationStartValues();
+			AnimationElapsed = 0.f;
+			bIsAnimating = true;
+		}
+	}
+
+	ApplyAnimatedValues();
+}
+
+void ULSChipStatWidget::ApplyAnimatedValues()
+{
+	SetDisplayedTexts(
+		FMath::Max(0, FMath::RoundToInt(AnimatedStatValue)),
+		FMath::Max(0, FMath::RoundToInt(AnimatedSignalLoss)));
+
+	SetGaugeFillWeight(GaugeStat, AnimatedStatFill);
+	SetGaugeFillWeight(GaugeSignal, AnimatedSignalFill);
+	SetGaugeFillWeight(GaugeEmpty, AnimatedEmptyFill);
+}
+
+void ULSChipStatWidget::SetDisplayedTexts(const int32 StatValue, const int32 SignalLoss) const
+{
 	if (StatValueText)
 	{
-		StatValueText->SetText(
-			FText::Format(NSLOCTEXT("LSChipStat", "StatValueFmt", "+{0}"), FMath::Max(0, StatValue)));
+		StatValueText->SetText(FText::Format(NSLOCTEXT("LSChipStat", "StatValueFmt", "+{0}"), StatValue));
 	}
 	if (SignalLossText)
 	{
-		SignalLossText->SetText(
-			FText::Format(NSLOCTEXT("LSChipStat", "SignalLossFmt", "+{0}"), FMath::Max(0, SignalLoss)));
+		SignalLossText->SetText(FText::Format(NSLOCTEXT("LSChipStat", "SignalLossFmt", "+{0}"), SignalLoss));
 	}
-
-	// ---- 게이지 바: [파랑=StatValue][분홍=SignalLoss][빈칸=나머지] ----
-	SetGaugeFillWeight(GaugeStat, static_cast<float>(StatFill));
-	SetGaugeFillWeight(GaugeSignal, static_cast<float>(SignalFill));
-	SetGaugeFillWeight(GaugeEmpty, static_cast<float>(EmptyFill));
 }
 
-void ULSChipStatWidget::SetGaugeFillWeight(UBorder* Segment, float Weight)
+void ULSChipStatWidget::SetAnimatedValuesToTarget()
+{
+	const int32 Max = FMath::Max(0, GaugeMax);
+	AnimatedStatValue = static_cast<float>(TargetStatValue);
+	AnimatedSignalLoss = static_cast<float>(TargetSignalLoss);
+	TargetStatFill = FMath::Clamp(static_cast<float>(TargetStatValue), 0.f, static_cast<float>(Max));
+	TargetSignalFill = FMath::Clamp(static_cast<float>(TargetSignalLoss), 0.f, static_cast<float>(Max) - TargetStatFill);
+	TargetEmptyFill = FMath::Max(0.f, static_cast<float>(Max) - TargetStatFill - TargetSignalFill);
+	AnimatedStatFill = TargetStatFill;
+	AnimatedSignalFill = TargetSignalFill;
+	AnimatedEmptyFill = TargetEmptyFill;
+	CacheAnimationStartValues();
+	AnimationElapsed = FMath::Max(0.f, StatAnimationDuration);
+	bIsAnimating = false;
+}
+
+void ULSChipStatWidget::CacheAnimationStartValues()
+{
+	StartStatValue = AnimatedStatValue;
+	StartSignalLoss = AnimatedSignalLoss;
+	StartStatFill = AnimatedStatFill;
+	StartSignalFill = AnimatedSignalFill;
+	StartEmptyFill = AnimatedEmptyFill;
+}
+
+float ULSChipStatWidget::GetAnimationAlpha() const
+{
+	const float Duration = FMath::Max(KINDA_SMALL_NUMBER, StatAnimationDuration);
+	const float LinearAlpha = FMath::Clamp(AnimationElapsed / Duration, 0.f, 1.f);
+	return FMath::InterpEaseInOut(0.f, 1.f, LinearAlpha, 2.f);
+}
+
+void ULSChipStatWidget::SetGaugeFillWeight(UBorder* Segment, const float Weight)
 {
 	if (!Segment)
 	{
@@ -50,8 +134,8 @@ void ULSChipStatWidget::SetGaugeFillWeight(UBorder* Segment, float Weight)
 	UHorizontalBoxSlot* BoxSlot = Cast<UHorizontalBoxSlot>(Segment->Slot);
 	if (!BoxSlot)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[ChipStat] %s 는 HorizontalBox 의 자식이어야 게이지 비중을 적용할 수 있습니다."),
-		       *GetNameSafe(Segment));
+		UE_LOG(LogLS, Warning, TEXT("[ChipStat] %s must be a child of HorizontalBox to apply gauge fill weight."),
+			*GetNameSafe(Segment));
 		return;
 	}
 

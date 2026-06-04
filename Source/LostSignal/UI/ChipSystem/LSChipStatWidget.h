@@ -24,6 +24,8 @@ class LOSTSIGNAL_API ULSChipStatWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
 	// 한 줄 스탯 표시를 갱신한다.
 	//  StatName   : 스탯 이름 (예: 공격력)
 	//  StatValue  : 전투 스탯 증가량 (게이지 파랑 비중)
@@ -56,7 +58,35 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI")
 	int32 GaugeMax = 50;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI")
+	float StatAnimationDuration = 0.35f;
+
 private:
 	// 자식 Border 의 HorizontalBoxSlot 을 Fill + 지정 비중으로 설정한다.
 	static void SetGaugeFillWeight(UBorder* Segment, float Weight);
+
+	void ApplyAnimatedValues();
+	void SetDisplayedTexts(int32 StatValue, int32 SignalLoss) const;
+	void SetAnimatedValuesToTarget();
+	void CacheAnimationStartValues();
+	float GetAnimationAlpha() const;
+
+	int32 TargetStatValue = 0;
+	int32 TargetSignalLoss = 0;
+	float StartStatValue = 0.f;
+	float StartSignalLoss = 0.f;
+	float AnimatedStatValue = 0.f;
+	float AnimatedSignalLoss = 0.f;
+	float StartStatFill = 0.f;
+	float StartSignalFill = 0.f;
+	float StartEmptyFill = 0.f;
+	float AnimatedStatFill = 0.f;
+	float AnimatedSignalFill = 0.f;
+	float AnimatedEmptyFill = 0.f;
+	float TargetStatFill = 0.f;
+	float TargetSignalFill = 0.f;
+	float TargetEmptyFill = 0.f;
+	float AnimationElapsed = 0.f;
+	bool bHasAnimatedState = false;
+	bool bIsAnimating = false;
 };
