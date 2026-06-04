@@ -53,23 +53,27 @@
 | 보관함 | 칩 탭 필터(`ELSStorageFilter::Chip`) + `WBP_ChipStorage` | `Source/LostSignal/UI/Storage/LSLobbyStorageWidget.*` |
 | 아이콘 | 칩 아이콘 경로(`/Game/LostSignal/UI/Icons/Chips/`) | `Source/LostSignal/UI/Inventory/LSItemSlotWidget.cpp:465` |
 | 툴팁(부분) | 칩 툴팁: 이름/등급/설명/가격/메모리/확정 전투 스탯 | `Source/LostSignal/UI/Inventory/LSItemTooltipWidget.cpp:197` |
+| 칩 스테이션 목록(부분) | `ChipSlotWrapBox`에 저장 인벤토리/창고의 `Chip_` 아이템을 가격 높은순으로 `ULSItemSlotWidget` 표시 | `Source/LostSignal/UI/ChipSystem/LSChipStationWidget.*` |
+| 하드웨어 슬롯(부분) | `EquipmentSlot_0~9` 내부 `ItemSlot`에 칩 목록 드래그 장착. 장착 슬롯끼리 이동/교환 가능. 장착 칩을 `ChipSlotBorder` 빈 영역에 드롭하면 창고 이동, 칩 리스트 아이템 위에 드롭하면 해당 저장 슬롯과 교환. 스탯/메모리 검증은 미연동 | `Source/LostSignal/UI/ChipSystem/LSChipEquipmentSlotWidget.*` |
 
 ### ⚠️ 부분 구현
 
 - **칩 툴팁** (`PopulateChipTooltip`): 메모리 할당량과 저장된 `ChipStats`의 **확정 전투 스탯 값**은 표시하지만, **프로토콜 수치**는 표시하지 않는다.
+- **칩 스테이션 목록** (`ULSChipStationWidget::RefreshChipSlots`): 저장 인벤토리/창고의 `Chip_` 아이템을 가격 높은순으로 아이콘/수량/툴팁 슬롯에 표시한다. 장착 슬롯 이동, 메모리 검증, 신호 게이지 연동은 아직 없다.
+- **하드웨어 슬롯** (`ULSChipEquipmentSlotWidget`): 칩 스테이션 목록에서 드래그한 칩을 `EquipmentSlot_0~9` 내부 `ItemSlot`에 저장 이동으로 장착할 수 있다. 장착 슬롯끼리 드래그하면 빈 슬롯으로는 이동하고, 이미 장착된 슬롯과는 교환한다. 장착 칩을 `ChipSlotBorder` 빈 영역으로 드래그하면 장착 해제되어 창고로 이동하고, 칩 리스트 아이템 위에 드롭하면 해당 인벤토리/창고 슬롯과 교환한다. 스탯 합산, 메모리 검증은 아직 없다.
 
 ### ❌ 미구현
 
 | 블록 | 항목 |
 |---|---|
 | 로직 | 등급 + `Item_Chip_Status_Count` → ChipStat 테이블에서 **실제 전투 스탯 산출**. 데이터만 있고 런타임 로직 없음 |
-| [2] | 칩 설정 전용 인벤토리 UI / 칩 오버랩(정보) UI |
-| [3] | 하드웨어 UI — 칩 장착 슬롯(10칸), 메모리 한도 표시·검증, 신호 게이지 스크롤바 |
+| [2] | 칩 장착/이동 가능한 전용 인벤토리 UI / 칩 오버랩(정보) UI |
+| [3] | 하드웨어 UI — 메모리 한도 표시·검증, 신호 게이지 스크롤바 |
 | [3] 로직 | 신호 게이지 10% 단위 → 칩 번호순 비활성화, 비활성 칩 50% 상승 |
 | [4] | 소프트웨어 UI — 프로토콜 UI/레벨/단계, 코어 출력 게이지바, 신호 유실 표시, 프로토콜 오버랩 UI |
 | [4] 로직 | 프로토콜 수치 합산 → 레벨/단계 계산 → 전투지역 편의 UI 활성화 연동 |
 
-**한 줄 요약**: 데이터 레이어와 보관/툴팁 기초는 되어 있으나, 기획의 핵심인 **칩 장착·신호 게이지·프로토콜 시스템과 그 UI는 전혀 구현되지 않았다.**
+**한 줄 요약**: 데이터 레이어와 보관/툴팁/칩 스테이션 목록 표시 기초는 되어 있으나, 기획의 핵심인 **칩 장착·신호 게이지·프로토콜 시스템과 조작 UI는 아직 구현되지 않았다.**
 
 ---
 

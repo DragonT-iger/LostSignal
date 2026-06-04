@@ -20,6 +20,7 @@ public:
 	UPROPERTY() TArray<FLSSessionItem> Inventory;
 	UPROPERTY() TArray<FLSSessionItem> WarehouseItems;
 	UPROPERTY() TArray<FLSSessionItem> SafeStash;
+	UPROPERTY() TArray<FLSSessionItem> ChipEquipmentSlots;
 
 	UPROPERTY() bool bRaidSaveActive = false;
 	UPROPERTY() TArray<FLSSessionItem> ActiveRaidLoadout;

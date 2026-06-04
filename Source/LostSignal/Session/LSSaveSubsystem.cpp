@@ -11,6 +11,7 @@
 #include "UObject/Package.h"
 
 constexpr int32 SaveDefaultMaxInventorySlotCount = 10;
+constexpr int32 ChipEquipmentSlotCount = 10;
 
 const FString ULSSaveSubsystem::SlotName = TEXT("LostSignalSave");
 const FString ULSSaveSubsystem::DebugFileName = TEXT("LostSignalSave_Debug.json");
@@ -117,6 +118,169 @@ const TArray<FLSSessionItem>& ULSSaveSubsystem::GetSafeStash() const
 {
 	static TArray<FLSSessionItem> Empty;
 	return SaveData ? SaveData->SafeStash : Empty;
+}
+
+const TArray<FLSSessionItem>& ULSSaveSubsystem::GetChipEquipmentSlots() const
+{
+	static TArray<FLSSessionItem> Empty;
+	return SaveData ? SaveData->ChipEquipmentSlots : Empty;
+}
+
+bool ULSSaveSubsystem::EquipChipFromStoredSlot(const ELSInventorySlotArea SourceArea, const int32 SourceIndex, const int32 EquipmentIndex)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot equip chip because SaveData is missing."));
+		return false;
+	}
+
+	if (EquipmentIndex < 0 || EquipmentIndex >= ChipEquipmentSlotCount)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot equip chip because equipment index is invalid. Index=%d"), EquipmentIndex);
+		return false;
+	}
+
+	TArray<FLSSessionItem>* SourceSlots = GetMutableStoredSlots(SourceArea);
+	if (!SourceSlots || !SourceSlots->IsValidIndex(SourceIndex) || !LSInventorySlotUtils::IsFilled((*SourceSlots)[SourceIndex]))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot equip chip because source slot is invalid. Area=%d Index=%d"),
+			static_cast<int32>(SourceArea),
+			SourceIndex);
+		return false;
+	}
+
+	FLSSessionItem& SourceSlot = (*SourceSlots)[SourceIndex];
+	if (!SourceSlot.ItemRowName.ToString().StartsWith(TEXT("Chip_")))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot equip non-chip item '%s'."), *SourceSlot.ItemRowName.ToString());
+		return false;
+	}
+
+	EnsureChipEquipmentSlots();
+	FLSSessionItem& EquipmentSlot = SaveData->ChipEquipmentSlots[EquipmentIndex];
+	if (LSInventorySlotUtils::IsFilled(EquipmentSlot) && !EquipmentSlot.ItemRowName.ToString().StartsWith(TEXT("Chip_")))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot swap equipment slot %d because it contains non-chip item '%s'."),
+			EquipmentIndex,
+			*EquipmentSlot.ItemRowName.ToString());
+		return false;
+	}
+
+	if (LSInventorySlotUtils::IsFilled(EquipmentSlot))
+	{
+		Swap(SourceSlot, EquipmentSlot);
+	}
+	else
+	{
+		EquipmentSlot = SourceSlot;
+		SourceSlot = LSInventorySlotUtils::MakeEmptyItem();
+	}
+
+	Save();
+	return true;
+}
+
+bool ULSSaveSubsystem::DropChipEquipmentSlot(const int32 FromEquipmentIndex, const int32 ToEquipmentIndex)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop chip equipment slot because SaveData is missing."));
+		return false;
+	}
+
+	if (FromEquipmentIndex < 0 || FromEquipmentIndex >= ChipEquipmentSlotCount || ToEquipmentIndex < 0 || ToEquipmentIndex >= ChipEquipmentSlotCount)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop chip equipment slot because index is invalid. From=%d To=%d"),
+			FromEquipmentIndex,
+			ToEquipmentIndex);
+		return false;
+	}
+
+	EnsureChipEquipmentSlots();
+	const FLSSessionItem& FromSlot = SaveData->ChipEquipmentSlots[FromEquipmentIndex];
+	if (!LSInventorySlotUtils::IsFilled(FromSlot))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop chip equipment slot because source is empty. From=%d To=%d"),
+			FromEquipmentIndex,
+			ToEquipmentIndex);
+		return false;
+	}
+
+	if (!FromSlot.ItemRowName.ToString().StartsWith(TEXT("Chip_")))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop non-chip equipment item '%s'."), *FromSlot.ItemRowName.ToString());
+		return false;
+	}
+
+	const FLSSessionItem& ToSlot = SaveData->ChipEquipmentSlots[ToEquipmentIndex];
+	if (LSInventorySlotUtils::IsFilled(ToSlot) && !ToSlot.ItemRowName.ToString().StartsWith(TEXT("Chip_")))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop to equipment slot %d because it contains non-chip item '%s'."),
+			ToEquipmentIndex,
+			*ToSlot.ItemRowName.ToString());
+		return false;
+	}
+
+	const bool bDropped = LSInventorySlotUtils::DropSlot(
+		SaveData->ChipEquipmentSlots,
+		FromEquipmentIndex,
+		SaveData->ChipEquipmentSlots,
+		ToEquipmentIndex,
+		ChipEquipmentSlotCount);
+	if (bDropped)
+	{
+		Save();
+	}
+	return bDropped;
+}
+
+bool ULSSaveSubsystem::UnequipChipToWarehouse(const int32 EquipmentIndex)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot unequip chip because SaveData is missing."));
+		return false;
+	}
+
+	if (EquipmentIndex < 0 || EquipmentIndex >= ChipEquipmentSlotCount)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot unequip chip because equipment index is invalid. Index=%d"), EquipmentIndex);
+		return false;
+	}
+
+	EnsureChipEquipmentSlots();
+	FLSSessionItem& EquipmentSlot = SaveData->ChipEquipmentSlots[EquipmentIndex];
+	if (!LSInventorySlotUtils::IsFilled(EquipmentSlot))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot unequip chip because equipment slot is empty. Index=%d"), EquipmentIndex);
+		return false;
+	}
+
+	if (!EquipmentSlot.ItemRowName.ToString().StartsWith(TEXT("Chip_")))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot unequip non-chip item '%s'."), *EquipmentSlot.ItemRowName.ToString());
+		return false;
+	}
+
+	FLSSessionItem RemainingItem;
+	const bool bMoved = LSInventorySlotUtils::TryAddItemsToSlotArray(
+		SaveData->WarehouseItems,
+		EquipmentSlot.ItemRowName,
+		EquipmentSlot.Amount,
+		MAX_int32,
+		EquipmentSlot.ChipStats,
+		RemainingItem);
+	if (!bMoved || LSInventorySlotUtils::IsFilled(RemainingItem))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot unequip chip because warehouse add failed. Index=%d Row=%s"),
+			EquipmentIndex,
+			*EquipmentSlot.ItemRowName.ToString());
+		return false;
+	}
+
+	EquipmentSlot = LSInventorySlotUtils::MakeEmptyItem();
+	Save();
+	return true;
 }
 
 void ULSSaveSubsystem::SortInventory()
@@ -407,6 +571,7 @@ void ULSSaveSubsystem::Load()
 			LSInventorySlotUtils::NormalizeSlotArray(SaveData->Inventory);
 			LSInventorySlotUtils::NormalizeSlotArray(SaveData->WarehouseItems);
 			LSInventorySlotUtils::NormalizeSlotArray(SaveData->SafeStash);
+			EnsureChipEquipmentSlots();
 			ResolveInterruptedRaid();
 			Save();
 		}
@@ -420,6 +585,7 @@ void ULSSaveSubsystem::Load()
 	}
 
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
+	EnsureChipEquipmentSlots();
 	UE_LOG(LogLS, Log, TEXT("[Save] Created new save object for slot %s"), *ResolvedSlotName);
 }
 
@@ -485,6 +651,24 @@ void ULSSaveSubsystem::Save()
 	SaveDebugJson();
 #endif
 	UE_LOG(LogLS, Log, TEXT("[Save] Save completed: %s"), *ResolvedSlotName);
+}
+
+void ULSSaveSubsystem::EnsureChipEquipmentSlots()
+{
+	if (!SaveData)
+	{
+		return;
+	}
+
+	while (SaveData->ChipEquipmentSlots.Num() < ChipEquipmentSlotCount)
+	{
+		SaveData->ChipEquipmentSlots.Add(LSInventorySlotUtils::MakeEmptyItem());
+	}
+
+	if (SaveData->ChipEquipmentSlots.Num() > ChipEquipmentSlotCount)
+	{
+		SaveData->ChipEquipmentSlots.SetNum(ChipEquipmentSlotCount);
+	}
 }
 
 TArray<FLSSessionItem>& ULSSaveSubsystem::GetMutableInventory()
@@ -581,6 +765,7 @@ void ULSSaveSubsystem::SaveDebugJson() const
 	AddSlotArrayField(TEXT("inventory"), SaveData->Inventory);
 	AddSlotArrayField(TEXT("warehouseItems"), SaveData->WarehouseItems);
 	AddSlotArrayField(TEXT("safeStash"), SaveData->SafeStash);
+	AddSlotArrayField(TEXT("chipEquipmentSlots"), SaveData->ChipEquipmentSlots);
 
 	TArray<TSharedPtr<FJsonValue>> ActiveRaidLoadoutArray;
 	ActiveRaidLoadoutArray.Reserve(SaveData->ActiveRaidLoadout.Num());

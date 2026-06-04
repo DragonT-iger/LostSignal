@@ -8,6 +8,8 @@
 #include "Engine/Texture2D.h"
 #include "InputCoreTypes.h"
 #include "LostSignal.h"
+#include "UI/ChipSystem/LSChipEquipmentSlotWidget.h"
+#include "UI/ChipSystem/LSChipStationWidget.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
@@ -51,6 +53,9 @@ void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, con
 	AmountText->SetText(FText::AsNumber(Amount));
 	AmountText->SetVisibility(Amount > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	SetTooltipItem(ItemRowName, Amount, ChipStats);
+	DragItemRowName = ItemRowName;
+	DragAmount = Amount;
+	DragChipStats = ChipStats;
 	bHasItem = true;
 }
 
@@ -82,6 +87,9 @@ void ULSItemSlotWidget::ClearItem()
 	AmountText->SetText(FText::GetEmpty());
 	AmountText->SetVisibility(ESlateVisibility::Collapsed);
 	bHasItem = false;
+	DragItemRowName = NAME_None;
+	DragAmount = 0;
+	DragChipStats.Reset();
 	ClearTooltipItem();
 }
 
@@ -89,8 +97,12 @@ void ULSItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, co
 {
 	InventoryWidget = InInventoryWidget;
 	LootDropWidget.Reset();
+	LobbyStorageWidget.Reset();
+	ChipStationWidget.Reset();
+	ChipEquipmentSlotWidget.Reset();
 	SlotArea = InSlotArea;
 	SlotIndex = InSlotIndex;
+	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = bInHasItem;
 }
 
@@ -99,8 +111,11 @@ void ULSItemSlotWidget::SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, 
 	LootDropWidget = InLootDropWidget;
 	InventoryWidget.Reset();
 	LobbyStorageWidget.Reset();
+	ChipStationWidget.Reset();
+	ChipEquipmentSlotWidget.Reset();
 	SlotArea = ELSInventorySlotArea::Inventory;
 	SlotIndex = InSlotIndex;
+	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = bInHasItem;
 }
 
@@ -109,9 +124,40 @@ void ULSItemSlotWidget::SetWarehouseSlotContext(ULSLobbyStorageWidget* InStorage
 	LobbyStorageWidget = InStorageWidget;
 	InventoryWidget.Reset();
 	LootDropWidget.Reset();
+	ChipStationWidget.Reset();
+	ChipEquipmentSlotWidget.Reset();
 	SlotArea = InSlotArea;
 	SlotIndex = InSlotIndex;
+	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = bInHasItem;
+}
+
+void ULSItemSlotWidget::SetChipStationSlotContext(ULSChipStationWidget* InChipStationWidget, const ELSInventorySlotArea InSourceArea, const int32 InSourceSlotIndex, const FName InItemRowName, const int32 InAmount, const TArray<FLSChipResolvedStat>& InChipStats)
+{
+	ChipStationWidget = InChipStationWidget;
+	InventoryWidget.Reset();
+	LootDropWidget.Reset();
+	LobbyStorageWidget.Reset();
+	ChipEquipmentSlotWidget.Reset();
+	SlotArea = InSourceArea;
+	SlotIndex = InSourceSlotIndex;
+	EquipmentSlotIndex = INDEX_NONE;
+	DragItemRowName = InItemRowName;
+	DragAmount = InAmount;
+	DragChipStats = InChipStats;
+	bHasItem = !InItemRowName.IsNone() && InAmount > 0;
+}
+
+void ULSItemSlotWidget::SetChipEquipmentSlotContext(ULSChipEquipmentSlotWidget* InChipEquipmentSlotWidget, ULSChipStationWidget* InChipStationWidget, const int32 InEquipmentSlotIndex)
+{
+	ChipEquipmentSlotWidget = InChipEquipmentSlotWidget;
+	InventoryWidget.Reset();
+	LootDropWidget.Reset();
+	LobbyStorageWidget.Reset();
+	ChipStationWidget = InChipStationWidget;
+	SlotArea = ELSInventorySlotArea::Inventory;
+	SlotIndex = INDEX_NONE;
+	EquipmentSlotIndex = InEquipmentSlotIndex;
 }
 
 void ULSItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -229,9 +275,15 @@ void ULSItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const 
 	DragOperation->SourceInventoryWidget = InventoryWidget.Get();
 	DragOperation->SourceLootDropWidget = LootDropWidget.Get();
 	DragOperation->SourceLobbyStorageWidget = LobbyStorageWidget.Get();
+	DragOperation->SourceChipStationWidget = ChipStationWidget.Get();
+	DragOperation->SourceChipEquipmentSlotWidget = ChipEquipmentSlotWidget.Get();
 	DragOperation->SourceSlotWidget = this;
 	DragOperation->SourceSlotIndex = SlotIndex;
+	DragOperation->SourceEquipmentSlotIndex = EquipmentSlotIndex;
 	DragOperation->SourceSlotArea = SlotArea;
+	DragOperation->DragItemRowName = DragItemRowName;
+	DragOperation->DragAmount = DragAmount;
+	DragOperation->DragChipStats = DragChipStats;
 	DragOperation->DefaultDragVisual = this;
 	DragOperation->Pivot = EDragPivot::MouseDown;
 	SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -249,6 +301,21 @@ bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDro
 
 	bIsDragTarget = false;
 	ApplyHoverVisual();
+
+	if (ULSChipEquipmentSlotWidget* EquipmentSlotWidget = ChipEquipmentSlotWidget.Get())
+	{
+		return EquipmentSlotWidget->HandleChipDrop(*DragOperation);
+	}
+
+	if (ULSChipStationWidget* TargetChipStationWidget = ChipStationWidget.Get())
+	{
+		if (DragOperation->SourceChipEquipmentSlotWidget)
+		{
+			return TargetChipStationWidget->SwapEquippedChipWithStoredSlot(*DragOperation, SlotArea, SlotIndex);
+		}
+
+		return false;
+	}
 
 	if (ULSLootDropWidget* TargetLootDropWidget = LootDropWidget.Get())
 	{
@@ -357,7 +424,22 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 
 bool ULSItemSlotWidget::CanStartItemDrag() const
 {
-	return bHasItem && SlotIndex != INDEX_NONE && (InventoryWidget.IsValid() || LootDropWidget.IsValid() || LobbyStorageWidget.IsValid());
+	if (!bHasItem)
+	{
+		return false;
+	}
+
+	if (ChipStationWidget.IsValid())
+	{
+		if (ChipEquipmentSlotWidget.IsValid())
+		{
+			return EquipmentSlotIndex != INDEX_NONE && !DragItemRowName.IsNone() && DragAmount > 0;
+		}
+
+		return SlotIndex != INDEX_NONE && !DragItemRowName.IsNone() && DragAmount > 0;
+	}
+
+	return SlotIndex != INDEX_NONE && (InventoryWidget.IsValid() || LootDropWidget.IsValid() || LobbyStorageWidget.IsValid());
 }
 
 bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const

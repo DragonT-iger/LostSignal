@@ -48,6 +48,12 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	const TArray<FLSSessionItem>& GetSafeStash() const;
 
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	const TArray<FLSSessionItem>& GetChipEquipmentSlots() const;
+
+	bool EquipChipFromStoredSlot(ELSInventorySlotArea SourceArea, int32 SourceIndex, int32 EquipmentIndex);
+	bool DropChipEquipmentSlot(int32 FromEquipmentIndex, int32 ToEquipmentIndex);
+	bool UnequipChipToWarehouse(int32 EquipmentIndex);
 	bool DropStoredSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool TransferStoredSlotToArea(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea);
 	bool TransferAllInventoryToWarehouse(int32 WarehouseMaxSlotCount, bool& bOutStoppedBecauseFull);
@@ -63,6 +69,7 @@ private:
 	void SaveDebugJson() const;
 	void ResolveInterruptedRaid();
 	void MigrateInventory();
+	void EnsureChipEquipmentSlots();
 	TArray<FLSSessionItem>& GetMutableInventory();
 	TArray<FLSSessionItem>* GetMutableStoredSlots(ELSInventorySlotArea SlotArea);
 	const TArray<FLSSessionItem>* GetStoredSlots(ELSInventorySlotArea SlotArea) const;

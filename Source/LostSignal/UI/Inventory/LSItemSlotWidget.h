@@ -6,6 +6,8 @@
 #include "LSItemSlotWidget.generated.h"
 
 class UImage;
+class ULSChipEquipmentSlotWidget;
+class ULSChipStationWidget;
 class ULSInventoryWidget;
 class ULSLobbyStorageWidget;
 class ULSLootDropWidget;
@@ -28,6 +30,8 @@ public:
 	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem);
 	void SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, int32 InSlotIndex, bool bInHasItem);
 	void SetWarehouseSlotContext(ULSLobbyStorageWidget* InStorageWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem);
+	void SetChipStationSlotContext(ULSChipStationWidget* InChipStationWidget, ELSInventorySlotArea InSourceArea, int32 InSourceSlotIndex, FName InItemRowName, int32 InAmount, const TArray<FLSChipResolvedStat>& InChipStats);
+	void SetChipEquipmentSlotContext(ULSChipEquipmentSlotWidget* InChipEquipmentSlotWidget, ULSChipStationWidget* InChipStationWidget, int32 InEquipmentSlotIndex);
 	void RestoreDragSourceVisual();
 
 protected:
@@ -58,8 +62,14 @@ private:
 	TWeakObjectPtr<ULSInventoryWidget> InventoryWidget;
 	TWeakObjectPtr<ULSLootDropWidget> LootDropWidget;
 	TWeakObjectPtr<ULSLobbyStorageWidget> LobbyStorageWidget;
+	TWeakObjectPtr<ULSChipStationWidget> ChipStationWidget;
+	TWeakObjectPtr<ULSChipEquipmentSlotWidget> ChipEquipmentSlotWidget;
 	ELSInventorySlotArea SlotArea = ELSInventorySlotArea::Inventory;
 	int32 SlotIndex = INDEX_NONE;
+	int32 EquipmentSlotIndex = INDEX_NONE;
+	FName DragItemRowName;
+	int32 DragAmount = 0;
+	TArray<FLSChipResolvedStat> DragChipStats;
 	bool bHasItem = false;
 	bool bIsHovered = false;
 	bool bIsDragTarget = false;
