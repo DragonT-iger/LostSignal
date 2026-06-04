@@ -11,7 +11,6 @@ ULSShortCircuitSkillDataAsset::ULSShortCircuitSkillDataAsset()
 	CooldownTag = LSGameplayTags::Cooldown_Skill_ShortCircuit;
 	ProjectileClass = ALSShortCircuitProjectile::StaticClass();
 	FieldClass = ALSShortCircuitField::StaticClass();
-	AttackCoefficient = 1.5f;
 }
 
 TSubclassOf<ALSShortCircuitProjectile> ULSShortCircuitSkillDataAsset::ResolveProjectileClass() const

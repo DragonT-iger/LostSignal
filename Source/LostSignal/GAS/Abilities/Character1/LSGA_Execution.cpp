@@ -260,7 +260,7 @@ void ULSGA_Execution::PerformSheathHit()
 			1.0f,
 			0.0f,
 			CachedAttackCoefficient,
-			SkillData->bCanCrit,
+			bCanCrit,
 			ResolvedBreakPower))
 		{
 			UniqueTargets.Add(TargetActor);
@@ -286,7 +286,7 @@ void ULSGA_Execution::PerformSheathHit()
 			const float FieldRadiusOverride = ExecutionData ? ExecutionData->FieldExplosionRadiusOverride : 0.0f;
 			const bool bDestroyField = !ExecutionData || ExecutionData->bDestroyShortCircuitFieldOnExplosion;
 
-			if (Field->ExplodeByExecution(SourceActor, SkillData, FieldExplosionCoefficient, FieldRadiusOverride, bDestroyField))
+			if (Field->ExplodeByExecution(SourceActor, SkillData, FieldExplosionCoefficient, bCanCrit, ResolvedBreakPower, FieldRadiusOverride, bDestroyField))
 			{
 				++ExplodedFieldCount;
 			}

@@ -6,29 +6,17 @@
 #include "GAS/Abilities/Character1/LSGA_Overclock.h"
 #include "GAS/Abilities/Character1/LSGA_Override.h"
 #include "GAS/Abilities/Character1/LSGA_ShortCircuit.h"
-#include "GAS/Effects/LSGE_SkillCooldown.h"
 #include "GAS/Effects/LSGE_PlayerBasicDamage.h"
 #include "GAS/LSGameplayTags.h"
 
 ULSSkillDataAsset::ULSSkillDataAsset()
 {
 	DamageEffectClass = ULSGE_PlayerBasicDamage::StaticClass();
-	CooldownEffectClass = ULSGE_SkillCooldown::StaticClass();
 }
 
 FLSSkillAreaPreviewSpec ULSSkillDataAsset::BuildPreviewSpec() const
 {
 	return PreviewSpec;
-}
-
-TSubclassOf<UGameplayAbility> ULSSkillDataAsset::GetAbilityClass() const
-{
-	return AbilityClass;
-}
-
-float ULSSkillDataAsset::GetCooldownDuration() const
-{
-	return FallbackCooldown;
 }
 
 FGameplayTag ULSSkillDataAsset::GetCooldownTag() const

@@ -42,6 +42,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Execution")
 	ELSBreakPowerTier FallbackBreakPower = ELSBreakPowerTier::HardCrowdControl;
 
+	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Execution")
+	bool bCanCrit = false;
+
 private:
 	void PerformSheathHit();
 	int32 ConsumeCombatAccelerationStacks(AActor* SourceActor) const;

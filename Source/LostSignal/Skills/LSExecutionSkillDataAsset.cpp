@@ -7,6 +7,4 @@ ULSExecutionSkillDataAsset::ULSExecutionSkillDataAsset()
 {
 	AbilityClass = ULSGA_Execution::StaticClass();
 	CooldownTag = LSGameplayTags::Cooldown_Skill_Execution;
-	AttackCoefficient = 3.0f;
-	BreakPower = ELSBreakPowerTier::HardCrowdControl;
 }

@@ -44,6 +44,7 @@ namespace
 
 	constexpr float DebugSphereMeshBaseDiameter = 100.0f;
 	constexpr float DefaultShortCircuitAttackCoefficient = 1.5f;
+	constexpr bool bDefaultShortCircuitCanCrit = false;
 
 	const FLSCharacterSkillRow* ResolveShortCircuitSkillRow(const UObject* WorldContextObject, const ULSSkillDataAsset* SkillData, const TCHAR* Context)
 	{
@@ -125,6 +126,8 @@ bool ALSShortCircuitField::ExplodeByExecution(
 	AActor* InstigatorActor,
 	const ULSSkillDataAsset* ExecutionSkillData,
 	float AttackCoefficient,
+	bool bCanCrit,
+	ELSBreakPowerTier BreakPower,
 	float RadiusOverride,
 	bool bDestroyAfterExplosion)
 {
@@ -146,11 +149,6 @@ bool ALSShortCircuitField::ExplodeByExecution(
 	{
 		return false;
 	}
-
-	const FLSCharacterSkillRow* Row = ResolveShortCircuitSkillRow(InstigatorActor, ExecutionSkillData, TEXT("ShortCircuitField.ExplodeByExecution"));
-	const ELSBreakPowerTier ResolvedBreakPower = Row
-		? ToShortCircuitBreakPowerTier(Row->Skill_Impact, ExecutionSkillData->BreakPower)
-		: ExecutionSkillData->BreakPower;
 
 	TArray<AActor*> OverlappedActors;
 	TArray<AActor*> ActorsToIgnore;
@@ -182,8 +180,8 @@ bool ALSShortCircuitField::ExplodeByExecution(
 			1.0f,
 			0.0f,
 			AttackCoefficient,
-			ExecutionSkillData->bCanCrit,
-			ResolvedBreakPower))
+			bCanCrit,
+			BreakPower))
 		{
 			UniqueTargets.Add(TargetActor);
 			++ValidHitCount;
@@ -408,7 +406,7 @@ void ALSShortCircuitField::ApplyPulse()
 			1.0f,
 			0.0f,
 			AttackCoefficient,
-			SkillData->bCanCrit,
+			bDefaultShortCircuitCanCrit,
 			BreakPower))
 		{
 			const float AfterHealth = TargetASC

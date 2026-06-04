@@ -1,14 +1,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Skills/LSSkillDataAsset.h"
+#include "Skills/LSPassiveSkillDataAsset.h"
 #include "LSCombatAccelerationSkillDataAsset.generated.h"
 
 class UGameplayEffect;
 
 /** Passive data for Combat Acceleration. Application is handled by ULSPlayerSkillComponent. */
 UCLASS(BlueprintType)
-class LOSTSIGNAL_API ULSCombatAccelerationSkillDataAsset : public ULSSkillDataAsset
+class LOSTSIGNAL_API ULSCombatAccelerationSkillDataAsset : public ULSPassiveSkillDataAsset
 {
 	GENERATED_BODY()
 

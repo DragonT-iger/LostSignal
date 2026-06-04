@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/LSCombatTypes.h"
 #include "GameFramework/Actor.h"
 #include "LSShortCircuitField.generated.h"
 
@@ -22,6 +23,8 @@ public:
 		AActor* InstigatorActor,
 		const ULSSkillDataAsset* ExecutionSkillData,
 		float AttackCoefficient,
+		bool bCanCrit,
+		ELSBreakPowerTier BreakPower,
 		float RadiusOverride = 0.0f,
 		bool bDestroyAfterExplosion = true);
 

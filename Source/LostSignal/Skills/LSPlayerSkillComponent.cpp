@@ -20,6 +20,7 @@
 #include "GAS/LSGameplayTags.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
+#include "Skills/LSPassiveSkillDataAsset.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "TimerManager.h"
@@ -251,7 +252,7 @@ void ULSPlayerSkillComponent::HandleBasicAttackHit(int32 ComboIndex, int32 Valid
 		return;
 	}
 
-	for (ULSSkillDataAsset* PassiveSkillData : PassiveSkills)
+	for (ULSPassiveSkillDataAsset* PassiveSkillData : PassiveSkills)
 	{
 		if (!PassiveSkillData)
 		{
@@ -541,7 +542,7 @@ bool ULSPlayerSkillComponent::TryActivateGameplayAbility(ULSSkillDataAsset* Skil
 	return bActivated;
 }
 
-bool ULSPlayerSkillComponent::TrySendPassiveGameplayEvent(ULSSkillDataAsset* SkillData, int32 ComboIndex) const
+bool ULSPlayerSkillComponent::TrySendPassiveGameplayEvent(ULSPassiveSkillDataAsset* SkillData, int32 ComboIndex) const
 {
 	AActor* OwnerActor = GetOwner();
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerActor);

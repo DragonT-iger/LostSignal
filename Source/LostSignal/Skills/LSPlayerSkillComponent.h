@@ -7,6 +7,7 @@
 #include "LSPlayerSkillComponent.generated.h"
 
 class ULSSkillDataAsset;
+class ULSPassiveSkillDataAsset;
 class ULSSkillPreviewComponent;
 class UGameplayAbility;
 struct FLSCharacterSkillRow;
@@ -68,7 +69,7 @@ protected:
 	TMap<ELSPlayerSkillSlot, FLSPlayerSkillSlotSpec> SkillSlots;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
-	TArray<TObjectPtr<ULSSkillDataAsset>> PassiveSkills;
+	TArray<TObjectPtr<ULSPassiveSkillDataAsset>> PassiveSkills;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill")
 	TObjectPtr<ULSSkillDataAsset> ActiveSkillData;
@@ -94,7 +95,7 @@ private:
 	FVector ClampTargetLocationToCastRange(const ULSSkillDataAsset* SkillData, const FVector& TargetLocation) const;
 	void LogSkillCooldownBlocked(const ULSSkillDataAsset* SkillData, const TCHAR* Phase) const;
 	bool TryActivateGameplayAbility(ULSSkillDataAsset* SkillData, const FLSSkillActivationContext& Context);
-	bool TrySendPassiveGameplayEvent(ULSSkillDataAsset* SkillData, int32 ComboIndex) const;
+	bool TrySendPassiveGameplayEvent(ULSPassiveSkillDataAsset* SkillData, int32 ComboIndex) const;
 	bool TryPredictFastMovementSkill(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw);
 	bool ResolvePredictedFastMovementParams(ULSSkillDataAsset* SkillData, float& OutDistance, float& OutDuration) const;
 	void IgnoreEnemiesForPredictedFastMovement(ACharacter* OwnerCharacter, const FVector& StartLocation, const FVector& Direction, float Distance);

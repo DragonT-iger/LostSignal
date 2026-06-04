@@ -19,7 +19,7 @@
 - 스킬이 이동 스킬일 때만: `로컬 예측 구조`를 확인한다.
 - 스킬이 강화 버전을 가질 때만: `강화 스킬 구조`를 확인한다.
 - 새 GameplayTag가 필요할 때만: `상태 태그`를 확인하고 `LSGameplayTags`에 추가한다.
-- UI 표시나 아이콘만 바꿀 때: `ULSSkillDataAsset`, `에디터 설정 체크리스트`의 위젯 항목만 확인한다.
+- UI 표시나 아이콘만 바꿀 때: `ULSSkillDataAssetBase`, `에디터 설정 체크리스트`의 위젯 항목만 확인한다.
 
 ## 목적
 
@@ -31,8 +31,8 @@
 
 - 런타임 스킬 실행은 `GameplayAbility`를 기준으로 한다.
 - 수치 변경은 `GameplayEffect`를 통해 처리한다.
-- 스킬별 설정은 `ULSSkillDataAsset` 또는 스킬 전용 DataAsset에 둔다.
-- 기획 수치는 가능하면 `FLSCharacterSkillRow` DataTable에서 읽는다.
+- 스킬별 설정은 액티브 `ULSSkillDataAsset`, 패시브 `ULSPassiveSkillDataAsset`, 또는 스킬 전용 파생 DataAsset에 둔다.
+- 액티브 기획 수치는 `FLSCharacterSkillRow`, 패시브 기획 수치는 `FLSCharacterPassiveSkillRow` DataTable에서 읽는다.
 
 ## 전체 구조
 
@@ -51,16 +51,20 @@ ALSPlayerCharacter
     ├── GameplayAbility 활성화 요청
     └── 빠른 이동 스킬 로컬 예측
 
-ULSSkillDataAsset
+ULSSkillDataAssetBase
 ├── AbilityClass
 ├── CooldownTag
 ├── CooldownEffectClass
+└── UI 정보
+
+ULSSkillDataAsset
 ├── Skill_ID
 ├── PreviewSpec
 ├── DamageEffectClass
-├── AttackCoefficient / bCanCrit / BreakPower
-├── UI 정보
 └── EnhancementVariants
+
+ULSPassiveSkillDataAsset
+└── PassiveSkill_ID
 
 GameplayAbility
 └── 실제 스킬 실행 로직
@@ -75,8 +79,8 @@ GameplayEffect
 
 플레이어 스킬 슬롯과 입력 흐름의 중심이다.
 
-- `SkillSlots`에 슬롯별 `ULSSkillDataAsset`을 가진다.
-- `PassiveSkills`에 패시브 스킬 DataAsset을 가진다.
+- `SkillSlots`에 슬롯별 액티브 `ULSSkillDataAsset`을 가진다.
+- `PassiveSkills`에 패시브 `ULSPassiveSkillDataAsset`을 가진다.
 - 프리뷰 시작, 갱신, 확정, 취소를 담당한다.
 - 스킬 쿨타임 태그를 확인해서 프리뷰와 발동을 차단한다.
 - 서버에 스킬 발동 요청을 보낸다.
@@ -84,9 +88,9 @@ GameplayEffect
 - 빠른 이동 스킬의 클라이언트 예측을 담당한다.
 - 전투 이벤트를 받아 패시브 발동 조건을 검사한다.
 
-## ULSSkillDataAsset
+## ULSSkillDataAssetBase
 
-스킬 공통 데이터의 기준 클래스다.
+액티브/패시브 스킬 DataAsset의 공통 기준 클래스다.
 
 ```text
 AbilityClass
@@ -103,6 +107,15 @@ CooldownEffectClass
 - 쿨타임 적용용 GameplayEffect
 - 기본값은 ULSGE_SkillCooldown
 
+DisplayName / Description / Icon
+- UI 표시 정보
+```
+
+## ULSSkillDataAsset
+
+액티브 스킬 전용 DataAsset이다.
+
+```text
 Skill_ID
 - FLSCharacterSkillRow DataTable row 조회 키
 - DataAsset은 row handle을 직접 들지 않고, 사용 시점에 ULSGameDataSubsystem에서 Skill_ID로 조회한다.
@@ -116,18 +129,28 @@ DamageEffectClass
 - 데미지 적용용 GameplayEffect
 - 기본값은 ULSGE_PlayerBasicDamage
 
-AttackCoefficient / bCanCrit / BreakPower
-- DataTable 값이 없거나 fallback이 필요할 때 사용하는 공통 데미지 데이터
-- 스킬 경로에서는 FixedDamage를 사용하지 않는다. 스킬 데미지는 DataTable의 Skill_Multiplier 또는 fallback 계수 기반으로 계산한다.
+공통 데미지 수치
+- 공통 `ULSSkillDataAssetBase`와 액티브 `ULSSkillDataAsset`에는 AttackCoefficient / bCanCrit / BreakPower 같은 데미지 수치를 두지 않는다.
+- 스킬 경로에서는 FixedDamage를 사용하지 않는다. 스킬 데미지는 DataTable의 Skill_Multiplier 또는 Ability/파생 DataAsset fallback 계수 기반으로 계산한다.
 
 DisplayName / Description / Icon
-- UI 표시 정보
+- UI 표시 정보는 ULSSkillDataAssetBase에서 상속받는다.
 
 EnhancementVariants
 - 강화 스킬 DataAsset 목록
 ```
 
-공통 DataAsset에 모든 스킬 전용 필드를 계속 추가하지 않는다. 특정 스킬에만 필요한 값은 파생 DataAsset을 만든다.
+## ULSPassiveSkillDataAsset
+
+패시브 스킬 전용 DataAsset이다.
+
+```text
+PassiveSkill_ID
+- FLSCharacterPassiveSkillRow DataTable row 조회 키
+- 패시브 row 조회는 액티브 Skill_ID와 분리한다.
+```
+
+공통 DataAsset에 모든 스킬 전용 필드를 계속 추가하지 않는다. 액티브/패시브 공통은 `ULSSkillDataAssetBase`, 액티브 전용은 `ULSSkillDataAsset`, 패시브 전용은 `ULSPassiveSkillDataAsset`, 특정 스킬 전용 값은 각 파생 DataAsset에 둔다.
 
 ## GameplayAbility
 
@@ -184,7 +207,7 @@ EnhancementVariants
 
 ## 패시브 스킬
 
-패시브는 `ULSPlayerSkillComponent::PassiveSkills`에 DataAsset을 등록한다.
+패시브는 `ULSPlayerSkillComponent::PassiveSkills`에 `ULSPassiveSkillDataAsset` 파생 DataAsset을 등록한다.
 
 ```text
 전투 이벤트 발생
@@ -230,7 +253,7 @@ FLSCharacterSkillRow.Skill_Cooldown > 0
 
 ## DataTable과 DataAsset 우선순위
 
-`FLSCharacterSkillRow`는 기획 수치의 기준이다.
+`FLSCharacterSkillRow`는 액티브 스킬 기획 수치의 기준이다.
 
 주요 필드:
 
@@ -269,8 +292,8 @@ UE DataTable CSV import에서는 첫 컬럼이 RowName으로 소비된다. 액�
 
 - 기획자가 조정할 수치: DataTable에 둔다.
 - 에셋 참조, 클래스 참조, VFX/Projectile/Field Actor: DataAsset에 둔다.
-- 특정 스킬에만 필요한 필드: 공통 `ULSSkillDataAsset`이 아니라 파생 DataAsset에 둔다.
-- DataTable row가 없거나 값이 0인 경우: DataAsset fallback 값을 사용한다.
+- 특정 스킬에만 필요한 필드: 공통 `ULSSkillDataAssetBase`가 아니라 액티브/패시브 또는 스킬별 파생 DataAsset에 둔다.
+- DataTable row가 없거나 값이 0인 경우: Ability 또는 파생 DataAsset fallback 값을 사용한다.
 
 공통 우선순위 예시:
 
@@ -285,7 +308,7 @@ UE DataTable CSV import에서는 첫 컬럼이 RowName으로 소비된다. 액�
 
 데미지 계수
 -> DataTable Skill_Multiplier 우선
--> 없으면 SkillData.AttackCoefficient
+-> 없으면 Ability 또는 파생 DataAsset fallback 계수
 
 고정 피해
 -> 스킬 경로에서는 사용하지 않음
@@ -301,7 +324,9 @@ UE DataTable CSV import에서는 첫 컬럼이 RowName으로 소비된다. 액�
 - `ULSGameDataSubsystem`: DataTable 로드, 캐싱, row 조회, 누락 row 검증만 담당하는 `UGameInstanceSubsystem`
 - `ULSStatusEffectComponent`: 상태이상 적용, 제거, 스택, 지속시간, UI/FX 훅을 담당하는 대상 Actor 컴포넌트
 - `GameplayAbility`: 스킬 발동, 명중 판정, 적용 대상 결정, 적용 타이밍만 담당
-- `ULSSkillDataAsset`: `Skill_ID`, AbilityClass, 에셋 참조, fallback 값, 프리뷰 기본값만 담당
+- `ULSSkillDataAssetBase`: AbilityClass, 쿨타임 공통값, UI 정보만 담당한다.
+- `ULSSkillDataAsset`: 액티브 Skill_ID, 프리뷰, 액티브 GE/에셋 참조, 강화 목록만 담당한다.
+- `ULSPassiveSkillDataAsset`: 패시브 PassiveSkill_ID와 패시브 공통 확장점만 담당한다.
 
 `ULSGameDataSubsystem`은 GameplayEffect를 직접 적용하지 않는다. Subsystem이 GE까지 적용하면 데이터 조회, 게임 규칙, 대상 ASC 처리, 서버 권한 처리가 한 곳에 섞여 테스트와 멀티 전환이 어려워진다.
 
@@ -464,7 +489,7 @@ ULSPlayerSkillComponent::ApplySkillEnhancementByIndex
 -> Skill UI 갱신
 ```
 
-강화 버전이 DataTable에서 다른 row를 읽어야 하면 강화 DataAsset의 `SkillRow`를 별도로 지정한다.
+강화 버전이 DataTable에서 다른 row를 읽어야 하면 강화 DataAsset의 `Skill_ID`를 다른 row로 지정한다.
 
 즉, 강화 스킬은 원본 DataAsset 안에서 분기 플래그만 늘리는 방식이 아니라 “다른 DataAsset으로 교체”하는 방식이다.
 
@@ -478,7 +503,7 @@ ULSPlayerSkillComponent::ApplySkillEnhancementByIndex
 3. GameplayAbility 클래스를 만든다.
 4. 필요한 GameplayEffect를 만든다.
 5. 필요한 GameplayTag를 LSGameplayTags에 추가한다.
-6. DataAsset을 만들고 AbilityClass, SkillRow, CooldownTag, DamageEffectClass를 연결한다.
+6. DataAsset을 만들고 AbilityClass, Skill_ID, CooldownTag, DamageEffectClass를 연결한다.
 7. 프리뷰가 필요하면 PreviewSpec 또는 DataTable Range 값을 설정한다.
 8. ULSPlayerSkillComponent의 SkillSlots에 DataAsset을 등록한다.
 9. UI 아이콘/이름/설명을 DataAsset에 설정한다.
@@ -501,7 +526,7 @@ ULSPlayerSkillComponent::ApplySkillEnhancementByIndex
 
 ```text
 1. 강화 버전 DataAsset을 별도로 만든다.
-2. 강화 버전의 SkillRow를 필요한 row로 지정한다.
+2. 강화 버전의 Skill_ID를 필요한 row로 지정한다.
 3. 원본 스킬 DataAsset의 EnhancementVariants에 등록한다.
 4. 강화 선택 시스템에서 ApplySkillEnhancementByIndex를 호출한다.
 5. 강화 후 UI와 쿨타임 태그가 의도대로 바뀌는지 확인한다.
@@ -513,7 +538,7 @@ ULSPlayerSkillComponent::ApplySkillEnhancementByIndex
 
 ```text
 - AbilityClass 지정
-- SkillRow 지정
+- 액티브 Skill_ID 지정
 - CooldownTag 지정
 - CooldownEffectClass 지정
 - DamageEffectClass 지정
@@ -548,7 +573,7 @@ Ability BP 또는 C++ 기본값:
 ## 금지/주의 사항
 
 - HP, 공격력, 공격속도 같은 수치를 직접 수정하지 않는다.
-- 스킬별 특수 필드를 공통 `ULSSkillDataAsset`에 무한히 추가하지 않는다.
+- 스킬별 특수 필드를 공통 `ULSSkillDataAssetBase`나 액티브 `ULSSkillDataAsset`에 무한히 추가하지 않는다.
 - 쿨타임 태그를 공유할지 분리할지 명확히 정하지 않고 추가하지 않는다.
 - 로컬 예측 이동만 만들고 서버 Ability 이동을 빼먹지 않는다.
 - 서버 판정 없이 클라이언트에서 데미지나 CC를 확정하지 않는다.
