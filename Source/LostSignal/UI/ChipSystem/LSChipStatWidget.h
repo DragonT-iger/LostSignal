@@ -15,7 +15,7 @@ class UBorder;
 //  - SignalLossText: 신호 유실 증가량
 //  - 게이지 바(1개): HorizontalBox 안에 [파랑][분홍][빈칸] Border 를 Slot Size = Fill 비중으로 표현.
 //      파랑 비중 = 전투 스탯 증가량, 분홍 비중 = 신호 유실 증가량,
-//      빈칸 비중 = (max - 전투 스탯 - 신호 유실).
+//      빈칸 비중 = max에서 두 값을 뺀 나머지. 두 값의 합이 max를 넘으면 빈칸 없이 실제 값 비율로 표시.
 //
 // max 값은 현재 임의값(GaugeMax, 기본 50)이다.
 UCLASS(BlueprintType, Blueprintable)
@@ -54,7 +54,7 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UBorder> GaugeEmpty;   // 빈칸: 남은 비중 (max - 둘 합)
 
-	// 게이지 max (임의값). 파랑+분홍+빈칸 비중 합 기준.
+	// 게이지 max (임의값). 파랑+분홍 합이 이 값을 넘기 전까지 빈칸을 채우는 기준.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI")
 	int32 GaugeMax = 50;
 
@@ -68,6 +68,7 @@ private:
 	void ApplyAnimatedValues();
 	void SetDisplayedTexts(int32 StatValue, int32 SignalLoss) const;
 	void SetAnimatedValuesToTarget();
+	void UpdateTargetFillWeights();
 	void CacheAnimationStartValues();
 	float GetAnimationAlpha() const;
 

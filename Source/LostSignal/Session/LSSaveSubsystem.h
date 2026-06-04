@@ -51,6 +51,12 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	const TArray<FLSSessionItem>& GetChipEquipmentSlots() const;
 
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	float GetChipSignalGaugePercent() const;
+
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	void SetChipSignalGaugePercent(float Percent);
+
 	bool EquipChipFromStoredSlot(ELSInventorySlotArea SourceArea, int32 SourceIndex, int32 EquipmentIndex);
 	bool DropChipEquipmentSlot(int32 FromEquipmentIndex, int32 ToEquipmentIndex);
 	bool UnequipChipToWarehouse(int32 EquipmentIndex);

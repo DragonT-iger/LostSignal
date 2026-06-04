@@ -40,10 +40,7 @@ void ULSChipStatWidget::SetStat(const FText& StatName, const int32 StatValue, co
 	TargetStatValue = FMath::Max(0, StatValue);
 	TargetSignalLoss = FMath::Max(0, SignalLoss);
 
-	const int32 Max = FMath::Max(0, GaugeMax);
-	TargetStatFill = FMath::Clamp(static_cast<float>(TargetStatValue), 0.f, static_cast<float>(Max));
-	TargetSignalFill = FMath::Clamp(static_cast<float>(TargetSignalLoss), 0.f, static_cast<float>(Max) - TargetStatFill);
-	TargetEmptyFill = FMath::Max(0.f, static_cast<float>(Max) - TargetStatFill - TargetSignalFill);
+	UpdateTargetFillWeights();
 
 	if (StatNameText)
 	{
@@ -94,18 +91,23 @@ void ULSChipStatWidget::SetDisplayedTexts(const int32 StatValue, const int32 Sig
 
 void ULSChipStatWidget::SetAnimatedValuesToTarget()
 {
-	const int32 Max = FMath::Max(0, GaugeMax);
 	AnimatedStatValue = static_cast<float>(TargetStatValue);
 	AnimatedSignalLoss = static_cast<float>(TargetSignalLoss);
-	TargetStatFill = FMath::Clamp(static_cast<float>(TargetStatValue), 0.f, static_cast<float>(Max));
-	TargetSignalFill = FMath::Clamp(static_cast<float>(TargetSignalLoss), 0.f, static_cast<float>(Max) - TargetStatFill);
-	TargetEmptyFill = FMath::Max(0.f, static_cast<float>(Max) - TargetStatFill - TargetSignalFill);
+	UpdateTargetFillWeights();
 	AnimatedStatFill = TargetStatFill;
 	AnimatedSignalFill = TargetSignalFill;
 	AnimatedEmptyFill = TargetEmptyFill;
 	CacheAnimationStartValues();
 	AnimationElapsed = FMath::Max(0.f, StatAnimationDuration);
 	bIsAnimating = false;
+}
+
+void ULSChipStatWidget::UpdateTargetFillWeights()
+{
+	const float Max = static_cast<float>(FMath::Max(0, GaugeMax));
+	TargetStatFill = static_cast<float>(FMath::Max(0, TargetStatValue));
+	TargetSignalFill = static_cast<float>(FMath::Max(0, TargetSignalLoss));
+	TargetEmptyFill = FMath::Max(0.f, Max - TargetStatFill - TargetSignalFill);
 }
 
 void ULSChipStatWidget::CacheAnimationStartValues()

@@ -126,6 +126,29 @@ const TArray<FLSSessionItem>& ULSSaveSubsystem::GetChipEquipmentSlots() const
 	return SaveData ? SaveData->ChipEquipmentSlots : Empty;
 }
 
+float ULSSaveSubsystem::GetChipSignalGaugePercent() const
+{
+	return SaveData ? FMath::Clamp(SaveData->ChipSignalGaugePercent, 0.0f, 1.0f) : 1.0f;
+}
+
+void ULSSaveSubsystem::SetChipSignalGaugePercent(const float Percent)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot set chip signal gauge because SaveData is missing."));
+		return;
+	}
+
+	const float ClampedPercent = FMath::Clamp(Percent, 0.0f, 1.0f);
+	if (FMath::IsNearlyEqual(SaveData->ChipSignalGaugePercent, ClampedPercent))
+	{
+		return;
+	}
+
+	SaveData->ChipSignalGaugePercent = ClampedPercent;
+	Save();
+}
+
 bool ULSSaveSubsystem::EquipChipFromStoredSlot(const ELSInventorySlotArea SourceArea, const int32 SourceIndex, const int32 EquipmentIndex)
 {
 	if (!SaveData)
@@ -726,6 +749,7 @@ void ULSSaveSubsystem::SaveDebugJson() const
 	TSharedRef<FJsonObject> RootObject = MakeShared<FJsonObject>();
 	RootObject->SetStringField(TEXT("slotName"), GetResolvedSlotName());
 	RootObject->SetBoolField(TEXT("raidSaveActive"), SaveData->bRaidSaveActive);
+	RootObject->SetNumberField(TEXT("chipSignalGaugePercent"), GetChipSignalGaugePercent());
 
 	auto AddSessionItemFields = [](const TSharedRef<FJsonObject>& ItemObject, const FLSSessionItem& Item, const int32 SlotIndex)
 	{

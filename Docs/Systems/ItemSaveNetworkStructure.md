@@ -48,6 +48,8 @@ ULSSaveGame
 - Inventory
 - WarehouseItems
 - SafeStash
+- ChipEquipmentSlots
+- ChipSignalGaugePercent
 - bRaidSaveActive
 - ActiveRaidLoadout
 - ActiveRaidConsumedItems
@@ -67,6 +69,10 @@ WarehouseItems
 SafeStash
 - 레이드 중에도 보이는 안전 보관 슬롯
 - 로비 인벤토리 UI의 ConfirmedStorageSlot 영역이 이 데이터를 표시함
+
+ChipEquipmentSlots / ChipSignalGaugePercent
+- 로비 칩 스테이션의 장착 칩 10칸과 신호 게이지 값을 저장함
+- 칩 스테이션을 다시 열 때 이 값을 기준으로 슬롯 활성/비활성, 스탯/프로토콜 합산 UI를 복원함
 
 ActiveRaidLoadout / ActiveRaidConsumedItems
 - 레이드 중단, 강제 종료, PIE 중단 같은 상황에서 복구하기 위한 임시 저장 데이터

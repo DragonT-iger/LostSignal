@@ -191,11 +191,16 @@ void ULSChipStationWidget::NativeConstruct()
 	Super::NativeConstruct();
 
 	InitializeEquipmentSlots();
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	const float SavedSignalPercent = SaveSubsystem ? SaveSubsystem->GetChipSignalGaugePercent() : GetSignalGaugePercent();
+	SynchronizeSignalGauge(SavedSignalPercent);
+
 	if (SignalSlider)
 	{
 		SignalSlider->OnValueChanged.RemoveDynamic(this, &ULSChipStationWidget::HandleSignalSliderValueChanged);
 		SignalSlider->OnValueChanged.AddDynamic(this, &ULSChipStationWidget::HandleSignalSliderValueChanged);
-		SynchronizeSignalGauge(SignalSlider->GetValue());
 	}
 	else
 	{
@@ -614,6 +619,18 @@ void ULSChipStationWidget::SetEquippedChipMemoryText(const int32 CurrentMemory)
 void ULSChipStationWidget::SetSignalGaugePercent(const float Percent)
 {
 	SynchronizeSignalGauge(Percent);
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (SaveSubsystem)
+	{
+		SaveSubsystem->SetChipSignalGaugePercent(GetSignalGaugePercent());
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot save chip signal gauge because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+	}
+
 	RefreshEquippedChipSummary();
 	RefreshEquipmentSlots();
 }
@@ -640,6 +657,18 @@ void ULSChipStationWidget::SynchronizeSignalGauge(const float Percent)
 void ULSChipStationWidget::HandleSignalSliderValueChanged(const float Value)
 {
 	SynchronizeSignalGauge(Value);
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (SaveSubsystem)
+	{
+		SaveSubsystem->SetChipSignalGaugePercent(GetSignalGaugePercent());
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot save chip signal gauge because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+	}
+
 	RefreshEquippedChipSummary();
 	RefreshEquipmentSlots();
 }
