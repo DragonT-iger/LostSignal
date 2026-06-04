@@ -9,6 +9,7 @@
 class ULSSkillDataAsset;
 class ULSSkillPreviewComponent;
 class UGameplayAbility;
+struct FLSCharacterSkillRow;
 
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
 class LOSTSIGNAL_API ULSPlayerSkillComponent : public UActorComponent
@@ -87,6 +88,9 @@ private:
 
 	bool CanUseLocalPreview() const;
 	bool ActivateSkillOnServer(ELSPlayerSkillSlot Slot, const FVector& TargetLocation, float AimYaw);
+	const FLSCharacterSkillRow* ResolveActiveSkillRow(const ULSSkillDataAsset* SkillData, const TCHAR* Context) const;
+	FLSSkillAreaPreviewSpec BuildPreviewSpecForSkill(const ULSSkillDataAsset* SkillData) const;
+	float ResolveSkillCooldownDuration(const ULSSkillDataAsset* SkillData) const;
 	FVector ClampTargetLocationToCastRange(const ULSSkillDataAsset* SkillData, const FVector& TargetLocation) const;
 	void LogSkillCooldownBlocked(const ULSSkillDataAsset* SkillData, const TCHAR* Phase) const;
 	bool TryActivateGameplayAbility(ULSSkillDataAsset* SkillData, const FLSSkillActivationContext& Context);

@@ -75,7 +75,7 @@ void ALSShortCircuitProjectile::Tick(float DeltaSeconds)
 	MovementElapsedSeconds += DeltaSeconds;
 	const float Alpha = FMath::Clamp(MovementElapsedSeconds / MovementDurationSeconds, 0.0f, 1.0f);
 	const FVector LinearLocation = FMath::Lerp(MovementStartLocation, MovementVisualTargetLocation, Alpha);
-	const float ArcOffset = SkillData ? SkillData->ProjectileArcHeight * FMath::Sin(UE_PI * Alpha) : 0.0f;
+	const float ArcOffset = RuntimeProjectileArcHeight * FMath::Sin(UE_PI * Alpha);
 	SetActorLocation(LinearLocation + FVector(0.0f, 0.0f, ArcOffset));
 
 	if (Alpha >= 1.0f)
@@ -91,11 +91,18 @@ void ALSShortCircuitProjectile::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 	DOREPLIFETIME(ALSShortCircuitProjectile, bShowDebugProjectileMesh);
 }
 
-void ALSShortCircuitProjectile::InitializeProjectile(AActor* InSourceActor, ULSShortCircuitSkillDataAsset* InSkillData, const FVector& TargetLocation)
+void ALSShortCircuitProjectile::InitializeProjectile(
+	AActor* InSourceActor,
+	ULSShortCircuitSkillDataAsset* InSkillData,
+	const FVector& TargetLocation,
+	float ProjectileDuration,
+	float ProjectileArcHeight,
+	float ProjectileLifeSeconds)
 {
 	SourceActor = InSourceActor;
 	SkillData = InSkillData;
 	ImpactTargetLocation = TargetLocation;
+	RuntimeProjectileArcHeight = FMath::Max(0.0f, ProjectileArcHeight);
 
 	if (CollisionComponent && SourceActor)
 	{
@@ -109,10 +116,9 @@ void ALSShortCircuitProjectile::InitializeProjectile(AActor* InSourceActor, ULSS
 		MovementVisualTargetLocation.Z += CollisionComponent->GetScaledSphereRadius();
 	}
 
-	const float Speed = SkillData ? FMath::Max(SkillData->ProjectileSpeed, 1.0f) : 1200.0f;
-	MovementDurationSeconds = FMath::Max(FVector::Dist2D(MovementStartLocation, TargetLocation) / Speed, 0.05f);
+	MovementDurationSeconds = FMath::Max(ProjectileDuration, 0.05f);
 	MovementElapsedSeconds = 0.0f;
-	SetLifeSpan(SkillData ? FMath::Max(SkillData->ProjectileLifeSeconds, MovementDurationSeconds + 0.5f) : MovementDurationSeconds + 0.5f);
+	SetLifeSpan(FMath::Max(ProjectileLifeSeconds, MovementDurationSeconds + 0.5f));
 	SetActorTickEnabled(HasAuthority());
 
 	if (HasAuthority() && SkillData && SkillData->bEnableDebugVisualization)
@@ -127,8 +133,8 @@ void ALSShortCircuitProjectile::InitializeProjectile(AActor* InSourceActor, ULSS
 			*MovementStartLocation.ToCompactString(),
 			*TargetLocation.ToCompactString(),
 			*MovementVisualTargetLocation.ToCompactString(),
-			Speed,
-			SkillData ? SkillData->ProjectileArcHeight : 0.0f,
+			FVector::Dist2D(MovementStartLocation, TargetLocation) / MovementDurationSeconds,
+			RuntimeProjectileArcHeight,
 			MovementDurationSeconds,
 			GetLifeSpan());
 	}

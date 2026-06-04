@@ -35,9 +35,6 @@ public:
 	float FallbackAttackCoefficient = 1.2f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Override", meta=(ClampMin="0.0"))
-	float FallbackFixedDamage = 0.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Override", meta=(ClampMin="0.0"))
 	float FallbackKnockbackSpeed = 650.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Override")

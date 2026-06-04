@@ -26,9 +26,6 @@ protected:
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Overclock", meta=(ClampMin="0.0"))
-	float FixedDamage = 0.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Overclock", meta=(ClampMin="0.0"))
 	float FallbackRange = 300.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Overclock", meta=(ClampMin="0.0", ClampMax="360.0"))

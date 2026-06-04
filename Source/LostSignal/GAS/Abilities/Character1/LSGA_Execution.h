@@ -2,6 +2,7 @@
 
 #include "Abilities/GameplayAbility.h"
 #include "Combat/LSCombatTypes.h"
+#include "Data/LSCharacterSkillRow.h"
 #include "LSGA_Execution.generated.h"
 
 class UGameplayEffect;
@@ -16,7 +17,7 @@ class LOSTSIGNAL_API ULSGA_Execution : public UGameplayAbility
 public:
 	ULSGA_Execution();
 
-	bool ResolveMovementParams(const class ULSSkillDataAsset* SkillData, float& OutDistance, float& OutDuration) const;
+	bool ResolveMovementParams(const class ULSSkillDataAsset* SkillData, const FLSCharacterSkillRow* SkillRow, float& OutDistance, float& OutDuration) const;
 
 protected:
 	virtual void ActivateAbility(
@@ -64,4 +65,6 @@ private:
 	float CachedSlashWidth = 0.0f;
 	float CachedAttackCoefficient = 0.0f;
 	int32 CachedConsumedAccelerationStacks = 0;
+	FLSCharacterSkillRow CachedSkillRow;
+	bool bHasCachedSkillRow = false;
 };

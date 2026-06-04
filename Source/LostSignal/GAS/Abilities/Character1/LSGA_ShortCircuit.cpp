@@ -8,6 +8,56 @@
 #include "Skills/LSShortCircuitSkillDataAsset.h"
 #include "Skills/LSSkillDataAsset.h"
 
+namespace
+{
+	float ResolveShortCircuitProjectileDuration(const FLSCharacterSkillRow* Row, const ULSShortCircuitSkillDataAsset* SkillData, const FVector& StartLocation, const FVector& TargetLocation)
+	{
+		if (Row && Row->Skill_Time > 0.0f)
+		{
+			return Row->Skill_Time;
+		}
+
+		const float FallbackSpeed = SkillData ? FMath::Max(SkillData->ProjectileSpeed, 1.0f) : 1200.0f;
+		return FMath::Max(FVector::Dist2D(StartLocation, TargetLocation) / FallbackSpeed, 0.05f);
+	}
+
+	float ResolveShortCircuitArcHeight(const FLSCharacterSkillRow* Row, const ULSShortCircuitSkillDataAsset* SkillData)
+	{
+		if (Row && Row->Range_Z > 0.0f)
+		{
+			return Row->Range_Z;
+		}
+
+		return SkillData ? SkillData->ProjectileArcHeight : 0.0f;
+	}
+
+	float ResolveShortCircuitLifeSeconds(float ProjectileDuration, const ULSShortCircuitSkillDataAsset* SkillData)
+	{
+		const float FallbackLifeSeconds = SkillData ? SkillData->ProjectileLifeSeconds : 0.0f;
+		return FMath::Max(FallbackLifeSeconds, ProjectileDuration + 0.5f);
+	}
+
+	float ResolveShortCircuitSpawnForwardOffset(const FLSCharacterSkillRow* Row, const ULSShortCircuitSkillDataAsset* SkillData)
+	{
+		if (Row && Row->Move_Distance > 0.0f)
+		{
+			return Row->Move_Distance;
+		}
+
+		return SkillData ? SkillData->ProjectileSpawnForwardOffset : 0.0f;
+	}
+
+	float ResolveShortCircuitSpawnZOffset(const FLSCharacterSkillRow* Row, const ULSShortCircuitSkillDataAsset* SkillData)
+	{
+		if (Row && Row->Move_Duration > 0.0f)
+		{
+			return Row->Move_Duration;
+		}
+
+		return SkillData ? SkillData->ProjectileSpawnZOffset : 0.0f;
+	}
+}
+
 ULSGA_ShortCircuit::ULSGA_ShortCircuit()
 {
 	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
@@ -68,6 +118,14 @@ void ULSGA_ShortCircuit::ActivateAbility(
 		return;
 	}
 
+	const FLSCharacterSkillRow* Row = SkillContext.bHasSkillRow ? &SkillContext.SkillRow : nullptr;
+	if (!Row)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s ShortCircuit ability missing active skill row."), *GetNameSafe(SourceActor));
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
 	const FVector SourceLocation = SourceActor->GetActorLocation();
 	FVector AimDirection = SkillContext.TargetLocation - SourceLocation;
 	AimDirection.Z = 0.0f;
@@ -87,10 +145,12 @@ void ULSGA_ShortCircuit::ActivateAbility(
 		return;
 	}
 
+	const float SpawnForwardOffset = ResolveShortCircuitSpawnForwardOffset(Row, ShortCircuitData);
+	const float SpawnZOffset = ResolveShortCircuitSpawnZOffset(Row, ShortCircuitData);
 	const FVector SpawnLocation =
 		SourceLocation +
-		(AimDirection * ShortCircuitData->ProjectileSpawnForwardOffset) +
-		FVector(0.0f, 0.0f, ShortCircuitData->ProjectileSpawnZOffset);
+		(AimDirection * SpawnForwardOffset) +
+		FVector(0.0f, 0.0f, SpawnZOffset);
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = SourceActor;
@@ -112,15 +172,21 @@ void ULSGA_ShortCircuit::ActivateAbility(
 		return;
 	}
 
-	Projectile->InitializeProjectile(SourceActor, ShortCircuitData, SkillContext.TargetLocation);
+	const float ProjectileDuration = ResolveShortCircuitProjectileDuration(Row, ShortCircuitData, SpawnLocation, SkillContext.TargetLocation);
+	const float ProjectileArcHeight = ResolveShortCircuitArcHeight(Row, ShortCircuitData);
+	const float ProjectileLifeSeconds = ResolveShortCircuitLifeSeconds(ProjectileDuration, ShortCircuitData);
+	Projectile->InitializeProjectile(SourceActor, ShortCircuitData, SkillContext.TargetLocation, ProjectileDuration, ProjectileArcHeight, ProjectileLifeSeconds);
 
 	if (ShortCircuitData->bEnableDebugVisualization)
 	{
-		UE_LOG(LogLS, Log, TEXT("[GA_ShortCircuit] Projectile=%s SpawnLocation=%s Target=%s AimDirection=%s"),
+		UE_LOG(LogLS, Log, TEXT("[GA_ShortCircuit] Projectile=%s SpawnLocation=%s Target=%s AimDirection=%s Duration=%.2f Arc=%.2f Life=%.2f"),
 			*GetNameSafe(Projectile),
 			*SpawnLocation.ToCompactString(),
 			*SkillContext.TargetLocation.ToCompactString(),
-			*AimDirection.ToCompactString());
+			*AimDirection.ToCompactString(),
+			ProjectileDuration,
+			ProjectileArcHeight,
+			ProjectileLifeSeconds);
 	}
 
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);

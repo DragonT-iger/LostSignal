@@ -180,34 +180,32 @@ void ULSGA_Override::ActivateAbility(
 	}
 	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
 
-	FLSCharacterSkillRow Row;
-	const bool bHasRow = SkillContext.SkillData->TryGetSkillRow(Row);
+	const FLSCharacterSkillRow* Row = SkillContext.bHasSkillRow ? &SkillContext.SkillRow : nullptr;
 	const ULSOverrideSkillDataAsset* OverrideData = Cast<ULSOverrideSkillDataAsset>(SkillContext.SkillData);
-	const ELSCharacterSkillRangeShape ResolvedShape = bHasRow && Row.Range_Shape != ELSCharacterSkillRangeShape::None
-		? Row.Range_Shape
+	const ELSCharacterSkillRangeShape ResolvedShape = Row && Row->Range_Shape != ELSCharacterSkillRangeShape::None
+		? Row->Range_Shape
 		: OverrideData ? OverrideData->FallbackRangeShape : ELSCharacterSkillRangeShape::Circle;
-	const float Radius = ResolveOverrideDataFloat(Row.Range_X, 0.0f, OverrideData ? OverrideData->FallbackRadius : 0.0f, FallbackRadius);
-	const float Length = ResolveOverrideDataFloat(Row.Range_X, 0.0f, OverrideData ? OverrideData->FallbackLength : 0.0f, Radius);
-	const float Width = ResolveOverrideDataFloat(Row.Range_Y, 0.0f, OverrideData ? OverrideData->FallbackWidth : 0.0f, Radius);
-	const float ConeAngleDegrees = ResolveOverrideDataFloat(Row.Range_Y, 0.0f, OverrideData ? OverrideData->FallbackConeAngleDegrees : 0.0f, 60.0f);
+	const float RowRangeX = Row ? Row->Range_X : 0.0f;
+	const float RowRangeY = Row ? Row->Range_Y : 0.0f;
+	const float Radius = ResolveOverrideDataFloat(RowRangeX, 0.0f, OverrideData ? OverrideData->FallbackRadius : 0.0f, FallbackRadius);
+	const float Length = ResolveOverrideDataFloat(RowRangeX, 0.0f, OverrideData ? OverrideData->FallbackLength : 0.0f, Radius);
+	const float Width = ResolveOverrideDataFloat(RowRangeY, 0.0f, OverrideData ? OverrideData->FallbackWidth : 0.0f, Radius);
+	const float ConeAngleDegrees = ResolveOverrideDataFloat(RowRangeY, 0.0f, OverrideData ? OverrideData->FallbackConeAngleDegrees : 0.0f, 60.0f);
 	const float ResolvedAttackCoefficient = ResolveOverrideDataFloat(
-		bHasRow ? Row.Skill_Multiplier : 0.0f,
-		SkillContext.SkillData->AttackCoefficient,
+		Row ? Row->Skill_Multiplier : 0.0f,
+		0.0f,
 		OverrideData ? OverrideData->FallbackAttackCoefficient : 0.0f,
 		FallbackAttackCoefficient);
-	const float ResolvedFixedDamage = SkillContext.SkillData->FixedDamage > 0.0f
-		? SkillContext.SkillData->FixedDamage
-		: OverrideData ? OverrideData->FallbackFixedDamage : FixedDamage;
-	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverrideAbilityBreakPowerTier(Row.Skill_Impact, SkillContext.SkillData->BreakPower) : SkillContext.SkillData->BreakPower;
-	const float ResolvedKnockbackDuration = bHasRow && Row.Skill_Time > 0.0f
-		? Row.Skill_Time
+	const ELSBreakPowerTier ResolvedBreakPower = Row ? ToOverrideAbilityBreakPowerTier(Row->Skill_Impact, BreakPower) : BreakPower;
+	const float ResolvedKnockbackDuration = Row && Row->Skill_Time > 0.0f
+		? Row->Skill_Time
 		: OverrideData ? OverrideData->FallbackKnockbackDuration : FallbackKnockbackDuration;
-	const float ResolvedKnockbackSpeed = bHasRow && Row.CC_Value > 0.0f
-		? Row.CC_Value
+	const float ResolvedKnockbackSpeed = Row && Row->CC_Value > 0.0f
+		? Row->CC_Value
 		: OverrideData && OverrideData->FallbackKnockbackSpeed > 0.0f ? OverrideData->FallbackKnockbackSpeed : KnockbackSpeed;
 	const float ResolvedKnockbackUpSpeed = OverrideData ? OverrideData->FallbackKnockbackUpSpeed : KnockbackUpSpeed;
-	const ELSCharacterSkillCrowdControlType ResolvedCCType = bHasRow && Row.CC_Type != ELSCharacterSkillCrowdControlType::None
-		? Row.CC_Type
+	const ELSCharacterSkillCrowdControlType ResolvedCCType = Row && Row->CC_Type != ELSCharacterSkillCrowdControlType::None
+		? Row->CC_Type
 		: ELSCharacterSkillCrowdControlType::KnockBack;
 	const FVector AimDirection = ResolveOverrideAimDirection(SourceActor, SkillContext);
 	const float QueryRadius = ResolvedShape == ELSCharacterSkillRangeShape::Box
@@ -253,9 +251,9 @@ void ULSGA_Override::ActivateAbility(
 			TargetActor,
 			ResolvedDamageEffectClass,
 			1.0f,
-			ResolvedFixedDamage,
+			0.0f,
 			ResolvedAttackCoefficient,
-			SkillContext.SkillData->bCanCrit,
+			bCanCrit,
 			ResolvedBreakPower))
 		{
 			continue;
@@ -301,11 +299,11 @@ void ULSGA_Override::ActivateAbility(
 		}
 	}
 
-	if (OverrideData && OverrideData->bApplyAttackSpeedBuff && ShouldApplyOverrideSelfEffect(Row, bHasRow))
+	if (OverrideData && OverrideData->bApplyAttackSpeedBuff && (!Row || ShouldApplyOverrideSelfEffect(*Row, true)))
 	{
 		UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
 		const float AttackSpeedBonus = OverrideData->FallbackAttackSpeedBonus;
-		const float AttackSpeedDuration = bHasRow && Row.Skill_Effect_Duration > 0.0f ? Row.Skill_Effect_Duration : OverrideData->FallbackAttackSpeedDuration;
+		const float AttackSpeedDuration = Row && Row->Skill_Effect_Duration > 0.0f ? Row->Skill_Effect_Duration : OverrideData->FallbackAttackSpeedDuration;
 		if (ASC && OverrideData->AttackSpeedBuffEffectClass && AttackSpeedBonus > 0.0f && AttackSpeedDuration > 0.0f)
 		{
 			FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
@@ -326,7 +324,7 @@ void ULSGA_Override::ActivateAbility(
 		UE_LOG(
 			LogLS,
 			Log,
-			TEXT("[GA_Override] Source=%s Shape=%d QueryRadius=%.2f Radius=%.2f Length=%.2f Width=%.2f RawTargets=%d ValidHits=%d Knockbacks=%d Fixed=%.2f Coef=%.2f BreakPower=%d"),
+			TEXT("[GA_Override] Source=%s Shape=%d QueryRadius=%.2f Radius=%.2f Length=%.2f Width=%.2f RawTargets=%d ValidHits=%d Knockbacks=%d Coef=%.2f BreakPower=%d"),
 			*GetNameSafe(SourceActor),
 			static_cast<int32>(ResolvedShape),
 			QueryRadius,
@@ -336,7 +334,6 @@ void ULSGA_Override::ActivateAbility(
 			OverlappedActors.Num(),
 			ValidHitCount,
 			KnockbackCount,
-			ResolvedFixedDamage,
 			ResolvedAttackCoefficient,
 			static_cast<int32>(ResolvedBreakPower));
 	}

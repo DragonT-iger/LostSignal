@@ -61,6 +61,9 @@ struct FLSSTEvaluator_MonsterSenseInstanceData
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bIsBeyondLeashDistance = false;
 
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	bool bIsAttacking = false;
+
 	/** Mirrors the monster ASC dead tag so every state can transition into Dead with one shared bool. */
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bIsDead = false;

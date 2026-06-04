@@ -7,7 +7,9 @@
 #include "Characters/LSEnemyCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "Data/LSCharacterSkillRow.h"
+#include "Data/LSGameDataSubsystem.h"
 #include "Engine/EngineTypes.h"
+#include "Engine/GameInstance.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -21,6 +23,45 @@
 #include "Skills/LSSkillDataAsset.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "TimerManager.h"
+
+namespace
+{
+	void ApplySkillRowRangeToPreviewSpec(const FLSCharacterSkillRow& Row, FLSSkillAreaPreviewSpec& InOutSpec)
+	{
+		switch (Row.Range_Shape)
+		{
+		case ELSCharacterSkillRangeShape::Cone:
+			InOutSpec.Shape = ELSSkillAreaShape::Circle;
+			InOutSpec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
+			InOutSpec.Radius = Row.Range_X;
+			InOutSpec.Degrees = Row.Range_Y;
+			break;
+
+		case ELSCharacterSkillRangeShape::Circle:
+			InOutSpec.Shape = ELSSkillAreaShape::Circle;
+			InOutSpec.Radius = Row.Range_X;
+			InOutSpec.Degrees = 360.0f;
+			break;
+
+		case ELSCharacterSkillRangeShape::Box:
+			InOutSpec.Shape = ELSSkillAreaShape::Box;
+			InOutSpec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
+			InOutSpec.BoxLength = Row.Range_X;
+			InOutSpec.BoxWidth = Row.Range_Y;
+			if (InOutSpec.LocationOffset.IsNearlyZero() && Row.Range_X > 0.0f)
+			{
+				InOutSpec.LocationOffset.X = Row.Range_X * 0.5f;
+			}
+			break;
+
+		case ELSCharacterSkillRangeShape::None:
+		default:
+			break;
+		}
+
+		InOutSpec.WorldZOffset = 0.0f;
+	}
+}
 
 ULSPlayerSkillComponent::ULSPlayerSkillComponent()
 {
@@ -56,7 +97,7 @@ bool ULSPlayerSkillComponent::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 	ActiveSkillData = nullptr;
 	ActiveSlot = Slot;
 
-	if (!PreviewComponent->BeginAreaPreview(SkillData->BuildPreviewSpecForWorld(this)))
+	if (!PreviewComponent->BeginAreaPreview(BuildPreviewSpecForSkill(SkillData)))
 	{
 		return false;
 	}
@@ -198,7 +239,7 @@ bool ULSPlayerSkillComponent::GetActivePreviewSpec(FLSSkillAreaPreviewSpec& OutP
 		return false;
 	}
 
-	OutPreviewSpec = ActiveSkillData->BuildPreviewSpecForWorld(this);
+	OutPreviewSpec = BuildPreviewSpecForSkill(ActiveSkillData);
 	return true;
 }
 
@@ -244,7 +285,7 @@ bool ULSPlayerSkillComponent::ApplySkillCooldown(const ULSSkillDataAsset* SkillD
 	}
 
 	const FGameplayTag CooldownTag = SkillData->GetCooldownTag();
-	const float BaseDuration = SkillData->GetCooldownDurationForWorld(this);
+	const float BaseDuration = ResolveSkillCooldownDuration(SkillData);
 	if (!CooldownTag.IsValid() || BaseDuration <= 0.0f || !SkillData->CooldownEffectClass)
 	{
 		return false;
@@ -351,8 +392,8 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 		return false;
 	}
 
-	FLSCharacterSkillRow SkillRow;
-	if (!SkillData->TryGetSkillRowForWorld(this, SkillRow))
+	const FLSCharacterSkillRow* SkillRow = ResolveActiveSkillRow(SkillData, TEXT("ActivateSkillOnServer"));
+	if (!SkillRow)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s skill activation rejected because %s has no active skill row. RowName=%s"),
 			*GetNameSafe(OwnerActor),
@@ -374,6 +415,8 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 	Context.SkillData = SkillData;
 	Context.TargetLocation = ClampedTargetLocation;
 	Context.AimYaw = AimYaw;
+	Context.SkillRow = *SkillRow;
+	Context.bHasSkillRow = true;
 
 	if (SkillData->GetAbilityClass())
 	{
@@ -386,10 +429,44 @@ bool ULSPlayerSkillComponent::ActivateSkillOnServer(ELSPlayerSkillSlot Slot, con
 	return false;
 }
 
+const FLSCharacterSkillRow* ULSPlayerSkillComponent::ResolveActiveSkillRow(const ULSSkillDataAsset* SkillData, const TCHAR* Context) const
+{
+	if (!SkillData || SkillData->GetSkillID() <= 0)
+	{
+		return nullptr;
+	}
+
+	const UWorld* World = GetWorld();
+	const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	return GameDataSubsystem ? GameDataSubsystem->FindActiveSkillRowByID(SkillData->GetSkillID(), Context) : nullptr;
+}
+
+FLSSkillAreaPreviewSpec ULSPlayerSkillComponent::BuildPreviewSpecForSkill(const ULSSkillDataAsset* SkillData) const
+{
+	FLSSkillAreaPreviewSpec ResolvedSpec = SkillData ? SkillData->BuildPreviewSpec() : FLSSkillAreaPreviewSpec();
+	if (const FLSCharacterSkillRow* Row = ResolveActiveSkillRow(SkillData, TEXT("BuildPreviewSpecForSkill")))
+	{
+		ApplySkillRowRangeToPreviewSpec(*Row, ResolvedSpec);
+	}
+
+	return ResolvedSpec;
+}
+
+float ULSPlayerSkillComponent::ResolveSkillCooldownDuration(const ULSSkillDataAsset* SkillData) const
+{
+	if (const FLSCharacterSkillRow* Row = ResolveActiveSkillRow(SkillData, TEXT("ResolveSkillCooldownDuration")); Row && Row->Skill_Cooldown > 0.0f)
+	{
+		return Row->Skill_Cooldown;
+	}
+
+	return SkillData ? SkillData->GetCooldownDuration() : 0.0f;
+}
+
 FVector ULSPlayerSkillComponent::ClampTargetLocationToCastRange(const ULSSkillDataAsset* SkillData, const FVector& TargetLocation) const
 {
-	FLSCharacterSkillRow Row;
-	if (!SkillData || !SkillData->TryGetSkillRowForWorld(this, Row) || Row.Cast_Range <= 0.0f)
+	const FLSCharacterSkillRow* Row = ResolveActiveSkillRow(SkillData, TEXT("ClampTargetLocationToCastRange"));
+	if (!Row || Row->Cast_Range <= 0.0f)
 	{
 		return TargetLocation;
 	}
@@ -404,12 +481,12 @@ FVector ULSPlayerSkillComponent::ClampTargetLocationToCastRange(const ULSSkillDa
 	FVector ToTarget = TargetLocation - OwnerLocation;
 	ToTarget.Z = 0.0f;
 	const float Distance = ToTarget.Size2D();
-	if (Distance <= Row.Cast_Range || Distance <= KINDA_SMALL_NUMBER)
+	if (Distance <= Row->Cast_Range || Distance <= KINDA_SMALL_NUMBER)
 	{
 		return TargetLocation;
 	}
 
-	FVector ClampedLocation = OwnerLocation + (ToTarget / Distance * Row.Cast_Range);
+	FVector ClampedLocation = OwnerLocation + (ToTarget / Distance * Row->Cast_Range);
 	ClampedLocation.Z = TargetLocation.Z;
 	return ClampedLocation;
 }
@@ -574,13 +651,13 @@ bool ULSPlayerSkillComponent::ResolvePredictedFastMovementParams(ULSSkillDataAss
 	if (AbilityClass->IsChildOf(ULSGA_Bypass::StaticClass()))
 	{
 		const ULSGA_Bypass* BypassCDO = AbilityClass->GetDefaultObject<ULSGA_Bypass>();
-		return BypassCDO && BypassCDO->ResolveMovementParams(SkillData, OutDistance, OutDuration);
+		return BypassCDO && BypassCDO->ResolveMovementParams(SkillData, ResolveActiveSkillRow(SkillData, TEXT("ResolvePredictedFastMovementParams")), OutDistance, OutDuration);
 	}
 
 	if (AbilityClass->IsChildOf(ULSGA_Execution::StaticClass()))
 	{
 		const ULSGA_Execution* ExecutionCDO = AbilityClass->GetDefaultObject<ULSGA_Execution>();
-		return ExecutionCDO && ExecutionCDO->ResolveMovementParams(SkillData, OutDistance, OutDuration);
+		return ExecutionCDO && ExecutionCDO->ResolveMovementParams(SkillData, ResolveActiveSkillRow(SkillData, TEXT("ResolvePredictedFastMovementParams")), OutDistance, OutDuration);
 	}
 
 	return false;

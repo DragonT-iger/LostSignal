@@ -44,6 +44,11 @@ EStateTreeRunStatus FLSSTTask_RequestAbilityByTag::Tick(FStateTreeExecutionConte
 		return EStateTreeRunStatus::Failed;
 	}
 
+	if (InstanceData.CombatComponent->IsAbilityActiveByTag(InstanceData.ActiveAbilityTag))
+	{
+		return EStateTreeRunStatus::Running;
+	}
+
 	if (InstanceData.bCancelAbilityWhenTargetLeavesRange && InstanceData.EnemyCharacter && InstanceData.TargetActor && InstanceData.CancelIfTargetFartherThan > 0.0f)
 	{
 		const float DistanceToTarget = FVector::Dist2D(
@@ -57,7 +62,5 @@ EStateTreeRunStatus FLSSTTask_RequestAbilityByTag::Tick(FStateTreeExecutionConte
 		}
 	}
 
-	return InstanceData.CombatComponent->IsAbilityActiveByTag(InstanceData.ActiveAbilityTag)
-		? EStateTreeRunStatus::Running
-		: EStateTreeRunStatus::Succeeded;
+	return EStateTreeRunStatus::Succeeded;
 }

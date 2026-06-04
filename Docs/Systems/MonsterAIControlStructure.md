@@ -142,6 +142,7 @@ Evaluator InstanceData
 -> bHasVisualTarget
 -> bHasInterestLocation
 -> bIsBeyondLeashDistance
+-> bIsAttacking
 -> bIsDead
 -> bIsKnockback
 ```
@@ -196,7 +197,8 @@ ReturnHome
 
 Attack
 - GAS Ability 요청
-- Ability가 끝나거나 대상이 거리 밖으로 나가면 Chase로 전이
+- 공격 Ability가 시작되면 몽타주/Ability가 끝날 때까지 상태 이탈을 막음
+- Ability가 끝난 뒤 대상 거리와 시야 조건을 다시 판단
 
 Knockback
 - LS.State.Knockback 동안 이동 정지 및 공격 취소
@@ -237,6 +239,20 @@ StateTree Attack 상태
 -> ULSMonsterCombatComponent::PerformMeleeHit
 -> GameplayEffect로 데미지 적용
 ```
+
+공격 상태 이탈 규칙:
+
+```text
+Attack -> Combat 또는 Chase
+조건:
+LS Is Attacking(bInvert=true)
+
+Attack -> Dead / Knockback
+조건:
+기존 강제 상태 전이 유지
+```
+
+`LS Request Ability By Tag`는 Ability가 활성화된 뒤에는 거리 이탈로 Ability를 취소하지 않는다. 공격 거리 이탈은 Ability 종료 후 StateTree 전이 조건으로 다시 판단한다.
 
 공격 로직을 추가할 때 지킬 규칙:
 

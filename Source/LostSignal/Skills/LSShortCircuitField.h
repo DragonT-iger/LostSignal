@@ -21,7 +21,6 @@ public:
 	bool ExplodeByExecution(
 		AActor* InstigatorActor,
 		const ULSSkillDataAsset* ExecutionSkillData,
-		float FixedDamage,
 		float AttackCoefficient,
 		float RadiusOverride = 0.0f,
 		bool bDestroyAfterExplosion = true);

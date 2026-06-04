@@ -16,7 +16,13 @@ class LOSTSIGNAL_API ALSShortCircuitProjectile : public AActor
 public:
 	ALSShortCircuitProjectile();
 
-	void InitializeProjectile(AActor* InSourceActor, ULSShortCircuitSkillDataAsset* InSkillData, const FVector& TargetLocation);
+	void InitializeProjectile(
+		AActor* InSourceActor,
+		ULSShortCircuitSkillDataAsset* InSkillData,
+		const FVector& TargetLocation,
+		float ProjectileDuration,
+		float ProjectileArcHeight,
+		float ProjectileLifeSeconds);
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -37,6 +43,9 @@ protected:
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit")
 	FVector ImpactTargetLocation = FVector::ZeroVector;
+
+	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit")
+	float RuntimeProjectileArcHeight = 0.0f;
 
 private:
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit", meta=(AllowPrivateAccess="true"))

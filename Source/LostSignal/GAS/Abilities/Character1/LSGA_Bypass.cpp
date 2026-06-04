@@ -5,7 +5,9 @@
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"
+#include "Data/LSGameDataSubsystem.h"
 #include "DrawDebugHelpers.h"
+#include "Engine/GameInstance.h"
 #include "Engine/EngineTypes.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
@@ -20,6 +22,17 @@
 #include "Skills/LSPlayerSkillComponent.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "TimerManager.h"
+
+namespace
+{
+	const FLSCharacterSkillRow* ResolveBypassSkillRow(const UObject* WorldContextObject, const ULSSkillDataAsset* SkillData, const TCHAR* Context)
+	{
+		const UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+		const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+		const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+		return GameDataSubsystem && SkillData ? GameDataSubsystem->FindActiveSkillRowByID(SkillData->GetSkillID(), Context) : nullptr;
+	}
+}
 
 ULSGA_Bypass::ULSGA_Bypass()
 {
@@ -60,7 +73,7 @@ void ULSGA_Bypass::ActivateAbility(
 
 	float Distance = 0.0f;
 	float Duration = 0.0f;
-	if (!ResolveMovementParams(SkillContext.SkillData, Distance, Duration))
+	if (!ResolveMovementParams(SkillContext.SkillData, SkillContext.bHasSkillRow ? &SkillContext.SkillRow : nullptr, Distance, Duration))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -130,16 +143,14 @@ void ULSGA_Bypass::ActivateAbility(
 	}
 }
 
-bool ULSGA_Bypass::ResolveMovementParams(const ULSSkillDataAsset* SkillData, float& OutDistance, float& OutDuration) const
+bool ULSGA_Bypass::ResolveMovementParams(const ULSSkillDataAsset* SkillData, const FLSCharacterSkillRow* SkillRow, float& OutDistance, float& OutDuration) const
 {
 	const ULSBypassSkillDataAsset* BypassData = Cast<ULSBypassSkillDataAsset>(SkillData);
-	FLSCharacterSkillRow Row;
-	const bool bHasRow = SkillData && SkillData->TryGetSkillRow(Row);
-	OutDistance = bHasRow && Row.Range_X > 0.0f
-		? Row.Range_X
+	OutDistance = SkillRow && SkillRow->Range_X > 0.0f
+		? SkillRow->Range_X
 		: BypassData ? BypassData->FallbackDistance : FallbackDistance;
-	OutDuration = bHasRow && Row.Skill_Time > 0.0f
-		? Row.Skill_Time
+	OutDuration = SkillRow && SkillRow->Skill_Time > 0.0f
+		? SkillRow->Skill_Time
 		: BypassData ? BypassData->FallbackDuration : FallbackDuration;
 	return OutDistance > 0.0f && OutDuration > 0.0f;
 }
@@ -379,31 +390,36 @@ void ULSGA_Bypass::ClearIgnoredEnemiesForBypass(ACharacter* SourceCharacter)
 
 void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLocation, ULSBypassSkillDataAsset* BypassData)
 {
-	if (!SourceActor || !SourceActor->HasAuthority() || !BypassData || BypassData->PullRadius <= 0.0f)
+	if (!SourceActor || !SourceActor->HasAuthority() || !BypassData)
 	{
 		if (BypassData && BypassData->bEnableSpoofingDebugLog)
 		{
-			UE_LOG(LogLS, Warning, TEXT("[GA_Bypass] Spoofing pull skipped. Source=%s HasAuthority=%d Data=%s Radius=%.2f"),
+			UE_LOG(LogLS, Warning, TEXT("[GA_Bypass] Spoofing pull skipped. Source=%s HasAuthority=%d Data=%s"),
 				*GetNameSafe(SourceActor),
 				SourceActor && SourceActor->HasAuthority() ? 1 : 0,
-				*GetNameSafe(BypassData),
-				BypassData->PullRadius);
+				*GetNameSafe(BypassData));
 		}
 		return;
 	}
 
-	FLSCharacterSkillRow Row;
-	const bool bHasRow = BypassData->TryGetSkillRow(Row);
-	const bool bRowHasCCType = bHasRow && Row.CC_Type != ELSCharacterSkillCrowdControlType::None;
-	if (bRowHasCCType && Row.CC_Type != ELSCharacterSkillCrowdControlType::Pull)
+	const FLSCharacterSkillRow* Row = ResolveBypassSkillRow(SourceActor, BypassData, TEXT("PullTargetsToHologram"));
+	const bool bRowHasCCType = Row && Row->CC_Type != ELSCharacterSkillCrowdControlType::None;
+	if (bRowHasCCType && Row->CC_Type != ELSCharacterSkillCrowdControlType::Pull)
 	{
 		return;
 	}
 
-	const float PullSpeed = bHasRow && Row.CC_Value > 0.0f ? Row.CC_Value : BypassData->PullSpeed;
-	const ELSBreakPowerTier PullBreakPower = bHasRow
+	const float PullRadius = Row && Row->Range_X > 0.0f ? Row->Range_X : BypassData->PullRadius;
+	if (PullRadius <= 0.0f)
+	{
+		return;
+	}
+
+	const float PullSpeed = Row && Row->CC_Value > 0.0f ? Row->CC_Value : BypassData->PullSpeed;
+	const float PullDuration = Row && Row->Skill_Time > 0.0f ? Row->Skill_Time : BypassData->PullDuration;
+	const ELSBreakPowerTier PullBreakPower = Row
 		? static_cast<ELSBreakPowerTier>(FMath::Clamp(
-			Row.Skill_Impact,
+			Row->Skill_Impact,
 			static_cast<int32>(ELSBreakPowerTier::NormalAttack),
 			static_cast<int32>(ELSBreakPowerTier::HardCrowdControl)))
 		: BypassData->PullBreakPower;
@@ -418,7 +434,7 @@ void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLo
 	UKismetSystemLibrary::SphereOverlapActors(
 		SourceActor->GetWorld(),
 		HologramLocation,
-		BypassData->PullRadius,
+		PullRadius,
 		ObjectTypes,
 		ALSEnemyCharacter::StaticClass(),
 		ActorsToIgnore,
@@ -435,10 +451,10 @@ void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLo
 
 		FVector PullDirection = HologramLocation - TargetActor->GetActorLocation();
 		PullDirection.Z = 0.0f;
-		if (TargetCombatComponent->ApplyKnockback(PullDirection, PullSpeed, BypassData->PullDuration, BypassData->PullUpSpeed))
+		if (TargetCombatComponent->ApplyKnockback(PullDirection, PullSpeed, PullDuration, BypassData->PullUpSpeed))
 		{
 			++PulledCount;
-			ScheduleSpoofingStun(TargetActor, BypassData);
+			ScheduleSpoofingStun(TargetActor, BypassData, PullDuration);
 		}
 	}
 
@@ -447,13 +463,13 @@ void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLo
 		UE_LOG(LogLS, Log, TEXT("[GA_Bypass] Spoofing Source=%s Hologram=%s Radius=%.2f RawTargets=%d Pulled=%d"),
 			*GetNameSafe(SourceActor),
 			*HologramLocation.ToCompactString(),
-			BypassData->PullRadius,
+			PullRadius,
 			OverlappedActors.Num(),
 			PulledCount);
 	}
 }
 
-void ULSGA_Bypass::ScheduleSpoofingStun(AActor* TargetActor, const ULSBypassSkillDataAsset* BypassData)
+void ULSGA_Bypass::ScheduleSpoofingStun(AActor* TargetActor, const ULSBypassSkillDataAsset* BypassData, float DelaySeconds)
 {
 	if (!TargetActor || !BypassData || !BypassData->StunEffectClass)
 	{
@@ -474,7 +490,7 @@ void ULSGA_Bypass::ScheduleSpoofingStun(AActor* TargetActor, const ULSBypassSkil
 	});
 
 	FTimerHandle StunTimerHandle;
-	World->GetTimerManager().SetTimer(StunTimerHandle, TimerDelegate, FMath::Max(0.01f, BypassData->PullDuration), false);
+	World->GetTimerManager().SetTimer(StunTimerHandle, TimerDelegate, FMath::Max(0.01f, DelaySeconds), false);
 }
 
 void ULSGA_Bypass::ApplySpoofingStunIfConfigured(AActor* TargetActor, const ULSBypassSkillDataAsset* BypassData)

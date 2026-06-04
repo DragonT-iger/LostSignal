@@ -29,9 +29,6 @@ protected:
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Override", meta=(ClampMin="0.0"))
-	float FixedDamage = 0.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Override", meta=(ClampMin="0.0"))
 	float FallbackRadius = 450.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Override", meta=(ClampMin="0.0"))

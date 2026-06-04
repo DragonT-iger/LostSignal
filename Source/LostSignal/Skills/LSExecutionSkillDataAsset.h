@@ -32,9 +32,6 @@ public:
 	float FieldExplosionAttackCoefficient = 1.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Execution|ShortCircuit", meta=(ClampMin="0.0"))
-	float FieldExplosionFixedDamage = 0.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Execution|ShortCircuit", meta=(ClampMin="0.0"))
 	float FieldExplosionRadiusOverride = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Execution|ShortCircuit")

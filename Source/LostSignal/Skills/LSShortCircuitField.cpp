@@ -6,7 +6,9 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Data/LSCharacterSkillRow.h"
+#include "Data/LSGameDataSubsystem.h"
 #include "Engine/EngineTypes.h"
+#include "Engine/GameInstance.h"
 #include "Engine/StaticMesh.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
@@ -42,6 +44,14 @@ namespace
 
 	constexpr float DebugSphereMeshBaseDiameter = 100.0f;
 	constexpr float DefaultShortCircuitAttackCoefficient = 1.5f;
+
+	const FLSCharacterSkillRow* ResolveShortCircuitSkillRow(const UObject* WorldContextObject, const ULSSkillDataAsset* SkillData, const TCHAR* Context)
+	{
+		const UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+		const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+		const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+		return GameDataSubsystem && SkillData ? GameDataSubsystem->FindActiveSkillRowByID(SkillData->GetSkillID(), Context) : nullptr;
+	}
 }
 
 ALSShortCircuitField::ALSShortCircuitField()
@@ -114,7 +124,6 @@ void ALSShortCircuitField::InitializeField(AActor* InSourceActor, ULSShortCircui
 bool ALSShortCircuitField::ExplodeByExecution(
 	AActor* InstigatorActor,
 	const ULSSkillDataAsset* ExecutionSkillData,
-	float FixedDamage,
 	float AttackCoefficient,
 	float RadiusOverride,
 	bool bDestroyAfterExplosion)
@@ -138,10 +147,9 @@ bool ALSShortCircuitField::ExplodeByExecution(
 		return false;
 	}
 
-	FLSCharacterSkillRow Row;
-	const bool bHasRow = ExecutionSkillData->TryGetSkillRow(Row);
-	const ELSBreakPowerTier ResolvedBreakPower = bHasRow
-		? ToShortCircuitBreakPowerTier(Row.Skill_Impact, ExecutionSkillData->BreakPower)
+	const FLSCharacterSkillRow* Row = ResolveShortCircuitSkillRow(InstigatorActor, ExecutionSkillData, TEXT("ShortCircuitField.ExplodeByExecution"));
+	const ELSBreakPowerTier ResolvedBreakPower = Row
+		? ToShortCircuitBreakPowerTier(Row->Skill_Impact, ExecutionSkillData->BreakPower)
 		: ExecutionSkillData->BreakPower;
 
 	TArray<AActor*> OverlappedActors;
@@ -172,7 +180,7 @@ bool ALSShortCircuitField::ExplodeByExecution(
 			TargetActor,
 			ExecutionSkillData->DamageEffectClass,
 			1.0f,
-			FixedDamage,
+			0.0f,
 			AttackCoefficient,
 			ExecutionSkillData->bCanCrit,
 			ResolvedBreakPower))
@@ -281,15 +289,17 @@ void ALSShortCircuitField::ConfigureFromSkillData()
 
 	if (SkillData)
 	{
-		FLSSkillAreaPreviewSpec PreviewSpec = SkillData->BuildPreviewSpec();
-		Radius = PreviewSpec.Radius > 0.0f ? PreviewSpec.Radius : Radius;
-
-		FLSCharacterSkillRow Row;
-		if (SkillData->TryGetSkillRow(Row))
+		if (const FLSCharacterSkillRow* Row = ResolveShortCircuitSkillRow(this, SkillData, TEXT("ShortCircuitField.ConfigureFromSkillData")))
 		{
-			HitCount = Row.Skill_HitCount > 0 ? Row.Skill_HitCount : HitCount;
-			Interval = Row.Skill_HitRate > 0.0f ? Row.Skill_HitRate : Interval;
+			Radius = Row->Range_X > 0.0f ? Row->Range_X : Radius;
+			HitCount = Row->Skill_HitCount > 0 ? Row->Skill_HitCount : HitCount;
+			Interval = Row->Skill_HitRate > 0.0f ? Row->Skill_HitRate : Interval;
 			Duration = HitCount * Interval;
+		}
+		else
+		{
+			const FLSSkillAreaPreviewSpec PreviewSpec = SkillData->BuildPreviewSpec();
+			Radius = PreviewSpec.Radius > 0.0f ? PreviewSpec.Radius : Radius;
 		}
 	}
 
@@ -331,27 +341,21 @@ void ALSShortCircuitField::ApplyPulse()
 		return;
 	}
 
-	FLSCharacterSkillRow Row;
-	const bool bHasRow = SkillData->TryGetSkillRow(Row);
-	const float FallbackAttackCoefficient = SkillData->AttackCoefficient > 0.0f
-		? SkillData->AttackCoefficient
-		: DefaultShortCircuitAttackCoefficient;
-	const float AttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : FallbackAttackCoefficient;
-	const ELSBreakPowerTier BreakPower = bHasRow ? ToShortCircuitBreakPowerTier(Row.Skill_Impact, SkillData->BreakPower) : SkillData->BreakPower;
+	const FLSCharacterSkillRow* Row = ResolveShortCircuitSkillRow(this, SkillData, TEXT("ShortCircuitField.ApplyPulse"));
+	const float AttackCoefficient = Row && Row->Skill_Multiplier > 0.0f ? Row->Skill_Multiplier : DefaultShortCircuitAttackCoefficient;
+	const ELSBreakPowerTier BreakPower = Row ? ToShortCircuitBreakPowerTier(Row->Skill_Impact, ELSBreakPowerTier::NormalAttack) : ELSBreakPowerTier::NormalAttack;
 	const float Radius = AreaComponent ? AreaComponent->GetScaledSphereRadius() : 350.0f;
-	if (!bHasRow || Row.Skill_Multiplier <= 0.0f || SkillData->AttackCoefficient <= 0.0f)
+	if (!Row || Row->Skill_Multiplier <= 0.0f)
 	{
 		UE_LOG(
 			LogLS,
 			Log,
-			TEXT("[ShortCircuit] Pulse coefficient fallback check. Field=%s Skill=%s HasRow=%d RowMultiplier=%.2f AssetFallbackCoef=%.2f ResolvedCoef=%.2f Fixed=%.2f"),
+			TEXT("[ShortCircuit] Pulse coefficient fallback check. Field=%s Skill=%s HasRow=%d RowMultiplier=%.2f ResolvedCoef=%.2f"),
 			*GetNameSafe(this),
 			*GetNameSafe(SkillData),
-			bHasRow ? 1 : 0,
-			bHasRow ? Row.Skill_Multiplier : 0.0f,
-			SkillData->AttackCoefficient,
-			AttackCoefficient,
-			SkillData->FixedDamage);
+			Row ? 1 : 0,
+			Row ? Row->Skill_Multiplier : 0.0f,
+			AttackCoefficient);
 	}
 
 	if (SkillData->bEnableDebugVisualization)
@@ -402,7 +406,7 @@ void ALSShortCircuitField::ApplyPulse()
 			TargetActor,
 			SkillData->DamageEffectClass,
 			1.0f,
-			SkillData->FixedDamage,
+			0.0f,
 			AttackCoefficient,
 			SkillData->bCanCrit,
 			BreakPower))
@@ -413,9 +417,8 @@ void ALSShortCircuitField::ApplyPulse()
 			UE_LOG(
 				LogLS,
 				Log,
-				TEXT("[ShortCircuit] Pulse Damaged: Actor=%s | Fixed=%.2f Coef=%.2f BreakPower=%d | HP %.2f -> %.2f (ActualDamage %.2f)"),
+				TEXT("[ShortCircuit] Pulse Damaged: Actor=%s | Coef=%.2f BreakPower=%d | HP %.2f -> %.2f (ActualDamage %.2f)"),
 				*GetNameSafe(TargetActor),
-				SkillData->FixedDamage,
 				AttackCoefficient,
 				static_cast<int32>(BreakPower),
 				BeforeHealth,

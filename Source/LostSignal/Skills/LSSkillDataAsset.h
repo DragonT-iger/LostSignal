@@ -3,7 +3,6 @@
 #include "CoreMinimal.h"
 #include "Combat/LSCombatTypes.h"
 #include "Engine/DataAsset.h"
-#include "Engine/DataTable.h"
 #include "GameplayTagContainer.h"
 #include "Skills/LSSkillAreaTypes.h"
 #include "Skills/LSSkillTypes.h"
@@ -11,7 +10,6 @@
 
 class UGameplayAbility;
 class UGameplayEffect;
-struct FLSCharacterSkillRow;
 
 UCLASS(BlueprintType)
 class LOSTSIGNAL_API ULSSkillDataAsset : public UDataAsset
@@ -25,25 +23,16 @@ public:
 	FLSSkillAreaPreviewSpec BuildPreviewSpec() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
-	FLSSkillAreaPreviewSpec BuildPreviewSpecForWorld(const UObject* WorldContextObject) const;
-
-	UFUNCTION(BlueprintPure, Category="LS/Skill")
-	bool TryGetSkillRow(FLSCharacterSkillRow& OutRow) const;
-
-	UFUNCTION(BlueprintPure, Category="LS/Skill")
-	bool TryGetSkillRowForWorld(const UObject* WorldContextObject, FLSCharacterSkillRow& OutRow) const;
-
-	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	TSubclassOf<UGameplayAbility> GetAbilityClass() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill|Cooldown")
 	float GetCooldownDuration() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill|Cooldown")
-	float GetCooldownDurationForWorld(const UObject* WorldContextObject) const;
-
-	UFUNCTION(BlueprintPure, Category="LS/Skill|Cooldown")
 	FGameplayTag GetCooldownTag() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Skill|DataTable")
+	int32 GetSkillID() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Skill|DataTable")
 	FName GetSkillRowName() const;
@@ -64,7 +53,7 @@ public:
 	TSubclassOf<UGameplayEffect> CooldownEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|DataTable")
-	FDataTableRowHandle SkillRow;
+	int32 Skill_ID = 0;
 
 	//Preview Effect
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
@@ -76,9 +65,6 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage")
 	TSubclassOf<UGameplayEffect> SlowEffectClass;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage", meta=(ClampMin="0.0"))
-	float FixedDamage = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Damage", meta=(ClampMin="0.0"))
 	float AttackCoefficient = 0.0f;
@@ -102,7 +88,4 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Enhancement")
 	TArray<TObjectPtr<ULSSkillDataAsset>> EnhancementVariants;
 
-private:
-	const FLSCharacterSkillRow* ResolveSkillRow() const;
-	const FLSCharacterSkillRow* ResolveSkillRowForWorld(const UObject* WorldContextObject) const;
 };

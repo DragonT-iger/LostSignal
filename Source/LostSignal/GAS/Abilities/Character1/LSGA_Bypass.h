@@ -3,6 +3,8 @@
 #include "Abilities/GameplayAbility.h"
 #include "LSGA_Bypass.generated.h"
 
+struct FLSCharacterSkillRow;
+
 /** GameplayAbility version of Bypass sliding movement. */
 UCLASS()
 class LOSTSIGNAL_API ULSGA_Bypass : public UGameplayAbility
@@ -12,7 +14,7 @@ class LOSTSIGNAL_API ULSGA_Bypass : public UGameplayAbility
 public:
 	ULSGA_Bypass();
 
-	bool ResolveMovementParams(const class ULSSkillDataAsset* SkillData, float& OutDistance, float& OutDuration) const;
+	bool ResolveMovementParams(const class ULSSkillDataAsset* SkillData, const FLSCharacterSkillRow* SkillRow, float& OutDistance, float& OutDuration) const;
 
 protected:
 	virtual void ActivateAbility(
@@ -45,7 +47,7 @@ private:
 	void ClearIgnoredEnemiesForBypass(ACharacter* SourceCharacter);
 	static void PullTargetsToHologram(AActor* SourceActor, FVector HologramLocation, class ULSBypassSkillDataAsset* BypassData);
 	static void ApplySpoofingStunIfConfigured(AActor* TargetActor, const class ULSBypassSkillDataAsset* BypassData);
-	static void ScheduleSpoofingStun(AActor* TargetActor, const class ULSBypassSkillDataAsset* BypassData);
+	static void ScheduleSpoofingStun(AActor* TargetActor, const class ULSBypassSkillDataAsset* BypassData, float DelaySeconds);
 	void SetInvincibleTagActive(bool bActive);
 
 	FTimerHandle BypassTimerHandle;

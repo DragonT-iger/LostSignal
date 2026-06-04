@@ -87,14 +87,12 @@ void ULSGA_Overclock::ActivateAbility(
 	}
 	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
 
-	FLSCharacterSkillRow Row;
-	const bool bHasRow = SkillContext.SkillData->TryGetSkillRow(Row);
-	const float Range = bHasRow && Row.Range_X > 0.0f ? Row.Range_X : FallbackRange;
-	const float ConeDegrees = bHasRow && Row.Range_Y > 0.0f ? Row.Range_Y : FallbackConeDegrees;
-	const float DataAssetAttackCoefficient = SkillContext.SkillData->AttackCoefficient > 0.0f ? SkillContext.SkillData->AttackCoefficient : FallbackAttackCoefficient;
-	const float BaseAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f ? Row.Skill_Multiplier : DataAssetAttackCoefficient;
-	const float AdditionalCoefficientPerStack = bHasRow && Row.Res_Multiplier > 0.0f ? Row.Res_Multiplier : FallbackAdditionalAttackCoefficientPerStack;
-	const ELSBreakPowerTier ResolvedBreakPower = bHasRow ? ToOverclockAbilityBreakPowerTier(Row.Skill_Impact, SkillContext.SkillData->BreakPower) : SkillContext.SkillData->BreakPower;
+	const FLSCharacterSkillRow* Row = SkillContext.bHasSkillRow ? &SkillContext.SkillRow : nullptr;
+	const float Range = Row && Row->Range_X > 0.0f ? Row->Range_X : FallbackRange;
+	const float ConeDegrees = Row && Row->Range_Y > 0.0f ? Row->Range_Y : FallbackConeDegrees;
+	const float BaseAttackCoefficient = Row && Row->Skill_Multiplier > 0.0f ? Row->Skill_Multiplier : FallbackAttackCoefficient;
+	const float AdditionalCoefficientPerStack = Row && Row->Res_Multiplier > 0.0f ? Row->Res_Multiplier : FallbackAdditionalAttackCoefficientPerStack;
+	const ELSBreakPowerTier ResolvedBreakPower = Row ? ToOverclockAbilityBreakPowerTier(Row->Skill_Impact, BreakPower) : BreakPower;
 
 	const FVector SourceLocation = SourceActor->GetActorLocation();
 	FVector AimDirection = SkillContext.TargetLocation - SourceLocation;
@@ -164,9 +162,9 @@ void ULSGA_Overclock::ActivateAbility(
 			TargetActor,
 			ResolvedDamageEffectClass,
 			1.0f,
-			SkillContext.SkillData->FixedDamage,
+			0.0f,
 			FinalAttackCoefficient,
-			SkillContext.SkillData->bCanCrit,
+			bCanCrit,
 			ResolvedBreakPower))
 		{
 			++ValidHitCount;

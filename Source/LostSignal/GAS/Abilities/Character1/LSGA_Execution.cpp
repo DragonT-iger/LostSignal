@@ -57,17 +57,15 @@ ULSGA_Execution::ULSGA_Execution()
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
-bool ULSGA_Execution::ResolveMovementParams(const ULSSkillDataAsset* InSkillData, float& OutDistance, float& OutDuration) const
+bool ULSGA_Execution::ResolveMovementParams(const ULSSkillDataAsset* InSkillData, const FLSCharacterSkillRow* SkillRow, float& OutDistance, float& OutDuration) const
 {
 	const ULSExecutionSkillDataAsset* InExecutionData = Cast<ULSExecutionSkillDataAsset>(InSkillData);
 
-	FLSCharacterSkillRow Row;
-	const bool bHasRow = InSkillData && InSkillData->TryGetSkillRow(Row);
-	OutDistance = bHasRow && Row.Range_X > 0.0f
-		? Row.Range_X
+	OutDistance = SkillRow && SkillRow->Range_X > 0.0f
+		? SkillRow->Range_X
 		: InExecutionData ? InExecutionData->FallbackDashDistance : 650.0f;
-	OutDuration = bHasRow && Row.Skill_Time > 0.0f
-		? Row.Skill_Time
+	OutDuration = SkillRow && SkillRow->Skill_Time > 0.0f
+		? SkillRow->Skill_Time
 		: InExecutionData ? InExecutionData->FallbackDashDuration : 0.25f;
 
 	UE_LOG(LogLS, Warning, TEXT("Excution Distance = %.2f, Duration = %.2f"), OutDistance, OutDuration)
@@ -113,16 +111,15 @@ void ULSGA_Execution::ActivateAbility(
 		return;
 	}
 
-	FLSCharacterSkillRow Row;
-	const bool bHasRow = SkillContext.SkillData->TryGetSkillRow(Row);
+	const FLSCharacterSkillRow* Row = SkillContext.bHasSkillRow ? &SkillContext.SkillRow : nullptr;
 	float DashDuration = 0.0f;
-	ResolveMovementParams(SkillContext.SkillData, CachedDashDistance, DashDuration);
-	CachedSlashWidth = bHasRow && Row.Range_Y > 0.0f
-		? Row.Range_Y
+	ResolveMovementParams(SkillContext.SkillData, Row, CachedDashDistance, DashDuration);
+	CachedSlashWidth = Row && Row->Range_Y > 0.0f
+		? Row->Range_Y
 		: ExecutionData ? ExecutionData->FallbackSlashWidth : 220.0f;
-	const float BaseAttackCoefficient = bHasRow && Row.Skill_Multiplier > 0.0f
-		? Row.Skill_Multiplier
-		: SkillContext.SkillData->AttackCoefficient > 0.0f ? SkillContext.SkillData->AttackCoefficient : FallbackAttackCoefficient;
+	const float BaseAttackCoefficient = Row && Row->Skill_Multiplier > 0.0f
+		? Row->Skill_Multiplier
+		: FallbackAttackCoefficient;
 
 	if (CachedDashDistance <= 0.0f || DashDuration <= 0.0f || CachedSlashWidth <= 0.0f)
 	{
@@ -160,8 +157,10 @@ void ULSGA_Execution::ActivateAbility(
 	CachedStartLocation = SourceActor->GetActorLocation();
 	CachedConsumedAccelerationStacks = ConsumeCombatAccelerationStacks(SourceActor);
 	const float DataAssetAdditionalCoefficient = ExecutionData ? ExecutionData->AdditionalAttackCoefficientPerAccelerationStack : 0.25f;
-	const float AdditionalCoefficient = bHasRow && Row.Res_Multiplier > 0.0f ? Row.Res_Multiplier : DataAssetAdditionalCoefficient;
+	const float AdditionalCoefficient = Row && Row->Res_Multiplier > 0.0f ? Row->Res_Multiplier : DataAssetAdditionalCoefficient;
 	CachedAttackCoefficient = BaseAttackCoefficient + (AdditionalCoefficient * CachedConsumedAccelerationStacks);
+	CachedSkillRow = Row ? *Row : FLSCharacterSkillRow();
+	bHasCachedSkillRow = Row != nullptr;
 	IgnoreEnemiesForDash(SourceCharacter);
 
 	TSharedPtr<FRootMotionSource_ConstantForce> RootMotion = MakeShared<FRootMotionSource_ConstantForce>();
@@ -206,6 +205,8 @@ void ULSGA_Execution::EndAbility(
 	ExecutionData = nullptr;
 	SkillData = nullptr;
 	CachedConsumedAccelerationStacks = 0;
+	CachedSkillRow = FLSCharacterSkillRow();
+	bHasCachedSkillRow = false;
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -220,11 +221,9 @@ void ULSGA_Execution::PerformSheathHit()
 		return;
 	}
 
-	FLSCharacterSkillRow Row;
-	const bool bHasRow = SkillData->TryGetSkillRow(Row);
-	const ELSBreakPowerTier ResolvedBreakPower = bHasRow
-		? ToExecutionBreakPowerTier(Row.Skill_Impact, SkillData->BreakPower)
-		: SkillData->BreakPower;
+	const ELSBreakPowerTier ResolvedBreakPower = bHasCachedSkillRow
+		? ToExecutionBreakPowerTier(CachedSkillRow.Skill_Impact, FallbackBreakPower)
+		: FallbackBreakPower;
 	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = SkillData->DamageEffectClass
 		? SkillData->DamageEffectClass
 		: DamageEffectClass;
@@ -259,7 +258,7 @@ void ULSGA_Execution::PerformSheathHit()
 			TargetActor,
 			ResolvedDamageEffectClass,
 			1.0f,
-			SkillData->FixedDamage,
+			0.0f,
 			CachedAttackCoefficient,
 			SkillData->bCanCrit,
 			ResolvedBreakPower))
@@ -284,11 +283,10 @@ void ULSGA_Execution::PerformSheathHit()
 			const float FieldExplosionCoefficient = ExecutionData && ExecutionData->FieldExplosionAttackCoefficient > 0.0f
 				? ExecutionData->FieldExplosionAttackCoefficient
 				: CachedAttackCoefficient;
-			const float FieldExplosionFixedDamage = ExecutionData ? ExecutionData->FieldExplosionFixedDamage : SkillData->FixedDamage;
 			const float FieldRadiusOverride = ExecutionData ? ExecutionData->FieldExplosionRadiusOverride : 0.0f;
 			const bool bDestroyField = !ExecutionData || ExecutionData->bDestroyShortCircuitFieldOnExplosion;
 
-			if (Field->ExplodeByExecution(SourceActor, SkillData, FieldExplosionFixedDamage, FieldExplosionCoefficient, FieldRadiusOverride, bDestroyField))
+			if (Field->ExplodeByExecution(SourceActor, SkillData, FieldExplosionCoefficient, FieldRadiusOverride, bDestroyField))
 			{
 				++ExplodedFieldCount;
 			}

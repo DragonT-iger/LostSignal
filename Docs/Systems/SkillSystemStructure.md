@@ -55,10 +55,10 @@ ULSSkillDataAsset
 ├── AbilityClass
 ├── CooldownTag
 ├── CooldownEffectClass
-├── SkillRow
+├── Skill_ID
 ├── PreviewSpec
 ├── DamageEffectClass
-├── FixedDamage / AttackCoefficient / bCanCrit / BreakPower
+├── AttackCoefficient / bCanCrit / BreakPower
 ├── UI 정보
 └── EnhancementVariants
 
@@ -103,9 +103,9 @@ CooldownEffectClass
 - 쿨타임 적용용 GameplayEffect
 - 기본값은 ULSGE_SkillCooldown
 
-SkillRow
-- FLSCharacterSkillRow DataTable row
-- 기획 수치의 1차 기준
+Skill_ID
+- FLSCharacterSkillRow DataTable row 조회 키
+- DataAsset은 row handle을 직접 들지 않고, 사용 시점에 ULSGameDataSubsystem에서 Skill_ID로 조회한다.
 
 PreviewSpec
 - 프리뷰 표시 기본값
@@ -116,8 +116,9 @@ DamageEffectClass
 - 데미지 적용용 GameplayEffect
 - 기본값은 ULSGE_PlayerBasicDamage
 
-FixedDamage / AttackCoefficient / bCanCrit / BreakPower
+AttackCoefficient / bCanCrit / BreakPower
 - DataTable 값이 없거나 fallback이 필요할 때 사용하는 공통 데미지 데이터
+- 스킬 경로에서는 FixedDamage를 사용하지 않는다. 스킬 데미지는 DataTable의 Skill_Multiplier 또는 fallback 계수 기반으로 계산한다.
 
 DisplayName / Description / Icon
 - UI 표시 정보
@@ -285,6 +286,9 @@ UE DataTable CSV import에서는 첫 컬럼이 RowName으로 소비된다. 액�
 데미지 계수
 -> DataTable Skill_Multiplier 우선
 -> 없으면 SkillData.AttackCoefficient
+
+고정 피해
+-> 스킬 경로에서는 사용하지 않음
 ```
 
 ## 전역 데이터 조회와 상태이상 적용 구조
@@ -297,7 +301,7 @@ UE DataTable CSV import에서는 첫 컬럼이 RowName으로 소비된다. 액�
 - `ULSGameDataSubsystem`: DataTable 로드, 캐싱, row 조회, 누락 row 검증만 담당하는 `UGameInstanceSubsystem`
 - `ULSStatusEffectComponent`: 상태이상 적용, 제거, 스택, 지속시간, UI/FX 훅을 담당하는 대상 Actor 컴포넌트
 - `GameplayAbility`: 스킬 발동, 명중 판정, 적용 대상 결정, 적용 타이밍만 담당
-- `ULSSkillDataAsset`: AbilityClass, 에셋 참조, fallback 값, 프리뷰 기본값만 담당
+- `ULSSkillDataAsset`: `Skill_ID`, AbilityClass, 에셋 참조, fallback 값, 프리뷰 기본값만 담당
 
 `ULSGameDataSubsystem`은 GameplayEffect를 직접 적용하지 않는다. Subsystem이 GE까지 적용하면 데이터 조회, 게임 규칙, 대상 ASC 처리, 서버 권한 처리가 한 곳에 섞여 테스트와 멀티 전환이 어려워진다.
 
@@ -316,8 +320,8 @@ GameplayAbility 서버 권한에서 명중/대상 확정
 책임 분리:
 
 - `ULSGameDataSubsystem`: `FindActiveSkillRow`, `FindPassiveSkillRow`, `FindStatusEffectRow` 같은 순수 조회 API만 제공한다.
-- `ULSSkillDataAsset`: `TryGetSkillRowForWorld`, `BuildPreviewSpecForWorld`, `GetCooldownDurationForWorld`에서 `ULSGameDataSubsystem` 조회를 우선 사용하고, 테이블 미설정 시 기존 `SkillRow` 핸들을 fallback으로 사용한다.
-- `ULSPlayerSkillComponent`: 클라이언트 입력을 `ServerRequestActivateSkill`로 서버에 보내고, 서버의 `ActivateSkillOnServer`에서 스킬 row 존재 여부, 사거리, 쿨타임을 검증한다.
+- `ULSPlayerSkillComponent`: 클라이언트 입력을 `ServerRequestActivateSkill`로 서버에 보내고, 서버의 `ActivateSkillOnServer`에서 `ULSGameDataSubsystem`에 `Skill_ID`로 row를 직접 요청해 스킬 row 존재 여부, 사거리, 쿨타임을 검증한다.
+- `GameplayAbility`: `FLSSkillActivationContext`에 포함된 서버 조회 row snapshot을 사용한다. 지연 실행 Actor처럼 context 밖에서 동작하는 객체는 실행 시점에 `ULSGameDataSubsystem`을 직접 조회한다.
 - `ULSStatusEffectComponent`: 상태이상 적용 가능 여부, 중복 스택 처리, 지속시간 override, 제거, UI/FX 이벤트를 관리한다.
 - 클라이언트는 프리뷰와 UI 표시용으로 DataTable을 읽을 수 있지만, 데미지와 상태이상 적용 확정은 서버 권한에서만 수행한다.
 - 캐릭터마다 상태이상 DataTable을 직접 들고 있지 않는다. 모든 캐릭터가 같은 전역 테이블을 조회하되, 실제 적용 상태는 각 대상의 `ULSStatusEffectComponent`가 보유한다.
@@ -328,11 +332,12 @@ GameplayAbility 서버 권한에서 명중/대상 확정
 클라이언트 ConfirmAnyActiveSkillPreview
 -> ServerRequestActivateSkill(Slot, TargetLocation, AimYaw)
 -> 서버 ActivateSkillOnServer
--> SkillData.TryGetSkillRowForWorld
--> ULSGameDataSubsystem.FindActiveSkillRow(SkillRow.RowName)
--> row 없으면 기존 SkillRow handle fallback
--> row가 끝까지 없으면 서버에서 발동 거부
--> 사거리 Clamp / 쿨타임 검증 / GameplayAbility 활성화
+-> SkillData.Skill_ID 확인
+-> ULSGameDataSubsystem.FindActiveSkillRowByID(Skill_ID)
+-> row 없으면 서버에서 발동 거부
+-> 사거리 Clamp / 쿨타임 검증
+-> FLSSkillActivationContext에 row snapshot 저장
+-> GameplayAbility 활성화
 ```
 
 초기 구현 순서:

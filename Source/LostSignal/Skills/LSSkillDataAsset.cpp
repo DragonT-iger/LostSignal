@@ -1,9 +1,6 @@
 #include "Skills/LSSkillDataAsset.h"
 
 #include "Abilities/GameplayAbility.h"
-#include "Data/LSCharacterSkillRow.h"
-#include "Data/LSGameDataSubsystem.h"
-#include "Engine/GameInstance.h"
 #include "GAS/Abilities/Character1/LSGA_Bypass.h"
 #include "GAS/Abilities/Character1/LSGA_Execution.h"
 #include "GAS/Abilities/Character1/LSGA_Overclock.h"
@@ -13,45 +10,6 @@
 #include "GAS/Effects/LSGE_PlayerBasicDamage.h"
 #include "GAS/LSGameplayTags.h"
 
-namespace
-{
-	void ApplySkillRowRangeToPreviewSpec(const FLSCharacterSkillRow& Row, FLSSkillAreaPreviewSpec& InOutSpec)
-	{
-		switch (Row.Range_Shape)
-		{
-		case ELSCharacterSkillRangeShape::Cone:
-			InOutSpec.Shape = ELSSkillAreaShape::Circle;
-			InOutSpec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
-			InOutSpec.Radius = Row.Range_X;
-			InOutSpec.Degrees = Row.Range_Y;
-			break;
-
-		case ELSCharacterSkillRangeShape::Circle:
-			InOutSpec.Shape = ELSSkillAreaShape::Circle;
-			InOutSpec.Radius = Row.Range_X;
-			InOutSpec.Degrees = 360.0f;
-			break;
-
-		case ELSCharacterSkillRangeShape::Box:
-			InOutSpec.Shape = ELSSkillAreaShape::Box;
-			InOutSpec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
-			InOutSpec.BoxLength = Row.Range_X;
-			InOutSpec.BoxWidth = Row.Range_Y;
-			if (InOutSpec.LocationOffset.IsNearlyZero() && Row.Range_X > 0.0f)
-			{
-				InOutSpec.LocationOffset.X = Row.Range_X * 0.5f;
-			}
-			break;
-
-		case ELSCharacterSkillRangeShape::None:
-		default:
-			break;
-		}
-
-		InOutSpec.WorldZOffset = 0;
-	}
-}
-
 ULSSkillDataAsset::ULSSkillDataAsset()
 {
 	DamageEffectClass = ULSGE_PlayerBasicDamage::StaticClass();
@@ -60,50 +18,7 @@ ULSSkillDataAsset::ULSSkillDataAsset()
 
 FLSSkillAreaPreviewSpec ULSSkillDataAsset::BuildPreviewSpec() const
 {
-	FLSSkillAreaPreviewSpec ResolvedSpec = PreviewSpec;
-	const FLSCharacterSkillRow* Row = ResolveSkillRow();
-	if (!Row)
-	{
-		return ResolvedSpec;
-	}
-
-	ApplySkillRowRangeToPreviewSpec(*Row, ResolvedSpec);
-	return ResolvedSpec;
-}
-
-FLSSkillAreaPreviewSpec ULSSkillDataAsset::BuildPreviewSpecForWorld(const UObject* WorldContextObject) const
-{
-	FLSSkillAreaPreviewSpec ResolvedSpec = PreviewSpec;
-	const FLSCharacterSkillRow* Row = ResolveSkillRowForWorld(WorldContextObject);
-	if (!Row)
-	{
-		return ResolvedSpec;
-	}
-
-	ApplySkillRowRangeToPreviewSpec(*Row, ResolvedSpec);
-	return ResolvedSpec;
-}
-
-bool ULSSkillDataAsset::TryGetSkillRow(FLSCharacterSkillRow& OutRow) const
-{
-	if (const FLSCharacterSkillRow* Row = ResolveSkillRow())
-	{
-		OutRow = *Row;
-		return true;
-	}
-
-	return false;
-}
-
-bool ULSSkillDataAsset::TryGetSkillRowForWorld(const UObject* WorldContextObject, FLSCharacterSkillRow& OutRow) const
-{
-	if (const FLSCharacterSkillRow* Row = ResolveSkillRowForWorld(WorldContextObject))
-	{
-		OutRow = *Row;
-		return true;
-	}
-
-	return false;
+	return PreviewSpec;
 }
 
 TSubclassOf<UGameplayAbility> ULSSkillDataAsset::GetAbilityClass() const
@@ -113,23 +28,6 @@ TSubclassOf<UGameplayAbility> ULSSkillDataAsset::GetAbilityClass() const
 
 float ULSSkillDataAsset::GetCooldownDuration() const
 {
-	FLSCharacterSkillRow Row;
-	if (TryGetSkillRow(Row) && Row.Skill_Cooldown > 0.0f)
-	{
-		return Row.Skill_Cooldown;
-	}
-
-	return FallbackCooldown;
-}
-
-float ULSSkillDataAsset::GetCooldownDurationForWorld(const UObject* WorldContextObject) const
-{
-	FLSCharacterSkillRow Row;
-	if (TryGetSkillRowForWorld(WorldContextObject, Row) && Row.Skill_Cooldown > 0.0f)
-	{
-		return Row.Skill_Cooldown;
-	}
-
 	return FallbackCooldown;
 }
 
@@ -168,45 +66,17 @@ FGameplayTag ULSSkillDataAsset::GetCooldownTag() const
 	return FGameplayTag();
 }
 
+int32 ULSSkillDataAsset::GetSkillID() const
+{
+	return Skill_ID;
+}
+
 FName ULSSkillDataAsset::GetSkillRowName() const
 {
-	return SkillRow.RowName;
+	return Skill_ID > 0 ? FName(*FString::FromInt(Skill_ID)) : NAME_None;
 }
 
 ULSSkillDataAsset* ULSSkillDataAsset::GetEnhancementVariant(int32 Index) const
 {
 	return EnhancementVariants.IsValidIndex(Index) ? EnhancementVariants[Index].Get() : nullptr;
-}
-
-const FLSCharacterSkillRow* ULSSkillDataAsset::ResolveSkillRow() const
-{
-	const FLSCharacterSkillRow* Row = SkillRow.GetRow<FLSCharacterSkillRow>(TEXT("LSSkillDataAsset"));
-	if (Row)
-	{
-		const_cast<FLSCharacterSkillRow*>(Row)->NormalizeSkillIDFromRowName(SkillRow.RowName);
-	}
-
-	return Row;
-}
-
-const FLSCharacterSkillRow* ULSSkillDataAsset::ResolveSkillRowForWorld(const UObject* WorldContextObject) const
-{
-	if (WorldContextObject)
-	{
-		if (const UWorld* World = WorldContextObject->GetWorld())
-		{
-			if (UGameInstance* GameInstance = World->GetGameInstance())
-			{
-				if (const ULSGameDataSubsystem* GameDataSubsystem = GameInstance->GetSubsystem<ULSGameDataSubsystem>())
-				{
-					if (const FLSCharacterSkillRow* Row = GameDataSubsystem->FindActiveSkillRow(GetSkillRowName(), TEXT("LSSkillDataAsset")))
-					{
-						return Row;
-					}
-				}
-			}
-		}
-	}
-
-	return ResolveSkillRow();
 }

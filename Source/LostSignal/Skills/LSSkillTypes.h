@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/LSCharacterSkillRow.h"
 #include "LSSkillTypes.generated.h"
 
 class ULSSkillDataAsset;
@@ -21,6 +22,12 @@ struct FLSSkillActivationContext
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Skill")
 	float AimYaw = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Skill")
+	FLSCharacterSkillRow SkillRow;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Skill")
+	bool bHasSkillRow = false;
 };
 
 USTRUCT(BlueprintType)
