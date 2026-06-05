@@ -5,6 +5,8 @@
 
 class UAbilitySystemComponent;
 class UAnimMontage;
+class ULSPlayerCombatComponent;
+struct FLSComboAttackRow;
 
 /**
  * Player basic attack combo ability.
@@ -21,6 +23,7 @@ public:
 	static ULSGA_PlayerBasicAttack* FindActiveBasicAttackAbility(UAbilitySystemComponent* ASC);
 
 	int32 GetCurrentComboIndex() const { return CurrentSectionIndex; }
+	int32 GetCurrentComboTag() const { return CurrentComboTag; }
 
 	void QueueComboInput();
 	void OpenComboWindow();
@@ -47,6 +50,8 @@ private:
 	void ConsumePostComboInput();
 	void HandleAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 	void SetComboWindowTagActive(bool bActive);
+	float ResolveComboPlayRate(const FLSComboAttackRow* ComboRow, int32 SectionIndex, float AttackSpeed) const;
+	float GetCurrentComboInputWindowSeconds() const;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TArray<FName> ComboSections;
@@ -62,6 +67,8 @@ private:
 
 	FTimerHandle PostComboInputWindowTimerHandle;
 	int32 CurrentSectionIndex = INDEX_NONE;
+	int32 CurrentComboTag = 0;
+	float CurrentComboInputWindowSeconds = 0.0f;
 	bool bComboInputBuffered = false;
 	bool bComboWindowOpen = false;
 	bool bWaitingForPostComboInput = false;

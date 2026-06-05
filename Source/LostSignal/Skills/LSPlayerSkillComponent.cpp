@@ -244,7 +244,7 @@ bool ULSPlayerSkillComponent::GetActivePreviewSpec(FLSSkillAreaPreviewSpec& OutP
 	return true;
 }
 
-void ULSPlayerSkillComponent::HandleBasicAttackHit(int32 ComboIndex, int32 ValidHitCount)
+void ULSPlayerSkillComponent::HandleBasicAttackHit(int32 ComboIndex, int32 ComboAttackID, int32 ValidHitCount)
 {
 	AActor* OwnerActor = GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority() || ValidHitCount <= 0)
@@ -259,7 +259,7 @@ void ULSPlayerSkillComponent::HandleBasicAttackHit(int32 ComboIndex, int32 Valid
 			continue;
 		}
 
-		TrySendPassiveGameplayEvent(PassiveSkillData, ComboIndex);
+		TrySendPassiveGameplayEvent(PassiveSkillData, ComboIndex, ComboAttackID);
 	}
 }
 
@@ -542,7 +542,7 @@ bool ULSPlayerSkillComponent::TryActivateGameplayAbility(ULSSkillDataAsset* Skil
 	return bActivated;
 }
 
-bool ULSPlayerSkillComponent::TrySendPassiveGameplayEvent(ULSPassiveSkillDataAsset* SkillData, int32 ComboIndex) const
+bool ULSPlayerSkillComponent::TrySendPassiveGameplayEvent(ULSPassiveSkillDataAsset* SkillData, int32 ComboIndex, int32 ComboAttackID) const
 {
 	AActor* OwnerActor = GetOwner();
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerActor);
@@ -572,7 +572,7 @@ bool ULSPlayerSkillComponent::TrySendPassiveGameplayEvent(ULSPassiveSkillDataAss
 	EventData.Instigator = OwnerActor;
 	EventData.Target = OwnerActor;
 	EventData.OptionalObject = SkillData;
-	EventData.EventMagnitude = static_cast<float>(ComboIndex);
+	EventData.EventMagnitude = static_cast<float>(ComboAttackID > 0 ? ComboAttackID : ComboIndex);
 	ASC->HandleGameplayEvent(LSGameplayTags::Event_Combat_BasicAttackHit, &EventData);
 
 	return true;

@@ -7,6 +7,7 @@
 #include "Combat/LSCombatStateComponent.h"
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Data/LSComboAttackRow.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "LostSignal.h"
@@ -113,6 +114,8 @@ void ULSGA_PlayerBasicAttack::ActivateAbility(
 	bWaitingForPostComboInput = false;
 	bComboWindowTagActive = false;
 	CurrentSectionIndex = INDEX_NONE;
+	CurrentComboTag = 0;
+	CurrentComboInputWindowSeconds = 0.0f;
 
 	ALSCharacterBase* Character = Cast<ALSCharacterBase>(GetAvatarActorFromActorInfo());
 	ULSPlayerCombatComponent* PlayerCombatComponent = Character ? Character->FindComponentByClass<ULSPlayerCombatComponent>() : nullptr;
@@ -149,11 +152,13 @@ void ULSGA_PlayerBasicAttack::ActivateAbility(
 	}
 
 	int32 StartSectionIndex = 0;
-	if (PlayerCombatComponent->ConsumePendingBasicAttackComboIndexOverride(StartSectionIndex))
+	int32 StartComboTag = 0;
+	if (PlayerCombatComponent->ConsumePendingBasicAttackComboIndexOverride(StartSectionIndex, StartComboTag))
 	{
 		UE_LOG(LogLS, Log, TEXT("%s basic attack starts from override combo index %d."),
 			*GetNameSafe(Character),
 			StartSectionIndex);
+		CurrentComboTag = FMath::Max(0, StartComboTag);
 	}
 	if (!ComboSections.IsValidIndex(StartSectionIndex))
 	{
@@ -201,6 +206,8 @@ void ULSGA_PlayerBasicAttack::EndAbility(
 
 	ActiveAttackMontage = nullptr;
 	CurrentSectionIndex = INDEX_NONE;
+	CurrentComboTag = 0;
+	CurrentComboInputWindowSeconds = 0.0f;
 	bComboInputBuffered = false;
 	bComboWindowOpen = false;
 	bWaitingForPostComboInput = false;
@@ -232,7 +239,15 @@ void ULSGA_PlayerBasicAttack::PlayComboSection(int32 SectionIndex)
 		World->GetTimerManager().ClearTimer(PostComboInputWindowTimerHandle);
 	}
 
-	if (ULSPlayerCombatComponent* PlayerCombatComponent = Character->FindComponentByClass<ULSPlayerCombatComponent>())
+	ULSPlayerCombatComponent* PlayerCombatComponent = Character->FindComponentByClass<ULSPlayerCombatComponent>();
+	const FLSComboAttackRow* ComboRow = PlayerCombatComponent
+		? PlayerCombatComponent->ResolveComboAttackRow(SectionIndex, CurrentComboTag)
+		: nullptr;
+	CurrentComboInputWindowSeconds = ComboRow && ComboRow->Combo_Input_Window > 0.0f
+		? ComboRow->Combo_Input_Window
+		: PostComboInputWindowSeconds;
+
+	if (PlayerCombatComponent)
 	{
 		PlayerCombatComponent->ResetBasicAttackHit();
 	}
@@ -241,7 +256,7 @@ void ULSGA_PlayerBasicAttack::PlayComboSection(int32 SectionIndex)
 	const float AttackSpeed = ASC
 		? ASC->GetNumericAttribute(ULSCharacterAttributeSet::GetAttackSpeedAttribute())
 		: 1.0f;
-	Character->MulticastPlayLSMontage(ActiveAttackMontage, ComboSections[SectionIndex], FMath::Max(0.01f, AttackSpeed));
+	Character->MulticastPlayLSMontage(ActiveAttackMontage, ComboSections[SectionIndex], ResolveComboPlayRate(ComboRow, SectionIndex, AttackSpeed));
 	Character->MulticastSetLSMontageNextSection(ActiveAttackMontage, ComboSections[SectionIndex], NAME_None);
 
 	UAnimInstance* AnimInstance = Character->GetMesh() ? Character->GetMesh()->GetAnimInstance() : nullptr;
@@ -269,12 +284,13 @@ void ULSGA_PlayerBasicAttack::OpenPostComboInputWindow()
 
 	if (UWorld* World = GetWorld())
 	{
+		const float WindowSeconds = GetCurrentComboInputWindowSeconds();
 		World->GetTimerManager().ClearTimer(PostComboInputWindowTimerHandle);
 		World->GetTimerManager().SetTimer(
 			PostComboInputWindowTimerHandle,
 			this,
 			&ULSGA_PlayerBasicAttack::ClosePostComboInputWindow,
-			PostComboInputWindowSeconds,
+			WindowSeconds,
 			false);
 	}
 
@@ -300,6 +316,7 @@ void ULSGA_PlayerBasicAttack::ConsumePostComboInput()
 	}
 
 	bComboInputBuffered = false;
+	CurrentComboTag = 0;
 
 	const int32 NextSectionIndex = CurrentSectionIndex + 1;
 	if (!ComboSections.IsValidIndex(NextSectionIndex))
@@ -321,7 +338,7 @@ void ULSGA_PlayerBasicAttack::HandleAttackMontageEnded(UAnimMontage* Montage, bo
 	if (IsActive())
 	{
 		const int32 NextSectionIndex = CurrentSectionIndex + 1;
-		if (!bInterrupted && ComboSections.IsValidIndex(NextSectionIndex) && PostComboInputWindowSeconds > 0.0f)
+		if (!bInterrupted && ComboSections.IsValidIndex(NextSectionIndex) && GetCurrentComboInputWindowSeconds() > 0.0f)
 		{
 			OpenPostComboInputWindow();
 			return;
@@ -329,6 +346,68 @@ void ULSGA_PlayerBasicAttack::HandleAttackMontageEnded(UAnimMontage* Montage, bo
 
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, bInterrupted);
 	}
+}
+
+float ULSGA_PlayerBasicAttack::ResolveComboPlayRate(const FLSComboAttackRow* ComboRow, int32 SectionIndex, float AttackSpeed) const
+{
+	const float BasePlayRate = FMath::Max(0.01f, AttackSpeed);
+	if (!ComboRow || ComboRow->Combo_Time <= 0.0f || !ActiveAttackMontage || !ComboSections.IsValidIndex(SectionIndex))
+	{
+		UE_LOG(
+			LogLS,
+			Log,
+			TEXT("BasicAttack combo play rate uses fallback. SectionIndex=%d PlayRate=%.3f AttackSpeed=%.3f ComboRow=%s"),
+			SectionIndex,
+			BasePlayRate,
+			AttackSpeed,
+			ComboRow ? TEXT("Valid") : TEXT("None"));
+		return BasePlayRate;
+	}
+
+	const int32 MontageSectionIndex = ActiveAttackMontage->GetSectionIndex(ComboSections[SectionIndex]);
+	if (MontageSectionIndex == INDEX_NONE)
+	{
+		UE_LOG(
+			LogLS,
+			Log,
+			TEXT("BasicAttack combo play rate uses fallback because montage section is missing. Section=%s PlayRate=%.3f"),
+			*ComboSections[SectionIndex].ToString(),
+			BasePlayRate);
+		return BasePlayRate;
+	}
+
+	const float SectionLength = ActiveAttackMontage->GetSectionLength(MontageSectionIndex);
+	if (SectionLength <= 0.0f)
+	{
+		UE_LOG(
+			LogLS,
+			Log,
+			TEXT("BasicAttack combo play rate uses fallback because section length is invalid. Section=%s SectionLength=%.3f PlayRate=%.3f"),
+			*ComboSections[SectionIndex].ToString(),
+			SectionLength,
+			BasePlayRate);
+		return BasePlayRate;
+	}
+
+	const float PlayRate = FMath::Max(0.01f, SectionLength / ComboRow->Combo_Time);
+	const float FinalSectionTime = SectionLength / PlayRate;
+	UE_LOG(
+		LogLS,
+		Log,
+		TEXT("BasicAttack combo play rate resolved. ComboID=%d Section=%s SectionLength=%.3f ComboTime=%.3f PlayRate=%.3f FinalSectionTime=%.3f"),
+		ComboRow->Combo_ID,
+		*ComboSections[SectionIndex].ToString(),
+		SectionLength,
+		ComboRow->Combo_Time,
+		PlayRate,
+		FinalSectionTime);
+
+	return PlayRate;
+}
+
+float ULSGA_PlayerBasicAttack::GetCurrentComboInputWindowSeconds() const
+{
+	return CurrentComboInputWindowSeconds > 0.0f ? CurrentComboInputWindowSeconds : PostComboInputWindowSeconds;
 }
 
 void ULSGA_PlayerBasicAttack::SetComboWindowTagActive(bool bActive)

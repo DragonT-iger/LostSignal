@@ -213,7 +213,8 @@ PassiveSkill_ID
 전투 이벤트 발생
 -> ULSPlayerSkillComponent가 이벤트 수신
 -> PassiveSkills 순회
--> DataAsset 조건 확인
+-> PassiveSkill_ID로 FLSCharacterPassiveSkillRow 조회
+-> Trigger_Event / Trigger_Target_ID 조건 확인
 -> GameplayEvent 전송 또는 Ability 직접 활성화
 -> 패시브 GameplayAbility 실행
 -> 필요한 GameplayEffect 적용
@@ -288,6 +289,28 @@ Status_ID_2 / Effect_Target_2 / Skill_Effect_Duration_2
 
 UE DataTable CSV import에서는 첫 컬럼이 RowName으로 소비된다. 액티브 스킬 테이블은 `Skill_ID`를 첫 컬럼 RowName으로 사용하되, `FLSCharacterSkillRow`가 import/change 시 RowName 숫자를 `Skill_ID` 프로퍼티에도 보정한다.
 
+`FLSCharacterPassiveSkillRow`는 패시브 스킬 기획 수치의 기준이다. 패시브 테이블은 `Name`을 첫 컬럼 RowName으로 사용하되, import/change 시 RowName 숫자를 `PassiveSkill_ID`에도 보정한다.
+
+`FLSComboAttackRow`는 일반 공격 콤보 기획 수치의 기준이다. Combo Attack 테이블은 `Combo_ID`를 첫 컬럼 RowName으로 사용하되, import/change 시 RowName 숫자를 `Combo_ID`에도 보정한다.
+
+전투 가속 같은 콤보 기반 패시브는 다음 키 관계를 사용한다.
+
+```text
+기본공격 히트
+-> ULSPlayerCombatComponent가 ComboCharacterID + 현재 Combo_Index + 선택적 Combo_Tag로 FLSComboAttackRow 조회
+-> Combo_ID를 ULSPlayerSkillComponent에 전달
+-> 패시브 row의 Trigger_Target_ID와 Combo_ID 비교
+-> 패시브 row의 Status_ID / Effect_Duration 기준으로 GE 적용
+```
+
+바이패스 매크로처럼 특정 콤보 row를 선택해야 하는 스킬은 DataAsset에 `ComboTagOverride`를 설정한다. 예를 들어 Combo Attack 시트에서 3타 매크로 row가 `Combo_Tag=5001`이면, 실행 시 `Combo_Index=3`과 `Combo_Tag=5001` 조합으로 row를 찾고 최종 `Combo_ID`를 패시브 트리거 비교에 사용한다.
+
+기본 공격 입력 서버 요청은 `ULSPlayerCombatComponent`가 담당한다. 캐릭터는 입력을 컴포넌트에 전달하고, 컴포넌트의 `RequestBasicAttack`이 클라이언트에서는 `ServerRequestBasicAttack` RPC를 보내고 서버에서는 실제 기본 공격 Ability 활성화 또는 콤보 입력 큐잉을 수행한다.
+
+Combo Attack row의 시간 값은 기본 공격 Ability에서 사용한다. `Combo_Time`이 0보다 크면 현재 몽타주 섹션 길이를 기준으로 재생 속도를 보정하고, `Combo_Input_Window`가 0보다 크면 섹션 종료 후 다음 콤보 입력 대기 시간으로 사용한다. 값이 없으면 기존 Ability fallback 값을 사용한다.
+
+기본 공격 데미지는 히트 시점의 Combo Attack row를 기준으로 계산한다. `Combo_Multiplier`가 0보다 크면 `캐릭터 공격력 * Combo_Multiplier` 계수로 Damage GE에 전달하고, row가 없거나 값이 없으면 기존 컴포넌트 fallback 계수를 사용한다.
+
 권장 기준:
 
 - 기획자가 조정할 수치: DataTable에 둔다.
@@ -320,7 +343,7 @@ UE DataTable CSV import에서는 첫 컬럼이 RowName으로 소비된다. 액�
 
 권장 구조:
 
-- `ULSGameDataSettings`: 액티브 스킬, 패시브 스킬, 상태이상 등 전역 DataTable 참조를 들고 있는 `UDeveloperSettings`
+- `ULSGameDataSettings`: 액티브 스킬, 패시브 스킬, Combo Attack, 상태이상 등 전역 DataTable 참조를 들고 있는 `UDeveloperSettings`
 - `ULSGameDataSubsystem`: DataTable 로드, 캐싱, row 조회, 누락 row 검증만 담당하는 `UGameInstanceSubsystem`
 - `ULSStatusEffectComponent`: 상태이상 적용, 제거, 스택, 지속시간, UI/FX 훅을 담당하는 대상 Actor 컴포넌트
 - `GameplayAbility`: 스킬 발동, 명중 판정, 적용 대상 결정, 적용 타이밍만 담당
@@ -344,7 +367,7 @@ GameplayAbility 서버 권한에서 명중/대상 확정
 
 책임 분리:
 
-- `ULSGameDataSubsystem`: `FindActiveSkillRow`, `FindPassiveSkillRow`, `FindStatusEffectRow` 같은 순수 조회 API만 제공한다.
+- `ULSGameDataSubsystem`: `FindActiveSkillRow`, `FindPassiveSkillRow`, `FindComboAttackRow`, `FindStatusEffectRow` 같은 순수 조회 API만 제공한다.
 - `ULSPlayerSkillComponent`: 클라이언트 입력을 `ServerRequestActivateSkill`로 서버에 보내고, 서버의 `ActivateSkillOnServer`에서 `ULSGameDataSubsystem`에 `Skill_ID`로 row를 직접 요청해 스킬 row 존재 여부, 사거리, 쿨타임을 검증한다.
 - `GameplayAbility`: `FLSSkillActivationContext`에 포함된 서버 조회 row snapshot을 사용한다. 지연 실행 Actor처럼 context 밖에서 동작하는 객체는 실행 시점에 `ULSGameDataSubsystem`을 직접 조회한다.
 - `ULSStatusEffectComponent`: 상태이상 적용 가능 여부, 중복 스택 처리, 지속시간 override, 제거, UI/FX 이벤트를 관리한다.
@@ -372,7 +395,7 @@ GameplayAbility 서버 권한에서 명중/대상 확정
 3. 상태이상 row는 `FLSStatusEffectRow`로 분리한다.
 4. `ULSGameDataSettings`와 `ULSGameDataSubsystem`으로 액티브, 패시브, 상태이상 테이블 조회를 연결한다.
 5. `ULSStatusEffectComponent`를 추가하고 `Self` / `Target` 상태이상 적용만 우선 구현한다.
-6. 이후 패시브, Resource, Combo Attack 테이블 조회를 같은 Subsystem 구조로 확장한다.
+6. 이후 Resource 테이블 조회를 같은 Subsystem 구조로 확장한다.
 
 ## 데미지 구조
 

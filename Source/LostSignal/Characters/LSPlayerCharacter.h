@@ -256,9 +256,6 @@ private:
 	void ServerSetRunState(bool bNewIsRunning);
 
 	UFUNCTION(Server, Reliable)
-	void ServerRequestBasicAttack();
-
-	UFUNCTION(Server, Reliable)
 	void ServerRequestDash(FVector_NetQuantizeNormal DashDirection);
 
 	UFUNCTION(Server, Unreliable)

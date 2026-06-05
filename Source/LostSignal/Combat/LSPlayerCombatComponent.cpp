@@ -7,7 +7,10 @@
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Combat/LSCombatStateComponent.h"
 #include "Combat/LSCombatTypes.h"
+#include "Data/LSComboAttackRow.h"
+#include "Data/LSGameDataSubsystem.h"
 #include "Engine/EngineTypes.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GAS/Abilities/LSGA_Dash.h"
 #include "GAS/Abilities/Character1/LSGA_PlayerBasicAttack.h"
@@ -24,6 +27,7 @@
 ULSPlayerCombatComponent::ULSPlayerCombatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 	BasicAttackAbilityClass = ULSGA_PlayerBasicAttack::StaticClass();
 	DashAbilityClass = ULSGA_Dash::StaticClass();
 	BasicAttackDamageEffectClass = ULSGE_PlayerBasicDamage::StaticClass();
@@ -32,6 +36,17 @@ ULSPlayerCombatComponent::ULSPlayerCombatComponent()
 bool ULSPlayerCombatComponent::RequestBasicAttack()
 {
 	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
+	if (!OwnerCharacter || OwnerCharacter->IsTemplate())
+	{
+		return false;
+	}
+
+	if (!OwnerCharacter->HasAuthority())
+	{
+		ServerRequestBasicAttack();
+		return true;
+	}
+
 	ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent();
 	ULSCombatStateComponent* CombatStateComponent = ResolveCombatStateComponent();
 	if (!OwnerCharacter || OwnerCharacter->IsTemplate() || !SharedCombatComponent || !CombatStateComponent || SharedCombatComponent->IsDead())
@@ -50,11 +65,6 @@ bool ULSPlayerCombatComponent::RequestBasicAttack()
 		UE_LOG(LogLS, Warning, TEXT("%s basic attack rejected because AttackMontage is not set."),
 			*GetNameSafe(OwnerCharacter));
 		return false;
-	}
-
-	if (!OwnerCharacter->HasAuthority())
-	{
-		return true;
 	}
 
 	if (ULSGA_PlayerBasicAttack* ActiveAttackAbility = FindActiveBasicAttackAbility())
@@ -92,6 +102,11 @@ bool ULSPlayerCombatComponent::RequestBasicAttack()
 	}
 
 	return bActivated;
+}
+
+void ULSPlayerCombatComponent::ServerRequestBasicAttack_Implementation()
+{
+	RequestBasicAttack();
 }
 
 bool ULSPlayerCombatComponent::RequestDash()
@@ -268,16 +283,21 @@ void ULSPlayerCombatComponent::PerformMeleeHit()
 	{
 		AttackDirection = AttackDirection.GetSafeNormal();
 	}
-	const int32 ValidHitCount = ExecuteMeleeHit(AttackDirection);
+	ULSGA_PlayerBasicAttack* ActiveBasicAttackAbility = FindActiveBasicAttackAbility();
+	const int32 ComboIndex = ActiveBasicAttackAbility
+		? ActiveBasicAttackAbility->GetCurrentComboIndex()
+		: INDEX_NONE;
+	const int32 ComboTag = ActiveBasicAttackAbility ? ActiveBasicAttackAbility->GetCurrentComboTag() : 0;
+	const FLSComboAttackRow* ComboRow = ResolveComboAttackRow(ComboIndex, ComboTag);
+
+	const int32 ValidHitCount = ExecuteMeleeHit(AttackDirection, ComboRow);
 	if (ValidHitCount > 0)
 	{
-		const int32 ComboIndex = FindActiveBasicAttackAbility()
-			? FindActiveBasicAttackAbility()->GetCurrentComboIndex()
-			: INDEX_NONE;
+		const int32 ComboAttackID = ComboRow ? ComboRow->Combo_ID : INDEX_NONE;
 
 		if (ULSPlayerSkillComponent* SkillComponent = OwnerCharacter->FindComponentByClass<ULSPlayerSkillComponent>())
 		{
-			SkillComponent->HandleBasicAttackHit(ComboIndex, ValidHitCount);
+			SkillComponent->HandleBasicAttackHit(ComboIndex, ComboAttackID, ValidHitCount);
 		}
 	}
 
@@ -309,7 +329,7 @@ void ULSPlayerCombatComponent::ResetBasicAttackHit()
 	bAttackHitConsumed = false;
 }
 
-void ULSPlayerCombatComponent::SetPendingBasicAttackComboIndexOverride(int32 ComboIndex, float ExpireSeconds)
+void ULSPlayerCombatComponent::SetPendingBasicAttackComboIndexOverride(int32 ComboIndex, float ExpireSeconds, int32 ComboTag)
 {
 	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
 	if (!OwnerCharacter || !OwnerCharacter->HasAuthority() || ComboIndex == INDEX_NONE)
@@ -318,6 +338,7 @@ void ULSPlayerCombatComponent::SetPendingBasicAttackComboIndexOverride(int32 Com
 	}
 
 	PendingComboIndexOverride = ComboIndex;
+	PendingComboTagOverride = FMath::Max(0, ComboTag);
 	if (ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent())
 	{
 		SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_NextAttack_ComboIndexOverride, true);
@@ -337,13 +358,14 @@ void ULSPlayerCombatComponent::SetPendingBasicAttackComboIndexOverride(int32 Com
 		}
 	}
 
-	UE_LOG(LogLS, Log, TEXT("%s reserved next basic attack combo index override. ComboIndex=%d Window=%.2f"),
+	UE_LOG(LogLS, Log, TEXT("%s reserved next basic attack combo index override. ComboIndex=%d ComboTag=%d Window=%.2f"),
 		*GetNameSafe(OwnerCharacter),
 		PendingComboIndexOverride,
+		PendingComboTagOverride,
 		ExpireSeconds);
 }
 
-bool ULSPlayerCombatComponent::ConsumePendingBasicAttackComboIndexOverride(int32& OutComboIndex)
+bool ULSPlayerCombatComponent::ConsumePendingBasicAttackComboIndexOverride(int32& OutComboIndex, int32& OutComboTag)
 {
 	if (PendingComboIndexOverride == INDEX_NONE)
 	{
@@ -351,6 +373,7 @@ bool ULSPlayerCombatComponent::ConsumePendingBasicAttackComboIndexOverride(int32
 	}
 
 	OutComboIndex = PendingComboIndexOverride;
+	OutComboTag = PendingComboTagOverride;
 	ClearPendingBasicAttackComboIndexOverride();
 	return true;
 }
@@ -532,6 +555,7 @@ void ULSPlayerCombatComponent::ClearPendingBasicAttackComboIndexOverride()
 	}
 
 	PendingComboIndexOverride = INDEX_NONE;
+	PendingComboTagOverride = 0;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PendingComboIndexOverrideTimerHandle);
@@ -543,7 +567,35 @@ void ULSPlayerCombatComponent::ClearPendingBasicAttackComboIndexOverride()
 	}
 }
 
-int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection)
+int32 ULSPlayerCombatComponent::ResolveComboAttackID(int32 ComboSectionIndex, int32 ComboTagOverride) const
+{
+	const FLSComboAttackRow* ComboRow = ResolveComboAttackRow(ComboSectionIndex, ComboTagOverride);
+	return ComboRow ? ComboRow->Combo_ID : INDEX_NONE;
+}
+
+const FLSComboAttackRow* ULSPlayerCombatComponent::ResolveComboAttackRow(int32 ComboSectionIndex, int32 ComboTagOverride) const
+{
+	if (ComboSectionIndex == INDEX_NONE)
+	{
+		return nullptr;
+	}
+
+	const UWorld* World = GetWorld();
+	const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	if (!GameDataSubsystem)
+	{
+		return nullptr;
+	}
+
+	return GameDataSubsystem->FindComboAttackRowByIndex(
+		ComboCharacterID,
+		ComboSectionIndex + 1,
+		FMath::Max(0, ComboTagOverride),
+		TEXT("PlayerCombat.ResolveComboAttackID"));
+}
+
+int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection, const FLSComboAttackRow* ComboRow)
 {
 	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
 	ULSCharacterCombatComponent* SharedCombatComponent = ResolveSharedCombatComponent();
@@ -569,6 +621,18 @@ int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection)
 		ActorsToIgnore,
 		OverlappedActors);
 
+	const float AttackCoefficient = ComboRow && ComboRow->Combo_Multiplier > 0.0f
+		? ComboRow->Combo_Multiplier
+		: BasicAttackAttackCoefficient;
+	UE_LOG(
+		LogLS,
+		Log,
+		TEXT("%s basic attack damage coefficient resolved. ComboID=%d ComboMultiplier=%.3f FinalCoefficient=%.3f"),
+		*GetNameSafe(OwnerCharacter),
+		ComboRow ? ComboRow->Combo_ID : INDEX_NONE,
+		ComboRow ? ComboRow->Combo_Multiplier : 0.0f,
+		AttackCoefficient);
+
 	TSet<AActor*> UniqueTargets;
 	for (AActor* HitActor : OverlappedActors)
 	{
@@ -582,7 +646,7 @@ int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection)
 			BasicAttackDamageEffectClass,
 			DamageEffectLevel,
 			BasicAttackFixedDamage,
-			BasicAttackAttackCoefficient,
+			AttackCoefficient,
 			bBasicAttackCanCrit,
 			BasicAttackBreakPower))
 		{

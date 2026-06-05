@@ -158,13 +158,6 @@ void ALSPlayerCharacter::OnAttack()
 		return;
 	}
 
-	if (!HasAuthority())
-	{
-		PlayerCombatComponent->RequestBasicAttack();
-		ServerRequestBasicAttack();
-		return;
-	}
-
 	PlayerCombatComponent->RequestBasicAttack();
 }
 
@@ -641,14 +634,6 @@ void ALSPlayerCharacter::ApplyRunState(bool bNewIsRunning)
 void ALSPlayerCharacter::ServerSetRunState_Implementation(bool bNewIsRunning)
 {
 	ApplyRunState(bNewIsRunning);
-}
-
-void ALSPlayerCharacter::ServerRequestBasicAttack_Implementation()
-{
-	if (PlayerCombatComponent)
-	{
-		PlayerCombatComponent->RequestBasicAttack();
-	}
 }
 
 void ALSPlayerCharacter::ServerRequestDash_Implementation(FVector_NetQuantizeNormal DashDirection)

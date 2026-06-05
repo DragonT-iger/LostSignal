@@ -56,7 +56,7 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Skill")
 	bool GetActivePreviewSpec(FLSSkillAreaPreviewSpec& OutPreviewSpec) const;
 
-	void HandleBasicAttackHit(int32 ComboIndex, int32 ValidHitCount);
+	void HandleBasicAttackHit(int32 ComboIndex, int32 ComboAttackID, int32 ValidHitCount);
 	bool ConsumePendingAbilityContext(TSubclassOf<UGameplayAbility> AbilityClass, FLSSkillActivationContext& OutContext);
 	bool ApplySkillCooldown(const ULSSkillDataAsset* SkillData) const;
 	bool IsSkillCooldownActive(const ULSSkillDataAsset* SkillData) const;
@@ -95,7 +95,7 @@ private:
 	FVector ClampTargetLocationToCastRange(const ULSSkillDataAsset* SkillData, const FVector& TargetLocation) const;
 	void LogSkillCooldownBlocked(const ULSSkillDataAsset* SkillData, const TCHAR* Phase) const;
 	bool TryActivateGameplayAbility(ULSSkillDataAsset* SkillData, const FLSSkillActivationContext& Context);
-	bool TrySendPassiveGameplayEvent(ULSPassiveSkillDataAsset* SkillData, int32 ComboIndex) const;
+	bool TrySendPassiveGameplayEvent(ULSPassiveSkillDataAsset* SkillData, int32 ComboIndex, int32 ComboAttackID) const;
 	bool TryPredictFastMovementSkill(ULSSkillDataAsset* SkillData, const FVector& TargetLocation, float AimYaw);
 	bool ResolvePredictedFastMovementParams(ULSSkillDataAsset* SkillData, float& OutDistance, float& OutDuration) const;
 	void IgnoreEnemiesForPredictedFastMovement(ACharacter* OwnerCharacter, const FVector& StartLocation, const FVector& Direction, float Distance);

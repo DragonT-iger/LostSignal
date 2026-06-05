@@ -12,6 +12,7 @@ class ULSGA_PlayerBasicAttack;
 class ULSAimComponent;
 class ULSCharacterCombatComponent;
 class ULSCombatStateComponent;
+struct FLSComboAttackRow;
 
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
 class LOSTSIGNAL_API ULSPlayerCombatComponent : public UActorComponent
@@ -31,9 +32,10 @@ public:
 	void ResetBasicAttackHit();
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
-	void SetPendingBasicAttackComboIndexOverride(int32 ComboIndex, float ExpireSeconds);
+	void SetPendingBasicAttackComboIndexOverride(int32 ComboIndex, float ExpireSeconds, int32 ComboTag = 0);
 
-	bool ConsumePendingBasicAttackComboIndexOverride(int32& OutComboIndex);
+	bool ConsumePendingBasicAttackComboIndexOverride(int32& OutComboIndex, int32& OutComboTag);
+	const FLSComboAttackRow* ResolveComboAttackRow(int32 ComboSectionIndex, int32 ComboTagOverride) const;
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	bool RequestDash();
@@ -93,6 +95,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	ELSBreakPowerTier BasicAttackBreakPower = ELSBreakPowerTier::NormalAttack;
 
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
+	int32 ComboCharacterID = 101;
+
 	FTimerHandle PredictedDashTimerHandle;
 	FTimerHandle PredictedDashCooldownTimerHandle;
 	FTimerHandle PendingComboIndexOverrideTimerHandle;
@@ -102,6 +107,7 @@ private:
 	uint16 PredictedDashRootMotionSourceID = 0;
 	FVector PendingDashDirection = FVector::ZeroVector;
 	int32 PendingComboIndexOverride = INDEX_NONE;
+	int32 PendingComboTagOverride = 0;
 
 	ULSAimComponent* ResolveAimComponent() const;
 	ULSCharacterCombatComponent* ResolveSharedCombatComponent() const;
@@ -113,10 +119,14 @@ private:
 	void FinishPredictedDash();
 	void FinishPredictedDashCooldown();
 	void ClearPendingBasicAttackComboIndexOverride();
-	int32 ExecuteMeleeHit(const FVector& AttackDirection);
+	int32 ExecuteMeleeHit(const FVector& AttackDirection, const FLSComboAttackRow* ComboRow);
+	int32 ResolveComboAttackID(int32 ComboSectionIndex, int32 ComboTagOverride) const;
 	ULSGA_PlayerBasicAttack* FindActiveBasicAttackAbility() const;
 	bool ApplyDashRootMotion(const FVector& DashDirection, uint16& OutRootMotionSourceID) const;
 	float GetDashDuration() const;
 	float GetDashCooldown() const;
 	bool IsDashCooldownActive() const;
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestBasicAttack();
 };

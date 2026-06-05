@@ -18,5 +18,8 @@ public:
 	TSoftObjectPtr<UDataTable> CharacterPassiveSkillTable;
 
 	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
+	TSoftObjectPtr<UDataTable> ComboAttackTable;
+
+	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
 	TSoftObjectPtr<UDataTable> StatusEffectTable;
 };

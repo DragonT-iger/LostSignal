@@ -30,6 +30,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Bypass|Macro", meta=(ClampMin="0"))
 	int32 ComboIndexOverride = 2;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Bypass|Macro", meta=(ClampMin="0"))
+	int32 ComboTagOverride = 0;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Bypass|Macro", meta=(ClampMin="0.0"))
 	float ComboIndexOverrideWindowSeconds = 1.0f;
 

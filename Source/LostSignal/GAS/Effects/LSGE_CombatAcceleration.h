@@ -5,7 +5,7 @@
 
 /**
  * Stacking passive buff for Combat Acceleration.
- * SetByCaller values come from ULSCombatAccelerationSkillDataAsset.
+ * SetByCaller values come from Passive and StatusEffect DataTables.
  */
 UCLASS()
 class LOSTSIGNAL_API ULSGE_CombatAcceleration : public UGameplayEffect

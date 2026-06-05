@@ -9,10 +9,13 @@ UENUM(BlueprintType)
 enum class ELSCharacterPassiveTriggerEvent : uint8
 {
 	None,
+	Always,
 	OnComboEnd,
 	OnDamaged,
 	OnGuard,
 	OnIdle,
+	Onkill,
+	OnKill,
 	OnSkillCast,
 	OnStrike
 };
@@ -37,6 +40,38 @@ USTRUCT(BlueprintType)
 struct LOSTSIGNAL_API FLSCharacterPassiveSkillRow : public FTableRowBase
 {
 	GENERATED_BODY()
+
+	virtual void OnPostDataImport(const UDataTable* InDataTable, const FName InRowName, TArray<FString>& OutCollectedImportProblems) override
+	{
+		NormalizePassiveSkillIDFromRowName(InRowName);
+	}
+
+	virtual void OnDataTableChanged(const UDataTable* InDataTable, const FName InRowName) override
+	{
+		NormalizePassiveSkillIDFromRowName(InRowName);
+	}
+
+	void NormalizePassiveSkillIDFromRowName(const FName InRowName)
+	{
+		const FString RowNameString = InRowName.ToString();
+		if (RowNameString.IsEmpty())
+		{
+			return;
+		}
+
+		for (const TCHAR Character : RowNameString)
+		{
+			if (!FChar::IsDigit(Character))
+			{
+				return;
+			}
+		}
+
+		PassiveSkill_ID = FCString::Atoi(*RowNameString);
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill")
+	int32 PassiveSkill_ID = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Skill")
 	int32 Skill_Char = 0;

@@ -210,7 +210,8 @@ void ULSGA_Bypass::ApplyBypassStartEffects(float Duration)
 
 	PlayerCombatComponent->SetPendingBasicAttackComboIndexOverride(
 		BypassData->ComboIndexOverride,
-		Duration + BypassData->ComboIndexOverrideWindowSeconds);
+		Duration + BypassData->ComboIndexOverrideWindowSeconds,
+		BypassData->ComboTagOverride);
 }
 
 void ULSGA_Bypass::ApplySpoofingStartEffects(const FVector& HologramLocation)
