@@ -1,7 +1,9 @@
 #include "UI/Protocol/LSProtocolWidget.h"
 
+#include "Blueprint/WidgetTree.h"
 #include "Components/RichTextBlock.h"
 #include "Components/TextBlock.h"
+#include "Components/Widget.h"
 #include "LostSignal.h"
 #include "UI/Protocol/LSProtocolTooltipWidget.h"
 
@@ -70,13 +72,12 @@ FString ULSProtocolWidget::BuildSynergyMarkup(int32 ActiveStage) const
 	return Markup;
 }
 
-void ULSProtocolWidget::RefreshProtocolTooltip()
+ULSProtocolTooltipWidget* ULSProtocolWidget::CreateProtocolTooltipWidget()
 {
 	if (!ProtocolTooltipWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("ProtocolTooltipWidgetClass is not set on %s."), *GetNameSafe(this));
-		SetToolTip(nullptr);
-		return;
+		return nullptr;
 	}
 
 	ULSProtocolTooltipWidget* ProtocolTooltipWidget = nullptr;
@@ -92,10 +93,39 @@ void ULSProtocolWidget::RefreshProtocolTooltip()
 	if (!ProtocolTooltipWidget)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Failed to create protocol tooltip widget on %s."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	ProtocolTooltipWidget->SetProtocolTooltip(ProtocolType, TooltipIconTexture);
+	return ProtocolTooltipWidget;
+}
+
+void ULSProtocolWidget::RefreshProtocolTooltip()
+{
+	ULSProtocolTooltipWidget* ProtocolTooltipWidget = CreateProtocolTooltipWidget();
+	if (!ProtocolTooltipWidget)
+	{
 		SetToolTip(nullptr);
 		return;
 	}
 
-	ProtocolTooltipWidget->SetProtocolTooltip(ProtocolType, TooltipIconTexture);
 	SetToolTip(ProtocolTooltipWidget);
+
+	UWidget* RootWidget = WidgetTree ? WidgetTree->RootWidget : nullptr;
+	if (!RootWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("RootWidget is not set on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (RootWidget->GetVisibility() == ESlateVisibility::HitTestInvisible ||
+		RootWidget->GetVisibility() == ESlateVisibility::SelfHitTestInvisible)
+	{
+		RootWidget->SetVisibility(ESlateVisibility::Visible);
+	}
+
+	if (ULSProtocolTooltipWidget* RootTooltipWidget = CreateProtocolTooltipWidget())
+	{
+		RootWidget->SetToolTip(RootTooltipWidget);
+	}
 }

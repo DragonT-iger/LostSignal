@@ -68,5 +68,6 @@ protected:
 private:
 	// 활성 단계까지 Bold, 나머지 Light 로 감싼 RichText 마크업을 만든다.
 	FString BuildSynergyMarkup(int32 ActiveStage) const;
+	ULSProtocolTooltipWidget* CreateProtocolTooltipWidget();
 	void RefreshProtocolTooltip();
 };
