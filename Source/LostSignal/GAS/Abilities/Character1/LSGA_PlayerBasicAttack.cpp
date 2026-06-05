@@ -389,7 +389,7 @@ float ULSGA_PlayerBasicAttack::ResolveComboPlayRate(const FLSComboAttackRow* Com
 		return BasePlayRate;
 	}
 
-	const float PlayRate = FMath::Max(0.01f, SectionLength / ComboRow->Combo_Time);
+	const float PlayRate = FMath::Max(0.01f, SectionLength / ComboRow->Combo_Time * AttackSpeed);
 	const float FinalSectionTime = SectionLength / PlayRate;
 	UE_LOG(
 		LogLS,
