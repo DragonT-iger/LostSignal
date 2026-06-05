@@ -353,54 +353,23 @@ float ULSGA_PlayerBasicAttack::ResolveComboPlayRate(const FLSComboAttackRow* Com
 	const float BasePlayRate = FMath::Max(0.01f, AttackSpeed);
 	if (!ComboRow || ComboRow->Combo_Time <= 0.0f || !ActiveAttackMontage || !ComboSections.IsValidIndex(SectionIndex))
 	{
-		UE_LOG(
-			LogLS,
-			Log,
-			TEXT("BasicAttack combo play rate uses fallback. SectionIndex=%d PlayRate=%.3f AttackSpeed=%.3f ComboRow=%s"),
-			SectionIndex,
-			BasePlayRate,
-			AttackSpeed,
-			ComboRow ? TEXT("Valid") : TEXT("None"));
 		return BasePlayRate;
 	}
 
 	const int32 MontageSectionIndex = ActiveAttackMontage->GetSectionIndex(ComboSections[SectionIndex]);
 	if (MontageSectionIndex == INDEX_NONE)
 	{
-		UE_LOG(
-			LogLS,
-			Log,
-			TEXT("BasicAttack combo play rate uses fallback because montage section is missing. Section=%s PlayRate=%.3f"),
-			*ComboSections[SectionIndex].ToString(),
-			BasePlayRate);
 		return BasePlayRate;
 	}
 
 	const float SectionLength = ActiveAttackMontage->GetSectionLength(MontageSectionIndex);
 	if (SectionLength <= 0.0f)
 	{
-		UE_LOG(
-			LogLS,
-			Log,
-			TEXT("BasicAttack combo play rate uses fallback because section length is invalid. Section=%s SectionLength=%.3f PlayRate=%.3f"),
-			*ComboSections[SectionIndex].ToString(),
-			SectionLength,
-			BasePlayRate);
 		return BasePlayRate;
 	}
 
 	const float PlayRate = FMath::Max(0.01f, SectionLength / ComboRow->Combo_Time * AttackSpeed);
 	const float FinalSectionTime = SectionLength / PlayRate;
-	UE_LOG(
-		LogLS,
-		Log,
-		TEXT("BasicAttack combo play rate resolved. ComboID=%d Section=%s SectionLength=%.3f ComboTime=%.3f PlayRate=%.3f FinalSectionTime=%.3f"),
-		ComboRow->Combo_ID,
-		*ComboSections[SectionIndex].ToString(),
-		SectionLength,
-		ComboRow->Combo_Time,
-		PlayRate,
-		FinalSectionTime);
 
 	return PlayRate;
 }
