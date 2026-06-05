@@ -2,6 +2,15 @@
 
 #include "Components/RichTextBlock.h"
 #include "Components/TextBlock.h"
+#include "LostSignal.h"
+#include "UI/Protocol/LSProtocolTooltipWidget.h"
+
+void ULSProtocolWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	RefreshProtocolTooltip();
+}
 
 void ULSProtocolWidget::SetProtocol(int32 Level, int32 SynergyStage)
 {
@@ -13,6 +22,12 @@ void ULSProtocolWidget::SetProtocol(int32 Level, int32 SynergyStage)
 	{
 		SynergyStageText->SetText(FText::FromString(BuildSynergyMarkup(SynergyStage)));
 	}
+}
+
+void ULSProtocolWidget::SetProtocolType(const ELSProtocolType InProtocolType)
+{
+	ProtocolType = InProtocolType;
+	RefreshProtocolTooltip();
 }
 
 FString ULSProtocolWidget::BuildSynergyMarkup(int32 ActiveStage) const
@@ -53,4 +68,34 @@ FString ULSProtocolWidget::BuildSynergyMarkup(int32 ActiveStage) const
 	}
 
 	return Markup;
+}
+
+void ULSProtocolWidget::RefreshProtocolTooltip()
+{
+	if (!ProtocolTooltipWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("ProtocolTooltipWidgetClass is not set on %s."), *GetNameSafe(this));
+		SetToolTip(nullptr);
+		return;
+	}
+
+	ULSProtocolTooltipWidget* ProtocolTooltipWidget = nullptr;
+	if (APlayerController* OwningPlayer = GetOwningPlayer())
+	{
+		ProtocolTooltipWidget = CreateWidget<ULSProtocolTooltipWidget>(OwningPlayer, ProtocolTooltipWidgetClass);
+	}
+	else if (UWorld* World = GetWorld())
+	{
+		ProtocolTooltipWidget = CreateWidget<ULSProtocolTooltipWidget>(World, ProtocolTooltipWidgetClass);
+	}
+
+	if (!ProtocolTooltipWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Failed to create protocol tooltip widget on %s."), *GetNameSafe(this));
+		SetToolTip(nullptr);
+		return;
+	}
+
+	ProtocolTooltipWidget->SetProtocolTooltip(ProtocolType, TooltipIconTexture);
+	SetToolTip(ProtocolTooltipWidget);
 }

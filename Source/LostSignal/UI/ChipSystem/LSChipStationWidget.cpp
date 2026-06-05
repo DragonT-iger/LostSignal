@@ -121,6 +121,19 @@ TArray<FLSSessionItem> BuildInactiveSignalEquipmentItems(const TArray<FLSSession
 	return InactiveItems;
 }
 
+TArray<FLSSessionItem> BuildSignalActiveEquipmentItems(const TArray<FLSSessionItem>& Items, const int32 InactiveSlotCount)
+{
+	TArray<FLSSessionItem> ActiveItems;
+	ActiveItems.Reserve(Items.Num());
+
+	for (int32 SlotIndex = InactiveSlotCount; SlotIndex < Items.Num(); ++SlotIndex)
+	{
+		ActiveItems.Add(Items[SlotIndex]);
+	}
+
+	return ActiveItems;
+}
+
 int32 GetHalfSignalLossValue(const TMap<FName, int32>& Totals, const FName StatKey)
 {
 	const int32* Total = Totals.Find(StatKey);
@@ -171,6 +184,23 @@ void SortChipViewItems(TArray<FLSChipStationViewItem>& ViewItems)
 void ULSChipStationWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	if (Protocol_Survival)
+	{
+		Protocol_Survival->SetProtocolType(ELSProtocolType::Survival);
+	}
+	if (Protocol_Carrying)
+	{
+		Protocol_Carrying->SetProtocolType(ELSProtocolType::Carrying);
+	}
+	if (Protocol_Battle)
+	{
+		Protocol_Battle->SetProtocolType(ELSProtocolType::Battle);
+	}
+	if (Protocol_Navigation)
+	{
+		Protocol_Navigation->SetProtocolType(ELSProtocolType::Navigation);
+	}
 
 	InitializeEquipmentSlots();
 
@@ -331,6 +361,7 @@ void ULSChipStationWidget::RefreshEquippedChipSummary()
 	const int32 InactiveSlotCount = GetInactiveSignalSlotCount();
 	const TArray<FLSSessionItem>& AllEquipmentItems = EquipmentItems;
 	const TArray<FLSSessionItem> InactiveEquipmentItems = BuildInactiveSignalEquipmentItems(EquipmentItems, InactiveSlotCount);
+	const TArray<FLSSessionItem> ProtocolEquipmentItems = BuildSignalActiveEquipmentItems(EquipmentItems, InactiveSlotCount);
 	const TMap<FName, int32> StatTotals = LSChipStats::AggregateChipStatTotals(AllEquipmentItems);
 	const TMap<FName, int32> SignalLossTotals = LSChipStats::AggregateChipStatTotals(InactiveEquipmentItems);
 	auto GetStatTotal = [&StatTotals](const FName StatKey)
@@ -356,7 +387,7 @@ void ULSChipStationWidget::RefreshEquippedChipSummary()
 	SetChipStat(TEXT("Chip_Recovery"), GetStatTotal(TEXT("Chip_Recovery")), GetSignalLossTotal(TEXT("Chip_Recovery")));
 	SetChipStat(TEXT("Chip_Move_Speed"), GetStatTotal(TEXT("Chip_Move_Speed")), GetSignalLossTotal(TEXT("Chip_Move_Speed")));
 
-	const FLSChipProtocolTotals ProtocolTotals = LSChipStats::AggregateChipProtocolTotals(AllEquipmentItems, this);
+	const FLSChipProtocolTotals ProtocolTotals = LSChipStats::AggregateChipProtocolTotals(ProtocolEquipmentItems, this);
 	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), ProtocolTotals.Survival, ProtocolTotals.Survival);
 	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), ProtocolTotals.Carrying, ProtocolTotals.Carrying);
 	SetProtocolWidget(Protocol_Battle, TEXT("Protocol_Battle"), ProtocolTotals.Battle, ProtocolTotals.Battle);

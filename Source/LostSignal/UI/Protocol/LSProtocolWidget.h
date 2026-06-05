@@ -4,8 +4,19 @@
 #include "CoreMinimal.h"
 #include "LSProtocolWidget.generated.h"
 
+class ULSProtocolTooltipWidget;
 class UTextBlock;
 class URichTextBlock;
+class UTexture2D;
+
+UENUM(BlueprintType)
+enum class ELSProtocolType : uint8
+{
+	Survival,
+	Carrying,
+	Battle,
+	Navigation
+};
 
 // 프로토콜 한 줄 위젯 (WBP_Protocol 등 한 칸의 부모 클래스).
 // 프로토콜 이름은 WBP 에서 이미지로 직접 표시한다(여기서 다루지 않음).
@@ -29,7 +40,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
 	void SetProtocol(int32 Level, int32 SynergyStage);
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
+	void SetProtocolType(ELSProtocolType InProtocolType);
+
 protected:
+	virtual void NativeConstruct() override;
+
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTextBlock> LevelText;
 
@@ -40,7 +56,17 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI")
 	int32 SynergyStageCount = 8;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
+	ELSProtocolType ProtocolType = ELSProtocolType::Survival;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
+	TObjectPtr<UTexture2D> TooltipIconTexture;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
+	TSubclassOf<ULSProtocolTooltipWidget> ProtocolTooltipWidgetClass;
+
 private:
 	// 활성 단계까지 Bold, 나머지 Light 로 감싼 RichText 마크업을 만든다.
 	FString BuildSynergyMarkup(int32 ActiveStage) const;
+	void RefreshProtocolTooltip();
 };

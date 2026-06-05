@@ -9,6 +9,23 @@ void ULSProtocolUIWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	if (Protocol_Survival)
+	{
+		Protocol_Survival->SetProtocolType(ELSProtocolType::Survival);
+	}
+	if (Protocol_Carrying)
+	{
+		Protocol_Carrying->SetProtocolType(ELSProtocolType::Carrying);
+	}
+	if (Protocol_Battle)
+	{
+		Protocol_Battle->SetProtocolType(ELSProtocolType::Battle);
+	}
+	if (Protocol_Navigation)
+	{
+		Protocol_Navigation->SetProtocolType(ELSProtocolType::Navigation);
+	}
+
 	RefreshProtocolUI();
 }
 
