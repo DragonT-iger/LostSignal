@@ -178,6 +178,12 @@ protected:
 	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
 	float RunSpeed = 600.0f;
 
+	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
+	float MaxAllowedStepHeight = 10.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0", ClampMax="90.0"))
+	float MaxWalkableSlopeAngle = 5.0f;
+
 	UPROPERTY(EditAnywhere, Category="LS/Camera")
 	float TopDownCameraPitch = -60.0f;
 

@@ -56,7 +56,12 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	PlayerSkillComponent = CreateDefaultSubobject<ULSPlayerSkillComponent>(TEXT("PlayerSkillComponent"));
 	PlayerAttributeSet = CreateDefaultSubobject<ULSCharacterAttributeSet>(TEXT("PlayerAttributeSet"));
 
-	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->MaxWalkSpeed = WalkSpeed;
+		MovementComponent->MaxStepHeight = MaxAllowedStepHeight;
+		MovementComponent->SetWalkableFloorAngle(MaxWalkableSlopeAngle);
+	}
 }
 
 void ALSPlayerCharacter::BeginPlay()
