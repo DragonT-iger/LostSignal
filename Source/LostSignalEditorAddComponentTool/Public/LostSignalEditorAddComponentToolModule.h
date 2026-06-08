@@ -12,4 +12,5 @@ private:
 	void RegisterMenus();
 	void AddVisionSetupToSelectedActors();
 	void AddRoofSetupToSelectedActors();
+	void AddMinimapObstacleToSelectedActors();
 };

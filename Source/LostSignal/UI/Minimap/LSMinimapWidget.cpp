@@ -10,6 +10,7 @@
 #include "Internationalization/Text.h"
 #include "LostSignal.h"
 #include "Minimap/LSMinimapMarkerComponent.h"
+#include "Minimap/LSMinimapObstacleComponent.h"
 #include "Minimap/LSMinimapShapeActor.h"
 #include "Minimap/LSMinimapSubsystem.h"
 #include "Session/LSSaveSubsystem.h"
@@ -102,6 +103,7 @@ int32 ULSMinimapWidget::NativePaint(
 	const float PixelsPerCm = Radius / FMath::Max(ViewRadiusCm, 1.0f);
 
 	DrawFilledCircle(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, Radius, BackgroundColor);
+	DrawCircleOutline(OutDrawElements, CurrentLayer, AllottedGeometry, Center, Radius - 0.75f, BackgroundColor, 1.5f);
 
 	UWorld* World = GetWorld();
 	ULSMinimapSubsystem* MinimapSubsystem = World ? World->GetSubsystem<ULSMinimapSubsystem>() : nullptr;
@@ -118,6 +120,7 @@ int32 ULSMinimapWidget::NativePaint(
 		}
 	}
 	DrawVisionTerrain(AllottedGeometry, OutDrawElements, CurrentLayer, Center, Radius, PixelsPerCm);
+	DrawMinimapObstacles(AllottedGeometry, OutDrawElements, CurrentLayer, Center, Radius, PixelsPerCm);
 
 	const APawn* Pawn = ObservedPawn.Get();
 	if (Pawn)
@@ -342,6 +345,56 @@ void ULSMinimapWidget::DrawShape(const FLSMinimapShapeSnapshot& Shape, const FGe
 	}
 }
 
+void ULSMinimapWidget::DrawMinimapObstacles(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm) const
+{
+	const UWorld* World = GetWorld();
+	const ULSMinimapSubsystem* MinimapSubsystem = World ? World->GetSubsystem<ULSMinimapSubsystem>() : nullptr;
+	if (!MinimapSubsystem)
+	{
+		return;
+	}
+
+	TArray<ULSMinimapObstacleComponent*> Obstacles;
+	MinimapSubsystem->GetRegisteredObstacles(Obstacles);
+	for (const ULSMinimapObstacleComponent* Obstacle : Obstacles)
+	{
+		if (!IsValid(Obstacle) || !Obstacle->IsMinimapVisible())
+		{
+			continue;
+		}
+
+		TArray<FBox> BoundsList;
+		Obstacle->GatherObstacleBounds(BoundsList);
+		for (const FBox& Bounds : BoundsList)
+		{
+			if (Bounds.IsValid)
+			{
+				DrawObstacleBounds(Bounds, Geometry, OutDrawElements, ++LayerId, Center, Radius, PixelsPerCm, FlattenTerrainColor(Obstacle->GetObstacleColor()), Obstacle->GetLineThickness());
+			}
+		}
+	}
+}
+
+void ULSMinimapWidget::DrawObstacleBounds(const FBox& Bounds, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm, const FLinearColor& Color, const float Thickness) const
+{
+	const TArray<FVector2D> Corners = {
+		ProjectWorldLocation(FVector(Bounds.Min.X, Bounds.Min.Y, Bounds.Min.Z), Center, PixelsPerCm),
+		ProjectWorldLocation(FVector(Bounds.Max.X, Bounds.Min.Y, Bounds.Min.Z), Center, PixelsPerCm),
+		ProjectWorldLocation(FVector(Bounds.Max.X, Bounds.Max.Y, Bounds.Min.Z), Center, PixelsPerCm),
+		ProjectWorldLocation(FVector(Bounds.Min.X, Bounds.Max.Y, Bounds.Min.Z), Center, PixelsPerCm)
+	};
+
+	for (int32 CornerIndex = 0; CornerIndex < Corners.Num(); ++CornerIndex)
+	{
+		FVector2D Start = Corners[CornerIndex];
+		FVector2D End = Corners[(CornerIndex + 1) % Corners.Num()];
+		if (ClipSegmentToCircle(Start, End, Center, Radius - 0.75f))
+		{
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { Start, End }, ESlateDrawEffect::None, Color, true, Thickness);
+		}
+	}
+}
+
 void ULSMinimapWidget::DrawVisionTerrain(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm) const
 {
 	const UWorld* World = GetWorld();
@@ -416,7 +469,17 @@ void ULSMinimapWidget::DrawVisionSurfaceBounds(const FBox& Bounds, const FGeomet
 		ProjectWorldLocation(FVector(Bounds.Max.X, Bounds.Max.Y, Bounds.Min.Z), Center, PixelsPerCm),
 		ProjectWorldLocation(FVector(Bounds.Min.X, Bounds.Max.Y, Bounds.Min.Z), Center, PixelsPerCm)
 	};
-	DrawFilledPolygonInCircle(OutDrawElements, LayerId, Geometry, Corners, Center, Radius, FlattenTerrainColor(VisionTerrainColor));
+	const FLinearColor TerrainColor = FlattenTerrainColor(VisionTerrainColor);
+	DrawFilledPolygonInCircle(OutDrawElements, LayerId, Geometry, Corners, Center, Radius, TerrainColor);
+	for (int32 CornerIndex = 0; CornerIndex < Corners.Num(); ++CornerIndex)
+	{
+		FVector2D Start = Corners[CornerIndex];
+		FVector2D End = Corners[(CornerIndex + 1) % Corners.Num()];
+		if (ClipSegmentToCircle(Start, End, Center, Radius - 0.75f))
+		{
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { Start, End }, ESlateDrawEffect::None, TerrainColor, true, 1.5f);
+		}
+	}
 }
 
 void ULSMinimapWidget::DrawVisionOccluderSegments(const TArray<FLSVisionSegment2D>& Segments, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm) const
@@ -432,6 +495,7 @@ void ULSMinimapWidget::DrawVisionOccluderSegments(const TArray<FLSVisionSegment2
 			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { ProjectedStart, ProjectedEnd }, ESlateDrawEffect::None, FlattenTerrainColor(VisionTerrainColor), true, 3.0f);
 		}
 	}
+
 }
 
 void ULSMinimapWidget::DrawSightCone(FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FGeometry& Geometry, const FVector2D& Center, const FVector2D& Forward, const float Radius, const float AngleDegrees, const FLinearColor& Color) const
@@ -493,6 +557,25 @@ void ULSMinimapWidget::DrawSightCone(FSlateWindowElementList& OutDrawElements, c
 				Color);
 		}
 	}
+
+	const float HalfAngleRad = FMath::DegreesToRadians(FMath::Clamp(AngleDegrees, 1.0f, 180.0f) * 0.5f);
+	const FVector2D Right(ForwardNormal.Y, -ForwardNormal.X);
+	const FVector2D LeftDirection = (ForwardNormal * FMath::Cos(HalfAngleRad)) - (Right * FMath::Sin(HalfAngleRad));
+	const FVector2D RightDirection = (ForwardNormal * FMath::Cos(HalfAngleRad)) + (Right * FMath::Sin(HalfAngleRad));
+	TArray<FVector2D> OutlinePoints;
+	OutlinePoints.Reserve(35);
+	OutlinePoints.Add(Center);
+	OutlinePoints.Add(Center + LeftDirection * (Radius - 0.75f));
+	for (int32 ArcIndex = 1; ArcIndex < 32; ++ArcIndex)
+	{
+		const float Alpha = static_cast<float>(ArcIndex) / 32.0f;
+		const float Angle = FMath::Lerp(-HalfAngleRad, HalfAngleRad, Alpha);
+		const FVector2D ArcDirection = (ForwardNormal * FMath::Cos(Angle)) + (Right * FMath::Sin(Angle));
+		OutlinePoints.Add(Center + ArcDirection * (Radius - 0.75f));
+	}
+	OutlinePoints.Add(Center + RightDirection * (Radius - 0.75f));
+	OutlinePoints.Add(Center);
+	DrawPolyline(OutDrawElements, LayerId, Geometry, OutlinePoints, Color, 1.5f, false);
 }
 
 void ULSMinimapWidget::DrawFilledPolygonInCircle(FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FGeometry& Geometry, const TArray<FVector2D>& Points, const FVector2D& Center, const float Radius, const FLinearColor& Color) const
@@ -678,6 +761,35 @@ void ULSMinimapWidget::DrawFilledCircle(FSlateWindowElementList& OutDrawElements
 			ESlateDrawEffect::None,
 			Color);
 	}
+}
+
+void ULSMinimapWidget::DrawCircleOutline(FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FGeometry& Geometry, const FVector2D& Center, const float Radius, const FLinearColor& Color, const float Thickness) const
+{
+	TArray<FVector2D> Points;
+	Points.Reserve(97);
+	for (int32 PointIndex = 0; PointIndex <= 96; ++PointIndex)
+	{
+		const float Angle = (static_cast<float>(PointIndex) / 96.0f) * (2.0f * UE_PI);
+		Points.Add(Center + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Radius);
+	}
+
+	FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), Points, ESlateDrawEffect::None, Color, true, Thickness);
+}
+
+void ULSMinimapWidget::DrawPolyline(FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FGeometry& Geometry, const TArray<FVector2D>& Points, const FLinearColor& Color, const float Thickness, const bool bClosed) const
+{
+	if (Points.Num() < 2)
+	{
+		return;
+	}
+
+	TArray<FVector2D> DrawPoints = Points;
+	if (bClosed)
+	{
+		DrawPoints.Add(Points[0]);
+	}
+
+	FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), DrawPoints, ESlateDrawEffect::None, Color, true, Thickness);
 }
 
 void ULSMinimapWidget::DrawText(FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FGeometry& Geometry, const FVector2D& Position, const FText& Text, const FLinearColor& Color) const

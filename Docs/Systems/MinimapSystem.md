@@ -20,6 +20,9 @@ ULSMinimapSubsystem
 ULSMinimapMarkerComponent
 -> 적, 루팅 오브젝트, 월드 드랍 아이템, 탈출구의 미니맵 표시 정보 보관
 
+ULSMinimapObstacleComponent
+-> 시야를 막지는 않지만 미니맵에 보여야 하는 펜스/난간/낮은 장애물의 콜라이더 표시 정보 보관
+
 ALSMinimapShapeActor
 -> 시야 판정 데이터만으로 부족할 때 레벨 디자이너가 배치하는 보정 도형 데이터
 ```
@@ -35,7 +38,7 @@ ALSMinimapShapeActor
 | 루팅 오브젝트 | `ALSLootBox`의 `ULSMinimapMarkerComponent` |
 | 월드 드랍 아이템 | `ALSWorldDroppedItem`의 `ULSMinimapMarkerComponent` |
 | 탈출구 | `ALSExtractionZone`의 `ULSMinimapMarkerComponent` |
-| 지형지물 | `ULSVisionSurfaceComponent`, `ULSVisionOccluderComponent`, 필요 시 `ALSMinimapShapeActor` |
+| 지형지물 | `ULSVisionSurfaceComponent`, `ULSVisionOccluderComponent`, `ULSMinimapObstacleComponent`, 필요 시 `ALSMinimapShapeActor` |
 
 루팅 박스는 열리면 미니맵 마커를 숨긴다. 월드 드랍 아이템은 아이템 RowName과 수량이 유효할 때만 표시한다. 탈출구는 미니맵 가장자리 방향 표시와 거리 텍스트를 함께 표시한다.
 
@@ -61,6 +64,10 @@ ULSMinimapWidget
 미니맵 지형은 `ULSVisionSubsystem`에 등록된 시야 판정 데이터를 먼저 사용한다. `ULSVisionSurfaceComponent`가 있으면 대상 프리미티브의 월드 바운드를 합산한 뒤 보라색 면으로 채우고, 같은 액터에 `ULSVisionOccluderComponent`가 함께 있으면 중복 표현을 피하기 위해 오클루더 선분은 생략한다.
 
 `ULSVisionSurfaceComponent` 없이 `ULSVisionOccluderComponent`만 있는 액터는 오클루더 선분을 보라색 선으로 그린다. 지형 면과 선분은 미니맵 원 반경 안에서만 그려서 바깥으로 삐져나가지 않게 한다. 이 방식은 플레이어 시야를 실제로 가리는 벽, 장애물, 차폐물과 미니맵 지형 표시를 같은 데이터에서 관리하기 위한 기본 경로다.
+
+펜스나 난간처럼 구멍이 있어 시야를 막지 않는 물체는 `ULSMinimapObstacleComponent`를 붙여 미니맵 전용으로 표시한다. 이 컴포넌트는 지정한 `TargetPrimitives`를 우선 사용하고, 비어 있으면 owner의 Pawn Block 콜라이더를 수집해 보라색 외곽선으로 그린다. 시야 판정에는 영향을 주지 않는다.
+
+StaticMeshActor 기반 펜스는 Outliner에서 액터를 선택한 뒤 우클릭 메뉴의 `LostSignal > Add Minimap Obstacle`로 `ULSMinimapObstacleComponent`를 추가할 수 있다.
 
 `ALSMinimapShapeActor`는 시야 판정 데이터만으로 표현하기 어려운 안내선이나 추상화된 영역을 보정할 때 사용한다.
 

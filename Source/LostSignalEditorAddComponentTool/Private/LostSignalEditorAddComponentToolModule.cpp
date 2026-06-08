@@ -4,6 +4,7 @@
 #include "Editor.h"
 #include "Engine/Selection.h"
 #include "Engine/StaticMeshActor.h"
+#include "Minimap/LSMinimapObstacleComponent.h"
 #include "ScopedTransaction.h"
 #include "ToolMenus.h"
 #include "Vision/LSRoofFadeComponent.h"
@@ -87,6 +88,14 @@ void FLostSignalEditorAddComponentToolModule::RegisterMenus()
 		LOCTEXT("AddRoofSetupTooltip", "Add RoofFadeComponent and StencilMarker to selected static mesh actors."),
 		FSlateIcon(),
 		FUIAction(FExecuteAction::CreateRaw(this, &FLostSignalEditorAddComponentToolModule::AddRoofSetupToSelectedActors))
+	);
+
+	Section.AddMenuEntry(
+		"AddMinimapObstacle",
+		LOCTEXT("AddMinimapObstacleLabel", "Add Minimap Obstacle"),
+		LOCTEXT("AddMinimapObstacleTooltip", "Add MinimapObstacleComponent to selected static mesh actors without changing vision blocking."),
+		FSlateIcon(),
+		FUIAction(FExecuteAction::CreateRaw(this, &FLostSignalEditorAddComponentToolModule::AddMinimapObstacleToSelectedActors))
 	);
 }
 
@@ -236,6 +245,66 @@ void FLostSignalEditorAddComponentToolModule::AddRoofSetupToSelectedActors()
 		}
 
 		EnsureStencilMarkerComponent(StaticMeshActor, StaticMeshComponent);
+
+		StaticMeshActor->MarkPackageDirty();
+	}
+}
+
+void FLostSignalEditorAddComponentToolModule::AddMinimapObstacleToSelectedActors()
+{
+	if (GEditor == nullptr)
+	{
+		return;
+	}
+
+	USelection* SelectedActors = GEditor->GetSelectedActors();
+	if (SelectedActors == nullptr || SelectedActors->Num() == 0)
+	{
+		return;
+	}
+
+	const FScopedTransaction Transaction(LOCTEXT("AddMinimapObstacleTransaction", "Add Minimap Obstacle"));
+
+	for (FSelectionIterator SelectionIt(*SelectedActors); SelectionIt; ++SelectionIt)
+	{
+		AStaticMeshActor* StaticMeshActor = Cast<AStaticMeshActor>(*SelectionIt);
+		if (StaticMeshActor == nullptr)
+		{
+			continue;
+		}
+
+		UStaticMeshComponent* StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent();
+		if (StaticMeshComponent == nullptr)
+		{
+			continue;
+		}
+
+		StaticMeshActor->Modify();
+		StaticMeshComponent->Modify();
+
+		ULSMinimapObstacleComponent* MinimapObstacleComponent = StaticMeshActor->FindComponentByClass<ULSMinimapObstacleComponent>();
+		if (MinimapObstacleComponent == nullptr)
+		{
+			MinimapObstacleComponent = NewObject<ULSMinimapObstacleComponent>(
+				StaticMeshActor,
+				ULSMinimapObstacleComponent::StaticClass(),
+				TEXT("MinimapObstacleComponent"),
+				RF_Transactional);
+
+			if (MinimapObstacleComponent != nullptr)
+			{
+				StaticMeshActor->AddInstanceComponent(MinimapObstacleComponent);
+				MinimapObstacleComponent->AddTargetPrimitive(StaticMeshComponent);
+				MinimapObstacleComponent->OnComponentCreated();
+				MinimapObstacleComponent->RegisterComponent();
+				MinimapObstacleComponent->Modify();
+			}
+		}
+		else
+		{
+			MinimapObstacleComponent->Modify();
+			MinimapObstacleComponent->AddTargetPrimitive(StaticMeshComponent);
+		}
 
 		StaticMeshActor->MarkPackageDirty();
 	}
