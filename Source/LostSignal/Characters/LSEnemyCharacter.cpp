@@ -15,6 +15,7 @@
 #include "GAS/LSCombatAttributeSet.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "LostSignal.h"
+#include "Minimap/LSMinimapMarkerComponent.h"
 #include "UI/Debug/LSHpDebugWidget.h"
 
 namespace
@@ -36,6 +37,9 @@ ALSEnemyCharacter::ALSEnemyCharacter()
 
 	MonsterSenseComponent = CreateDefaultSubobject<ULSMonsterSenseComponent>(TEXT("MonsterSenseComponent"));
 	MonsterCombatComponent = CreateDefaultSubobject<ULSMonsterCombatComponent>(TEXT("MonsterCombatComponent"));
+	MinimapMarkerComponent = CreateDefaultSubobject<ULSMinimapMarkerComponent>(TEXT("MinimapMarkerComponent"));
+	MinimapMarkerComponent->SetMarkerType(ELSMinimapMarkerType::Enemy);
+	MinimapMarkerComponent->SetMarkerColor(FLinearColor(1.0f, 0.12f, 0.1f, 1.0f));
 	MonsterAttributeSet = CreateDefaultSubobject<ULSCharacterAttributeSet>(TEXT("MonsterAttributeSet"));
 }
 

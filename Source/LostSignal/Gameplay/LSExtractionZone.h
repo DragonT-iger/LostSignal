@@ -5,6 +5,7 @@
 #include "LSExtractionZone.generated.h"
 
 class UBoxComponent;
+class ULSMinimapMarkerComponent;
 class UPointLightComponent;
 class UStaticMeshComponent;
 class UTextRenderComponent;
@@ -32,6 +33,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category="LS/Extraction")
 	TObjectPtr<UPointLightComponent> MarkerLight;
+
+	UPROPERTY(VisibleAnywhere, Category="LS/Minimap")
+	TObjectPtr<ULSMinimapMarkerComponent> MinimapMarkerComponent;
 
 	UFUNCTION()
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,

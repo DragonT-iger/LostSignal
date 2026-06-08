@@ -6,6 +6,7 @@
 #include "LSWorldDroppedItem.generated.h"
 
 class UTexture2D;
+class ULSMinimapMarkerComponent;
 class ULSWorldDroppedItemIconWidget;
 class UWidgetComponent;
 
@@ -34,6 +35,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Drop")
 	FVector2D IconDrawSize = FVector2D(64.0f, 64.0f);
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Minimap")
+	TObjectPtr<ULSMinimapMarkerComponent> MinimapMarkerComponent;
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_ItemData)

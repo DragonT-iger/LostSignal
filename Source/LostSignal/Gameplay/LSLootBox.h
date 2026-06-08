@@ -7,6 +7,7 @@
 #include "LSLootBox.generated.h"
 
 class ULSRaidInventoryComponent;
+class ULSMinimapMarkerComponent;
 
 UCLASS()
 class LOSTSIGNAL_API ALSLootBox : public ALSInteractableObject
@@ -14,6 +15,8 @@ class LOSTSIGNAL_API ALSLootBox : public ALSInteractableObject
 	GENERATED_BODY()
 
 public:
+	ALSLootBox();
+
 	virtual bool CanInteract_Implementation(APawn* Interactor) override;
 	virtual void Interact_Implementation(APawn* Interactor) override;
 
@@ -31,6 +34,9 @@ public:
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/Loot")
 	FName RootingObjectRowName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Minimap")
+	TObjectPtr<ULSMinimapMarkerComponent> MinimapMarkerComponent;
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_IsOpened, VisibleInstanceOnly, Category="LS/Loot")

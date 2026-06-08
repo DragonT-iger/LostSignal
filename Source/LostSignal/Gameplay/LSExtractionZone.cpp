@@ -7,6 +7,7 @@
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
 #include "LostSignal.h"
+#include "Minimap/LSMinimapMarkerComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 #define LOCTEXT_NAMESPACE "LSExtractionZone"
@@ -53,6 +54,10 @@ ALSExtractionZone::ALSExtractionZone()
 	MarkerLight->SetLightColor(FLinearColor(0.2f, 1.f, 0.35f));
 	MarkerLight->SetIntensity(1200.f);
 	MarkerLight->SetAttenuationRadius(450.f);
+
+	MinimapMarkerComponent = CreateDefaultSubobject<ULSMinimapMarkerComponent>(TEXT("MinimapMarkerComponent"));
+	MinimapMarkerComponent->SetMarkerType(ELSMinimapMarkerType::Extraction);
+	MinimapMarkerComponent->SetMarkerColor(FLinearColor(0.28f, 1.0f, 0.45f, 1.0f));
 }
 
 void ALSExtractionZone::BeginPlay()

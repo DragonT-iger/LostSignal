@@ -12,6 +12,7 @@ class UGameplayAbility;
 class UAnimMontage;
 class ULSCharacterAttributeSet;
 class ULSHpDebugWidget;
+class ULSMinimapMarkerComponent;
 class ULSMonsterCombatComponent;
 class ULSMonsterSenseComponent;
 struct FLSMonsterArchetypeRow;
@@ -50,6 +51,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/AI")
 	ULSMonsterCombatComponent* GetMonsterCombatComponent() const { return MonsterCombatComponent; }
+
+	UFUNCTION(BlueprintPure, Category="LS/Minimap")
+	ULSMinimapMarkerComponent* GetMinimapMarkerComponent() const { return MinimapMarkerComponent; }
 
 	UFUNCTION(BlueprintPure, Category="LS/GAS")
 	ULSCharacterAttributeSet* GetMonsterAttributeSet() const { return MonsterAttributeSet; }
@@ -94,6 +98,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/AI")
 	TObjectPtr<ULSMonsterCombatComponent> MonsterCombatComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Minimap")
+	TObjectPtr<ULSMinimapMarkerComponent> MinimapMarkerComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/GAS")
 	TObjectPtr<ULSCharacterAttributeSet> MonsterAttributeSet;

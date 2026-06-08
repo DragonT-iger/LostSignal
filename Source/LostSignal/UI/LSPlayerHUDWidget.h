@@ -5,8 +5,9 @@
 #include "LSPlayerHUDWidget.generated.h"
 
 class ULSSkillBarWidget;
+class ULSMinimapWidget;
 
-/** Root in-game HUD widget. WBP should place and bind SkillBar. */
+/** Root in-game HUD widget. WBP should place and bind SkillBar and Minimap. */
 UCLASS()
 class LOSTSIGNAL_API ULSPlayerHUDWidget : public UUserWidget
 {
@@ -21,4 +22,7 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSSkillBarWidget> SkillBar;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSMinimapWidget> Minimap;
 };

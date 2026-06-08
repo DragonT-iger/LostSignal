@@ -2,6 +2,7 @@
 
 #include "LostSignal.h"
 #include "Skills/LSPlayerSkillComponent.h"
+#include "UI/Minimap/LSMinimapWidget.h"
 #include "UI/Skill/LSSkillBarWidget.h"
 
 void ULSPlayerHUDWidget::InitializeHUDForPawn(APawn* InPawn)
@@ -9,7 +10,15 @@ void ULSPlayerHUDWidget::InitializeHUDForPawn(APawn* InPawn)
 	if (!SkillBar)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s cannot initialize HUD because SkillBar is not bound."), *GetNameSafe(this));
-		return;
+	}
+
+	if (!Minimap)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot initialize HUD because Minimap is not bound."), *GetNameSafe(this));
+	}
+	else
+	{
+		Minimap->InitializeMinimapForPawn(InPawn);
 	}
 
 	ULSPlayerSkillComponent* SkillComponent = InPawn ? InPawn->FindComponentByClass<ULSPlayerSkillComponent>() : nullptr;
@@ -21,7 +30,10 @@ void ULSPlayerHUDWidget::InitializeHUDForPawn(APawn* InPawn)
 		return;
 	}
 
-	SkillBar->InitializeSkillBar(SkillComponent);
+	if (SkillBar)
+	{
+		SkillBar->InitializeSkillBar(SkillComponent);
+	}
 }
 
 void ULSPlayerHUDWidget::NativeConstruct()
@@ -31,5 +43,9 @@ void ULSPlayerHUDWidget::NativeConstruct()
 	if (!SkillBar)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s is missing required HUD widget binding: SkillBar."), *GetNameSafe(this));
+	}
+	if (!Minimap)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required HUD widget binding: Minimap."), *GetNameSafe(this));
 	}
 }

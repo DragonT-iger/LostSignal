@@ -5,12 +5,17 @@
 #include "Engine/Texture2D.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
+#include "Minimap/LSMinimapMarkerComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Inventory/LSWorldDroppedItemIconWidget.h"
 
 ALSWorldDroppedItem::ALSWorldDroppedItem()
 {
+	MinimapMarkerComponent = CreateDefaultSubobject<ULSMinimapMarkerComponent>(TEXT("MinimapMarkerComponent"));
+	MinimapMarkerComponent->SetMarkerType(ELSMinimapMarkerType::DroppedItem);
+	MinimapMarkerComponent->SetMarkerColor(FLinearColor(0.25f, 1.0f, 0.42f, 1.0f));
+
 	ItemIconWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("ItemIconWidget"));
 	ItemIconWidgetComponent->SetupAttachment(RootComponent);
 	ItemIconWidgetComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -110,6 +115,11 @@ void ALSWorldDroppedItem::RefreshItemVisual()
 	{
 		UE_LOG(LogLS, Warning, TEXT("ItemIconWidgetComponent is not bound on %s."), *GetNameSafe(this));
 		return;
+	}
+
+	if (MinimapMarkerComponent)
+	{
+		MinimapMarkerComponent->SetMinimapVisible(!ItemRowName.IsNone() && Amount > 0);
 	}
 
 	ItemIconWidgetComponent->SetRelativeLocation(FVector(0.0f, 0.0f, GroundOffsetZ));

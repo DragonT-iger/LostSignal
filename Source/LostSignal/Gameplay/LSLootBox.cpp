@@ -3,7 +3,15 @@
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
+#include "Minimap/LSMinimapMarkerComponent.h"
 #include "Net/UnrealNetwork.h"
+
+ALSLootBox::ALSLootBox()
+{
+	MinimapMarkerComponent = CreateDefaultSubobject<ULSMinimapMarkerComponent>(TEXT("MinimapMarkerComponent"));
+	MinimapMarkerComponent->SetMarkerType(ELSMinimapMarkerType::Loot);
+	MinimapMarkerComponent->SetMarkerColor(FLinearColor(1.0f, 0.82f, 0.18f, 1.0f));
+}
 
 void ALSLootBox::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -41,6 +49,10 @@ void ALSLootBox::Interact_Implementation(APawn* Interactor)
 
 		LootResults = DropSubsystem->OpenRootingObject(RootingObjectRowName);
 		bIsOpened = true;
+		if (MinimapMarkerComponent)
+		{
+			MinimapMarkerComponent->SetMinimapVisible(false);
+		}
 		RefreshWidgetVisibility();
 		OnLootResultReceived(LootResults);
 		NotifyLootResultsChanged();
@@ -63,6 +75,10 @@ void ALSLootBox::Interact_Implementation(APawn* Interactor)
 
 void ALSLootBox::OnRep_IsOpened()
 {
+	if (MinimapMarkerComponent)
+	{
+		MinimapMarkerComponent->SetMinimapVisible(!bIsOpened);
+	}
 	RefreshWidgetVisibility();
 }
 
