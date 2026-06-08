@@ -123,8 +123,7 @@ int32 ULSMinimapWidget::NativePaint(
 	if (Pawn)
 	{
 		const FVector2D Forward2D = ProjectWorldDirection(Pawn->GetActorForwardVector());
-		const float SightRadiusPx = FMath::Min(SightRadiusCm * PixelsPerCm, Radius);
-		DrawSightCone(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, Forward2D, SightRadiusPx, SightAngleDegrees, SightColor);
+		DrawSightCone(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, Forward2D, Radius, SightAngleDegrees, SightColor);
 	}
 
 	const int32 NavigationProtocol = ResolveNavigationProtocol();
@@ -277,7 +276,7 @@ bool ULSMinimapWidget::IsEnemyInSight(const FLSMinimapMarkerSnapshot& Marker) co
 	}
 
 	const FVector ToMarker = Marker.WorldLocation - Pawn->GetActorLocation();
-	if (ToMarker.Size2D() > SightRadiusCm)
+	if (ToMarker.Size2D() > ViewRadiusCm)
 	{
 		return false;
 	}
@@ -417,16 +416,7 @@ void ULSMinimapWidget::DrawVisionSurfaceBounds(const FBox& Bounds, const FGeomet
 		ProjectWorldLocation(FVector(Bounds.Max.X, Bounds.Max.Y, Bounds.Min.Z), Center, PixelsPerCm),
 		ProjectWorldLocation(FVector(Bounds.Min.X, Bounds.Max.Y, Bounds.Min.Z), Center, PixelsPerCm)
 	};
-	const FLinearColor TerrainColor = FlattenTerrainColor(VisionTerrainColor);
-	for (int32 CornerIndex = 0; CornerIndex < Corners.Num(); ++CornerIndex)
-	{
-		FVector2D Start = Corners[CornerIndex];
-		FVector2D End = Corners[(CornerIndex + 1) % Corners.Num()];
-		if (ClipSegmentToCircle(Start, End, Center, Radius))
-		{
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { Start, End }, ESlateDrawEffect::None, TerrainColor, true, 2.0f);
-		}
-	}
+	DrawFilledPolygonInCircle(OutDrawElements, LayerId, Geometry, Corners, Center, Radius, FlattenTerrainColor(VisionTerrainColor));
 }
 
 void ULSMinimapWidget::DrawVisionOccluderSegments(const TArray<FLSVisionSegment2D>& Segments, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm) const
@@ -498,6 +488,79 @@ void ULSMinimapWidget::DrawSightCone(FSlateWindowElementList& OutDrawElements, c
 				OutDrawElements,
 				LayerId,
 				Geometry.ToPaintGeometry(FVector2f(FVector2D(RunEndX - RunStartX, RowHeight)), FSlateLayoutTransform(FVector2f(Center + FVector2D(RunStartX, LocalY)))),
+				Brush,
+				ESlateDrawEffect::None,
+				Color);
+		}
+	}
+}
+
+void ULSMinimapWidget::DrawFilledPolygonInCircle(FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FGeometry& Geometry, const TArray<FVector2D>& Points, const FVector2D& Center, const float Radius, const FLinearColor& Color) const
+{
+	if (Points.Num() < 3)
+	{
+		return;
+	}
+
+	float MinY = Points[0].Y;
+	float MaxY = Points[0].Y;
+	for (const FVector2D& Point : Points)
+	{
+		MinY = FMath::Min(MinY, Point.Y);
+		MaxY = FMath::Max(MaxY, Point.Y);
+	}
+
+	MinY = FMath::Max(MinY, Center.Y - Radius);
+	MaxY = FMath::Min(MaxY, Center.Y + Radius);
+	if (MinY >= MaxY)
+	{
+		return;
+	}
+
+	const FSlateBrush* Brush = FCoreStyle::Get().GetBrush("WhiteBrush");
+	TArray<float> Intersections;
+	Intersections.Reserve(Points.Num());
+
+	for (float Y = MinY; Y < MaxY; Y += CircleFillStep)
+	{
+		const float RowHeight = FMath::Min(CircleFillStep, MaxY - Y);
+		const float SampleY = Y + RowHeight * 0.5f;
+		Intersections.Reset();
+
+		for (int32 PointIndex = 0; PointIndex < Points.Num(); ++PointIndex)
+		{
+			const FVector2D& A = Points[PointIndex];
+			const FVector2D& B = Points[(PointIndex + 1) % Points.Num()];
+			if ((A.Y <= SampleY && B.Y > SampleY) || (B.Y <= SampleY && A.Y > SampleY))
+			{
+				const float Alpha = (SampleY - A.Y) / (B.Y - A.Y);
+				Intersections.Add(FMath::Lerp(A.X, B.X, Alpha));
+			}
+		}
+
+		if (Intersections.Num() < 2)
+		{
+			continue;
+		}
+
+		Intersections.Sort();
+		const float CircleHalfWidth = FMath::Sqrt(FMath::Max(0.0f, Radius * Radius - FMath::Square(SampleY - Center.Y)));
+		const float CircleMinX = Center.X - CircleHalfWidth;
+		const float CircleMaxX = Center.X + CircleHalfWidth;
+
+		for (int32 IntersectionIndex = 1; IntersectionIndex < Intersections.Num(); IntersectionIndex += 2)
+		{
+			const float MinX = FMath::Max(Intersections[IntersectionIndex - 1], CircleMinX);
+			const float MaxX = FMath::Min(Intersections[IntersectionIndex], CircleMaxX);
+			if (MinX >= MaxX)
+			{
+				continue;
+			}
+
+			FSlateDrawElement::MakeBox(
+				OutDrawElements,
+				LayerId,
+				Geometry.ToPaintGeometry(FVector2f(FVector2D(MaxX - MinX, RowHeight)), FSlateLayoutTransform(FVector2f(MinX, Y))),
 				Brush,
 				ESlateDrawEffect::None,
 				Color);

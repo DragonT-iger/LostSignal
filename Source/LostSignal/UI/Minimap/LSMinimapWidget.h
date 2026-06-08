@@ -42,6 +42,7 @@ private:
 	void DrawVisionSurfaceBounds(const FBox& Bounds, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
 	void DrawVisionOccluderSegments(const TArray<FLSVisionSegment2D>& Segments, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
 	void DrawSightCone(FSlateWindowElementList& OutDrawElements, int32 LayerId, const FGeometry& Geometry, const FVector2D& Center, const FVector2D& Forward, float Radius, float AngleDegrees, const FLinearColor& Color) const;
+	void DrawFilledPolygonInCircle(FSlateWindowElementList& OutDrawElements, int32 LayerId, const FGeometry& Geometry, const TArray<FVector2D>& Points, const FVector2D& Center, float Radius, const FLinearColor& Color) const;
 	void DrawFilledRectInCircle(FSlateWindowElementList& OutDrawElements, int32 LayerId, const FGeometry& Geometry, const FVector2D& TopLeft, const FVector2D& Size, const FVector2D& Center, float Radius, const FLinearColor& Color) const;
 	void DrawFilledCircle(FSlateWindowElementList& OutDrawElements, int32 LayerId, const FGeometry& Geometry, const FVector2D& Center, float Radius, const FLinearColor& Color) const;
 	void DrawText(FSlateWindowElementList& OutDrawElements, int32 LayerId, const FGeometry& Geometry, const FVector2D& Position, const FText& Text, const FLinearColor& Color) const;
