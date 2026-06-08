@@ -93,15 +93,6 @@ void ULSItemSlotWidget::ClearItem()
 	ClearTooltipItem();
 }
 
-void ULSItemSlotWidget::SetDefaultSlotTexture(UTexture2D* InDefaultSlotTexture)
-{
-	DefaultSlotTexture = InDefaultSlotTexture;
-	if (!bHasItem)
-	{
-		ClearItem();
-	}
-}
-
 void ULSItemSlotWidget::SetDisplayOnlySlotContext()
 {
 	InventoryWidget.Reset();
@@ -113,6 +104,16 @@ void ULSItemSlotWidget::SetDisplayOnlySlotContext()
 	SlotIndex = INDEX_NONE;
 	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = false;
+}
+
+void ULSItemSlotWidget::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+
+	if (!bHasItem)
+	{
+		ClearItem();
+	}
 }
 
 void ULSItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)

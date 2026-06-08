@@ -27,9 +27,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void ClearItem();
 
-	UFUNCTION(BlueprintCallable, Category="LS/UI")
-	void SetDefaultSlotTexture(UTexture2D* InDefaultSlotTexture);
-
 	void SetDisplayOnlySlotContext();
 	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem);
 	void SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, int32 InSlotIndex, bool bInHasItem);
@@ -39,6 +36,7 @@ public:
 	void RestoreDragSourceVisual();
 
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
