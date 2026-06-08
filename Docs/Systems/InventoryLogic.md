@@ -65,6 +65,8 @@ Source/LostSignal/Inventory/LSInventorySlotUtils.cpp
 
 `ULSInventoryWidget`은 인벤토리와 SafeStash 영역을 표시한다.
 
+또한 `WeaponSlot`, `HeadphoneSlot`, `HeadSlot`, `GlovesSlot`, `BodySlot` 장비 슬롯을 `ULSItemSlotWidget`으로 바인딩한다. 빈 상태 기본 텍스처는 `ULSInventoryWidget`의 슬롯별 `*DefaultTexture` 설정에서 지정하며, 현재 이 5개 슬롯은 표시용이라 장착 저장/드래그 장착/장착 타입 검증 로직은 아직 연결하지 않는다.
+
 ```text
 RebuildInventorySlots
 -> 레이드 중이면 RaidInventoryComponent::GetSessionInventory

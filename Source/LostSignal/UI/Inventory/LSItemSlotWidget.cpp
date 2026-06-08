@@ -73,7 +73,7 @@ void ULSItemSlotWidget::ClearItem()
 		return;
 	}
 
-	if (UTexture2D* DefaultIconTexture = LoadDefaultIconTexture())
+	if (UTexture2D* DefaultIconTexture = LoadSlotDefaultTexture())
 	{
 		ItemIconImage->SetBrushFromTexture(DefaultIconTexture);
 	}
@@ -91,6 +91,28 @@ void ULSItemSlotWidget::ClearItem()
 	DragAmount = 0;
 	DragChipStats.Reset();
 	ClearTooltipItem();
+}
+
+void ULSItemSlotWidget::SetDefaultSlotTexture(UTexture2D* InDefaultSlotTexture)
+{
+	DefaultSlotTexture = InDefaultSlotTexture;
+	if (!bHasItem)
+	{
+		ClearItem();
+	}
+}
+
+void ULSItemSlotWidget::SetDisplayOnlySlotContext()
+{
+	InventoryWidget.Reset();
+	LootDropWidget.Reset();
+	LobbyStorageWidget.Reset();
+	ChipStationWidget.Reset();
+	ChipEquipmentSlotWidget.Reset();
+	SlotArea = ELSInventorySlotArea::Inventory;
+	SlotIndex = INDEX_NONE;
+	EquipmentSlotIndex = INDEX_NONE;
+	bHasItem = false;
 }
 
 void ULSItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)
@@ -510,6 +532,16 @@ UTexture2D* ULSItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName)
 	}
 
 	return IconTexture;
+}
+
+UTexture2D* ULSItemSlotWidget::LoadSlotDefaultTexture() const
+{
+	if (DefaultSlotTexture)
+	{
+		return DefaultSlotTexture;
+	}
+
+	return LoadDefaultIconTexture();
 }
 
 UTexture2D* ULSItemSlotWidget::LoadDefaultIconTexture() const

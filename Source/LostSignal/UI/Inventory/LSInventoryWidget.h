@@ -9,6 +9,7 @@ class ALSWorldDroppedItem;
 class UBorder;
 class UButton;
 class UDragDropOperation;
+class UTexture2D;
 class UWrapBox;
 class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
@@ -60,8 +61,38 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UButton> SortButton;
 
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSItemSlotWidget> WeaponSlot;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSItemSlotWidget> HeadphoneSlot;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSItemSlotWidget> HeadSlot;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSItemSlotWidget> GlovesSlot;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSItemSlotWidget> BodySlot;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UTexture2D> WeaponSlotDefaultTexture;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UTexture2D> HeadphoneSlotDefaultTexture;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UTexture2D> HeadSlotDefaultTexture;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UTexture2D> GlovesSlotDefaultTexture;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UTexture2D> BodySlotDefaultTexture;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI", meta=(ClampMin="0"))
 	int32 InventorySlotCount = 10;
@@ -79,6 +110,7 @@ private:
 	UFUNCTION()
 	void HandleSortButtonClicked();
 
+	void InitializeDisplayOnlyEquipmentSlot(ULSItemSlotWidget* SlotWidget, UTexture2D* DefaultTexture, const TCHAR* SlotName) const;
 	bool HandleInventoryBackgroundDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation);
 	bool DropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation, FVector2D ScreenPosition);
 	bool IsPointerInsideInventoryWindow(FVector2D ScreenPosition) const;

@@ -5,6 +5,7 @@
 #include "Components/Button.h"
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Engine/Texture2D.h"
 #include "Gameplay/LSWorldDroppedItem.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "Layout/WidgetPath.h"
@@ -46,6 +47,12 @@ void ULSInventoryWidget::NativeConstruct()
 	{
 		SortButton->OnClicked.AddDynamic(this, &ULSInventoryWidget::HandleSortButtonClicked);
 	}
+
+	InitializeDisplayOnlyEquipmentSlot(WeaponSlot, WeaponSlotDefaultTexture, TEXT("WeaponSlot"));
+	InitializeDisplayOnlyEquipmentSlot(HeadphoneSlot, HeadphoneSlotDefaultTexture, TEXT("HeadphoneSlot"));
+	InitializeDisplayOnlyEquipmentSlot(HeadSlot, HeadSlotDefaultTexture, TEXT("HeadSlot"));
+	InitializeDisplayOnlyEquipmentSlot(GlovesSlot, GlovesSlotDefaultTexture, TEXT("GlovesSlot"));
+	InitializeDisplayOnlyEquipmentSlot(BodySlot, BodySlotDefaultTexture, TEXT("BodySlot"));
 
 	RebuildInventorySlots();
 	RebuildConfirmedStorageSlots();
@@ -455,6 +462,22 @@ void ULSInventoryWidget::HandleSortButtonClicked()
 
 	RebuildInventorySlots();
 	RebuildConfirmedStorageSlots();
+}
+
+void ULSInventoryWidget::InitializeDisplayOnlyEquipmentSlot(ULSItemSlotWidget* SlotWidget, UTexture2D* DefaultTexture, const TCHAR* SlotName) const
+{
+	if (!SlotWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s is not bound on %s."), SlotName, *GetNameSafe(this));
+		return;
+	}
+
+	SlotWidget->SetDisplayOnlySlotContext();
+	if (!DefaultTexture)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s default texture is not set on %s."), SlotName, *GetNameSafe(this));
+	}
+	SlotWidget->SetDefaultSlotTexture(DefaultTexture);
 }
 
 bool ULSInventoryWidget::HandleInventoryBackgroundDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)

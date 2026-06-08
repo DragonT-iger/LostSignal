@@ -27,6 +27,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void ClearItem();
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	void SetDefaultSlotTexture(UTexture2D* InDefaultSlotTexture);
+
+	void SetDisplayOnlySlotContext();
 	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem);
 	void SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, int32 InSlotIndex, bool bInHasItem);
 	void SetWarehouseSlotContext(ULSLobbyStorageWidget* InStorageWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem);
@@ -58,6 +62,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	FLinearColor DragTargetIconTint = FLinearColor(1.0f, 0.84f, 0.35f, 1.0f);
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UTexture2D> DefaultSlotTexture;
+
 private:
 	TWeakObjectPtr<ULSInventoryWidget> InventoryWidget;
 	TWeakObjectPtr<ULSLootDropWidget> LootDropWidget;
@@ -80,6 +87,7 @@ private:
 	bool IsValidLootDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidWarehouseDropTarget(const UDragDropOperation* InOperation) const;
 	UTexture2D* LoadIconTextureByRowName(FName ItemRowName) const;
+	UTexture2D* LoadSlotDefaultTexture() const;
 	UTexture2D* LoadDefaultIconTexture() const;
 	static FString BuildIconObjectPath(const FString& IconNameOrPath, const FString& BaseFolder);
 	static FString GetIconBaseFolderByRowName(FName ItemRowName);
