@@ -5,6 +5,7 @@
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSProtocolUnlockRow.h"
@@ -20,6 +21,7 @@
 namespace
 {
 const FName ProgressParameterName(TEXT("Progress"));
+constexpr int32 StaminaProgressFillProtocolLevel = 2;
 
 FText BuildSurvivalStatusValueText(const float CurrentValue, const float MaxValue)
 {
@@ -181,6 +183,9 @@ void ULSSurvivalStatusWidget::RefreshDisplay()
 	const float MaxHealth = CombatAttributeSet ? CombatAttributeSet->GetMaxHealth() : 0.0f;
 	const float CurrentStamina = CharacterAttributeSet ? CharacterAttributeSet->GetCurrentStamina() : 0.0f;
 	const float MaxStamina = CharacterAttributeSet ? CharacterAttributeSet->GetMaxStamina() : 0.0f;
+	int32 CurrentSurvivalProtocolLevel = 0;
+	int32 PreviousSurvivalProtocolLevel = 0;
+	ResolveSurvivalProtocolLevels(CurrentSurvivalProtocolLevel, PreviousSurvivalProtocolLevel);
 
 	if (HealthText)
 	{
@@ -196,17 +201,22 @@ void ULSSurvivalStatusWidget::RefreshDisplay()
 	}
 	if (StaminaProgressBar)
 	{
-		StaminaProgressBar->SetPercent(MaxStamina > 0.0f ? CurrentStamina / MaxStamina : 0.0f);
+		const bool bUpdateStaminaProgress = CurrentSurvivalProtocolLevel >= StaminaProgressFillProtocolLevel;
+		StaminaProgressBar->SetPercent(bUpdateStaminaProgress && MaxStamina > 0.0f ? CurrentStamina / MaxStamina : 0.0f);
 	}
 	RefreshVisibility();
 }
 
 void ULSSurvivalStatusWidget::RefreshVisibility()
 {
+	int32 CurrentSurvivalProtocolLevel = 0;
+	int32 PreviousSurvivalProtocolLevel = 0;
+	ResolveSurvivalProtocolLevels(CurrentSurvivalProtocolLevel, PreviousSurvivalProtocolLevel);
+
 	const bool bShowHealthText = IsSurvivalFeatureVisible(TEXT("HP_Text"));
 	const bool bShowStaminaText = IsSurvivalFeatureVisible(TEXT("Stamina_Text"));
-	const bool bShowHealthBar = IsSurvivalFeatureVisible(TEXT("HP_Bar"));
-	const bool bShowStaminaBar = IsSurvivalFeatureVisible(TEXT("Stamina_Bar"));
+	const bool bShowHealthBar = IsSurvivalFeatureVisible(TEXT("HP_Bar")) || CurrentSurvivalProtocolLevel >= 1;
+	const bool bShowStaminaBar = IsSurvivalFeatureVisible(TEXT("Stamina_Bar")) || CurrentSurvivalProtocolLevel >= 1;
 
 	SetWidgetVisibility(HealthText, bShowHealthText);
 	SetWidgetVisibility(StaminaText, bShowStaminaText);
@@ -241,6 +251,16 @@ void ULSSurvivalStatusWidget::ResolveSurvivalProtocolLevels(int32& OutCurrentLev
 {
 	OutCurrentLevel = 0;
 	OutPreviousLevel = 0;
+
+	if (const ALSPlayerControllerBase* PlayerController = GetOwningPlayer<ALSPlayerControllerBase>())
+	{
+		if (PlayerController->HasSurvivalProtocolTestLevel())
+		{
+			OutCurrentLevel = PlayerController->GetSurvivalProtocolTestLevel();
+			OutPreviousLevel = OutCurrentLevel;
+			return;
+		}
+	}
 
 	UGameInstance* GameInstance = GetGameInstance();
 	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;

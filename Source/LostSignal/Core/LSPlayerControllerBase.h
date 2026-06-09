@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/LSProtocolTypes.h"
 #include "Data/LSDropSubsystem.h"
 #include "GameFramework/PlayerController.h"
 #include "Session/LSSessionSubsystem.h"
@@ -70,6 +71,32 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	bool TransferHoveredLootDropItemToInventory();
 
+	UFUNCTION(Exec)
+	void LSTestSurvivalProtocol(int32 Level);
+
+	UFUNCTION(Exec)
+	void LSTestCarryingProtocol(int32 Level);
+
+	UFUNCTION(Exec)
+	void LSTestBattleProtocol(int32 Level);
+
+	UFUNCTION(Exec)
+	void LSTestNavigationProtocol(int32 Level);
+
+	UFUNCTION(Exec)
+	void LSTestAllProtocols(int32 Survival, int32 Carrying, int32 Battle, int32 Navigation);
+
+	UFUNCTION(Exec)
+	void LSClearSurvivalProtocolTest();
+
+	UFUNCTION(Exec)
+	void LSClearProtocolTest();
+
+	bool HasSurvivalProtocolTestLevel() const { return HasProtocolTestLevel(ELSProtocolType::Survival); }
+	int32 GetSurvivalProtocolTestLevel() const { return GetProtocolTestLevel(ELSProtocolType::Survival); }
+	bool HasProtocolTestLevel(ELSProtocolType ProtocolType) const;
+	int32 GetProtocolTestLevel(ELSProtocolType ProtocolType) const;
+
 	UFUNCTION(Client, Reliable)
 	void ClientStartRaidSession(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
 
@@ -129,6 +156,18 @@ protected:
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
 	TArray<FLSSessionItem> SubmittedRaidSafeItems;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug", meta=(ClampMin="-1"))
+	int32 SurvivalProtocolTestLevel = -1;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug", meta=(ClampMin="-1"))
+	int32 CarryingProtocolTestLevel = -1;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug", meta=(ClampMin="-1"))
+	int32 BattleProtocolTestLevel = -1;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug", meta=(ClampMin="-1"))
+	int32 NavigationProtocolTestLevel = -1;
 
 protected:
 	virtual void BeginPlay() override;
@@ -203,6 +242,8 @@ private:
 	void StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
 	void ApplyRaidResultToLocalSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);
+	void SetProtocolTestLevel(ELSProtocolType ProtocolType, int32 Level);
+	void RefreshProtocolTestTargets();
 	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
 	bool ResolveServerDroppedItemTransform(FTransform& OutDropTransform, FVector DropDirection) const;
 	bool TransferLootDropSlotToSessionInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FLSSessionItem& OutLootItem);

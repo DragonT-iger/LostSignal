@@ -21,6 +21,7 @@
 #include "UI/Debug/LSHpDebugWidget.h"
 #include "UI/LSPlayerHUDWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
+#include "UI/Protocol/LSProtocolUIWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
 #include "UI/ChipSystem/LSChipStationWidget.h"
 
@@ -757,6 +758,139 @@ bool ALSPlayerControllerBase::TransferHoveredLootDropItemToInventory()
 	}
 
 	return LootDropWidgetInstance->TransferHoveredLootSlotToInventory();
+}
+
+void ALSPlayerControllerBase::LSTestSurvivalProtocol(const int32 Level)
+{
+	SetProtocolTestLevel(ELSProtocolType::Survival, Level);
+	RefreshProtocolTestTargets();
+
+	UE_LOG(LogLS, Log, TEXT("[SurvivalProtocolTest] OverrideLevel=%d"), SurvivalProtocolTestLevel);
+}
+
+void ALSPlayerControllerBase::LSTestCarryingProtocol(const int32 Level)
+{
+	SetProtocolTestLevel(ELSProtocolType::Carrying, Level);
+	RefreshProtocolTestTargets();
+
+	UE_LOG(LogLS, Log, TEXT("[CarryingProtocolTest] OverrideLevel=%d"), CarryingProtocolTestLevel);
+}
+
+void ALSPlayerControllerBase::LSTestBattleProtocol(const int32 Level)
+{
+	SetProtocolTestLevel(ELSProtocolType::Battle, Level);
+	RefreshProtocolTestTargets();
+
+	UE_LOG(LogLS, Log, TEXT("[BattleProtocolTest] OverrideLevel=%d"), BattleProtocolTestLevel);
+}
+
+void ALSPlayerControllerBase::LSTestNavigationProtocol(const int32 Level)
+{
+	SetProtocolTestLevel(ELSProtocolType::Navigation, Level);
+	RefreshProtocolTestTargets();
+
+	UE_LOG(LogLS, Log, TEXT("[NavigationProtocolTest] OverrideLevel=%d"), NavigationProtocolTestLevel);
+}
+
+void ALSPlayerControllerBase::LSTestAllProtocols(const int32 Survival, const int32 Carrying, const int32 Battle, const int32 Navigation)
+{
+	SetProtocolTestLevel(ELSProtocolType::Survival, Survival);
+	SetProtocolTestLevel(ELSProtocolType::Carrying, Carrying);
+	SetProtocolTestLevel(ELSProtocolType::Battle, Battle);
+	SetProtocolTestLevel(ELSProtocolType::Navigation, Navigation);
+	RefreshProtocolTestTargets();
+
+	UE_LOG(LogLS, Log, TEXT("[ProtocolTest] Survival=%d Carrying=%d Battle=%d Navigation=%d"),
+		SurvivalProtocolTestLevel,
+		CarryingProtocolTestLevel,
+		BattleProtocolTestLevel,
+		NavigationProtocolTestLevel);
+}
+
+void ALSPlayerControllerBase::LSClearSurvivalProtocolTest()
+{
+	SurvivalProtocolTestLevel = -1;
+	RefreshProtocolTestTargets();
+
+	UE_LOG(LogLS, Log, TEXT("[SurvivalProtocolTest] Override cleared."));
+}
+
+void ALSPlayerControllerBase::LSClearProtocolTest()
+{
+	SurvivalProtocolTestLevel = -1;
+	CarryingProtocolTestLevel = -1;
+	BattleProtocolTestLevel = -1;
+	NavigationProtocolTestLevel = -1;
+	RefreshProtocolTestTargets();
+
+	UE_LOG(LogLS, Log, TEXT("[ProtocolTest] All overrides cleared."));
+}
+
+bool ALSPlayerControllerBase::HasProtocolTestLevel(const ELSProtocolType ProtocolType) const
+{
+	return GetProtocolTestLevel(ProtocolType) >= 0;
+}
+
+int32 ALSPlayerControllerBase::GetProtocolTestLevel(const ELSProtocolType ProtocolType) const
+{
+	switch (ProtocolType)
+	{
+	case ELSProtocolType::Survival:
+		return SurvivalProtocolTestLevel;
+	case ELSProtocolType::Carrying:
+		return CarryingProtocolTestLevel;
+	case ELSProtocolType::Battle:
+		return BattleProtocolTestLevel;
+	case ELSProtocolType::Navigation:
+		return NavigationProtocolTestLevel;
+	default:
+		return -1;
+	}
+}
+
+void ALSPlayerControllerBase::SetProtocolTestLevel(const ELSProtocolType ProtocolType, const int32 Level)
+{
+	int32* TargetLevel = nullptr;
+	switch (ProtocolType)
+	{
+	case ELSProtocolType::Survival:
+		TargetLevel = &SurvivalProtocolTestLevel;
+		break;
+	case ELSProtocolType::Carrying:
+		TargetLevel = &CarryingProtocolTestLevel;
+		break;
+	case ELSProtocolType::Battle:
+		TargetLevel = &BattleProtocolTestLevel;
+		break;
+	case ELSProtocolType::Navigation:
+		TargetLevel = &NavigationProtocolTestLevel;
+		break;
+	default:
+		break;
+	}
+
+	if (TargetLevel)
+	{
+		*TargetLevel = FMath::Max(Level, 0);
+	}
+}
+
+void ALSPlayerControllerBase::RefreshProtocolTestTargets()
+{
+	if (PlayerHUDWidgetInstance)
+	{
+		PlayerHUDWidgetInstance->InitializeHUDForPawn(GetPawn());
+	}
+
+	TArray<UUserWidget*> ProtocolUIWidgets;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(this, ProtocolUIWidgets, ULSProtocolUIWidget::StaticClass(), false);
+	for (UUserWidget* Widget : ProtocolUIWidgets)
+	{
+		if (ULSProtocolUIWidget* ProtocolUIWidget = Cast<ULSProtocolUIWidget>(Widget))
+		{
+			ProtocolUIWidget->RefreshProtocolUI();
+		}
+	}
 }
 
 bool ALSPlayerControllerBase::TransferInventorySlotToLootDrop(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex)

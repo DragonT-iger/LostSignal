@@ -4,6 +4,7 @@
 #include "Characters/LSCharacterBase.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSProtocolUnlockRow.h"
@@ -186,6 +187,16 @@ void ULSSurvivalOverheadWidget::ResolveSurvivalProtocolLevels(int32& OutCurrentL
 {
 	OutCurrentLevel = 0;
 	OutPreviousLevel = 0;
+
+	if (const ALSPlayerControllerBase* PlayerController = GetOwningPlayer<ALSPlayerControllerBase>())
+	{
+		if (PlayerController->HasProtocolTestLevel(ELSProtocolType::Survival))
+		{
+			OutCurrentLevel = PlayerController->GetProtocolTestLevel(ELSProtocolType::Survival);
+			OutPreviousLevel = OutCurrentLevel;
+			return;
+		}
+	}
 
 	UGameInstance* GameInstance = GetGameInstance();
 	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;

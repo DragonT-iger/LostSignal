@@ -1,5 +1,6 @@
 #include "UI/Protocol/LSProtocolUIWidget.h"
 
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "LostSignal.h"
@@ -63,13 +64,36 @@ void ULSProtocolUIWidget::RefreshProtocolUI()
 {
 	UGameInstance* GameInstance = GetGameInstance();
 	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	FLSChipProtocolTotals ProtocolTotals;
 	if (!SaveSubsystem)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot refresh protocol UI because SaveSubsystem is missing on %s."), *GetNameSafe(this));
-		return;
+	}
+	else
+	{
+		ProtocolTotals = LSChipStats::AggregateChipProtocolTotals(SaveSubsystem->GetChipEquipmentSlots(), this);
 	}
 
-	const FLSChipProtocolTotals ProtocolTotals = LSChipStats::AggregateChipProtocolTotals(SaveSubsystem->GetChipEquipmentSlots(), this);
+	if (const ALSPlayerControllerBase* PlayerController = GetOwningPlayer<ALSPlayerControllerBase>())
+	{
+		if (PlayerController->HasProtocolTestLevel(ELSProtocolType::Survival))
+		{
+			ProtocolTotals.Survival = PlayerController->GetProtocolTestLevel(ELSProtocolType::Survival);
+		}
+		if (PlayerController->HasProtocolTestLevel(ELSProtocolType::Carrying))
+		{
+			ProtocolTotals.Carrying = PlayerController->GetProtocolTestLevel(ELSProtocolType::Carrying);
+		}
+		if (PlayerController->HasProtocolTestLevel(ELSProtocolType::Battle))
+		{
+			ProtocolTotals.Battle = PlayerController->GetProtocolTestLevel(ELSProtocolType::Battle);
+		}
+		if (PlayerController->HasProtocolTestLevel(ELSProtocolType::Navigation))
+		{
+			ProtocolTotals.Navigation = PlayerController->GetProtocolTestLevel(ELSProtocolType::Navigation);
+		}
+	}
+
 	SetProtocolWidgetFromData(Protocol_Survival, ELSProtocolType::Survival, ProtocolTotals.Survival, ProtocolTotals.Survival, GameInstance);
 	SetProtocolWidgetFromData(Protocol_Carrying, ELSProtocolType::Carrying, ProtocolTotals.Carrying, ProtocolTotals.Carrying, GameInstance);
 	SetProtocolWidgetFromData(Protocol_Battle, ELSProtocolType::Battle, ProtocolTotals.Battle, ProtocolTotals.Battle, GameInstance);

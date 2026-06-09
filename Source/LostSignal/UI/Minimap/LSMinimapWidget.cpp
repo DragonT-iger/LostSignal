@@ -4,6 +4,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/MeshComponent.h"
 #include "Components/PrimitiveComponent.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSProtocolUnlockRow.h"
@@ -351,6 +352,16 @@ void ULSMinimapWidget::ResolveNavigationProtocolLevels(int32& OutCurrentNavigati
 		OutCurrentNavigationProtocol = PreviewCurrentNavigationProtocol;
 		OutPreviousNavigationProtocol = PreviewPreviousNavigationProtocol;
 		return;
+	}
+
+	if (const ALSPlayerControllerBase* PlayerController = GetOwningPlayer<ALSPlayerControllerBase>())
+	{
+		if (PlayerController->HasProtocolTestLevel(ELSProtocolType::Navigation))
+		{
+			OutCurrentNavigationProtocol = PlayerController->GetProtocolTestLevel(ELSProtocolType::Navigation);
+			OutPreviousNavigationProtocol = OutCurrentNavigationProtocol;
+			return;
+		}
 	}
 
 	UGameInstance* GameInstance = GetGameInstance();
