@@ -42,9 +42,11 @@ private:
 	FVector2D ClampToMinimapEdge(const FVector2D& Point, const FVector2D& Center, float Radius) const;
 	bool ResolveMinimapViewAxes(FVector& OutViewUp, FVector& OutViewRight) const;
 	bool ShouldDrawMarker(const FLSMinimapMarkerSnapshot& Marker, const FVector2D& ProjectedPoint, const FVector2D& Center, float Radius, int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol) const;
-	bool IsEnemyInSight(const FLSMinimapMarkerSnapshot& Marker) const;
+	bool IsMarkerInSight(const FLSMinimapMarkerSnapshot& Marker) const;
 	void ResolveNavigationProtocolLevels(int32& OutCurrentNavigationProtocol, int32& OutPreviousNavigationProtocol) const;
 	bool IsNavigationFeatureVisible(FName EnableName, int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol, bool bFallbackVisible) const;
+	bool ShouldDrawMarkerDistance(const FLSMinimapMarkerSnapshot& Marker) const;
+	FText BuildMarkerDistanceText(const FLSMinimapMarkerSnapshot& Marker) const;
 	void DrawPreviewData(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius, int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol) const;
 	void DrawShape(const FLSMinimapShapeSnapshot& Shape, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
 	void DrawMinimapObstacles(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;

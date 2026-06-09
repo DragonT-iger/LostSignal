@@ -82,6 +82,11 @@ FText GetEnableDisplayText(const FName EnableName)
 		{ TEXT("Exit_Point"), LOCTEXT("ExitPoint", "탈출 지점 UI 표시") },
 		{ TEXT("Minimap_View_Angle"), LOCTEXT("MinimapViewAngle", "시야각 UI 표시") },
 		{ TEXT("Minimap_Enemy"), LOCTEXT("MinimapEnemy", "적 위치 UI 표시") },
+		{ TEXT("Minimap_Region"), LOCTEXT("MinimapRegion", "지역 정보 UI 표시") },
+		{ TEXT("Region_Quest"), LOCTEXT("RegionQuest", "지역 퀘스트 UI 표시") },
+		{ TEXT("Quest_Distance"), LOCTEXT("QuestDistance", "퀘스트 거리 UI 표시") },
+		{ TEXT("Minimap_View_Angle_Enemy"), LOCTEXT("MinimapViewAngleEnemy", "시야각 안 적 위치 UI 표시") },
+		{ TEXT("Minimap_View_Angle_Looting_Object"), LOCTEXT("MinimapViewAngleLootingObject", "시야각 안 루팅 오브젝트 UI 표시") },
 		{ TEXT("Protected_Level"), LOCTEXT("ProtectedLevel", "해금 정보 보호") },
 	};
 

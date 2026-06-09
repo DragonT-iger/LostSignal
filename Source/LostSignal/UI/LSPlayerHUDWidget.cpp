@@ -4,6 +4,7 @@
 #include "Skills/LSPlayerSkillComponent.h"
 #include "UI/Minimap/LSMinimapWidget.h"
 #include "UI/Skill/LSSkillBarWidget.h"
+#include "UI/Survival/LSSurvivalStatusWidget.h"
 
 void ULSPlayerHUDWidget::InitializeHUDForPawn(APawn* InPawn)
 {
@@ -19,6 +20,15 @@ void ULSPlayerHUDWidget::InitializeHUDForPawn(APawn* InPawn)
 	else
 	{
 		Minimap->InitializeMinimapForPawn(InPawn);
+	}
+
+	if (!SurvivalStatus)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot initialize HUD because SurvivalStatus is not bound."), *GetNameSafe(this));
+	}
+	else
+	{
+		SurvivalStatus->InitializeSurvivalStatusForPawn(InPawn);
 	}
 
 	ULSPlayerSkillComponent* SkillComponent = InPawn ? InPawn->FindComponentByClass<ULSPlayerSkillComponent>() : nullptr;
@@ -47,5 +57,9 @@ void ULSPlayerHUDWidget::NativeConstruct()
 	if (!Minimap)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s is missing required HUD widget binding: Minimap."), *GetNameSafe(this));
+	}
+	if (!SurvivalStatus)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required HUD widget binding: SurvivalStatus."), *GetNameSafe(this));
 	}
 }

@@ -26,6 +26,8 @@
 #include "Vision/LSPlayerXRayComponent.h"
 #include "Vision/LSVisionComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/WidgetComponent.h"
+#include "UI/Survival/LSSurvivalOverheadWidget.h"
 
 ALSPlayerCharacter::ALSPlayerCharacter()
 {
@@ -55,6 +57,13 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	SkillPreviewComponent = CreateDefaultSubobject<ULSSkillPreviewComponent>(TEXT("SkillPreviewComponent"));
 	PlayerSkillComponent = CreateDefaultSubobject<ULSPlayerSkillComponent>(TEXT("PlayerSkillComponent"));
 	PlayerAttributeSet = CreateDefaultSubobject<ULSCharacterAttributeSet>(TEXT("PlayerAttributeSet"));
+	SurvivalOverheadWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("SurvivalOverheadWidgetComponent"));
+	SurvivalOverheadWidgetComponent->SetupAttachment(RootComponent);
+	SurvivalOverheadWidgetComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SurvivalOverheadWidgetComponent->SetGenerateOverlapEvents(false);
+	SurvivalOverheadWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
+	SurvivalOverheadWidgetComponent->SetDrawSize(SurvivalOverheadDrawSize);
+	SurvivalOverheadWidgetComponent->SetRelativeLocation(SurvivalOverheadWidgetOffset);
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
@@ -67,6 +76,7 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 void ALSPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	InitializeSurvivalOverheadWidget();
 }
 
 void ALSPlayerCharacter::Tick(float DeltaSeconds)
@@ -634,6 +644,38 @@ void ALSPlayerCharacter::ApplyRunState(bool bNewIsRunning)
 	{
 		MovementComponent->MaxWalkSpeed = bIsRunning ? RunSpeed : WalkSpeed;
 	}
+}
+
+void ALSPlayerCharacter::InitializeSurvivalOverheadWidget()
+{
+	if (GetNetMode() == NM_DedicatedServer || !SurvivalOverheadWidgetComponent)
+	{
+		return;
+	}
+
+	SurvivalOverheadWidgetComponent->SetRelativeLocation(SurvivalOverheadWidgetOffset);
+	SurvivalOverheadWidgetComponent->SetDrawSize(SurvivalOverheadDrawSize);
+
+	if (SurvivalOverheadWidgetClass)
+	{
+		SurvivalOverheadWidgetComponent->SetWidgetClass(SurvivalOverheadWidgetClass);
+	}
+
+	if (!SurvivalOverheadWidgetComponent->GetWidgetClass())
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot initialize survival overhead widget because SurvivalOverheadWidgetClass is not set."), *GetNameSafe(this));
+		return;
+	}
+
+	SurvivalOverheadWidgetComponent->InitWidget();
+	ULSSurvivalOverheadWidget* OverheadWidget = Cast<ULSSurvivalOverheadWidget>(SurvivalOverheadWidgetComponent->GetWidget());
+	if (!OverheadWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s survival overhead widget is not derived from ULSSurvivalOverheadWidget."), *GetNameSafe(this));
+		return;
+	}
+
+	OverheadWidget->InitializeSurvivalOverheadForCharacter(this);
 }
 
 void ALSPlayerCharacter::ServerSetRunState_Implementation(bool bNewIsRunning)

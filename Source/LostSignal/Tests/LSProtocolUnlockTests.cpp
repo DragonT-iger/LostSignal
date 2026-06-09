@@ -48,6 +48,25 @@ bool FLSProtocolUnlockRowGroupingTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Previous unlock reports protected state"), bProtected);
 	TestFalse(TEXT("Previous unlock is hidden below protected range"), GameDataSubsystem->IsProtocolUnlockVisible(ProtectedRow, 5, 8, &bProtected));
 
+	FLSProtocolUnlockRow NavigationFullMarkerRow;
+	NavigationFullMarkerRow.Protocol_Required_Level = 8;
+	NavigationFullMarkerRow.Protocol_Enable_Name = TEXT("Minimap_Enemy");
+	NavigationFullMarkerRow.Protocol_Enable_Value = 0;
+	NavigationFullMarkerRow.Protocol_Protected_Level = 5;
+
+	TestTrue(TEXT("Navigation full marker remains visible at protected level"), GameDataSubsystem->IsProtocolUnlockVisible(NavigationFullMarkerRow, 5, 8, &bProtected));
+	TestTrue(TEXT("Navigation full marker reports protected state"), bProtected);
+	TestFalse(TEXT("Navigation full marker is hidden below protected level"), GameDataSubsystem->IsProtocolUnlockVisible(NavigationFullMarkerRow, 4, 8, &bProtected));
+
+	FLSProtocolUnlockRow SurvivalOverheadRow;
+	SurvivalOverheadRow.Protocol_Required_Level = 7;
+	SurvivalOverheadRow.Protocol_Enable_Name = TEXT("HP_Overhead");
+	SurvivalOverheadRow.Protocol_Protected_Level = 4;
+
+	TestTrue(TEXT("Survival overhead remains visible at protected level"), GameDataSubsystem->IsProtocolUnlockVisible(SurvivalOverheadRow, 4, 7, &bProtected));
+	TestTrue(TEXT("Survival overhead reports protected state"), bProtected);
+	TestFalse(TEXT("Survival overhead is hidden below protected level"), GameDataSubsystem->IsProtocolUnlockVisible(SurvivalOverheadRow, 3, 7, &bProtected));
+
 	return true;
 }
 

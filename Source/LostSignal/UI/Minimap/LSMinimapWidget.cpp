@@ -190,11 +190,9 @@ int32 ULSMinimapWidget::NativePaint(
 			const FVector2D DrawPoint = bOffscreen ? ClampToMinimapEdge(Projected, Center, Radius - 4.0f) : Projected;
 			DrawFilledCircle(OutDrawElements, ++CurrentLayer, AllottedGeometry, DrawPoint, Marker.DrawRadius, ResolveMarkerColor(Marker));
 
-			if (Marker.MarkerType == ELSMinimapMarkerType::Extraction && ObservedPawn.IsValid())
+			if (ShouldDrawMarkerDistance(Marker))
 			{
-				const float DistanceMeters = FVector::Dist2D(ObservedPawn->GetActorLocation(), Marker.WorldLocation) / 100.0f;
-				const FText DistanceText = FText::AsNumber(FMath::RoundToInt(DistanceMeters));
-				DrawText(OutDrawElements, ++CurrentLayer, AllottedGeometry, DrawPoint + FVector2D(6.0f, -6.0f), DistanceText, ResolveMarkerColor(Marker));
+				DrawText(OutDrawElements, ++CurrentLayer, AllottedGeometry, DrawPoint + FVector2D(6.0f, -6.0f), BuildMarkerDistanceText(Marker), ResolveMarkerColor(Marker));
 			}
 		}
 	}
@@ -291,16 +289,13 @@ bool ULSMinimapWidget::ShouldDrawMarker(const FLSMinimapMarkerSnapshot& Marker, 
 	switch (Marker.MarkerType)
 	{
 	case ELSMinimapMarkerType::Enemy:
-		return IsNavigationFeatureVisible(
-			TEXT("Minimap_Enemy"),
-			CurrentNavigationProtocol,
-			PreviousNavigationProtocol,
-			CurrentNavigationProtocol >= RevealPolicy.EnemyAlwaysVisibleNavigation ||
-				(CurrentNavigationProtocol >= RevealPolicy.EnemyVisibleNavigation && IsEnemyInSight(Marker)));
+		return IsNavigationFeatureVisible(TEXT("Minimap_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyAlwaysVisibleNavigation) ||
+			(IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyVisibleNavigation) && IsMarkerInSight(Marker));
 	case ELSMinimapMarkerType::Loot:
 	case ELSMinimapMarkerType::DroppedItem:
-		return IsNavigationFeatureVisible(TEXT("Minimap_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.LootVisibleNavigation) &&
-			FVector2D::Distance(ProjectedPoint, Center) <= Radius;
+		return FVector2D::Distance(ProjectedPoint, Center) <= Radius &&
+			(IsNavigationFeatureVisible(TEXT("Minimap_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.LootVisibleNavigation) ||
+				(IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, false) && IsMarkerInSight(Marker)));
 	case ELSMinimapMarkerType::Extraction:
 		return IsNavigationFeatureVisible(TEXT("Exit_Point"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.ExtractionVisibleNavigation);
 	default:
@@ -308,7 +303,7 @@ bool ULSMinimapWidget::ShouldDrawMarker(const FLSMinimapMarkerSnapshot& Marker, 
 	}
 }
 
-bool ULSMinimapWidget::IsEnemyInSight(const FLSMinimapMarkerSnapshot& Marker) const
+bool ULSMinimapWidget::IsMarkerInSight(const FLSMinimapMarkerSnapshot& Marker) const
 {
 	const APawn* Pawn = ObservedPawn.Get();
 	if (!Pawn)
@@ -327,6 +322,23 @@ bool ULSMinimapWidget::IsEnemyInSight(const FLSMinimapMarkerSnapshot& Marker) co
 	const float Dot = FVector::DotProduct(Forward, Direction);
 	const float MinDot = FMath::Cos(FMath::DegreesToRadians(SightAngleDegrees * 0.5f));
 	return Dot >= MinDot;
+}
+
+bool ULSMinimapWidget::ShouldDrawMarkerDistance(const FLSMinimapMarkerSnapshot& Marker) const
+{
+	return Marker.MarkerType == ELSMinimapMarkerType::Extraction && ObservedPawn.IsValid();
+}
+
+FText ULSMinimapWidget::BuildMarkerDistanceText(const FLSMinimapMarkerSnapshot& Marker) const
+{
+	const APawn* Pawn = ObservedPawn.Get();
+	if (!Pawn)
+	{
+		return FText::GetEmpty();
+	}
+
+	const float DistanceMeters = FVector::Dist2D(Pawn->GetActorLocation(), Marker.WorldLocation) / 100.0f;
+	return FText::AsNumber(FMath::RoundToInt(DistanceMeters));
 }
 
 void ULSMinimapWidget::ResolveNavigationProtocolLevels(int32& OutCurrentNavigationProtocol, int32& OutPreviousNavigationProtocol) const
@@ -395,7 +407,8 @@ void ULSMinimapWidget::DrawPreviewData(
 		DrawSightCone(OutDrawElements, ++LayerId, Geometry, Center, FVector2D(0.0f, -1.0f), Radius, SightAngleDegrees, SightColor);
 	}
 
-	if (IsNavigationFeatureVisible(TEXT("Minimap_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.LootVisibleNavigation))
+	if (IsNavigationFeatureVisible(TEXT("Minimap_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.LootVisibleNavigation) ||
+		IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, false))
 	{
 		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.42f, -Radius * 0.22f), 4.0f, FLinearColor(1.0f, 0.82f, 0.18f, 1.0f));
 		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D( Radius * 0.34f,  Radius * 0.16f), 3.5f, FLinearColor(0.25f, 1.0f, 0.42f, 1.0f));
@@ -409,7 +422,8 @@ void ULSMinimapWidget::DrawPreviewData(
 		DrawText(OutDrawElements, ++LayerId, Geometry, ExitPoint + FVector2D(6.0f, -6.0f), FText::AsNumber(184), ExitColor);
 	}
 
-	if (IsNavigationFeatureVisible(TEXT("Minimap_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyVisibleNavigation))
+	if (IsNavigationFeatureVisible(TEXT("Minimap_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyAlwaysVisibleNavigation) ||
+		IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyVisibleNavigation))
 	{
 		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.12f, -Radius * 0.52f), 4.0f, FLinearColor(1.0f, 0.12f, 0.1f, 1.0f));
 	}

@@ -82,6 +82,7 @@ void ALSTestPlayerCharacter::ApplyStatsToAttributeSet()
 	LocalPlayerAttributeSet->InitDefence(BaseDefence);
 	LocalPlayerAttributeSet->InitRecovery(BaseRecovery);
 	LocalPlayerAttributeSet->InitMaxStamina(BaseStamina);
+	LocalPlayerAttributeSet->InitCurrentStamina(BaseStamina);
 	LocalPlayerAttributeSet->InitMoveSpeed(BaseMoveSpeed);
 	LocalPlayerAttributeSet->InitDashSpeed(BaseDashSpeed);
 	LocalPlayerAttributeSet->InitDashDuration(BaseDashDuration);

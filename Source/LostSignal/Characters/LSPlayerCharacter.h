@@ -18,7 +18,9 @@ class ULSPlayerSkillComponent;
 class ULSSkillPreviewComponent;
 class ULSVisionComponent;
 class ULSCharacterAttributeSet;
+class ULSSurvivalOverheadWidget;
 class UUserWidget;
+class UWidgetComponent;
 class USpringArmComponent;
 struct FInputActionValue;
 
@@ -100,6 +102,18 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/GAS", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSCharacterAttributeSet> PlayerAttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/UI", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UWidgetComponent> SurvivalOverheadWidgetComponent;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
+	TSubclassOf<ULSSurvivalOverheadWidget> SurvivalOverheadWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
+	FVector SurvivalOverheadWidgetOffset = FVector(0.0f, 0.0f, 120.0f);
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
+	FVector2D SurvivalOverheadDrawSize = FVector2D(160.0f, 48.0f);
 
 	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TObjectPtr<UInputAction> MoveAction;
@@ -256,6 +270,7 @@ private:
 	bool CancelActiveSkillPreview();
 
 	void ApplyRunState(bool bNewIsRunning);
+	void InitializeSurvivalOverheadWidget();
 	bool ShouldSyncFacingRotation(float NewYaw) const;
 
 	UFUNCTION(Server, Reliable)

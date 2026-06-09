@@ -6,6 +6,7 @@
 
 class ULSSkillBarWidget;
 class ULSMinimapWidget;
+class ULSSurvivalStatusWidget;
 
 /** Root in-game HUD widget. WBP should place and bind SkillBar and Minimap. */
 UCLASS()
@@ -25,4 +26,7 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSMinimapWidget> Minimap;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSSurvivalStatusWidget> SurvivalStatus;
 };

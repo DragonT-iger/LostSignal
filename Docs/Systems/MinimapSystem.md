@@ -47,6 +47,7 @@ ALSMinimapShapeActor
 | 월드 드랍 아이템 | `ALSWorldDroppedItem`의 `ULSMinimapMarkerComponent` |
 | 탈출구 | `ALSExtractionZone`의 `ULSMinimapMarkerComponent` |
 | 지형지물 | `ULSVisionSurfaceComponent`, `ULSVisionOccluderComponent`, `ULSMinimapObstacleComponent`, 필요 시 `ALSMinimapShapeActor` |
+| 지역/위험도/퀘스트 위치 | 아직 실제 시스템 미연결. 향후 지역/퀘스트 액터 또는 데이터 소유자가 미니맵 마커/도형으로 연결 |
 
 루팅 박스는 열리면 미니맵 마커를 숨긴다. 월드 드랍 아이템은 아이템 RowName과 수량이 유효할 때만 표시한다. 탈출구는 미니맵 가장자리 방향 표시와 거리 텍스트를 함께 표시한다.
 
@@ -65,7 +66,20 @@ ULSMinimapWidget
 -> FLSMinimapRevealPolicy 기준 표시 여부 결정
 ```
 
-적 표시는 고정 규칙이 아니다. `FLSMinimapRevealPolicy`의 기본값에 따라 숨김, 플레이어 시야각 안에서만 표시, 항상 표시 중 하나로 결정된다. 최종 임계값을 기획 데이터로 분리해야 하면 별도 DataTable을 단일 출처로 만든다.
+`DT_Protocol`의 탐색 프로토콜 row가 있으면 row의 `Protocol_Required_Level`과 `Protocol_Protected_Level`이 표시 여부의 단일 출처다. row가 없을 때만 `FLSMinimapRevealPolicy` 기본값을 fallback으로 사용한다.
+
+| 해금 항목 | 현재 연결 상태 |
+|-----------|----------------|
+| `Minimap` | 미니맵 UI 활성화 |
+| `Exit_Point` | 탈출구 위치와 거리 표시 |
+| `Player_Point` | 플레이어 현재 위치 표시 |
+| `Minimap_View_Angle` | 플레이어 미니맵 시야각 표시 |
+| `Minimap_Region`, `Region_Quest` | 문서 정의만 있음. 지역/위험도/지역 퀘스트 시스템 연결 시 사용 |
+| `Quest`, `Quest_Distance` | 문서 정의만 있음. 전체 퀘스트 위치/거리 시스템 연결 시 사용 |
+| `Minimap_View_Angle_Enemy` | 플레이어 시야각 안 몬스터 표시 |
+| `Minimap_View_Angle_Looting_Object` | 플레이어 시야각 안 루팅 오브젝트/월드 드랍 아이템 표시 |
+| `Minimap_Enemy` | 미니맵 범위 안 모든 몬스터 표시. 정보 유지는 `Protocol_Protected_Level`로 판정 |
+| `Minimap_Looting_Object` | 미니맵 범위 안 모든 루팅 오브젝트/월드 드랍 아이템 표시. 정보 유지는 `Protocol_Protected_Level`로 판정 |
 
 ## 지형 표시
 

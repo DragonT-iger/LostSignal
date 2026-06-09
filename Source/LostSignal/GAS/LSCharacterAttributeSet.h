@@ -17,6 +17,7 @@ class LOSTSIGNAL_API ULSCharacterAttributeSet : public UAttributeSet
 	GENERATED_BODY()
 
 public:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 
@@ -60,9 +61,13 @@ public:
 	FGameplayAttributeData Recovery = 0.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Recovery)
 
-	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxStamina, Category="LS/Stats")
 	FGameplayAttributeData MaxStamina = 100.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, MaxStamina)
+
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CurrentStamina, Category="LS/Stats")
+	FGameplayAttributeData CurrentStamina = 100.0f;
+	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CurrentStamina)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData MoveSpeed = 1.0f;
@@ -79,4 +84,13 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData DashCooldown = 1.0f;
 	ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DashCooldown)
+
+private:
+	UFUNCTION()
+	void OnRep_MaxStamina(const FGameplayAttributeData& OldMaxStamina) const;
+
+	UFUNCTION()
+	void OnRep_CurrentStamina(const FGameplayAttributeData& OldCurrentStamina) const;
+
+	void ClampCurrentStamina();
 };
