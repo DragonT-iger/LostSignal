@@ -21,7 +21,7 @@ namespace
 {
 const FName ProgressParameterName(TEXT("Progress"));
 
-FText BuildValueText(const float CurrentValue, const float MaxValue)
+FText BuildSurvivalStatusValueText(const float CurrentValue, const float MaxValue)
 {
 	return FText::Format(
 		LOCTEXT("SurvivalValueFormat", "{0}/{1}"),
@@ -184,11 +184,11 @@ void ULSSurvivalStatusWidget::RefreshDisplay()
 
 	if (HealthText)
 	{
-		HealthText->SetText(BuildValueText(CurrentHealth, MaxHealth));
+		HealthText->SetText(BuildSurvivalStatusValueText(CurrentHealth, MaxHealth));
 	}
 	if (StaminaText)
 	{
-		StaminaText->SetText(BuildValueText(CurrentStamina, MaxStamina));
+		StaminaText->SetText(BuildSurvivalStatusValueText(CurrentStamina, MaxStamina));
 	}
 	if (HealthProgressBar)
 	{

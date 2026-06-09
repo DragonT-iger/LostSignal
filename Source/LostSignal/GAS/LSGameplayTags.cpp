@@ -39,4 +39,6 @@ namespace LSGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Data_Buff_AttackSpeed, "LS.Data.Buff.AttackSpeed")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Buff_AttackPower, "LS.Data.Buff.AttackPower")
+
+	UE_DEFINE_GAMEPLAY_TAG(Data_Stamina_Amount, "LS.Data.Stamina.Amount")
 }

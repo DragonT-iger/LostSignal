@@ -54,4 +54,7 @@ namespace LSGameplayTags
 	// SetByCaller buff data
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Buff_AttackSpeed)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Buff_AttackPower)
+
+	// SetByCaller stamina data
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Stamina_Amount)
 }

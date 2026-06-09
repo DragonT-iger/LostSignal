@@ -7,7 +7,10 @@
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "EnhancedInputComponent.h"
+#include "AbilitySystemComponent.h"
 #include "GAS/LSCharacterAttributeSet.h"
+#include "GAS/LSGameplayTags.h"
+#include "GAS/Effects/LSGE_StaminaChange.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -57,6 +60,7 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	SkillPreviewComponent = CreateDefaultSubobject<ULSSkillPreviewComponent>(TEXT("SkillPreviewComponent"));
 	PlayerSkillComponent = CreateDefaultSubobject<ULSPlayerSkillComponent>(TEXT("PlayerSkillComponent"));
 	PlayerAttributeSet = CreateDefaultSubobject<ULSCharacterAttributeSet>(TEXT("PlayerAttributeSet"));
+	StaminaChangeEffectClass = ULSGE_StaminaChange::StaticClass();
 	SurvivalOverheadWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("SurvivalOverheadWidgetComponent"));
 	SurvivalOverheadWidgetComponent->SetupAttachment(RootComponent);
 	SurvivalOverheadWidgetComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -94,6 +98,8 @@ void ALSPlayerCharacter::Tick(float DeltaSeconds)
 
 	UpdateInventoryWidgetDistance();
 	UpdateActiveSkillPreview();
+	UpdateRunStamina(DeltaSeconds);
+	UpdateStaminaRecovery(DeltaSeconds);
 }
 
 void ALSPlayerCharacter::ApplyFacingRotation(const FRotator& NewRotation)
@@ -191,6 +197,11 @@ void ALSPlayerCharacter::OnDash()
 	const FVector DashDirection = GetDashDirection();
 	if (!HasAuthority())
 	{
+		if (!HasStamina(DashStaminaCost))
+		{
+			return;
+		}
+
 		bool bShouldExecuteImmediately = false;
 		if (!PlayerCombatComponent->SubmitDashInput(DashDirection, bShouldExecuteImmediately))
 		{
@@ -206,7 +217,10 @@ void ALSPlayerCharacter::OnDash()
 		return;
 	}
 
-	PlayerCombatComponent->RequestDash(DashDirection);
+	if (HasStamina(DashStaminaCost) && PlayerCombatComponent->RequestDash(DashDirection))
+	{
+		TrySpendStamina(DashStaminaCost);
+	}
 }
 
 void ALSPlayerCharacter::OnSkillPreviewCancelInput()
@@ -544,6 +558,12 @@ void ALSPlayerCharacter::ServerRequestInteract_Implementation(AActor* Target)
 
 void ALSPlayerCharacter::OnRunStart()
 {
+	if (!CanStartRunning())
+	{
+		ApplyRunState(false);
+		return;
+	}
+
 	ApplyRunState(true);
 
 	if (!HasAuthority())
@@ -638,12 +658,121 @@ bool ALSPlayerCharacter::ShouldSyncFacingRotation(float NewYaw) const
 
 void ALSPlayerCharacter::ApplyRunState(bool bNewIsRunning)
 {
+	if (bNewIsRunning && !CanStartRunning())
+	{
+		bNewIsRunning = false;
+	}
+
 	bIsRunning = bNewIsRunning;
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
 		MovementComponent->MaxWalkSpeed = bIsRunning ? RunSpeed : WalkSpeed;
 	}
+}
+
+bool ALSPlayerCharacter::CanStartRunning() const
+{
+	return HasStamina(KINDA_SMALL_NUMBER);
+}
+
+bool ALSPlayerCharacter::IsMovingForRunStaminaDrain() const
+{
+	FVector HorizontalVelocity = GetVelocity();
+	HorizontalVelocity.Z = 0.0f;
+	return !HorizontalVelocity.IsNearlyZero(1.0f);
+}
+
+void ALSPlayerCharacter::UpdateRunStamina(float DeltaSeconds)
+{
+	if (!HasAuthority() || !bIsRunning || RunStaminaDrainPerSecond <= 0.0f)
+	{
+		return;
+	}
+
+	if (!CanStartRunning())
+	{
+		ApplyRunState(false);
+		ClientSetRunState(false);
+		return;
+	}
+
+	if (!IsMovingForRunStaminaDrain())
+	{
+		return;
+	}
+
+	TrySpendStamina(RunStaminaDrainPerSecond * DeltaSeconds);
+	if (!CanStartRunning())
+	{
+		ApplyRunState(false);
+		ClientSetRunState(false);
+	}
+}
+
+void ALSPlayerCharacter::UpdateStaminaRecovery(float DeltaSeconds)
+{
+	if (!HasAuthority() || !PlayerAttributeSet || StaminaRecoveryPerSecond <= 0.0f)
+	{
+		return;
+	}
+
+	if (bIsRunning || PlayerAttributeSet->GetCurrentStamina() >= PlayerAttributeSet->GetMaxStamina())
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World || World->GetTimeSeconds() - LastStaminaSpendTime < StaminaRecoveryDelay)
+	{
+		return;
+	}
+
+	ApplyStaminaChange(StaminaRecoveryPerSecond * DeltaSeconds);
+}
+
+bool ALSPlayerCharacter::HasStamina(float RequiredAmount) const
+{
+	return PlayerAttributeSet && PlayerAttributeSet->GetCurrentStamina() >= FMath::Max(RequiredAmount, 0.0f);
+}
+
+bool ALSPlayerCharacter::TrySpendStamina(float Amount)
+{
+	if (!HasAuthority() || Amount <= 0.0f || !HasStamina(Amount))
+	{
+		return false;
+	}
+
+	ApplyStaminaChange(-Amount);
+	LastStaminaSpendTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	return true;
+}
+
+void ALSPlayerCharacter::ApplyStaminaChange(float Amount)
+{
+	if (!HasAuthority() || FMath::IsNearlyZero(Amount) || !StaminaChangeEffectClass)
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC)
+	{
+		return;
+	}
+
+	FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
+	EffectContext.AddSourceObject(this);
+
+	const FGameplayEffectSpecHandle SpecHandle = ASC->MakeOutgoingSpec(StaminaChangeEffectClass, 1.0f, EffectContext);
+	if (!SpecHandle.IsValid() || !SpecHandle.Data.IsValid())
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s failed to create stamina change effect spec."), *GetNameSafe(this));
+		return;
+	}
+
+	SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Stamina_Amount, Amount);
+	ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
 }
 
 void ALSPlayerCharacter::InitializeSurvivalOverheadWidget()
@@ -681,13 +810,22 @@ void ALSPlayerCharacter::InitializeSurvivalOverheadWidget()
 void ALSPlayerCharacter::ServerSetRunState_Implementation(bool bNewIsRunning)
 {
 	ApplyRunState(bNewIsRunning);
+	if (bNewIsRunning && !bIsRunning)
+	{
+		ClientSetRunState(false);
+	}
+}
+
+void ALSPlayerCharacter::ClientSetRunState_Implementation(bool bNewIsRunning)
+{
+	ApplyRunState(bNewIsRunning);
 }
 
 void ALSPlayerCharacter::ServerRequestDash_Implementation(FVector_NetQuantizeNormal DashDirection)
 {
-	if (PlayerCombatComponent)
+	if (PlayerCombatComponent && HasStamina(DashStaminaCost) && PlayerCombatComponent->RequestDash(FVector(DashDirection)))
 	{
-		PlayerCombatComponent->RequestDash(FVector(DashDirection));
+		TrySpendStamina(DashStaminaCost);
 	}
 }
 

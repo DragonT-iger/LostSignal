@@ -55,7 +55,7 @@ int32 ResolveInactiveSignalSlotCount(const float SignalPercent)
 	return FMath::Clamp(FMath::FloorToInt((100.0f - SignalPercent100 + KINDA_SMALL_NUMBER) / 10.0f), 0, 10);
 }
 
-TArray<FLSSessionItem> BuildSignalActiveEquipmentItems(const TArray<FLSSessionItem>& Items, const int32 InactiveSlotCount)
+TArray<FLSSessionItem> BuildMinimapSignalActiveEquipmentItems(const TArray<FLSSessionItem>& Items, const int32 InactiveSlotCount)
 {
 	TArray<FLSSessionItem> ActiveItems;
 	ActiveItems.Reserve(Items.Num());
@@ -361,7 +361,7 @@ void ULSMinimapWidget::ResolveNavigationProtocolLevels(int32& OutCurrentNavigati
 	}
 
 	const int32 InactiveSlotCount = ResolveInactiveSignalSlotCount(SaveSubsystem->GetChipSignalGaugePercent());
-	const TArray<FLSSessionItem> ActiveEquipmentItems = BuildSignalActiveEquipmentItems(SaveSubsystem->GetChipEquipmentSlots(), InactiveSlotCount);
+	const TArray<FLSSessionItem> ActiveEquipmentItems = BuildMinimapSignalActiveEquipmentItems(SaveSubsystem->GetChipEquipmentSlots(), InactiveSlotCount);
 	OutCurrentNavigationProtocol = LSChipStats::AggregateChipProtocolTotals(ActiveEquipmentItems, this).Navigation;
 	OutPreviousNavigationProtocol = LSChipStats::AggregateChipProtocolTotals(SaveSubsystem->GetChipEquipmentSlots(), this).Navigation;
 }

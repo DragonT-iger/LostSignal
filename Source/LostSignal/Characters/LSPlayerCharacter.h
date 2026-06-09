@@ -8,6 +8,7 @@
 #include "LSPlayerCharacter.generated.h"
 
 class UCameraComponent;
+class UGameplayEffect;
 class UInputAction;
 class ULSAimComponent;
 class ULSMPCVisionSourceComponent;
@@ -192,6 +193,21 @@ protected:
 	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
 	float RunSpeed = 600.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category="LS/Movement")
+	TSubclassOf<UGameplayEffect> StaminaChangeEffectClass;
+
+	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
+	float RunStaminaDrainPerSecond = 5.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
+	float DashStaminaCost = 10.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
+	float StaminaRecoveryDelay = 2.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
+	float StaminaRecoveryPerSecond = 20.0f;
+
 	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
 	float MaxAllowedStepHeight = 10.0f;
 
@@ -238,6 +254,7 @@ private:
 
 	float LastSentFacingYaw = 0.0f;
 	float LastFacingSyncTime = 0.0f;
+	float LastStaminaSpendTime = -FLT_MAX;
 	FVector LastMoveWorldDirection = FVector::ZeroVector;
 
 	void Move(const FInputActionValue& Value);
@@ -270,11 +287,21 @@ private:
 	bool CancelActiveSkillPreview();
 
 	void ApplyRunState(bool bNewIsRunning);
+	bool CanStartRunning() const;
+	bool IsMovingForRunStaminaDrain() const;
+	void UpdateRunStamina(float DeltaSeconds);
+	void UpdateStaminaRecovery(float DeltaSeconds);
+	bool HasStamina(float RequiredAmount) const;
+	bool TrySpendStamina(float Amount);
+	void ApplyStaminaChange(float Amount);
 	void InitializeSurvivalOverheadWidget();
 	bool ShouldSyncFacingRotation(float NewYaw) const;
 
 	UFUNCTION(Server, Reliable)
 	void ServerSetRunState(bool bNewIsRunning);
+
+	UFUNCTION(Client, Reliable)
+	void ClientSetRunState(bool bNewIsRunning);
 
 	UFUNCTION(Server, Reliable)
 	void ServerRequestDash(FVector_NetQuantizeNormal DashDirection);
