@@ -1,4 +1,6 @@
 #include "Session/LSSaveSubsystem.h"
+#include "Data/LSGameDataSubsystem.h"
+#include "Data/LSChipStats.h"
 #include "Session/LSSaveGame.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Kismet/GameplayStatics.h"
@@ -33,7 +35,7 @@ void ULSSaveSubsystem::AddToInventory(const TArray<FLSSessionItem>& Items)
 	for (const FLSSessionItem& NewItem : Items)
 	{
 		FLSSessionItem IgnoredRemainingItem;
-		LSInventorySlotUtils::TryAddItemsToSlotArray(Inv, NewItem.ItemRowName, NewItem.Amount, MAX_int32, NewItem.ChipStats, IgnoredRemainingItem);
+		LSInventorySlotUtils::TryAddItemsToSlotArray(Inv, NewItem.ItemRowName, NewItem.Amount, GetMaxInventorySlotCount(), NewItem.ChipStats, IgnoredRemainingItem);
 	}
 
 	UE_LOG(LogLS, Log, TEXT("[Save] Inventory updated: added %d entries, total slots %d"), Items.Num(), Inv.Num());
@@ -49,7 +51,7 @@ bool ULSSaveSubsystem::TryAddToInventory(const FName ItemRowName, const int32 Am
 		return false;
 	}
 
-	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, SaveDefaultMaxInventorySlotCount, ChipStats, OutRemainingItem);
+	const bool bChanged = LSInventorySlotUtils::TryAddItemsToSlotArray(GetMutableInventory(), ItemRowName, Amount, GetMaxInventorySlotCount(), ChipStats, OutRemainingItem);
 	if (bChanged)
 	{
 		Save();
@@ -124,6 +126,17 @@ const TArray<FLSSessionItem>& ULSSaveSubsystem::GetChipEquipmentSlots() const
 {
 	static TArray<FLSSessionItem> Empty;
 	return SaveData ? SaveData->ChipEquipmentSlots : Empty;
+}
+
+int32 ULSSaveSubsystem::GetMaxInventorySlotCount() const
+{
+	return SaveDefaultMaxInventorySlotCount + GetCarryingProtocolSlotBonus(TEXT("Inventory"));
+}
+
+int32 ULSSaveSubsystem::GetMaxSafeStashSlotCount() const
+{
+	constexpr int32 SaveMaxSafeStashSlotCount = 4;
+	return FMath::Clamp(GetCarryingProtocolSlotBonus(TEXT("Protected_Inventory")), 0, SaveMaxSafeStashSlotCount);
 }
 
 float ULSSaveSubsystem::GetChipSignalGaugePercent() const
@@ -354,7 +367,9 @@ bool ULSSaveSubsystem::DropStoredSlot(const ELSInventorySlotArea FromArea, const
 		return true;
 	}
 
-	const int32 ToMaxSlotCount = (ToArea == ELSInventorySlotArea::Inventory) ? SaveDefaultMaxInventorySlotCount : INDEX_NONE;
+	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
+		? GetMaxInventorySlotCount()
+		: (ToArea == ELSInventorySlotArea::Safe ? GetMaxSafeStashSlotCount() : INDEX_NONE);
 	const bool bChanged = LSInventorySlotUtils::DropSlot(*FromSlots, FromIndex, *ToSlots, ToIndex, ToMaxSlotCount);
 	if (bChanged)
 	{
@@ -387,7 +402,9 @@ bool ULSSaveSubsystem::TransferStoredSlotToArea(const ELSInventorySlotArea FromA
 
 	FLSSessionItem& FromSlot = (*FromSlots)[FromIndex];
 	FLSSessionItem RemainingItem;
-	const int32 ToMaxSlotCount = (ToArea == ELSInventorySlotArea::Inventory) ? SaveDefaultMaxInventorySlotCount : MAX_int32;
+	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
+		? GetMaxInventorySlotCount()
+		: (ToArea == ELSInventorySlotArea::Safe ? GetMaxSafeStashSlotCount() : MAX_int32);
 	if (!LSInventorySlotUtils::TryAddItemsToSlotArray(*ToSlots, FromSlot.ItemRowName, FromSlot.Amount, ToMaxSlotCount, FromSlot.ChipStats, RemainingItem))
 	{
 		return false;
@@ -505,6 +522,16 @@ bool ULSSaveSubsystem::ReplaceStoredSlotItem(const ELSInventorySlotArea SlotArea
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace stored slot because area is invalid. Area=%d Index=%d"),
 			static_cast<int32>(SlotArea), SlotIndex);
+		return false;
+	}
+
+	const int32 MaxSlotCount = SlotArea == ELSInventorySlotArea::Inventory
+		? GetMaxInventorySlotCount()
+		: (SlotArea == ELSInventorySlotArea::Safe ? GetMaxSafeStashSlotCount() : INDEX_NONE);
+	if (MaxSlotCount != INDEX_NONE && SlotIndex >= MaxSlotCount)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace stored slot because index exceeds max. Area=%d Index=%d Max=%d"),
+			static_cast<int32>(SlotArea), SlotIndex, MaxSlotCount);
 		return false;
 	}
 
@@ -692,6 +719,32 @@ void ULSSaveSubsystem::EnsureChipEquipmentSlots()
 	{
 		SaveData->ChipEquipmentSlots.SetNum(ChipEquipmentSlotCount);
 	}
+}
+
+int32 ULSSaveSubsystem::GetCarryingProtocolSlotBonus(const FName EnableName) const
+{
+	if (!SaveData || EnableName.IsNone())
+	{
+		return 0;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	if (!GameDataSubsystem)
+	{
+		return 0;
+	}
+
+	const int32 InactiveSlotCount = LSChipStats::ResolveInactiveSignalSlotCount(GetChipSignalGaugePercent());
+	const TArray<FLSSessionItem> ActiveEquipmentItems = LSChipStats::BuildSignalActiveEquipmentItems(SaveData->ChipEquipmentSlots, InactiveSlotCount);
+	const int32 CurrentCarrying = LSChipStats::AggregateChipProtocolTotals(ActiveEquipmentItems, this).Carrying;
+	const int32 PreviousCarrying = LSChipStats::AggregateChipProtocolTotals(SaveData->ChipEquipmentSlots, this).Carrying;
+	return GameDataSubsystem->GetVisibleProtocolEnableValueSum(
+		ELSProtocolType::Carrying,
+		EnableName,
+		CurrentCarrying,
+		PreviousCarrying,
+		TEXT("SaveCarryingSlotBonus"));
 }
 
 TArray<FLSSessionItem>& ULSSaveSubsystem::GetMutableInventory()

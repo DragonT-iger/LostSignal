@@ -726,14 +726,17 @@ void ULSChipStationWidget::SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, 
 
 	UGameInstance* GameInstance = GetGameInstance();
 	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
-	const int32 StageCount = GameDataSubsystem ? GameDataSubsystem->GetMaxProtocolRequiredLevel(ProtocolType, TEXT("ChipStation")) : 0;
-	const int32 ActiveStage = StageCount > 0 ? FMath::Clamp(CurrentLevel, 0, StageCount) : CurrentLevel;
-
-	if (StageCount > 0)
+	TArray<int32> StageLevels;
+	if (GameDataSubsystem)
 	{
-		ProtocolWidget->SetProtocolStageCount(StageCount);
+		GameDataSubsystem->GetProtocolRequiredLevels(ProtocolType, StageLevels, TEXT("ChipStation"));
 	}
-	ProtocolWidget->SetProtocolLevels(CurrentLevel, PreviousLevel, ActiveStage);
+
+	if (!StageLevels.IsEmpty())
+	{
+		ProtocolWidget->SetProtocolStageLevels(StageLevels);
+	}
+	ProtocolWidget->SetProtocolLevels(CurrentLevel, PreviousLevel, CurrentLevel);
 }
 
 ULSChipStatWidget* ULSChipStationWidget::GetStatWidget(FName StatKey) const

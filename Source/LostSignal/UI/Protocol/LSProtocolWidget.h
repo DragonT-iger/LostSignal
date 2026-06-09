@@ -38,6 +38,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
 	void SetProtocolStageCount(int32 InSynergyStageCount);
 
+	void SetProtocolStageLevels(const TArray<int32>& InSynergyStageLevels);
+
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
 	void SetProtocolType(ELSProtocolType InProtocolType);
 
@@ -53,6 +55,8 @@ protected:
 	// 시너지 단계 총 개수 (1~N). 기본 8.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI")
 	int32 SynergyStageCount = 8;
+
+	TArray<int32> SynergyStageLevels;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
 	ELSProtocolType ProtocolType = ELSProtocolType::Survival;

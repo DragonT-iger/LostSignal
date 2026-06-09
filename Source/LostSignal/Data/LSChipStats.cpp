@@ -140,6 +140,28 @@ TArray<FLSChipResolvedStat> RollChipStats(const FName ChipRowName)
 	return Out;
 }
 
+int32 ResolveInactiveSignalSlotCount(const float SignalGaugePercent)
+{
+	const float ClampedPercent = FMath::Clamp(SignalGaugePercent, 0.0f, 1.0f);
+	if (ClampedPercent > 0.9f)
+	{
+		return 0;
+	}
+
+	return FMath::Clamp(FMath::FloorToInt((0.9f - ClampedPercent) / 0.1f) + 1, 0, 10);
+}
+
+TArray<FLSSessionItem> BuildSignalActiveEquipmentItems(const TArray<FLSSessionItem>& Items, const int32 InactiveSlotCount)
+{
+	TArray<FLSSessionItem> ActiveItems;
+	ActiveItems.Reserve(Items.Num());
+	for (int32 SlotIndex = InactiveSlotCount; SlotIndex < Items.Num(); ++SlotIndex)
+	{
+		ActiveItems.Add(Items[SlotIndex]);
+	}
+	return ActiveItems;
+}
+
 TMap<FName, int32> AggregateChipStatTotals(const TArray<FLSSessionItem>& Items)
 {
 	TMap<FName, int32> Totals;

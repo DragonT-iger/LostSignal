@@ -141,7 +141,7 @@ void ULSInventoryWidget::RebuildInventorySlots()
 			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
 				AppendSlotItems(InventoryItems, SaveSubsystem->GetInventory());
-				SlotCountToBuild = FMath::Max(InventorySlotCount, InventoryItems.Num());
+				SlotCountToBuild = FMath::Max(SaveSubsystem->GetMaxInventorySlotCount(), InventoryItems.Num());
 			}
 			else
 			{
@@ -314,6 +314,7 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 	}
 
 	TArray<FLSSessionItem> SafeItems;
+	int32 SlotCountToBuild = ConfirmedStorageSlotCount;
 	bool bUsingRaidInventory = false;
 	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(OwningPlayer))
 	{
@@ -322,6 +323,7 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 			if (RaidInventory->IsRaidActive())
 			{
 				AppendSlotItems(SafeItems, RaidInventory->GetSessionSafeInventory());
+				SlotCountToBuild = RaidInventory->GetMaxSafeSlotCount();
 				bUsingRaidInventory = true;
 			}
 		}
@@ -334,11 +336,11 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
 				AppendSlotItems(SafeItems, SaveSubsystem->GetSafeStash());
+				SlotCountToBuild = SaveSubsystem->GetMaxSafeStashSlotCount();
 			}
 		}
 	}
 
-	const int32 SlotCountToBuild = FMath::Max(ConfirmedStorageSlotCount, SafeItems.Num());
 	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
 	{
 		ULSItemSlotWidget* SlotWidget = OwningPlayer

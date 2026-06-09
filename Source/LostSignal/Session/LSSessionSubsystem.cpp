@@ -8,6 +8,7 @@
 namespace
 {
 constexpr int32 SessionDefaultMaxInventorySlotCount = 10;
+constexpr int32 SessionDefaultMaxSafeSlotCount = 4;
 }
 
 void ULSSessionSubsystem::StartRaid(const TArray<FLSSessionItem>& Loadout)
@@ -204,7 +205,9 @@ bool ULSSessionSubsystem::SwapSessionSlots(const ELSInventorySlotArea FromArea, 
 		return false;
 	}
 
-	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory ? GetMaxInventorySlotCount() : INDEX_NONE;
+	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
+		? GetMaxInventorySlotCount()
+		: GetMaxSafeSlotCount();
 	return LSInventorySlotUtils::SwapSlots(*FromSlots, FromIndex, *ToSlots, ToIndex, ToMaxSlotCount);
 }
 
@@ -249,7 +252,9 @@ bool ULSSessionSubsystem::DropSessionSlot(const ELSInventorySlotArea FromArea, c
 		return false;
 	}
 
-	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory ? GetMaxInventorySlotCount() : INDEX_NONE;
+	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
+		? GetMaxInventorySlotCount()
+		: GetMaxSafeSlotCount();
 	return LSInventorySlotUtils::DropSlot(*FromSlots, FromIndex, *ToSlots, ToIndex, ToMaxSlotCount);
 }
 
@@ -272,7 +277,9 @@ bool ULSSessionSubsystem::DropExternalItemToSessionSlot(FLSSessionItem& InOutExt
 		return false;
 	}
 
-	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory ? GetMaxInventorySlotCount() : INDEX_NONE;
+	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
+		? GetMaxInventorySlotCount()
+		: GetMaxSafeSlotCount();
 	return LSInventorySlotUtils::DropExternalItemToSlot(InOutExternalItem, *ToSlots, ToIndex, ToMaxSlotCount);
 }
 
@@ -334,6 +341,11 @@ bool ULSSessionSubsystem::ReplaceSessionSlotItem(const ELSInventorySlotArea Slot
 		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot replace inventory slot because index exceeds max. Index=%d"), SlotIndex);
 		return false;
 	}
+	if (SlotArea == ELSInventorySlotArea::Safe && SlotIndex >= GetMaxSafeSlotCount())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] Cannot replace safe slot because index exceeds max. Index=%d"), SlotIndex);
+		return false;
+	}
 
 	TArray<FLSSessionItem>& Slots = SlotArea == ELSInventorySlotArea::Safe ? SessionSafeInventory : SessionInventory;
 	LSInventorySlotUtils::EnsureSlotIndex(Slots, SlotIndex);
@@ -344,7 +356,14 @@ bool ULSSessionSubsystem::ReplaceSessionSlotItem(const ELSInventorySlotArea Slot
 
 int32 ULSSessionSubsystem::GetMaxInventorySlotCount() const
 {
-	return SessionDefaultMaxInventorySlotCount;
+	const ULSSaveSubsystem* SaveSub = GetGameInstance() ? GetGameInstance()->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	return SaveSub ? SaveSub->GetMaxInventorySlotCount() : SessionDefaultMaxInventorySlotCount;
+}
+
+int32 ULSSessionSubsystem::GetMaxSafeSlotCount() const
+{
+	const ULSSaveSubsystem* SaveSub = GetGameInstance() ? GetGameInstance()->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	return SaveSub ? SaveSub->GetMaxSafeStashSlotCount() : SessionDefaultMaxSafeSlotCount;
 }
 
 void ULSSessionSubsystem::ConsumeItem(FName ItemRowName, int32 Amount)

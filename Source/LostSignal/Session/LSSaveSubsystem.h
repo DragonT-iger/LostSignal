@@ -52,6 +52,12 @@ public:
 	const TArray<FLSSessionItem>& GetChipEquipmentSlots() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Save")
+	int32 GetMaxInventorySlotCount() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	int32 GetMaxSafeStashSlotCount() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Save")
 	float GetChipSignalGaugePercent() const;
 
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
@@ -76,6 +82,7 @@ private:
 	void ResolveInterruptedRaid();
 	void MigrateInventory();
 	void EnsureChipEquipmentSlots();
+	int32 GetCarryingProtocolSlotBonus(FName EnableName) const;
 	TArray<FLSSessionItem>& GetMutableInventory();
 	TArray<FLSSessionItem>* GetMutableStoredSlots(ELSInventorySlotArea SlotArea);
 	const TArray<FLSSessionItem>* GetStoredSlots(ELSInventorySlotArea SlotArea) const;

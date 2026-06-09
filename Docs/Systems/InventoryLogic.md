@@ -84,6 +84,19 @@ RefreshStorage
 -> SaveSubsystem::GetWarehouseItems
 ```
 
+## 적재 프로토콜 슬롯 수
+
+인벤토리와 Safe(보호슬롯)의 표시 슬롯 수와 실제 이동 제한은 `DT_Protocol`의 적재 프로토콜 row를 기준으로 계산한다.
+
+```text
+기본 Inventory 10칸 + 보이는 Protocol_Carrying Inventory 값 합산
+기본 Safe 0칸 + 보이는 Protocol_Carrying Protected_Inventory 값 합산, 총합 최대 4칸
+```
+
+현재 레벨은 신호 게이지로 비활성화된 칩 슬롯을 제외한 장착 칩의 `Carrying` 합산값이다. 이전 레벨은 전체 장착 칩의 `Carrying` 합산값이며, 기존 `Protocol_Protected_Level` 규칙으로 보호 표시가 유지되는 row도 슬롯 보너스에 포함한다.
+
+슬롯 수는 `ULSSaveSubsystem::GetMaxInventorySlotCount`, `ULSSaveSubsystem::GetMaxSafeStashSlotCount`, `ULSRaidInventoryComponent::GetMaxInventorySlotCount`, `ULSRaidInventoryComponent::GetMaxSafeSlotCount`를 통해 조회한다. UI에서 보이는 슬롯 수와 저장/레이드 드래그, 루팅, 월드 픽업 제한은 같은 값을 사용해야 한다.
+
 공통 슬롯 위젯은 `ULSItemSlotWidget`이다. 슬롯 context에 따라 인벤토리 슬롯, 루트 박스 슬롯, 창고 슬롯으로 동작한다.
 
 ```text

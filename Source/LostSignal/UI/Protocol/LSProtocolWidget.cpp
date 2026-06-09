@@ -38,6 +38,22 @@ void ULSProtocolWidget::SetProtocolLevels(const int32 CurrentLevel, const int32 
 void ULSProtocolWidget::SetProtocolStageCount(const int32 InSynergyStageCount)
 {
 	SynergyStageCount = FMath::Max(0, InSynergyStageCount);
+	SynergyStageLevels.Reset();
+}
+
+void ULSProtocolWidget::SetProtocolStageLevels(const TArray<int32>& InSynergyStageLevels)
+{
+	SynergyStageLevels.Reset();
+	for (const int32 StageLevel : InSynergyStageLevels)
+	{
+		if (StageLevel > 0)
+		{
+			SynergyStageLevels.AddUnique(StageLevel);
+		}
+	}
+
+	SynergyStageLevels.Sort();
+	SynergyStageCount = SynergyStageLevels.Num();
 }
 
 void ULSProtocolWidget::SetProtocolType(const ELSProtocolType InProtocolType)
@@ -49,36 +65,61 @@ void ULSProtocolWidget::SetProtocolType(const ELSProtocolType InProtocolType)
 FString ULSProtocolWidget::BuildSynergyMarkup(int32 ActiveStage) const
 {
 	const int32 Count = FMath::Max(0, SynergyStageCount);
-	const int32 Active = FMath::Clamp(ActiveStage, 0, Count);
+	const int32 Active = FMath::Clamp(ActiveStage, 0, SynergyStageLevels.IsEmpty() ? Count : MAX_int32);
 
 	FString Markup;
 
-	// 활성 단계: <Bold>1/2/.../Active</>
-	if (Active >= 1)
+	TArray<int32> DisplayLevels;
+	if (SynergyStageLevels.IsEmpty())
+	{
+		for (int32 i = 1; i <= Count; ++i)
+		{
+			DisplayLevels.Add(i);
+		}
+	}
+	else
+	{
+		DisplayLevels = SynergyStageLevels;
+	}
+
+	TArray<int32> ActiveLevels;
+	TArray<int32> InactiveLevels;
+	for (const int32 DisplayLevel : DisplayLevels)
+	{
+		if (DisplayLevel <= Active)
+		{
+			ActiveLevels.Add(DisplayLevel);
+		}
+		else
+		{
+			InactiveLevels.Add(DisplayLevel);
+		}
+	}
+
+	if (!ActiveLevels.IsEmpty())
 	{
 		Markup += TEXT("<Bold>");
-		for (int32 i = 1; i <= Active; ++i)
+		for (int32 Index = 0; Index < ActiveLevels.Num(); ++Index)
 		{
-			if (i > 1)
+			if (Index > 0)
 			{
 				Markup += TEXT("/");
 			}
-			Markup += FString::FromInt(i);
+			Markup += FString::FromInt(ActiveLevels[Index]);
 		}
 		Markup += TEXT("</>");
 	}
 
-	// 비활성 단계: <Light>/Active+1/.../Count</> (Bold 경계 슬래시는 Light 쪽에 둔다)
-	if (Active < Count)
+	if (!InactiveLevels.IsEmpty())
 	{
 		Markup += TEXT("<Light>");
-		for (int32 i = Active + 1; i <= Count; ++i)
+		for (int32 Index = 0; Index < InactiveLevels.Num(); ++Index)
 		{
-			if (i > 1)
+			if (!ActiveLevels.IsEmpty() || Index > 0)
 			{
 				Markup += TEXT("/");
 			}
-			Markup += FString::FromInt(i);
+			Markup += FString::FromInt(InactiveLevels[Index]);
 		}
 		Markup += TEXT("</>");
 	}

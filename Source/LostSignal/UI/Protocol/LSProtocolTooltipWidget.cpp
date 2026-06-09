@@ -61,6 +61,13 @@ FText GetEnableDisplayText(const FName EnableName)
 		{ TEXT("Carry_Limit"), LOCTEXT("CarryLimit", "적재 한계 UI 표시") },
 		{ TEXT("Item_Value"), LOCTEXT("ItemValue", "아이템 가치 정보 UI 표시") },
 		{ TEXT("Protection_Priority"), LOCTEXT("ProtectionPriority", "보관 우선순위 UI 표시") },
+		{ TEXT("Inventory"), LOCTEXT("InventorySlot", "인벤토리 슬롯") },
+		{ TEXT("Protected_Inventory"), LOCTEXT("ProtectedInventorySlot", "보호슬롯") },
+		{ TEXT("Quest"), LOCTEXT("QuestSlot", "퀵슬롯 UI") },
+		{ TEXT("Scan_Speed"), LOCTEXT("ScanSpeed", "스캔속도") },
+		{ TEXT("Consumables"), LOCTEXT("Consumables", "소모품 한도") },
+		{ TEXT("Wishlist"), LOCTEXT("Wishlist", "아이템 위시리스트 표시") },
+		{ TEXT("Info_Retention"), LOCTEXT("InfoRetention", "정보 유지") },
 		{ TEXT("Equipment_Weight"), LOCTEXT("EquipmentWeight", "장비 무게 UI 표시") },
 		{ TEXT("Damage_Number"), LOCTEXT("DamageNumber", "데미지 수치 UI 표시") },
 		{ TEXT("Projectile_Trajectory"), LOCTEXT("ProjectileTrajectory", "투사체 궤적 UI 표시") },
@@ -87,9 +94,33 @@ FText GetEnableDisplayText(const FName EnableName)
 	return FText::FromName(NormalizedEnableName);
 }
 
-FText BuildSynergyText(const FLSProtocolUnlockRow& Row, const bool bProtected)
+struct FProtocolTooltipGroup
 {
+	int32 RequiredLevel = 0;
+	TArray<FText> Entries;
+	TArray<FText> HighlightEntries;
+	bool bHasUnlocked = false;
+	bool bHasProtected = false;
+	bool bHasHighlightUnlocked = false;
+	bool bHasHighlightProtected = false;
+};
+
+bool IsInfoRetentionRow(const FLSProtocolUnlockRow& Row)
+{
+	return LSProtocol::NormalizeProtocolEnableName(Row.Protocol_Enable_Name) == TEXT("Info_Retention");
+}
+
+FText BuildSynergyEntryText(const FLSProtocolUnlockRow& Row, const bool bProtected)
+{
+	if (IsInfoRetentionRow(Row))
+	{
+		return FText::Format(
+			LOCTEXT("InfoRetentionFormat", "Lv.{0} 까지 정보가 사라지지 않음"),
+			FText::AsNumber(Row.Protocol_Enable_Value));
+	}
+
 	FText DisplayText = GetEnableDisplayText(Row.Protocol_Enable_Name);
+	const FName EnableName = LSProtocol::NormalizeProtocolEnableName(Row.Protocol_Enable_Name);
 	if (Row.Protocol_Enable_Type == TEXT("Protection") && Row.Protocol_Protected_Level > 0)
 	{
 		DisplayText = FText::Format(
@@ -98,10 +129,27 @@ FText BuildSynergyText(const FLSProtocolUnlockRow& Row, const bool bProtected)
 	}
 	else if (Row.Protocol_Enable_Value != 0)
 	{
-		DisplayText = FText::Format(
-			LOCTEXT("EnableValueFormat", "{0} ({1})"),
-			DisplayText,
-			FText::AsNumber(Row.Protocol_Enable_Value));
+		if (EnableName == TEXT("Inventory") || EnableName == TEXT("Protected_Inventory") || EnableName == TEXT("Consumables"))
+		{
+			DisplayText = FText::Format(
+				LOCTEXT("EnablePlusValueFormat", "{0} +{1}"),
+				DisplayText,
+				FText::AsNumber(Row.Protocol_Enable_Value));
+		}
+		else if (EnableName == TEXT("Quest"))
+		{
+			DisplayText = FText::Format(
+				LOCTEXT("EnableSlotCountFormat", "{0} {1}칸"),
+				DisplayText,
+				FText::AsNumber(Row.Protocol_Enable_Value));
+		}
+		else
+		{
+			DisplayText = FText::Format(
+				LOCTEXT("EnableValueFormat", "{0} ({1})"),
+				DisplayText,
+				FText::AsNumber(Row.Protocol_Enable_Value));
+		}
 	}
 
 	if (bProtected)
@@ -109,10 +157,59 @@ FText BuildSynergyText(const FLSProtocolUnlockRow& Row, const bool bProtected)
 		DisplayText = FText::Format(LOCTEXT("ProtectedFormat", "{0} - 보호 유지"), DisplayText);
 	}
 
+	return DisplayText;
+}
+
+FText BuildGroupedSynergyText(const FProtocolTooltipGroup& Group)
+{
+	TArray<FText> BulletEntries;
+	BulletEntries.Reserve(Group.Entries.Num());
+	for (const FText& Entry : Group.Entries)
+	{
+		BulletEntries.Add(FText::Format(LOCTEXT("SynergyBulletFormat", "- {0}"), Entry));
+	}
+
+	const FText JoinedEntries = FText::Join(LOCTEXT("SynergyEntrySeparator", "\n"), BulletEntries);
 	return FText::Format(
-		LOCTEXT("SynergyTextFormat", "({0})\n- {1}"),
-		FText::AsNumber(Row.Protocol_Required_Level),
-		DisplayText);
+		LOCTEXT("SynergyTextFormat", "({0})\n{1}"),
+		FText::AsNumber(Group.RequiredLevel),
+		JoinedEntries);
+}
+
+FText BuildGroupedHighlightText(const FProtocolTooltipGroup& Group)
+{
+	TArray<FText> BulletEntries;
+	BulletEntries.Reserve(Group.HighlightEntries.Num());
+	for (const FText& Entry : Group.HighlightEntries)
+	{
+		BulletEntries.Add(FText::Format(LOCTEXT("SynergyHighlightBulletFormat", "- {0}"), Entry));
+	}
+
+	const FText JoinedEntries = FText::Join(LOCTEXT("SynergyHighlightEntrySeparator", "\n"), BulletEntries);
+	if (Group.Entries.IsEmpty())
+	{
+		return FText::Format(
+			LOCTEXT("SynergyHighlightTextFormat", "({0})\n{1}"),
+			FText::AsNumber(Group.RequiredLevel),
+			JoinedEntries);
+	}
+
+	return JoinedEntries;
+}
+
+FProtocolTooltipGroup& FindOrAddTooltipGroup(TArray<FProtocolTooltipGroup>& Groups, const int32 RequiredLevel)
+{
+	for (FProtocolTooltipGroup& Group : Groups)
+	{
+		if (Group.RequiredLevel == RequiredLevel)
+		{
+			return Group;
+		}
+	}
+
+	FProtocolTooltipGroup& NewGroup = Groups.AddDefaulted_GetRef();
+	NewGroup.RequiredLevel = RequiredLevel;
+	return NewGroup;
 }
 }
 
@@ -168,6 +265,7 @@ void ULSProtocolTooltipWidget::SetProtocolTooltipLevels(const ELSProtocolType Pr
 
 	TArray<const FLSProtocolUnlockRow*> Rows;
 	GameDataSubsystem->GetProtocolUnlockRows(ProtocolType, Rows, TEXT("ProtocolTooltip"));
+	TArray<FProtocolTooltipGroup> Groups;
 	for (const FLSProtocolUnlockRow* Row : Rows)
 	{
 		if (!Row)
@@ -177,7 +275,35 @@ void ULSProtocolTooltipWidget::SetProtocolTooltipLevels(const ELSProtocolType Pr
 
 		bool bProtected = false;
 		const bool bUnlocked = GameDataSubsystem->IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel, &bProtected);
-		AddSynergyText(BuildSynergyText(*Row, bProtected), bUnlocked, bProtected);
+		FProtocolTooltipGroup& Group = FindOrAddTooltipGroup(Groups, Row->Protocol_Required_Level);
+		if (IsInfoRetentionRow(*Row))
+		{
+			Group.HighlightEntries.Add(BuildSynergyEntryText(*Row, bProtected));
+			Group.bHasHighlightUnlocked |= bUnlocked && !bProtected;
+			Group.bHasHighlightProtected |= bProtected;
+		}
+		else
+		{
+			Group.Entries.Add(BuildSynergyEntryText(*Row, bProtected));
+			Group.bHasUnlocked |= bUnlocked && !bProtected;
+			Group.bHasProtected |= bProtected;
+		}
+	}
+
+	for (const FProtocolTooltipGroup& Group : Groups)
+	{
+		if (!Group.Entries.IsEmpty())
+		{
+			AddSynergyText(
+				BuildGroupedSynergyText(Group),
+				Group.bHasUnlocked || Group.bHasProtected,
+				!Group.bHasUnlocked && Group.bHasProtected);
+		}
+
+		if (!Group.HighlightEntries.IsEmpty())
+		{
+			AddSynergyHighlightText(BuildGroupedHighlightText(Group));
+		}
 	}
 }
 
@@ -210,6 +336,38 @@ void ULSProtocolTooltipWidget::AddSynergyText(const FText& SynergyText, const bo
 	}
 
 	TooltipTextWidget->SetProtocolTooltipStateText(SynergyText, bUnlocked, bProtected);
+	SynergyBox->AddChild(TooltipTextWidget);
+}
+
+void ULSProtocolTooltipWidget::AddSynergyHighlightText(const FText& SynergyText)
+{
+	if (!SynergyBox)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SynergyBox is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (!TooltipTextWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("TooltipTextWidgetClass is not set on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot create protocol tooltip highlight text because world is missing on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	ULSProtocolTooltipTextWidget* TooltipTextWidget = CreateWidget<ULSProtocolTooltipTextWidget>(World, TooltipTextWidgetClass);
+	if (!TooltipTextWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Failed to create protocol tooltip highlight text on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	TooltipTextWidget->SetProtocolTooltipHighlightText(SynergyText);
 	SynergyBox->AddChild(TooltipTextWidget);
 }
 

@@ -2,10 +2,12 @@
 
 #include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
+#include "Session/LSSaveSubsystem.h"
 
 namespace
 {
 constexpr int32 DefaultMaxRaidInventorySlotCount = 10;
+constexpr int32 DefaultMaxRaidSafeSlotCount = 4;
 }
 
 ULSRaidInventoryComponent::ULSRaidInventoryComponent()
@@ -36,7 +38,16 @@ void ULSRaidInventoryComponent::EndRaidInventory()
 
 int32 ULSRaidInventoryComponent::GetMaxInventorySlotCount() const
 {
-	return DefaultMaxRaidInventorySlotCount;
+	UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	return SaveSubsystem ? SaveSubsystem->GetMaxInventorySlotCount() : DefaultMaxRaidInventorySlotCount;
+}
+
+int32 ULSRaidInventoryComponent::GetMaxSafeSlotCount() const
+{
+	UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	return SaveSubsystem ? SaveSubsystem->GetMaxSafeStashSlotCount() : DefaultMaxRaidSafeSlotCount;
 }
 
 bool ULSRaidInventoryComponent::TryAddSessionItem(const FName ItemRowName, const int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem)
@@ -58,7 +69,9 @@ bool ULSRaidInventoryComponent::DropSessionSlot(const ELSInventorySlotArea FromA
 
 	TArray<FLSSessionItem>* FromSlots = FromArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
-	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory ? GetMaxInventorySlotCount() : INDEX_NONE;
+	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
+		? GetMaxInventorySlotCount()
+		: GetMaxSafeSlotCount();
 	return LSInventorySlotUtils::DropSlot(*FromSlots, FromIndex, *ToSlots, ToIndex, ToMaxSlotCount);
 }
 
@@ -70,7 +83,9 @@ bool ULSRaidInventoryComponent::DropExternalItemToSessionSlot(FLSSessionItem& In
 	}
 
 	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
-	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory ? GetMaxInventorySlotCount() : INDEX_NONE;
+	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
+		? GetMaxInventorySlotCount()
+		: GetMaxSafeSlotCount();
 	return LSInventorySlotUtils::DropExternalItemToSlot(InOutExternalItem, *ToSlots, ToIndex, ToMaxSlotCount);
 }
 
@@ -122,6 +137,10 @@ bool ULSRaidInventoryComponent::ReplaceSessionSlotItem(const ELSInventorySlotAre
 	}
 
 	if (SlotArea == ELSInventorySlotArea::Inventory && SlotIndex >= GetMaxInventorySlotCount())
+	{
+		return false;
+	}
+	if (SlotArea == ELSInventorySlotArea::Safe && SlotIndex >= GetMaxSafeSlotCount())
 	{
 		return false;
 	}

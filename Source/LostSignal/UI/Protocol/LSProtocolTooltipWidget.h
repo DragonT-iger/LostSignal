@@ -41,4 +41,5 @@ protected:
 
 private:
 	void AddSynergyText(const FText& SynergyText, bool bUnlocked, bool bProtected);
+	void AddSynergyHighlightText(const FText& SynergyText);
 };

@@ -18,6 +18,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
 	void SetProtocolTooltipStateText(const FText& InText, bool bUnlocked, bool bProtected);
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
+	void SetProtocolTooltipHighlightText(const FText& InText);
+
 protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Protocol")
 	TObjectPtr<UTextBlock> Text;
@@ -27,6 +30,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
 	FSlateColor ProtectedColor = FSlateColor(FLinearColor(0.45f, 0.85f, 1.0f, 1.0f));
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
+	FSlateColor HighlightColor = FSlateColor(FLinearColor(1.0f, 0.82f, 0.15f, 1.0f));
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
 	FSlateColor LockedColor = FSlateColor(FLinearColor(0.45f, 0.45f, 0.45f, 1.0f));

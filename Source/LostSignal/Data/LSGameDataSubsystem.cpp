@@ -246,6 +246,23 @@ void ULSGameDataSubsystem::GetProtocolUnlockRows(const ELSProtocolType ProtocolT
 	});
 }
 
+void ULSGameDataSubsystem::GetProtocolRequiredLevels(const ELSProtocolType ProtocolType, TArray<int32>& OutRequiredLevels, const TCHAR* Context) const
+{
+	OutRequiredLevels.Reset();
+
+	TArray<const FLSProtocolUnlockRow*> Rows;
+	GetProtocolUnlockRows(ProtocolType, Rows, Context);
+	for (const FLSProtocolUnlockRow* Row : Rows)
+	{
+		if (Row && Row->Protocol_Required_Level > 0)
+		{
+			OutRequiredLevels.AddUnique(Row->Protocol_Required_Level);
+		}
+	}
+
+	OutRequiredLevels.Sort();
+}
+
 int32 ULSGameDataSubsystem::CountProtocolUnlockRows(const ELSProtocolType ProtocolType, const TCHAR* Context) const
 {
 	TArray<const FLSProtocolUnlockRow*> Rows;
@@ -285,6 +302,34 @@ int32 ULSGameDataSubsystem::CountVisibleProtocolUnlockRows(const ELSProtocolType
 	}
 
 	return VisibleCount;
+}
+
+int32 ULSGameDataSubsystem::GetVisibleProtocolEnableValueSum(const ELSProtocolType ProtocolType, const FName EnableName, const int32 CurrentLevel, const int32 PreviousLevel, const TCHAR* Context) const
+{
+	if (EnableName.IsNone())
+	{
+		return 0;
+	}
+
+	const FName NormalizedEnableName = LSProtocol::NormalizeProtocolEnableName(EnableName);
+	TArray<const FLSProtocolUnlockRow*> Rows;
+	GetProtocolUnlockRows(ProtocolType, Rows, Context);
+
+	int32 ValueSum = 0;
+	for (const FLSProtocolUnlockRow* Row : Rows)
+	{
+		if (!Row || LSProtocol::NormalizeProtocolEnableName(Row->Protocol_Enable_Name) != NormalizedEnableName)
+		{
+			continue;
+		}
+
+		if (IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel))
+		{
+			ValueSum += Row->Protocol_Enable_Value;
+		}
+	}
+
+	return ValueSum;
 }
 
 bool ULSGameDataSubsystem::IsProtocolUnlockVisible(const FLSProtocolUnlockRow& Row, const int32 CurrentLevel, const int32 PreviousLevel, bool* bOutProtected) const

@@ -19,3 +19,15 @@ void ULSProtocolTooltipTextWidget::SetProtocolTooltipStateText(const FText& InTe
 	Text->SetText(InText);
 	Text->SetColorAndOpacity(bProtected ? ProtectedColor : (bUnlocked ? UnlockedColor : LockedColor));
 }
+
+void ULSProtocolTooltipTextWidget::SetProtocolTooltipHighlightText(const FText& InText)
+{
+	if (!Text)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Text is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	Text->SetText(InText);
+	Text->SetColorAndOpacity(HighlightColor);
+}

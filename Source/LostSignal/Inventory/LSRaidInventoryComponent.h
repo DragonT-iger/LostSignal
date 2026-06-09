@@ -19,6 +19,7 @@ public:
 
 	bool IsRaidActive() const { return bRaidActive; }
 	int32 GetMaxInventorySlotCount() const;
+	int32 GetMaxSafeSlotCount() const;
 
 	const TArray<FLSSessionItem>& GetSessionInventory() const { return SessionInventory; }
 	const TArray<FLSSessionItem>& GetSessionSafeInventory() const { return SessionSafeInventory; }

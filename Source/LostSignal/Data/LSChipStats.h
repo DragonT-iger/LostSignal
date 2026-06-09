@@ -39,6 +39,8 @@ namespace LSChipStats
 	// (등급은 RowName에서 파싱, 스탯 개수는 ChipRow.Item_Chip_Status_Count, 값 범위는 ChipStat 등급 행)
 	LOSTSIGNAL_API TArray<FLSChipResolvedStat> RollChipStats(FName ChipRowName);
 
+	LOSTSIGNAL_API int32 ResolveInactiveSignalSlotCount(float SignalGaugePercent);
+	LOSTSIGNAL_API TArray<FLSSessionItem> BuildSignalActiveEquipmentItems(const TArray<FLSSessionItem>& Items, int32 InactiveSlotCount);
 	LOSTSIGNAL_API TMap<FName, int32> AggregateChipStatTotals(const TArray<FLSSessionItem>& Items);
 	LOSTSIGNAL_API FLSChipProtocolTotals AggregateChipProtocolTotals(const TArray<FLSSessionItem>& Items, const UObject* LogContext);
 
