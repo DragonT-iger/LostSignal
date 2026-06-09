@@ -18,6 +18,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Minimap")
 	void InitializeMinimapForPawn(APawn* InPawn);
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Minimap")
+	void SetPreviewNavigationLevels(int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Minimap")
+	void ClearPreviewNavigationLevels();
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
@@ -35,9 +41,11 @@ private:
 	FVector2D ProjectWorldDirection(FVector WorldDirection) const;
 	FVector2D ClampToMinimapEdge(const FVector2D& Point, const FVector2D& Center, float Radius) const;
 	bool ResolveMinimapViewAxes(FVector& OutViewUp, FVector& OutViewRight) const;
-	bool ShouldDrawMarker(const FLSMinimapMarkerSnapshot& Marker, const FVector2D& ProjectedPoint, const FVector2D& Center, float Radius, int32 NavigationProtocol) const;
+	bool ShouldDrawMarker(const FLSMinimapMarkerSnapshot& Marker, const FVector2D& ProjectedPoint, const FVector2D& Center, float Radius, int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol) const;
 	bool IsEnemyInSight(const FLSMinimapMarkerSnapshot& Marker) const;
-	int32 ResolveNavigationProtocol() const;
+	void ResolveNavigationProtocolLevels(int32& OutCurrentNavigationProtocol, int32& OutPreviousNavigationProtocol) const;
+	bool IsNavigationFeatureVisible(FName EnableName, int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol, bool bFallbackVisible) const;
+	void DrawPreviewData(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius, int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol) const;
 	void DrawShape(const FLSMinimapShapeSnapshot& Shape, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
 	void DrawMinimapObstacles(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
 	void DrawObstacleBounds(const FBox& Bounds, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm, const FLinearColor& Color, float Thickness) const;
@@ -56,6 +64,15 @@ private:
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<APawn> ObservedPawn;
+
+	UPROPERTY(Transient)
+	bool bUsePreviewNavigationLevels = false;
+
+	UPROPERTY(Transient)
+	int32 PreviewCurrentNavigationProtocol = 0;
+
+	UPROPERTY(Transient)
+	int32 PreviewPreviousNavigationProtocol = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Minimap", meta=(AllowPrivateAccess="true", ClampMin="100.0"))
 	float ViewRadiusCm = 3000.0f;

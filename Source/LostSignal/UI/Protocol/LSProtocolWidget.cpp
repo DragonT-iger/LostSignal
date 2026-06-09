@@ -16,14 +16,28 @@ void ULSProtocolWidget::NativeConstruct()
 
 void ULSProtocolWidget::SetProtocol(int32 Level, int32 SynergyStage)
 {
+	SetProtocolLevels(Level, Level, SynergyStage);
+}
+
+void ULSProtocolWidget::SetProtocolLevels(const int32 CurrentLevel, const int32 PreviousLevel, const int32 SynergyStage)
+{
 	if (LevelText)
 	{
-		LevelText->SetText(FText::AsNumber(Level));
+		LevelText->SetText(FText::AsNumber(CurrentLevel));
 	}
 	if (SynergyStageText)
 	{
 		SynergyStageText->SetText(FText::FromString(BuildSynergyMarkup(SynergyStage)));
 	}
+
+	CurrentProtocolLevel = CurrentLevel;
+	PreviousProtocolLevel = PreviousLevel;
+	RefreshProtocolTooltip();
+}
+
+void ULSProtocolWidget::SetProtocolStageCount(const int32 InSynergyStageCount)
+{
+	SynergyStageCount = FMath::Max(0, InSynergyStageCount);
 }
 
 void ULSProtocolWidget::SetProtocolType(const ELSProtocolType InProtocolType)
@@ -96,7 +110,7 @@ ULSProtocolTooltipWidget* ULSProtocolWidget::CreateProtocolTooltipWidget()
 		return nullptr;
 	}
 
-	ProtocolTooltipWidget->SetProtocolTooltip(ProtocolType, TooltipIconTexture);
+	ProtocolTooltipWidget->SetProtocolTooltipLevels(ProtocolType, TooltipIconTexture, CurrentProtocolLevel, PreviousProtocolLevel);
 	return ProtocolTooltipWidget;
 }
 

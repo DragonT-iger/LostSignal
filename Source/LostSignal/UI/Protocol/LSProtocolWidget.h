@@ -2,21 +2,13 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
+#include "Data/LSProtocolTypes.h"
 #include "LSProtocolWidget.generated.h"
 
 class ULSProtocolTooltipWidget;
 class UTextBlock;
 class URichTextBlock;
 class UTexture2D;
-
-UENUM(BlueprintType)
-enum class ELSProtocolType : uint8
-{
-	Survival,
-	Carrying,
-	Battle,
-	Navigation
-};
 
 // 프로토콜 한 줄 위젯 (WBP_Protocol 등 한 칸의 부모 클래스).
 // 프로토콜 이름은 WBP 에서 이미지로 직접 표시한다(여기서 다루지 않음).
@@ -39,6 +31,12 @@ public:
 	//  SynergyStage : 활성 시너지 단계 (0~SynergyStageCount). Bold 로 표시되는 개수.
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
 	void SetProtocol(int32 Level, int32 SynergyStage);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
+	void SetProtocolLevels(int32 CurrentLevel, int32 PreviousLevel, int32 SynergyStage);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
+	void SetProtocolStageCount(int32 InSynergyStageCount);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
 	void SetProtocolType(ELSProtocolType InProtocolType);
@@ -70,4 +68,7 @@ private:
 	FString BuildSynergyMarkup(int32 ActiveStage) const;
 	ULSProtocolTooltipWidget* CreateProtocolTooltipWidget();
 	void RefreshProtocolTooltip();
+
+	int32 CurrentProtocolLevel = 0;
+	int32 PreviousProtocolLevel = 0;
 };

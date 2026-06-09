@@ -1,5 +1,12 @@
 # Minimap 시스템
 
+## 현재 구현 메모: 탐색 프로토콜 연동
+
+- 미니맵 기본 표시, 플레이어 포인트, 시야각, 적, 루팅 오브젝트, 탈출구 표시는 `DT_Protocol`의 탐색 프로토콜 row를 기준으로 판정한다.
+- 미니맵은 신호 게이지로 비활성화된 칩 슬롯을 제외한 탐색 프로토콜 합산값을 현재 레벨로 사용한다.
+- 전체 장착 칩 합산값은 이전 해금 레벨로 사용해 `Protocol_Protected_Level` 보호 표시를 판정한다.
+- `DT_Protocol`이 없거나 해당 row가 없으면 기존 `FLSMinimapRevealPolicy` 기본값을 fallback으로 사용한다.
+
 ## 목적
 
 미니맵은 레이드 중 로컬 플레이어 기준으로 현재 위치, 시야각, 적, 루팅 오브젝트, 월드 드랍 아이템, 탈출구, 플레이어 시야 판정에 쓰는 지형 정보를 표시한다.
@@ -28,6 +35,7 @@ ALSMinimapShapeActor
 ```
 
 `WBP_PlayerHUD`는 `ULSPlayerHUDWidget`을 부모로 쓰고, 필수 자식 위젯 `Minimap`을 `BindWidget`으로 제공해야 한다. `Minimap`의 부모 클래스는 `ULSMinimapWidget`이다.
+`WBP_ChipStation`도 칩 장착/신호 게이지 조작 결과를 즉시 보여주려면 같은 부모 클래스의 자식 위젯을 `Minimap` 이름으로 배치해야 한다. 이 미니맵은 실제 월드 데이터를 복제하지 않고 고정 더미 지형/마커를 그리는 프리뷰 모드로 동작한다. `ULSChipStationWidget`은 장착 칩 전체 탐색 합산값을 이전 레벨, 신호 유실 후 활성 슬롯 탐색 합산값을 현재 레벨로 넘긴다.
 
 ## 표시 대상
 
@@ -83,7 +91,7 @@ StaticMeshActor 기반 펜스는 Outliner에서 액터를 선택한 뒤 우클�
 
 ## 주의 사항
 
-- `WBP_PlayerHUD`에 `Minimap` 바인딩이 없으면 `LogLS Warning`을 남긴다.
+- `WBP_PlayerHUD` 또는 `WBP_ChipStation`에 `Minimap` 바인딩이 없으면 `LogLS Warning`을 남긴다.
 - 마커 등록/해제는 컴포넌트와 도형 액터의 `BeginPlay`/`EndPlay`에서 처리한다.
 - 미니맵은 로컬 HUD 위젯에서만 렌더링하므로 서버 권위 판단을 변경하지 않는다.
 - 표시 수치의 단일 출처는 코드/설정/DataTable이다. 문서에는 실제 수치를 복붙하지 않는다.

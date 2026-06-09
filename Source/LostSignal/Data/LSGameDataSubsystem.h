@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/LSProtocolTypes.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "LSGameDataSubsystem.generated.h"
 
@@ -8,6 +9,7 @@ class UDataTable;
 struct FLSComboAttackRow;
 struct FLSCharacterPassiveSkillRow;
 struct FLSCharacterSkillRow;
+struct FLSProtocolUnlockRow;
 struct FLSStatusEffectRow;
 
 UCLASS()
@@ -30,6 +32,13 @@ public:
 	const FLSComboAttackRow* FindComboAttackRowByIndex(int32 CharacterID, int32 ComboIndex, int32 ComboTag = 0, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSStatusEffectRow* FindStatusEffectRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSStatusEffectRow* FindStatusEffectRowByID(int32 StatusID, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	const FLSProtocolUnlockRow* FindProtocolUnlockRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	const FLSProtocolUnlockRow* FindProtocolUnlockRowByEnableName(ELSProtocolType ProtocolType, FName EnableName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	void GetProtocolUnlockRows(ELSProtocolType ProtocolType, TArray<const FLSProtocolUnlockRow*>& OutRows, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	int32 CountProtocolUnlockRows(ELSProtocolType ProtocolType, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	int32 GetMaxProtocolRequiredLevel(ELSProtocolType ProtocolType, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	int32 CountVisibleProtocolUnlockRows(ELSProtocolType ProtocolType, int32 CurrentLevel, int32 PreviousLevel, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	bool IsProtocolUnlockVisible(const FLSProtocolUnlockRow& Row, int32 CurrentLevel, int32 PreviousLevel, bool* bOutProtected = nullptr) const;
 
 private:
 	void LoadTables();
@@ -48,4 +57,7 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UDataTable> StatusEffectTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> ProtocolUnlockTable;
 };

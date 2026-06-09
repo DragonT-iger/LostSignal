@@ -27,7 +27,7 @@
 
 - **메모리(Memory)**: 칩마다 메모리 비용(`Item_MemoryCost`)이 있고, 장착 UI에는 `현재 사용량 / 최대치` 한도가 있다. 합이 한도를 넘으면 장착 불가.
 - **신호 게이지(Signal Gauge)**: 0~100% 스크롤바. 게이지가 90.0% 이하로 내려갈 때부터 10% 단위로 **칩 번호 순서대로** 비활성화된다. 기본 장착 칩 스탯 합산은 활성·비활성 슬롯을 모두 포함하며, 프로토콜 합산은 비활성 슬롯을 제외한다. 비활성 칩 스탯 값의 50%는 `SignalLossText`에 별도로 표시한다. 최종 전투 스탯은 기본 스탯 표시값과 `SignalLossText` 표시값을 더한 값이다.
-- **프로토콜(Protocol)**: 칩이 보유한 4종 시너지 수치. 장착 칩들의 수치를 합산해 레벨/단계를 계산하고, 단계 달성 시 전투지역 편의 UI가 활성화된다.
+- **프로토콜(Protocol)**: 칩이 보유한 4종 시너지 수치. 장착 칩들의 합산값을 그대로 프로토콜 레벨로 보고, `DT_Protocol`의 해금 row를 기준으로 단계와 표시 항목을 계산한다.
   - 생존(Survival): 체력·스태미나 UI 등 긴장감을 낮추는 편의 UI
   - 적재(Carrying): 인벤토리 개수·보호슬롯·퀵슬롯 등 용량 UI
   - 탐색(Navigation): 미니맵·탈출 위치 등 목표 지향 UI
@@ -48,7 +48,7 @@
 |---|---|---|
 | 데이터 구조 | `FLSChipRow` — 등급/메모리/프로토콜 4종/스탯 개수 | `Source/LostSignal/Data/LSChipRow.h` |
 | 데이터 구조 | `FLSChipStatRow` — 등급 0~5별 스탯 Min/Max 범위 | `Source/LostSignal/Data/LSChipStatRow.h` |
-| 데이터 테이블 | `DT_ChipRow`, `DT_ChipStat` (+ Sandbox CSV) | `Content/LostSignal/Data/DataTables/`, `Content/LostSignal/Sandbox/DT/` |
+| 데이터 테이블 | `DT_ChipRow`, `DT_ChipStat`, `DT_Protocol` (+ Sandbox CSV) | `Content/LostSignal/Data/DataTables/`, `Content/LostSignal/Sandbox/DT/` |
 | 설정 참조 | `ChipTable`, `ChipStatTable` 소프트 참조 | `Source/LostSignal/Data/LSDropSettings.h` |
 | 보관함 | 칩 탭 필터(`ELSStorageFilter::Chip`) + `WBP_ChipStorage` | `Source/LostSignal/UI/Storage/LSLobbyStorageWidget.*` |
 | 아이콘 | 칩 아이콘 경로(`/Game/LostSignal/UI/Icons/Chips/`) | `Source/LostSignal/UI/Inventory/LSItemSlotWidget.cpp:465` |
@@ -60,6 +60,7 @@
 
 - **칩 툴팁** (`PopulateChipTooltip`): 메모리 할당량과 저장된 `ChipStats`의 **확정 전투 스탯 값**은 표시하지만, **프로토콜 수치**는 표시하지 않는다.
 - **칩 스테이션 목록** (`ULSChipStationWidget::RefreshChipSlots`): 저장 인벤토리/창고의 `Chip_` 아이템을 가격 높은순으로 아이콘/수량/툴팁 슬롯에 표시한다. `SignalSlider`와 `SignalProgressBar`는 0~1 값으로 동기화하며, 슬라이더 값은 `ULSSaveGame::ChipSignalGaugePercent`에 저장한다.
+- **칩 스테이션 미니맵** (`ULSChipStationWidget`): `WBP_ChipStation`에 `ULSMinimapWidget` 기반 자식 위젯을 `Minimap` 이름으로 배치하면 실제 월드 데이터 대신 더미 지형/마커 프리뷰를 표시한다. 장착 칩 전체 탐색 합산값을 이전 레벨, 신호 유실 후 활성 슬롯 탐색 합산값을 현재 레벨로 넘겨 프로토콜 감소에 따른 미니맵 UI 변화를 예시로 보여준다. 미니맵 표시 규칙의 단일 출처는 [MinimapSystem.md](MinimapSystem.md)다.
 - **칩 스테이션 닫힘** (`ALSChipStationActor`): 칩 설정 상호작용 범위에서 로컬 플레이어가 벗어나면 `ALSPlayerControllerBase::HideChipStationWidget`으로 스테이션 UI를 닫는다.
 - **하드웨어 슬롯** (`ULSChipEquipmentSlotWidget`): 칩 스테이션 목록에서 드래그한 칩을 `EquipmentSlot_0~9` 내부 `ItemSlot`에 저장 이동으로 장착할 수 있다. 장착 슬롯끼리 드래그하면 빈 슬롯으로는 이동하고, 이미 장착된 슬롯과는 교환한다. 장착 칩을 `ChipSlotBorder` 빈 영역으로 드래그하면 장착 해제되어 창고로 이동하고, 칩 리스트 아이템 위에 드롭하면 해당 인벤토리/창고 슬롯과 교환한다. 신호 게이지가 90.0% 이하로 내려갈 때부터 1번 슬롯부터 10% 단위로 비활성 처리하며, 장착 칩의 기본 `ChipStats` 10종 합산값은 활성·비활성 슬롯을 모두 포함하고 프로토콜 4종 합산값은 비활성 슬롯을 제외한다. 비활성 슬롯의 `ChipStats` 50%는 스탯 UI의 `SignalLossText`에 표시하고, 최종 스탯은 기본 표시값과 `SignalLossText` 표시값을 합산한다. 장착 칩과 신호 게이지 값은 SaveGame에 저장되어 칩 스테이션 재오픈 시 복원된다. 장착 칩의 `Item_MemoryCost` 합계는 `MemoryText`에 `현재/최대` 형식으로 표시한다. 메모리 검증은 아직 없다.
 
@@ -74,7 +75,7 @@
 | [4] | 소프트웨어 UI — 코어 출력 게이지바, 신호 유실 표시, 프로토콜 오버랩 UI |
 | [4] 로직 | 프로토콜 합산값 이후 레벨/단계 산식 확정, 전투지역 편의 UI 활성화 연동 |
 
-**한 줄 요약**: 데이터 레이어와 보관/툴팁/칩 스테이션 목록, 칩 장착/이동/교환, 신호 게이지 기반 장착 칩 비활성화, 장착 칩 스탯·프로토콜 합산 표시와 메모리 사용량 표시는 되어 있으나, **메모리 검증·프로토콜 단계 산식과 전투지역 UI 연동은 아직 구현되지 않았다.**
+**한 줄 요약**: 데이터 레이어와 보관/툴팁/칩 스테이션 목록, 칩 장착/이동/교환, 신호 게이지 기반 장착 칩 비활성화, 장착 칩 스탯·프로토콜 합산 표시와 `DT_Protocol` 기반 단계 표시는 구현되어 있다. 메모리 검증과 실제 게임플레이 구조 변경은 아직 구현되지 않았다.
 
 ---
 
@@ -100,6 +101,19 @@
 
 > **[임시 값]** 현재 CSV의 프로토콜 4종 값은 UI 확인용 임시값이다. `Item_MemoryCost`는 전부 1로 입력되어 있다. 등급/타입별 밸런싱 데이터 입력이 필요하다.
 > **[임시 적용]** 프로토콜 컬럼 합계가 0인 칩은 `Item_Chip_Status_Count`를 임시 프로토콜 파워로 사용한다. RowName 기능 토큰 기준으로 HP/SP는 생존, Inventory는 적재, Minimap/Exitpoint는 탐색에 합산한다. 프로토콜 컬럼에 명시값이 입력되면 명시값을 우선 사용한다.
+
+### FLSProtocolUnlockRow (`DT_Protocol`)
+
+`DT_Protocol`은 프로토콜 해금 항목의 단일 출처다. 첫 컬럼 RowName의 접두사로 생존/적재/전투/탐색 타입을 판정하고, `Protocol_Required_Level` 이하의 수치는 코드나 문서에 중복 저장하지 않는다.
+프로토콜 위젯의 숫자 스트립은 해당 타입의 최대 `Protocol_Required_Level`까지 표시하고, 볼드 처리는 현재 프로토콜 레벨 숫자만큼만 적용한다. 개별 항목의 보호 표시 여부는 각 row의 `Protocol_Protected_Level`로 별도 판정한다.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `Protocol_Required_Level` | int32 | 해금에 필요한 현재 프로토콜 레벨 |
+| `Protocol_Enable_Type` | FName | UI, Protection 등 해금 항목 분류 |
+| `Protocol_Enable_Name` | FName | 코드에서 찾는 해금 항목 이름. `Stemina_*` 입력은 조회 시 `Stamina_*`로 정규화 |
+| `Protocol_Enable_Value` | int32 | 항목별 보조 값. `Protocol_Protected_Level`과 같은 값을 중복 저장하지 않는다 |
+| `Protocol_Protected_Level` | int32 | 이전에 해금된 항목을 신호 유실 후에도 유지할 최소 현재 레벨. 0이면 보호 없음 |
 
 #### 중복 제거 원칙 (Name 파싱) — ✅ 적용 완료
 
@@ -146,7 +160,7 @@
 
 4. ~~**신호 게이지 비활성 경계**~~: **90.0% 이하부터 1번 슬롯 비활성, 이후 10% 단위로 2~10번 슬롯을 순서대로 비활성화한다.** 기본 장착 칩 스탯 합산은 활성·비활성 칩을 모두 포함하고, 프로토콜 합산은 비활성 칩을 제외한다. 비활성 칩 스탯 값의 50%를 `SignalLossText`에 표시한다. 최종 전투 스탯은 기본 표시값과 `SignalLossText` 표시값을 합산한다.
 
-5. **프로토콜 레벨/단계 산식**: 합산 수치 → 레벨 변환식, 단계별 활성화 임계값, 활성화 시 전투지역 UI와의 연동 방식.
+5. ~~**프로토콜 레벨/단계 산식**~~: **합산 수치를 그대로 프로토콜 레벨로 사용하고, 단계별 활성화 임계값은 `DT_Protocol`의 `Protocol_Required_Level`을 기준으로 판정한다.**
 
 ---
 

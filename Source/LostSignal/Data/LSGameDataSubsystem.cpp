@@ -4,6 +4,7 @@
 #include "Data/LSCharacterSkillRow.h"
 #include "Data/LSComboAttackRow.h"
 #include "Data/LSGameDataSettings.h"
+#include "Data/LSProtocolUnlockRow.h"
 #include "Data/LSStatusEffectRow.h"
 #include "Engine/DataTable.h"
 #include "LostSignal.h"
@@ -178,6 +179,138 @@ const FLSStatusEffectRow* ULSGameDataSubsystem::FindStatusEffectRowByID(const in
 	return FindStatusEffectRow(FName(*FString::FromInt(StatusID)), Context);
 }
 
+const FLSProtocolUnlockRow* ULSGameDataSubsystem::FindProtocolUnlockRow(const FName RowName, const TCHAR* Context) const
+{
+	if (!ProtocolUnlockTable || RowName.IsNone())
+	{
+		return nullptr;
+	}
+
+	return ProtocolUnlockTable->FindRow<FLSProtocolUnlockRow>(RowName, Context);
+}
+
+const FLSProtocolUnlockRow* ULSGameDataSubsystem::FindProtocolUnlockRowByEnableName(const ELSProtocolType ProtocolType, const FName EnableName, const TCHAR* Context) const
+{
+	if (!ProtocolUnlockTable || EnableName.IsNone())
+	{
+		return nullptr;
+	}
+
+	const FName NormalizedEnableName = LSProtocol::NormalizeProtocolEnableName(EnableName);
+	TArray<const FLSProtocolUnlockRow*> Rows;
+	GetProtocolUnlockRows(ProtocolType, Rows, Context);
+	for (const FLSProtocolUnlockRow* Row : Rows)
+	{
+		if (Row && LSProtocol::NormalizeProtocolEnableName(Row->Protocol_Enable_Name) == NormalizedEnableName)
+		{
+			return Row;
+		}
+	}
+
+	return nullptr;
+}
+
+void ULSGameDataSubsystem::GetProtocolUnlockRows(const ELSProtocolType ProtocolType, TArray<const FLSProtocolUnlockRow*>& OutRows, const TCHAR* Context) const
+{
+	(void)Context;
+
+	OutRows.Reset();
+	if (!ProtocolUnlockTable)
+	{
+		return;
+	}
+
+	for (const TPair<FName, uint8*>& Pair : ProtocolUnlockTable->GetRowMap())
+	{
+		ELSProtocolType RowProtocolType = ELSProtocolType::Survival;
+		if (!LSProtocol::ResolveProtocolTypeFromRowName(Pair.Key, RowProtocolType) || RowProtocolType != ProtocolType)
+		{
+			continue;
+		}
+
+		const FLSProtocolUnlockRow* Row = reinterpret_cast<const FLSProtocolUnlockRow*>(Pair.Value);
+		if (Row)
+		{
+			OutRows.Add(Row);
+		}
+	}
+
+	OutRows.Sort([](const FLSProtocolUnlockRow& Left, const FLSProtocolUnlockRow& Right)
+	{
+		if (Left.Protocol_Required_Level != Right.Protocol_Required_Level)
+		{
+			return Left.Protocol_Required_Level < Right.Protocol_Required_Level;
+		}
+
+		return Left.Protocol_Enable_Name.LexicalLess(Right.Protocol_Enable_Name);
+	});
+}
+
+int32 ULSGameDataSubsystem::CountProtocolUnlockRows(const ELSProtocolType ProtocolType, const TCHAR* Context) const
+{
+	TArray<const FLSProtocolUnlockRow*> Rows;
+	GetProtocolUnlockRows(ProtocolType, Rows, Context);
+	return Rows.Num();
+}
+
+int32 ULSGameDataSubsystem::GetMaxProtocolRequiredLevel(const ELSProtocolType ProtocolType, const TCHAR* Context) const
+{
+	TArray<const FLSProtocolUnlockRow*> Rows;
+	GetProtocolUnlockRows(ProtocolType, Rows, Context);
+
+	int32 MaxRequiredLevel = 0;
+	for (const FLSProtocolUnlockRow* Row : Rows)
+	{
+		if (Row)
+		{
+			MaxRequiredLevel = FMath::Max(MaxRequiredLevel, Row->Protocol_Required_Level);
+		}
+	}
+
+	return MaxRequiredLevel;
+}
+
+int32 ULSGameDataSubsystem::CountVisibleProtocolUnlockRows(const ELSProtocolType ProtocolType, const int32 CurrentLevel, const int32 PreviousLevel, const TCHAR* Context) const
+{
+	TArray<const FLSProtocolUnlockRow*> Rows;
+	GetProtocolUnlockRows(ProtocolType, Rows, Context);
+
+	int32 VisibleCount = 0;
+	for (const FLSProtocolUnlockRow* Row : Rows)
+	{
+		if (Row && IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel))
+		{
+			++VisibleCount;
+		}
+	}
+
+	return VisibleCount;
+}
+
+bool ULSGameDataSubsystem::IsProtocolUnlockVisible(const FLSProtocolUnlockRow& Row, const int32 CurrentLevel, const int32 PreviousLevel, bool* bOutProtected) const
+{
+	if (bOutProtected)
+	{
+		*bOutProtected = false;
+	}
+
+	if (CurrentLevel >= Row.Protocol_Required_Level)
+	{
+		return true;
+	}
+
+	const bool bProtected =
+		PreviousLevel >= Row.Protocol_Required_Level &&
+		Row.Protocol_Protected_Level > 0 &&
+		CurrentLevel >= Row.Protocol_Protected_Level;
+	if (bOutProtected)
+	{
+		*bOutProtected = bProtected;
+	}
+
+	return bProtected;
+}
+
 void ULSGameDataSubsystem::LoadTables()
 {
 	const ULSGameDataSettings* Settings = GetDefault<ULSGameDataSettings>();
@@ -190,6 +323,7 @@ void ULSGameDataSubsystem::LoadTables()
 	CharacterPassiveSkillTable = Settings->CharacterPassiveSkillTable.LoadSynchronous();
 	ComboAttackTable = Settings->ComboAttackTable.LoadSynchronous();
 	StatusEffectTable = Settings->StatusEffectTable.LoadSynchronous();
+	ProtocolUnlockTable = Settings->ProtocolUnlockTable.LoadSynchronous();
 
 	NormalizeActiveSkillRows();
 	NormalizePassiveSkillRows();
@@ -208,6 +342,11 @@ void ULSGameDataSubsystem::LoadTables()
 	if (!StatusEffectTable)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[GameData] StatusEffectTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!ProtocolUnlockTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] ProtocolUnlockTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
 	}
 }
 

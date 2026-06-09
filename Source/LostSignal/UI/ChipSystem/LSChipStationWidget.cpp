@@ -7,6 +7,7 @@
 #include "Components/WrapBox.h"
 #include "Data/LSChipRow.h"
 #include "Data/LSChipStats.h"
+#include "Data/LSGameDataSubsystem.h"
 #include "Data/LSDropSettings.h"
 #include "Engine/DataTable.h"
 #include "Inventory/LSInventorySlotUtils.h"
@@ -17,6 +18,7 @@
 #include "UI/ChipSystem/LSChipStatWidget.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
+#include "UI/Minimap/LSMinimapWidget.h"
 #include "UI/Protocol/LSProtocolWidget.h"
 
 namespace
@@ -387,11 +389,13 @@ void ULSChipStationWidget::RefreshEquippedChipSummary()
 	SetChipStat(TEXT("Chip_Recovery"), GetStatTotal(TEXT("Chip_Recovery")), GetSignalLossTotal(TEXT("Chip_Recovery")));
 	SetChipStat(TEXT("Chip_Move_Speed"), GetStatTotal(TEXT("Chip_Move_Speed")), GetSignalLossTotal(TEXT("Chip_Move_Speed")));
 
-	const FLSChipProtocolTotals ProtocolTotals = LSChipStats::AggregateChipProtocolTotals(ProtocolEquipmentItems, this);
-	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), ProtocolTotals.Survival, ProtocolTotals.Survival);
-	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), ProtocolTotals.Carrying, ProtocolTotals.Carrying);
-	SetProtocolWidget(Protocol_Battle, TEXT("Protocol_Battle"), ProtocolTotals.Battle, ProtocolTotals.Battle);
-	SetProtocolWidget(Protocol_Navigation, TEXT("Protocol_Navigation"), ProtocolTotals.Navigation, ProtocolTotals.Navigation);
+	const FLSChipProtocolTotals PreviousProtocolTotals = LSChipStats::AggregateChipProtocolTotals(AllEquipmentItems, this);
+	const FLSChipProtocolTotals CurrentProtocolTotals = LSChipStats::AggregateChipProtocolTotals(ProtocolEquipmentItems, this);
+	SetPreviewMinimapNavigationLevels(CurrentProtocolTotals.Navigation, PreviousProtocolTotals.Navigation);
+	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), ELSProtocolType::Survival, CurrentProtocolTotals.Survival, PreviousProtocolTotals.Survival);
+	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), ELSProtocolType::Carrying, CurrentProtocolTotals.Carrying, PreviousProtocolTotals.Carrying);
+	SetProtocolWidget(Protocol_Battle, TEXT("Protocol_Battle"), ELSProtocolType::Battle, CurrentProtocolTotals.Battle, PreviousProtocolTotals.Battle);
+	SetProtocolWidget(Protocol_Navigation, TEXT("Protocol_Navigation"), ELSProtocolType::Navigation, CurrentProtocolTotals.Navigation, PreviousProtocolTotals.Navigation);
 }
 
 void ULSChipStationWidget::QueueRefreshChipStation()
@@ -564,6 +568,17 @@ void ULSChipStationWidget::InitializeEquipmentSlots()
 	}
 }
 
+void ULSChipStationWidget::SetPreviewMinimapNavigationLevels(const int32 CurrentNavigationProtocol, const int32 PreviousNavigationProtocol)
+{
+	if (!Minimap)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Minimap is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	Minimap->SetPreviewNavigationLevels(CurrentNavigationProtocol, PreviousNavigationProtocol);
+}
+
 bool ULSChipStationWidget::IsPointerInsideChipSlotBorder(const FVector2D ScreenPosition) const
 {
 	if (!ChipSlotBorder)
@@ -701,7 +716,7 @@ int32 ULSChipStationWidget::GetInactiveSignalSlotCount() const
 	return CalculateInactiveSignalSlotCount(GetSignalGaugePercent());
 }
 
-void ULSChipStationWidget::SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, const TCHAR* ProtocolName, const int32 Level, const int32 SynergyStage) const
+void ULSChipStationWidget::SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, const TCHAR* ProtocolName, const ELSProtocolType ProtocolType, const int32 CurrentLevel, const int32 PreviousLevel) const
 {
 	if (!ProtocolWidget)
 	{
@@ -709,7 +724,16 @@ void ULSChipStationWidget::SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, 
 		return;
 	}
 
-	ProtocolWidget->SetProtocol(Level, SynergyStage);
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	const int32 StageCount = GameDataSubsystem ? GameDataSubsystem->GetMaxProtocolRequiredLevel(ProtocolType, TEXT("ChipStation")) : 0;
+	const int32 ActiveStage = StageCount > 0 ? FMath::Clamp(CurrentLevel, 0, StageCount) : CurrentLevel;
+
+	if (StageCount > 0)
+	{
+		ProtocolWidget->SetProtocolStageCount(StageCount);
+	}
+	ProtocolWidget->SetProtocolLevels(CurrentLevel, PreviousLevel, ActiveStage);
 }
 
 ULSChipStatWidget* ULSChipStationWidget::GetStatWidget(FName StatKey) const

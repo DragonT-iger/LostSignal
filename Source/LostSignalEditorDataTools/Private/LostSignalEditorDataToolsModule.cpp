@@ -27,6 +27,7 @@ namespace
 		{ TEXT("DT_DropTable"), TEXT("DT_DropTable.csv") },
 		{ TEXT("DT_GroupTable"), TEXT("DT_GroupTable.csv") },
 		{ TEXT("DT_Item"), TEXT("DT_Item.csv") },
+		{ TEXT("DT_Protocol"), TEXT("DT_Protocol.csv") },
 		{ TEXT("DT_RootingObject"), TEXT("DT_RootingObject.csv") },
 		{ TEXT("DT_Weapon"), TEXT("DT_Weapon.csv") },
 	};

@@ -5,6 +5,8 @@
 #include "Components/MeshComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Data/LSChipStats.h"
+#include "Data/LSGameDataSubsystem.h"
+#include "Data/LSProtocolUnlockRow.h"
 #include "Engine/GameInstance.h"
 #include "Fonts/SlateFontInfo.h"
 #include "Internationalization/Text.h"
@@ -70,10 +72,28 @@ TArray<FLSSessionItem> BuildSignalActiveEquipmentItems(const TArray<FLSSessionIt
 void ULSMinimapWidget::InitializeMinimapForPawn(APawn* InPawn)
 {
 	ObservedPawn = InPawn;
+	bUsePreviewNavigationLevels = false;
 	if (!InPawn)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s cannot initialize minimap because pawn is missing."), *GetNameSafe(this));
 	}
+}
+
+void ULSMinimapWidget::SetPreviewNavigationLevels(const int32 CurrentNavigationProtocol, const int32 PreviousNavigationProtocol)
+{
+	bUsePreviewNavigationLevels = true;
+	ObservedPawn.Reset();
+	PreviewCurrentNavigationProtocol = FMath::Max(0, CurrentNavigationProtocol);
+	PreviewPreviousNavigationProtocol = FMath::Max(PreviewCurrentNavigationProtocol, PreviousNavigationProtocol);
+	InvalidateLayoutAndVolatility();
+}
+
+void ULSMinimapWidget::ClearPreviewNavigationLevels()
+{
+	bUsePreviewNavigationLevels = false;
+	PreviewCurrentNavigationProtocol = 0;
+	PreviewPreviousNavigationProtocol = 0;
+	InvalidateLayoutAndVolatility();
 }
 
 void ULSMinimapWidget::NativeConstruct()
@@ -105,6 +125,20 @@ int32 ULSMinimapWidget::NativePaint(
 	DrawFilledCircle(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, Radius, BackgroundColor);
 	DrawCircleOutline(OutDrawElements, CurrentLayer, AllottedGeometry, Center, Radius - 0.75f, BackgroundColor, 1.5f);
 
+	int32 CurrentNavigationProtocol = 0;
+	int32 PreviousNavigationProtocol = 0;
+	ResolveNavigationProtocolLevels(CurrentNavigationProtocol, PreviousNavigationProtocol);
+	if (!IsNavigationFeatureVisible(TEXT("Minimap"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.LootVisibleNavigation))
+	{
+		return CurrentLayer;
+	}
+
+	if (bUsePreviewNavigationLevels)
+	{
+		DrawPreviewData(AllottedGeometry, OutDrawElements, CurrentLayer, Center, Radius, CurrentNavigationProtocol, PreviousNavigationProtocol);
+		return CurrentLayer;
+	}
+
 	UWorld* World = GetWorld();
 	ULSMinimapSubsystem* MinimapSubsystem = World ? World->GetSubsystem<ULSMinimapSubsystem>() : nullptr;
 	if (MinimapSubsystem)
@@ -123,13 +157,12 @@ int32 ULSMinimapWidget::NativePaint(
 	DrawMinimapObstacles(AllottedGeometry, OutDrawElements, CurrentLayer, Center, Radius, PixelsPerCm);
 
 	const APawn* Pawn = ObservedPawn.Get();
-	if (Pawn)
+	if (Pawn && IsNavigationFeatureVisible(TEXT("Minimap_View_Angle"), CurrentNavigationProtocol, PreviousNavigationProtocol, true))
 	{
 		const FVector2D Forward2D = ProjectWorldDirection(Pawn->GetActorForwardVector());
 		DrawSightCone(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, Forward2D, Radius, SightAngleDegrees, SightColor);
 	}
 
-	const int32 NavigationProtocol = ResolveNavigationProtocol();
 	if (MinimapSubsystem)
 	{
 		TArray<ULSMinimapMarkerComponent*> Markers;
@@ -148,7 +181,7 @@ int32 ULSMinimapWidget::NativePaint(
 
 			const FLSMinimapMarkerSnapshot Marker = MarkerComponent->BuildSnapshot();
 			const FVector2D Projected = ProjectWorldLocation(Marker.WorldLocation, Center, PixelsPerCm);
-			if (!ShouldDrawMarker(Marker, Projected, Center, Radius, NavigationProtocol))
+			if (!ShouldDrawMarker(Marker, Projected, Center, Radius, CurrentNavigationProtocol, PreviousNavigationProtocol))
 			{
 				continue;
 			}
@@ -166,7 +199,10 @@ int32 ULSMinimapWidget::NativePaint(
 		}
 	}
 
-	DrawFilledCircle(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, 5.0f, PlayerColor);
+	if (IsNavigationFeatureVisible(TEXT("Player_Point"), CurrentNavigationProtocol, PreviousNavigationProtocol, true))
+	{
+		DrawFilledCircle(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, 5.0f, PlayerColor);
+	}
 	return CurrentLayer;
 }
 
@@ -240,7 +276,7 @@ bool ULSMinimapWidget::ResolveMinimapViewAxes(FVector& OutViewUp, FVector& OutVi
 	return true;
 }
 
-bool ULSMinimapWidget::ShouldDrawMarker(const FLSMinimapMarkerSnapshot& Marker, const FVector2D& ProjectedPoint, const FVector2D& Center, const float Radius, const int32 NavigationProtocol) const
+bool ULSMinimapWidget::ShouldDrawMarker(const FLSMinimapMarkerSnapshot& Marker, const FVector2D& ProjectedPoint, const FVector2D& Center, const float Radius, const int32 CurrentNavigationProtocol, const int32 PreviousNavigationProtocol) const
 {
 	if (!Marker.bVisible || !IsValid(Marker.OwnerActor))
 	{
@@ -255,16 +291,18 @@ bool ULSMinimapWidget::ShouldDrawMarker(const FLSMinimapMarkerSnapshot& Marker, 
 	switch (Marker.MarkerType)
 	{
 	case ELSMinimapMarkerType::Enemy:
-		if (NavigationProtocol >= RevealPolicy.EnemyAlwaysVisibleNavigation)
-		{
-			return true;
-		}
-		return NavigationProtocol >= RevealPolicy.EnemyVisibleNavigation && IsEnemyInSight(Marker);
+		return IsNavigationFeatureVisible(
+			TEXT("Minimap_Enemy"),
+			CurrentNavigationProtocol,
+			PreviousNavigationProtocol,
+			CurrentNavigationProtocol >= RevealPolicy.EnemyAlwaysVisibleNavigation ||
+				(CurrentNavigationProtocol >= RevealPolicy.EnemyVisibleNavigation && IsEnemyInSight(Marker)));
 	case ELSMinimapMarkerType::Loot:
 	case ELSMinimapMarkerType::DroppedItem:
-		return NavigationProtocol >= RevealPolicy.LootVisibleNavigation && FVector2D::Distance(ProjectedPoint, Center) <= Radius;
+		return IsNavigationFeatureVisible(TEXT("Minimap_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.LootVisibleNavigation) &&
+			FVector2D::Distance(ProjectedPoint, Center) <= Radius;
 	case ELSMinimapMarkerType::Extraction:
-		return NavigationProtocol >= RevealPolicy.ExtractionVisibleNavigation;
+		return IsNavigationFeatureVisible(TEXT("Exit_Point"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.ExtractionVisibleNavigation);
 	default:
 		return false;
 	}
@@ -291,18 +329,95 @@ bool ULSMinimapWidget::IsEnemyInSight(const FLSMinimapMarkerSnapshot& Marker) co
 	return Dot >= MinDot;
 }
 
-int32 ULSMinimapWidget::ResolveNavigationProtocol() const
+void ULSMinimapWidget::ResolveNavigationProtocolLevels(int32& OutCurrentNavigationProtocol, int32& OutPreviousNavigationProtocol) const
 {
-	const UGameInstance* GameInstance = GetGameInstance();
+	OutCurrentNavigationProtocol = 0;
+	OutPreviousNavigationProtocol = 0;
+
+	if (bUsePreviewNavigationLevels)
+	{
+		OutCurrentNavigationProtocol = PreviewCurrentNavigationProtocol;
+		OutPreviousNavigationProtocol = PreviewPreviousNavigationProtocol;
+		return;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
 	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
 	if (!SaveSubsystem)
 	{
-		return 0;
+		return;
 	}
 
 	const int32 InactiveSlotCount = ResolveInactiveSignalSlotCount(SaveSubsystem->GetChipSignalGaugePercent());
 	const TArray<FLSSessionItem> ActiveEquipmentItems = BuildSignalActiveEquipmentItems(SaveSubsystem->GetChipEquipmentSlots(), InactiveSlotCount);
-	return LSChipStats::AggregateChipProtocolTotals(ActiveEquipmentItems, this).Navigation;
+	OutCurrentNavigationProtocol = LSChipStats::AggregateChipProtocolTotals(ActiveEquipmentItems, this).Navigation;
+	OutPreviousNavigationProtocol = LSChipStats::AggregateChipProtocolTotals(SaveSubsystem->GetChipEquipmentSlots(), this).Navigation;
+}
+
+bool ULSMinimapWidget::IsNavigationFeatureVisible(const FName EnableName, const int32 CurrentNavigationProtocol, const int32 PreviousNavigationProtocol, const bool bFallbackVisible) const
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	if (!GameDataSubsystem)
+	{
+		return bFallbackVisible;
+	}
+
+	const FLSProtocolUnlockRow* Row = GameDataSubsystem->FindProtocolUnlockRowByEnableName(ELSProtocolType::Navigation, EnableName, TEXT("MinimapProtocol"));
+	return Row
+		? GameDataSubsystem->IsProtocolUnlockVisible(*Row, CurrentNavigationProtocol, PreviousNavigationProtocol)
+		: bFallbackVisible;
+}
+
+void ULSMinimapWidget::DrawPreviewData(
+	const FGeometry& Geometry,
+	FSlateWindowElementList& OutDrawElements,
+	int32& LayerId,
+	const FVector2D& Center,
+	const float Radius,
+	const int32 CurrentNavigationProtocol,
+	const int32 PreviousNavigationProtocol) const
+{
+	const FLinearColor TerrainColor = FlattenTerrainColor(VisionTerrainColor);
+	DrawFilledRectInCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.65f, -Radius * 0.48f), FVector2D(Radius * 0.68f, Radius * 0.28f), Center, Radius, TerrainColor);
+	DrawFilledRectInCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D( Radius * 0.08f, -Radius * 0.18f), FVector2D(Radius * 0.56f, Radius * 0.38f), Center, Radius, TerrainColor);
+	DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.18f, Radius * 0.36f), Radius * 0.18f, TerrainColor);
+	const TArray<FVector2D> PreviewPath = {
+		Center + FVector2D(-Radius * 0.72f, Radius * 0.12f),
+		Center + FVector2D(-Radius * 0.28f, Radius * 0.0f),
+		Center + FVector2D( Radius * 0.12f, Radius * 0.22f),
+		Center + FVector2D( Radius * 0.56f, Radius * 0.08f)
+	};
+	DrawPolyline(OutDrawElements, ++LayerId, Geometry, PreviewPath, TerrainColor, 2.0f, false);
+
+	if (IsNavigationFeatureVisible(TEXT("Minimap_View_Angle"), CurrentNavigationProtocol, PreviousNavigationProtocol, true))
+	{
+		DrawSightCone(OutDrawElements, ++LayerId, Geometry, Center, FVector2D(0.0f, -1.0f), Radius, SightAngleDegrees, SightColor);
+	}
+
+	if (IsNavigationFeatureVisible(TEXT("Minimap_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.LootVisibleNavigation))
+	{
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.42f, -Radius * 0.22f), 4.0f, FLinearColor(1.0f, 0.82f, 0.18f, 1.0f));
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D( Radius * 0.34f,  Radius * 0.16f), 3.5f, FLinearColor(0.25f, 1.0f, 0.42f, 1.0f));
+	}
+
+	if (IsNavigationFeatureVisible(TEXT("Exit_Point"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.ExtractionVisibleNavigation))
+	{
+		const FVector2D ExitPoint = Center + FVector2D(Radius * 0.62f, -Radius * 0.58f);
+		const FLinearColor ExitColor(0.28f, 1.0f, 0.45f, 1.0f);
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, ExitPoint, 5.0f, ExitColor);
+		DrawText(OutDrawElements, ++LayerId, Geometry, ExitPoint + FVector2D(6.0f, -6.0f), FText::AsNumber(184), ExitColor);
+	}
+
+	if (IsNavigationFeatureVisible(TEXT("Minimap_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyVisibleNavigation))
+	{
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.12f, -Radius * 0.52f), 4.0f, FLinearColor(1.0f, 0.12f, 0.1f, 1.0f));
+	}
+
+	if (IsNavigationFeatureVisible(TEXT("Player_Point"), CurrentNavigationProtocol, PreviousNavigationProtocol, true))
+	{
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center, 5.0f, PlayerColor);
+	}
 }
 
 void ULSMinimapWidget::DrawShape(const FLSMinimapShapeSnapshot& Shape, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm) const

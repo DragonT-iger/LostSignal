@@ -2,7 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
-#include "UI/Protocol/LSProtocolWidget.h"
+#include "Data/LSProtocolTypes.h"
 #include "LSProtocolTooltipWidget.generated.h"
 
 class UImage;
@@ -19,6 +19,9 @@ class LOSTSIGNAL_API ULSProtocolTooltipWidget : public UUserWidget
 public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
 	void SetProtocolTooltip(ELSProtocolType ProtocolType, UTexture2D* IconTexture);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
+	void SetProtocolTooltipLevels(ELSProtocolType ProtocolType, UTexture2D* IconTexture, int32 CurrentLevel, int32 PreviousLevel);
 
 protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Protocol")
@@ -37,5 +40,5 @@ protected:
 	TSubclassOf<ULSProtocolTooltipTextWidget> TooltipTextWidgetClass;
 
 private:
-	void AddSynergyText(const FText& SynergyText);
+	void AddSynergyText(const FText& SynergyText, bool bUnlocked, bool bProtected);
 };

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Data/LSProtocolTypes.h"
 #include "LSChipStationWidget.generated.h"
 
 enum class ELSInventorySlotArea : uint8;
@@ -14,6 +15,7 @@ class ULSChipStatWidget;
 class ULSChipEquipmentSlotWidget;
 class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
+class ULSMinimapWidget;
 class ULSProtocolWidget;
 class USlider;
 class UWrapBox;
@@ -49,7 +51,7 @@ protected:
 
 	// 키 → ChipStat 칸 매핑. 8개 스탯.
 	ULSChipStatWidget* GetStatWidget(FName StatKey) const;
-	void SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, const TCHAR* ProtocolName, int32 Level, int32 SynergyStage) const;
+	void SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, const TCHAR* ProtocolName, ELSProtocolType ProtocolType, int32 CurrentLevel, int32 PreviousLevel) const;
 	void RefreshChipSlots();
 	void RefreshEquipmentSlots();
 	void RefreshEquippedChipSummary();
@@ -57,6 +59,7 @@ protected:
 	void QueueRefreshChipStation();
 	ULSItemSlotWidget* CreateChipSlotWidget() const;
 	void InitializeEquipmentSlots();
+	void SetPreviewMinimapNavigationLevels(int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol);
 	bool IsPointerInsideChipSlotBorder(FVector2D ScreenPosition) const;
 	float GetSignalGaugePercent() const;
 	int32 GetInactiveSignalSlotCount() const;
@@ -121,6 +124,9 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
 	TObjectPtr<UTextBlock> MemoryText;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Minimap")
+	TObjectPtr<ULSMinimapWidget> Minimap;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip", meta=(ClampMin="0"))
 	int32 MaxChipMemory = 100;
