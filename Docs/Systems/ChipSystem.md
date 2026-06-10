@@ -60,9 +60,9 @@
 
 - **칩 툴팁** (`PopulateChipTooltip`): 메모리 할당량과 저장된 `ChipStats`의 **확정 전투 스탯 값**은 표시하지만, **프로토콜 수치**는 표시하지 않는다.
 - **칩 스테이션 목록** (`ULSChipStationWidget::RefreshChipSlots`): 저장 인벤토리/창고의 `Chip_` 아이템을 가격 높은순으로 아이콘/수량/툴팁 슬롯에 표시한다. `SignalSlider`와 `SignalProgressBar`는 0~1 값으로 동기화하며, 슬라이더 값은 `ULSSaveGame::ChipSignalGaugePercent`에 저장한다.
-- **칩 스테이션 미니맵** (`ULSChipStationWidget`): `WBP_ChipStation`에 `ULSMinimapWidget` 기반 자식 위젯을 `Minimap` 이름으로 배치하면 실제 월드 데이터 대신 더미 지형/마커 프리뷰를 표시한다. 장착 칩 전체 탐색 합산값을 이전 레벨, 신호 유실 후 활성 슬롯 탐색 합산값을 현재 레벨로 넘겨 프로토콜 감소에 따른 미니맵 UI 변화를 예시로 보여준다. 미니맵 표시 규칙의 단일 출처는 [MinimapSystem.md](MinimapSystem.md)다.
+- **칩 스테이션 프리뷰** (`ULSChipStationWidget`): `WBP_ChipStation`에 `ULSMinimapWidget` 기반 자식 위젯을 `Minimap` 이름으로 배치하면 실제 월드 데이터 대신 더미 지형/마커 프리뷰를 표시한다. `ULSSurvivalStatusWidget` 기반 자식 위젯을 `SurvivalStatus` 이름으로 배치하면 같은 신호 게이지 테스트 레벨과 더미 체력/스태미나로 생존 UI 프리뷰를 표시한다. 현재 칩 스테이션 프리뷰는 프로토콜별 칩 합산값을 임시로 무시하고, 신호 게이지 10% 단위에 따라 모든 프로토콜을 0~9 레벨로 동일하게 표시한다. 미니맵 표시 규칙의 단일 출처는 [MinimapSystem.md](MinimapSystem.md)다.
 - **칩 스테이션 닫힘** (`ALSChipStationActor`): 칩 설정 상호작용 범위에서 로컬 플레이어가 벗어나면 `ALSPlayerControllerBase::HideChipStationWidget`으로 스테이션 UI를 닫는다.
-- **하드웨어 슬롯** (`ULSChipEquipmentSlotWidget`): 칩 스테이션 목록에서 드래그한 칩을 `EquipmentSlot_0~9` 내부 `ItemSlot`에 저장 이동으로 장착할 수 있다. 장착 슬롯끼리 드래그하면 빈 슬롯으로는 이동하고, 이미 장착된 슬롯과는 교환한다. 장착 칩을 `ChipSlotBorder` 빈 영역으로 드래그하면 장착 해제되어 창고로 이동하고, 칩 리스트 아이템 위에 드롭하면 해당 인벤토리/창고 슬롯과 교환한다. 신호 게이지가 90.0% 이하로 내려갈 때부터 1번 슬롯부터 10% 단위로 비활성 처리하며, 장착 칩의 기본 `ChipStats` 10종 합산값은 활성·비활성 슬롯을 모두 포함하고 프로토콜 4종 합산값은 비활성 슬롯을 제외한다. 비활성 슬롯의 `ChipStats` 50%는 스탯 UI의 `SignalLossText`에 표시하고, 최종 스탯은 기본 표시값과 `SignalLossText` 표시값을 합산한다. 장착 칩과 신호 게이지 값은 SaveGame에 저장되어 칩 스테이션 재오픈 시 복원된다. 장착 칩의 `Item_MemoryCost` 합계는 `MemoryText`에 `현재/최대` 형식으로 표시한다. 메모리 검증은 아직 없다.
+- **하드웨어 슬롯** (`ULSChipEquipmentSlotWidget`): 칩 스테이션 목록에서 드래그한 칩을 `EquipmentSlot_0~9` 내부 `ItemSlot`에 저장 이동으로 장착할 수 있다. 장착 슬롯끼리 드래그하면 빈 슬롯으로는 이동하고, 이미 장착된 슬롯과는 교환한다. 장착 칩을 `ChipSlotBorder` 빈 영역으로 드래그하면 장착 해제되어 창고로 이동하고, 칩 리스트 아이템 위에 드롭하면 해당 인벤토리/창고 슬롯과 교환한다. 신호 게이지가 90.0% 이하로 내려갈 때부터 1번 슬롯부터 10% 단위로 비활성 처리하며, 장착 칩의 기본 `ChipStats` 10종 합산값은 활성·비활성 슬롯을 모두 포함한다. 비활성 슬롯의 `ChipStats` 50%는 스탯 UI의 `SignalLossText`에 표시하고, 최종 스탯은 기본 표시값과 `SignalLossText` 표시값을 합산한다. 장착 칩과 신호 게이지 값은 SaveGame에 저장되어 칩 스테이션 재오픈 시 복원된다. 장착 칩의 `Item_MemoryCost` 합계는 `MemoryText`에 `현재/최대` 형식으로 표시한다. 메모리 검증은 아직 없다.
 
 ### ❌ 미구현
 

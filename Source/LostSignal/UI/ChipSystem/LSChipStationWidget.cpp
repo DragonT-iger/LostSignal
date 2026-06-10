@@ -5,6 +5,8 @@
 #include "Components/Slider.h"
 #include "Components/TextBlock.h"
 #include "Components/WrapBox.h"
+#include "Characters/LSPlayerCharacter.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipRow.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
@@ -20,6 +22,7 @@
 #include "UI/Inventory/LSItemSlotWidget.h"
 #include "UI/Minimap/LSMinimapWidget.h"
 #include "UI/Protocol/LSProtocolWidget.h"
+#include "UI/Survival/LSSurvivalStatusWidget.h"
 
 namespace
 {
@@ -110,6 +113,12 @@ int32 CalculateInactiveSignalSlotCount(const float SignalPercent)
 	return FMath::Clamp(FMath::FloorToInt((100.0f - SignalPercent100 + KINDA_SMALL_NUMBER) / 10.0f), 0, 10);
 }
 
+int32 CalculateTemporaryProtocolPreviewLevel(const float SignalPercent)
+{
+	const float ClampedPercent = FMath::Clamp(SignalPercent, 0.0f, 1.0f);
+	return FMath::Clamp(FMath::FloorToInt(ClampedPercent * 10.0f), 0, 9);
+}
+
 TArray<FLSSessionItem> BuildInactiveSignalEquipmentItems(const TArray<FLSSessionItem>& Items, const int32 InactiveSlotCount)
 {
 	TArray<FLSSessionItem> InactiveItems;
@@ -121,19 +130,6 @@ TArray<FLSSessionItem> BuildInactiveSignalEquipmentItems(const TArray<FLSSession
 	}
 
 	return InactiveItems;
-}
-
-TArray<FLSSessionItem> BuildSignalActiveEquipmentItems(const TArray<FLSSessionItem>& Items, const int32 InactiveSlotCount)
-{
-	TArray<FLSSessionItem> ActiveItems;
-	ActiveItems.Reserve(Items.Num());
-
-	for (int32 SlotIndex = InactiveSlotCount; SlotIndex < Items.Num(); ++SlotIndex)
-	{
-		ActiveItems.Add(Items[SlotIndex]);
-	}
-
-	return ActiveItems;
 }
 
 int32 GetHalfSignalLossValue(const TMap<FName, int32>& Totals, const FName StatKey)
@@ -202,6 +198,10 @@ void ULSChipStationWidget::NativeConstruct()
 	if (Protocol_Navigation)
 	{
 		Protocol_Navigation->SetProtocolType(ELSProtocolType::Navigation);
+	}
+	if (!SurvivalStatus)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SurvivalStatus is not bound on %s."), *GetNameSafe(this));
 	}
 
 	InitializeEquipmentSlots();
@@ -363,7 +363,6 @@ void ULSChipStationWidget::RefreshEquippedChipSummary()
 	const int32 InactiveSlotCount = GetInactiveSignalSlotCount();
 	const TArray<FLSSessionItem>& AllEquipmentItems = EquipmentItems;
 	const TArray<FLSSessionItem> InactiveEquipmentItems = BuildInactiveSignalEquipmentItems(EquipmentItems, InactiveSlotCount);
-	const TArray<FLSSessionItem> ProtocolEquipmentItems = BuildSignalActiveEquipmentItems(EquipmentItems, InactiveSlotCount);
 	const TMap<FName, int32> StatTotals = LSChipStats::AggregateChipStatTotals(AllEquipmentItems);
 	const TMap<FName, int32> SignalLossTotals = LSChipStats::AggregateChipStatTotals(InactiveEquipmentItems);
 	auto GetStatTotal = [&StatTotals](const FName StatKey)
@@ -389,13 +388,13 @@ void ULSChipStationWidget::RefreshEquippedChipSummary()
 	SetChipStat(TEXT("Chip_Recovery"), GetStatTotal(TEXT("Chip_Recovery")), GetSignalLossTotal(TEXT("Chip_Recovery")));
 	SetChipStat(TEXT("Chip_Move_Speed"), GetStatTotal(TEXT("Chip_Move_Speed")), GetSignalLossTotal(TEXT("Chip_Move_Speed")));
 
-	const FLSChipProtocolTotals PreviousProtocolTotals = LSChipStats::AggregateChipProtocolTotals(AllEquipmentItems, this);
-	const FLSChipProtocolTotals CurrentProtocolTotals = LSChipStats::AggregateChipProtocolTotals(ProtocolEquipmentItems, this);
-	SetPreviewMinimapNavigationLevels(CurrentProtocolTotals.Navigation, PreviousProtocolTotals.Navigation);
-	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), ELSProtocolType::Survival, CurrentProtocolTotals.Survival, PreviousProtocolTotals.Survival);
-	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), ELSProtocolType::Carrying, CurrentProtocolTotals.Carrying, PreviousProtocolTotals.Carrying);
-	SetProtocolWidget(Protocol_Battle, TEXT("Protocol_Battle"), ELSProtocolType::Battle, CurrentProtocolTotals.Battle, PreviousProtocolTotals.Battle);
-	SetProtocolWidget(Protocol_Navigation, TEXT("Protocol_Navigation"), ELSProtocolType::Navigation, CurrentProtocolTotals.Navigation, PreviousProtocolTotals.Navigation);
+	const int32 TemporaryProtocolLevel = CalculateTemporaryProtocolPreviewLevel(GetSignalGaugePercent());
+	SetPreviewMinimapNavigationLevels(TemporaryProtocolLevel, TemporaryProtocolLevel);
+	SetPreviewSurvivalStatus(TemporaryProtocolLevel, TemporaryProtocolLevel);
+	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), ELSProtocolType::Survival, TemporaryProtocolLevel, TemporaryProtocolLevel);
+	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), ELSProtocolType::Carrying, TemporaryProtocolLevel, TemporaryProtocolLevel);
+	SetProtocolWidget(Protocol_Battle, TEXT("Protocol_Battle"), ELSProtocolType::Battle, TemporaryProtocolLevel, TemporaryProtocolLevel);
+	SetProtocolWidget(Protocol_Navigation, TEXT("Protocol_Navigation"), ELSProtocolType::Navigation, TemporaryProtocolLevel, TemporaryProtocolLevel);
 }
 
 void ULSChipStationWidget::QueueRefreshChipStation()
@@ -411,6 +410,20 @@ void ULSChipStationWidget::QueueRefreshChipStation()
 	{
 		RefreshChipStation();
 	}));
+}
+
+void ULSChipStationWidget::HandleCarryingSlotCapacityChanged()
+{
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		PlayerController->DropOverflowInventorySlotsToWorld(nullptr, FVector::ZeroVector);
+		PlayerController->RefreshOpenLobbyStorageWidget();
+	}
+
+	if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
+	{
+		PlayerCharacter->RebuildInventoryWidgetSlots();
+	}
 }
 
 bool ULSChipStationWidget::EquipChipToHardwareSlot(const ULSInventoryDragDropOperation& DragOperation, const int32 EquipmentSlotIndex)
@@ -435,6 +448,7 @@ bool ULSChipStationWidget::EquipChipToHardwareSlot(const ULSInventoryDragDropOpe
 		EquipmentSlotIndex);
 	if (bEquipped)
 	{
+		HandleCarryingSlotCapacityChanged();
 		QueueRefreshChipStation();
 	}
 
@@ -468,6 +482,7 @@ bool ULSChipStationWidget::DropEquippedChipToHardwareSlot(const ULSInventoryDrag
 		TargetEquipmentSlotIndex);
 	if (bDropped)
 	{
+		HandleCarryingSlotCapacityChanged();
 		QueueRefreshChipStation();
 	}
 
@@ -499,6 +514,7 @@ bool ULSChipStationWidget::UnequipChipToWarehouse(const ULSInventoryDragDropOper
 	const bool bUnequipped = SaveSubsystem->UnequipChipToWarehouse(DragOperation.SourceEquipmentSlotIndex);
 	if (bUnequipped)
 	{
+		HandleCarryingSlotCapacityChanged();
 		QueueRefreshChipStation();
 	}
 
@@ -533,6 +549,7 @@ bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDrag
 		DragOperation.SourceEquipmentSlotIndex);
 	if (bSwapped)
 	{
+		HandleCarryingSlotCapacityChanged();
 		QueueRefreshChipStation();
 	}
 
@@ -577,6 +594,25 @@ void ULSChipStationWidget::SetPreviewMinimapNavigationLevels(const int32 Current
 	}
 
 	Minimap->SetPreviewNavigationLevels(CurrentNavigationProtocol, PreviousNavigationProtocol);
+}
+
+void ULSChipStationWidget::SetPreviewSurvivalStatus(const int32 CurrentSurvivalProtocol, const int32 PreviousSurvivalProtocol)
+{
+	if (!SurvivalStatus)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SurvivalStatus is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	const float MaxHealth = 1000.0f;
+	const float MaxStamina = 100.0f;
+	SurvivalStatus->SetPreviewSurvivalStatus(
+		CurrentSurvivalProtocol,
+		PreviousSurvivalProtocol,
+		720.0f,
+		MaxHealth,
+		65.0f,
+		MaxStamina);
 }
 
 bool ULSChipStationWidget::IsPointerInsideChipSlotBorder(const FVector2D ScreenPosition) const
@@ -653,6 +689,7 @@ void ULSChipStationWidget::SetSignalGaugePercent(const float Percent)
 	if (SaveSubsystem)
 	{
 		SaveSubsystem->SetChipSignalGaugePercent(GetSignalGaugePercent());
+		HandleCarryingSlotCapacityChanged();
 	}
 	else
 	{
@@ -691,6 +728,7 @@ void ULSChipStationWidget::HandleSignalSliderValueChanged(const float Value)
 	if (SaveSubsystem)
 	{
 		SaveSubsystem->SetChipSignalGaugePercent(GetSignalGaugePercent());
+		HandleCarryingSlotCapacityChanged();
 	}
 	else
 	{

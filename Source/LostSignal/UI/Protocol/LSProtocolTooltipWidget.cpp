@@ -63,7 +63,7 @@ FText GetEnableDisplayText(const FName EnableName)
 		{ TEXT("Protection_Priority"), LOCTEXT("ProtectionPriority", "보관 우선순위 UI 표시") },
 		{ TEXT("Inventory"), LOCTEXT("InventorySlot", "인벤토리 슬롯") },
 		{ TEXT("Protected_Inventory"), LOCTEXT("ProtectedInventorySlot", "보호슬롯") },
-		{ TEXT("Quest"), LOCTEXT("QuestSlot", "퀵슬롯 UI") },
+		{ TEXT("Quest"), LOCTEXT("QuestSlot", "퀘스트 슬롯") },
 		{ TEXT("Scan_Speed"), LOCTEXT("ScanSpeed", "스캔속도") },
 		{ TEXT("Consumables"), LOCTEXT("Consumables", "소모품 한도") },
 		{ TEXT("Wishlist"), LOCTEXT("Wishlist", "아이템 위시리스트 표시") },
@@ -76,15 +76,15 @@ FText GetEnableDisplayText(const FName EnableName)
 		{ TEXT("Buff_Duration"), LOCTEXT("BuffDuration", "버프 지속 시간 UI 표시") },
 		{ TEXT("Enemy_Attack_Range"), LOCTEXT("EnemyAttackRange", "적 공격 범위 UI 표시") },
 		{ TEXT("Enemy_Health_Bar"), LOCTEXT("EnemyHealthBar", "적 체력바 UI 표시") },
-		{ TEXT("Minimap"), LOCTEXT("Minimap", "미니맵 기본 UI 표시") },
+		{ TEXT("Minimap"), LOCTEXT("Minimap", "미니맵 UI 활성화, 지형지물 표시") },
 		{ TEXT("Player_Point"), LOCTEXT("PlayerPoint", "플레이어 위치 UI 표시") },
 		{ TEXT("Minimap_Looting_Object"), LOCTEXT("MinimapLootingObject", "루팅 오브젝트 UI 표시") },
-		{ TEXT("Exit_Point"), LOCTEXT("ExitPoint", "탈출 지점 UI 표시") },
+		{ TEXT("Exit_Point"), LOCTEXT("ExitPoint", "탈출구 위치 표시") },
 		{ TEXT("Minimap_View_Angle"), LOCTEXT("MinimapViewAngle", "시야각 UI 표시") },
 		{ TEXT("Minimap_Enemy"), LOCTEXT("MinimapEnemy", "적 위치 UI 표시") },
 		{ TEXT("Minimap_Region"), LOCTEXT("MinimapRegion", "지역 정보 UI 표시") },
 		{ TEXT("Region_Quest"), LOCTEXT("RegionQuest", "지역 퀘스트 UI 표시") },
-		{ TEXT("Quest_Distance"), LOCTEXT("QuestDistance", "퀘스트 거리 UI 표시") },
+		{ TEXT("Quest_Distance"), LOCTEXT("QuestDistance", "탈출구 및 퀘스트 거리 표시") },
 		{ TEXT("Minimap_View_Angle_Enemy"), LOCTEXT("MinimapViewAngleEnemy", "시야각 안 적 위치 UI 표시") },
 		{ TEXT("Minimap_View_Angle_Looting_Object"), LOCTEXT("MinimapViewAngleLootingObject", "시야각 안 루팅 오브젝트 UI 표시") },
 		{ TEXT("Protected_Level"), LOCTEXT("ProtectedLevel", "해금 정보 보호") },
@@ -120,12 +120,16 @@ FText BuildSynergyEntryText(const FLSProtocolUnlockRow& Row, const bool bProtect
 	if (IsInfoRetentionRow(Row))
 	{
 		return FText::Format(
-			LOCTEXT("InfoRetentionFormat", "Lv.{0} 까지 정보가 사라지지 않음"),
+			LOCTEXT("InfoRetentionFormat", "Lv.{0}까지 정보가 사라지지 않음"),
 			FText::AsNumber(Row.Protocol_Enable_Value));
 	}
 
 	FText DisplayText = GetEnableDisplayText(Row.Protocol_Enable_Name);
 	const FName EnableName = LSProtocol::NormalizeProtocolEnableName(Row.Protocol_Enable_Name);
+	if (EnableName == TEXT("Quest") && Row.Protocol_Enable_Type == TEXT("UI"))
+	{
+		DisplayText = LOCTEXT("QuestLocation", "전체 퀘스트 위치 표시");
+	}
 	if (Row.Protocol_Enable_Type == TEXT("Protection") && Row.Protocol_Protected_Level > 0)
 	{
 		DisplayText = FText::Format(

@@ -27,8 +27,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void ClearItem();
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	void SetSlotLocked(bool bInLocked);
+
 	void SetDisplayOnlySlotContext();
-	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem);
+	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem, bool bInLocked = false);
 	void SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, int32 InSlotIndex, bool bInHasItem);
 	void SetWarehouseSlotContext(ULSLobbyStorageWidget* InStorageWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem);
 	void SetChipStationSlotContext(ULSChipStationWidget* InChipStationWidget, ELSInventorySlotArea InSourceArea, int32 InSourceSlotIndex, FName InItemRowName, int32 InAmount, const TArray<FLSChipResolvedStat>& InChipStats);
@@ -61,6 +64,9 @@ protected:
 	FLinearColor DragTargetIconTint = FLinearColor(1.0f, 0.84f, 0.35f, 1.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
+	FLinearColor LockedIconTint = FLinearColor(0.35f, 0.35f, 0.35f, 0.65f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTexture2D> DefaultSlotTexture;
 
 private:
@@ -76,6 +82,7 @@ private:
 	int32 DragAmount = 0;
 	TArray<FLSChipResolvedStat> DragChipStats;
 	bool bHasItem = false;
+	bool bIsLocked = false;
 	bool bIsHovered = false;
 	bool bIsDragTarget = false;
 

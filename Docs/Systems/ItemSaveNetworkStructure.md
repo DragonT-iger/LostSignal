@@ -25,6 +25,12 @@ FLSSessionItem
 - ChipStats
 ```
 
+## 적재 프로토콜 감소 저장/네트워크 경계
+
+적재 프로토콜 감소로 일반 인벤토리 최대 슬롯 수를 넘는 아이템이 생기면 `ALSPlayerControllerBase`의 서버 권한 월드 드랍 경로를 사용한다. 이 경로는 기존 드래그 월드 드랍과 같은 `ALSWorldDroppedItem` 스폰/원본 슬롯 비우기 흐름을 공유한다.
+
+보호 슬롯 초과분은 저장 배열에 남긴다. UI와 슬롯 조작 API는 현재 최대 보호 슬롯 수보다 뒤의 Safe 슬롯을 잠긴 슬롯으로 보고 이동, 드래그, Shift-click, 월드 드랍을 거부한다.
+
 즉, 기본 저장 값은 “어떤 DataTable Row 아이템이 몇 개 있는가”이며, 칩처럼 개체별 확정 전투 스탯이 필요한 아이템은 `ChipStats` 스냅샷을 함께 저장한다. 아이템 이름, 아이콘, 최대 스택 수 같은 정적 값은 `DT_Item`, `DT_Weapon`, `DT_Armor`, `DT_Chip` 같은 DataTable에서 런타임에 다시 읽는다.
 
 루팅 결과는 별도 타입인 `FLSDropResult`를 사용한다.

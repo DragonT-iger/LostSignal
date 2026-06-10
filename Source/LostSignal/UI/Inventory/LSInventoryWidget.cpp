@@ -141,7 +141,7 @@ void ULSInventoryWidget::RebuildInventorySlots()
 			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
 				AppendSlotItems(InventoryItems, SaveSubsystem->GetInventory());
-				SlotCountToBuild = FMath::Max(SaveSubsystem->GetMaxInventorySlotCount(), InventoryItems.Num());
+				SlotCountToBuild = SaveSubsystem->GetMaxInventorySlotCount();
 			}
 			else
 			{
@@ -188,6 +188,16 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 	if (FromSlotIndex == INDEX_NONE || ToSlotIndex == INDEX_NONE)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot handle inventory slot drop because an index is invalid. From=%d To=%d"), FromSlotIndex, ToSlotIndex);
+		return false;
+	}
+
+	if (IsSlotLocked(FromSlotArea, FromSlotIndex) || IsSlotLocked(ToSlotArea, ToSlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle inventory slot drop because a slot is locked. FromArea=%d From=%d ToArea=%d To=%d"),
+			static_cast<int32>(FromSlotArea),
+			FromSlotIndex,
+			static_cast<int32>(ToSlotArea),
+			ToSlotIndex);
 		return false;
 	}
 
@@ -274,6 +284,14 @@ bool ULSInventoryWidget::TryDropInventoryDragToWorld(const ULSInventoryDragDropO
 		return false;
 	}
 
+	if (IsSlotLocked(DragOperation.SourceSlotArea, DragOperation.SourceSlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source slot is locked. Area=%d Index=%d"),
+			static_cast<int32>(DragOperation.SourceSlotArea),
+			DragOperation.SourceSlotIndex);
+		return false;
+	}
+
 	if (!InventoryWindowBorder)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because InventoryWindowBorder is not bound on %s."), *GetNameSafe(this));
@@ -323,7 +341,7 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 			if (RaidInventory->IsRaidActive())
 			{
 				AppendSlotItems(SafeItems, RaidInventory->GetSessionSafeInventory());
-				SlotCountToBuild = RaidInventory->GetMaxSafeSlotCount();
+				SlotCountToBuild = FMath::Max(RaidInventory->GetMaxSafeSlotCount(), SafeItems.Num());
 				bUsingRaidInventory = true;
 			}
 		}
@@ -336,7 +354,7 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 			if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
 			{
 				AppendSlotItems(SafeItems, SaveSubsystem->GetSafeStash());
-				SlotCountToBuild = SaveSubsystem->GetMaxSafeStashSlotCount();
+				SlotCountToBuild = FMath::Max(SaveSubsystem->GetMaxSafeStashSlotCount(), SafeItems.Num());
 			}
 		}
 	}
@@ -352,7 +370,8 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 			const bool bHasSlotItem = SafeItems.IsValidIndex(SlotIndex) &&
 				!SafeItems[SlotIndex].ItemRowName.IsNone() &&
 				SafeItems[SlotIndex].Amount > 0;
-			SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Safe, SlotIndex, bHasSlotItem);
+			const bool bIsLocked = IsSlotLocked(ELSInventorySlotArea::Safe, SlotIndex);
+			SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Safe, SlotIndex, bHasSlotItem, bIsLocked);
 			if (bHasSlotItem)
 			{
 				SlotWidget->SetItem(SafeItems[SlotIndex].ItemRowName, SafeItems[SlotIndex].Amount, SafeItems[SlotIndex].ChipStats);
@@ -512,6 +531,14 @@ bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOper
 		return false;
 	}
 
+	if (IsSlotLocked(DragOperation.SourceSlotArea, DragOperation.SourceSlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source slot is locked. Area=%d Index=%d"),
+			static_cast<int32>(DragOperation.SourceSlotArea),
+			DragOperation.SourceSlotIndex);
+		return false;
+	}
+
 	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
 	if (!PlayerController)
 	{
@@ -540,6 +567,30 @@ bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOper
 	}
 
 	return bDropped;
+}
+
+bool ULSInventoryWidget::IsSlotLocked(const ELSInventorySlotArea SlotArea, const int32 SlotIndex) const
+{
+	if (SlotArea != ELSInventorySlotArea::Safe || SlotIndex < 0)
+	{
+		return false;
+	}
+
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(OwningPlayer))
+	{
+		if (ULSRaidInventoryComponent* RaidInventory = LSPlayerController->GetRaidInventoryComponent())
+		{
+			if (RaidInventory->IsRaidActive())
+			{
+				return SlotIndex >= RaidInventory->GetMaxSafeSlotCount();
+			}
+		}
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	return SaveSubsystem && SlotIndex >= SaveSubsystem->GetMaxSafeStashSlotCount();
 }
 
 bool ULSInventoryWidget::IsPointerInsideInventoryWindow(const FVector2D ScreenPosition) const

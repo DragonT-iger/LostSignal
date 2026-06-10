@@ -17,6 +17,7 @@ class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
 class ULSMinimapWidget;
 class ULSProtocolWidget;
+class ULSSurvivalStatusWidget;
 class USlider;
 class UWrapBox;
 
@@ -57,9 +58,11 @@ protected:
 	void RefreshEquippedChipSummary();
 	void SetEquippedChipMemoryText(int32 CurrentMemory);
 	void QueueRefreshChipStation();
+	void HandleCarryingSlotCapacityChanged();
 	ULSItemSlotWidget* CreateChipSlotWidget() const;
 	void InitializeEquipmentSlots();
 	void SetPreviewMinimapNavigationLevels(int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol);
+	void SetPreviewSurvivalStatus(int32 CurrentSurvivalProtocol, int32 PreviousSurvivalProtocol);
 	bool IsPointerInsideChipSlotBorder(FVector2D ScreenPosition) const;
 	float GetSignalGaugePercent() const;
 	int32 GetInactiveSignalSlotCount() const;
@@ -127,6 +130,9 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Minimap")
 	TObjectPtr<ULSMinimapWidget> Minimap;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Survival")
+	TObjectPtr<ULSSurvivalStatusWidget> SurvivalStatus;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip", meta=(ClampMin="0"))
 	int32 MaxChipMemory = 100;

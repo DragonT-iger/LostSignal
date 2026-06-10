@@ -48,6 +48,9 @@ private:
 	bool ShouldDrawMarkerDistance(const FLSMinimapMarkerSnapshot& Marker) const;
 	FText BuildMarkerDistanceText(const FLSMinimapMarkerSnapshot& Marker) const;
 	void DrawPreviewData(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius, int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol) const;
+	void DrawPreviewTerrain(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius) const;
+	void DrawPreviewObjectiveMarkers(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius, int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol) const;
+	void DrawPreviewCombatMarkers(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius, int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol) const;
 	void DrawShape(const FLSMinimapShapeSnapshot& Shape, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
 	void DrawMinimapObstacles(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
 	void DrawObstacleBounds(const FBox& Bounds, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm, const FLinearColor& Color, float Thickness) const;

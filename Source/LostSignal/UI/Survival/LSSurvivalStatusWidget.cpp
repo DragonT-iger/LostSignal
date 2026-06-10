@@ -21,6 +21,7 @@
 namespace
 {
 const FName ProgressParameterName(TEXT("Progress"));
+constexpr int32 HealthProgressFillProtocolLevel = 2;
 constexpr int32 StaminaProgressFillProtocolLevel = 2;
 
 FText BuildSurvivalStatusValueText(const float CurrentValue, const float MaxValue)
@@ -88,6 +89,7 @@ void ULSSurvivalStatusWidget::NativeDestruct()
 
 void ULSSurvivalStatusWidget::InitializeSurvivalStatusForPawn(APawn* InPawn)
 {
+	bUsePreviewSurvivalStatus = false;
 	ALSCharacterBase* NewCharacter = Cast<ALSCharacterBase>(InPawn);
 	if (ObservedCharacter.Get() == NewCharacter)
 	{
@@ -105,6 +107,30 @@ void ULSSurvivalStatusWidget::InitializeSurvivalStatusForPawn(APawn* InPawn)
 			*GetNameSafe(this),
 			*GetNameSafe(InPawn));
 	}
+}
+
+void ULSSurvivalStatusWidget::SetPreviewSurvivalStatus(
+	const int32 CurrentSurvivalProtocol,
+	const int32 PreviousSurvivalProtocol,
+	const float CurrentHealth,
+	const float MaxHealth,
+	const float CurrentStamina,
+	const float MaxStamina)
+{
+	bUsePreviewSurvivalStatus = true;
+	ObservedCharacter.Reset();
+	UnbindFromObservedASC();
+
+	PreviewCurrentSurvivalProtocol = FMath::Max(0, CurrentSurvivalProtocol);
+	PreviewPreviousSurvivalProtocol = FMath::Max(PreviewCurrentSurvivalProtocol, PreviousSurvivalProtocol);
+	PreviewMaxHealth = FMath::Max(0.0f, MaxHealth);
+	PreviewCurrentHealth = FMath::Clamp(CurrentHealth, 0.0f, PreviewMaxHealth);
+	PreviewMaxStamina = FMath::Max(0.0f, MaxStamina);
+	PreviewCurrentStamina = FMath::Clamp(CurrentStamina, 0.0f, PreviewMaxStamina);
+	PreviewRingCooldownRemaining = 0.0f;
+	SetRingCooldownProgress(1.0f);
+
+	RefreshDisplay();
 }
 
 void ULSSurvivalStatusWidget::StartPreviewRingCooldown(float Duration)
@@ -179,10 +205,10 @@ void ULSSurvivalStatusWidget::RefreshDisplay()
 	const ULSCombatAttributeSet* CombatAttributeSet = ResolveCombatAttributeSet();
 	const ULSCharacterAttributeSet* CharacterAttributeSet = ResolveCharacterAttributeSet();
 
-	const float CurrentHealth = CombatAttributeSet ? CombatAttributeSet->GetCurrentHealth() : 0.0f;
-	const float MaxHealth = CombatAttributeSet ? CombatAttributeSet->GetMaxHealth() : 0.0f;
-	const float CurrentStamina = CharacterAttributeSet ? CharacterAttributeSet->GetCurrentStamina() : 0.0f;
-	const float MaxStamina = CharacterAttributeSet ? CharacterAttributeSet->GetMaxStamina() : 0.0f;
+	const float CurrentHealth = bUsePreviewSurvivalStatus ? PreviewCurrentHealth : (CombatAttributeSet ? CombatAttributeSet->GetCurrentHealth() : 0.0f);
+	const float MaxHealth = bUsePreviewSurvivalStatus ? PreviewMaxHealth : (CombatAttributeSet ? CombatAttributeSet->GetMaxHealth() : 0.0f);
+	const float CurrentStamina = bUsePreviewSurvivalStatus ? PreviewCurrentStamina : (CharacterAttributeSet ? CharacterAttributeSet->GetCurrentStamina() : 0.0f);
+	const float MaxStamina = bUsePreviewSurvivalStatus ? PreviewMaxStamina : (CharacterAttributeSet ? CharacterAttributeSet->GetMaxStamina() : 0.0f);
 	int32 CurrentSurvivalProtocolLevel = 0;
 	int32 PreviousSurvivalProtocolLevel = 0;
 	ResolveSurvivalProtocolLevels(CurrentSurvivalProtocolLevel, PreviousSurvivalProtocolLevel);
@@ -197,7 +223,8 @@ void ULSSurvivalStatusWidget::RefreshDisplay()
 	}
 	if (HealthProgressBar)
 	{
-		HealthProgressBar->SetPercent(MaxHealth > 0.0f ? CurrentHealth / MaxHealth : 0.0f);
+		const bool bUpdateHealthProgress = CurrentSurvivalProtocolLevel >= HealthProgressFillProtocolLevel;
+		HealthProgressBar->SetPercent(bUpdateHealthProgress && MaxHealth > 0.0f ? CurrentHealth / MaxHealth : 0.0f);
 	}
 	if (StaminaProgressBar)
 	{
@@ -251,6 +278,13 @@ void ULSSurvivalStatusWidget::ResolveSurvivalProtocolLevels(int32& OutCurrentLev
 {
 	OutCurrentLevel = 0;
 	OutPreviousLevel = 0;
+
+	if (bUsePreviewSurvivalStatus)
+	{
+		OutCurrentLevel = PreviewCurrentSurvivalProtocol;
+		OutPreviousLevel = PreviewPreviousSurvivalProtocol;
+		return;
+	}
 
 	if (const ALSPlayerControllerBase* PlayerController = GetOwningPlayer<ALSPlayerControllerBase>())
 	{

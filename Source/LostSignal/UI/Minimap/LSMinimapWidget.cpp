@@ -401,6 +401,23 @@ void ULSMinimapWidget::DrawPreviewData(
 	const int32 CurrentNavigationProtocol,
 	const int32 PreviousNavigationProtocol) const
 {
+	DrawPreviewTerrain(Geometry, OutDrawElements, LayerId, Center, Radius);
+	DrawPreviewObjectiveMarkers(Geometry, OutDrawElements, LayerId, Center, Radius, CurrentNavigationProtocol, PreviousNavigationProtocol);
+	DrawPreviewCombatMarkers(Geometry, OutDrawElements, LayerId, Center, Radius, CurrentNavigationProtocol, PreviousNavigationProtocol);
+
+	if (IsNavigationFeatureVisible(TEXT("Player_Point"), CurrentNavigationProtocol, PreviousNavigationProtocol, true))
+	{
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center, 5.0f, PlayerColor);
+	}
+}
+
+void ULSMinimapWidget::DrawPreviewTerrain(
+	const FGeometry& Geometry,
+	FSlateWindowElementList& OutDrawElements,
+	int32& LayerId,
+	const FVector2D& Center,
+	const float Radius) const
+{
 	const FLinearColor TerrainColor = FlattenTerrainColor(VisionTerrainColor);
 	DrawFilledRectInCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.65f, -Radius * 0.48f), FVector2D(Radius * 0.68f, Radius * 0.28f), Center, Radius, TerrainColor);
 	DrawFilledRectInCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D( Radius * 0.08f, -Radius * 0.18f), FVector2D(Radius * 0.56f, Radius * 0.38f), Center, Radius, TerrainColor);
@@ -412,17 +429,44 @@ void ULSMinimapWidget::DrawPreviewData(
 		Center + FVector2D( Radius * 0.56f, Radius * 0.08f)
 	};
 	DrawPolyline(OutDrawElements, ++LayerId, Geometry, PreviewPath, TerrainColor, 2.0f, false);
+}
 
+void ULSMinimapWidget::DrawPreviewObjectiveMarkers(
+	const FGeometry& Geometry,
+	FSlateWindowElementList& OutDrawElements,
+	int32& LayerId,
+	const FVector2D& Center,
+	const float Radius,
+	const int32 CurrentNavigationProtocol,
+	const int32 PreviousNavigationProtocol) const
+{
 	if (IsNavigationFeatureVisible(TEXT("Minimap_View_Angle"), CurrentNavigationProtocol, PreviousNavigationProtocol, true))
 	{
 		DrawSightCone(OutDrawElements, ++LayerId, Geometry, Center, FVector2D(0.0f, -1.0f), Radius, SightAngleDegrees, SightColor);
 	}
 
-	if (IsNavigationFeatureVisible(TEXT("Minimap_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.LootVisibleNavigation) ||
-		IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, false))
+	if (IsNavigationFeatureVisible(TEXT("Minimap_Region"), CurrentNavigationProtocol, PreviousNavigationProtocol, false))
 	{
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.42f, -Radius * 0.22f), 4.0f, FLinearColor(1.0f, 0.82f, 0.18f, 1.0f));
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D( Radius * 0.34f,  Radius * 0.16f), 3.5f, FLinearColor(0.25f, 1.0f, 0.42f, 1.0f));
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.55f, Radius * 0.42f), 6.0f, FLinearColor(0.35f, 0.65f, 1.0f, 1.0f));
+	}
+
+	if (IsNavigationFeatureVisible(TEXT("Region_Quest"), CurrentNavigationProtocol, PreviousNavigationProtocol, false))
+	{
+		const FVector2D RegionQuestPoint = Center + FVector2D(-Radius * 0.48f, Radius * 0.32f);
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, RegionQuestPoint, 4.0f, FLinearColor(0.9f, 0.55f, 1.0f, 1.0f));
+	}
+
+	const bool bShowQuest = IsNavigationFeatureVisible(TEXT("Quest"), CurrentNavigationProtocol, PreviousNavigationProtocol, false);
+	const bool bShowDistance = IsNavigationFeatureVisible(TEXT("Quest_Distance"), CurrentNavigationProtocol, PreviousNavigationProtocol, false);
+	if (bShowQuest)
+	{
+		const FVector2D QuestPoint = Center + FVector2D(Radius * 0.12f, Radius * 0.46f);
+		const FLinearColor QuestColor(0.95f, 0.78f, 1.0f, 1.0f);
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, QuestPoint, 4.5f, QuestColor);
+		if (bShowDistance)
+		{
+			DrawText(OutDrawElements, ++LayerId, Geometry, QuestPoint + FVector2D(6.0f, -6.0f), FText::AsNumber(92), QuestColor);
+		}
 	}
 
 	if (IsNavigationFeatureVisible(TEXT("Exit_Point"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.ExtractionVisibleNavigation))
@@ -430,18 +474,44 @@ void ULSMinimapWidget::DrawPreviewData(
 		const FVector2D ExitPoint = Center + FVector2D(Radius * 0.62f, -Radius * 0.58f);
 		const FLinearColor ExitColor(0.28f, 1.0f, 0.45f, 1.0f);
 		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, ExitPoint, 5.0f, ExitColor);
-		DrawText(OutDrawElements, ++LayerId, Geometry, ExitPoint + FVector2D(6.0f, -6.0f), FText::AsNumber(184), ExitColor);
+		if (bShowDistance)
+		{
+			DrawText(OutDrawElements, ++LayerId, Geometry, ExitPoint + FVector2D(6.0f, -6.0f), FText::AsNumber(184), ExitColor);
+		}
+	}
+}
+
+void ULSMinimapWidget::DrawPreviewCombatMarkers(
+	const FGeometry& Geometry,
+	FSlateWindowElementList& OutDrawElements,
+	int32& LayerId,
+	const FVector2D& Center,
+	const float Radius,
+	const int32 CurrentNavigationProtocol,
+	const int32 PreviousNavigationProtocol) const
+{
+	const bool bShowAllPreviewLoot = IsNavigationFeatureVisible(TEXT("Minimap_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.LootVisibleNavigation);
+	const bool bShowSightPreviewLoot = IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, false);
+	if (bShowSightPreviewLoot || bShowAllPreviewLoot)
+	{
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(Radius * 0.05f, -Radius * 0.38f), 4.0f, FLinearColor(1.0f, 0.82f, 0.18f, 1.0f));
+		if (bShowAllPreviewLoot)
+		{
+			DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.42f, -Radius * 0.22f), 4.0f, FLinearColor(1.0f, 0.82f, 0.18f, 1.0f));
+			DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(Radius * 0.34f, Radius * 0.16f), 3.5f, FLinearColor(0.25f, 1.0f, 0.42f, 1.0f));
+		}
 	}
 
-	if (IsNavigationFeatureVisible(TEXT("Minimap_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyAlwaysVisibleNavigation) ||
-		IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyVisibleNavigation))
+	const bool bShowAllPreviewEnemies = IsNavigationFeatureVisible(TEXT("Minimap_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyAlwaysVisibleNavigation);
+	const bool bShowSightPreviewEnemies = IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyVisibleNavigation);
+	if (bShowSightPreviewEnemies || bShowAllPreviewEnemies)
 	{
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.12f, -Radius * 0.52f), 4.0f, FLinearColor(1.0f, 0.12f, 0.1f, 1.0f));
-	}
-
-	if (IsNavigationFeatureVisible(TEXT("Player_Point"), CurrentNavigationProtocol, PreviousNavigationProtocol, true))
-	{
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center, 5.0f, PlayerColor);
+		const FLinearColor EnemyColor(1.0f, 0.12f, 0.1f, 1.0f);
+		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.12f, -Radius * 0.52f), 4.0f, EnemyColor);
+		if (bShowAllPreviewEnemies)
+		{
+			DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(Radius * 0.5f, Radius * 0.18f), 4.0f, EnemyColor);
+		}
 	}
 }
 

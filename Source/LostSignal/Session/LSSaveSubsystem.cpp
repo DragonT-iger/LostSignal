@@ -367,6 +367,12 @@ bool ULSSaveSubsystem::DropStoredSlot(const ELSInventorySlotArea FromArea, const
 		return true;
 	}
 
+	if (FromArea == ELSInventorySlotArea::Safe && FromIndex >= GetMaxSafeStashSlotCount())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop stored slot because source safe slot is locked. Index=%d"), FromIndex);
+		return false;
+	}
+
 	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
 		? GetMaxInventorySlotCount()
 		: (ToArea == ELSInventorySlotArea::Safe ? GetMaxSafeStashSlotCount() : INDEX_NONE);
@@ -397,6 +403,12 @@ bool ULSSaveSubsystem::TransferStoredSlotToArea(const ELSInventorySlotArea FromA
 
 	if (FromSlots == ToSlots)
 	{
+		return false;
+	}
+
+	if (FromArea == ELSInventorySlotArea::Safe && FromIndex >= GetMaxSafeStashSlotCount())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot transfer stored slot because source safe slot is locked. Index=%d"), FromIndex);
 		return false;
 	}
 

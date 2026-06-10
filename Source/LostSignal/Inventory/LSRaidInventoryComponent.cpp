@@ -67,6 +67,11 @@ bool ULSRaidInventoryComponent::DropSessionSlot(const ELSInventorySlotArea FromA
 		return false;
 	}
 
+	if (FromArea == ELSInventorySlotArea::Safe && FromIndex >= GetMaxSafeSlotCount())
+	{
+		return false;
+	}
+
 	TArray<FLSSessionItem>* FromSlots = FromArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 	TArray<FLSSessionItem>* ToSlots = ToArea == ELSInventorySlotArea::Safe ? &SessionSafeInventory : &SessionInventory;
 	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory

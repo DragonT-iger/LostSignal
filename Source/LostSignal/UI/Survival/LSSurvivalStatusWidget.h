@@ -28,6 +28,9 @@ public:
 	void InitializeSurvivalStatusForPawn(APawn* InPawn);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Survival")
+	void SetPreviewSurvivalStatus(int32 CurrentSurvivalProtocol, int32 PreviousSurvivalProtocol, float CurrentHealth, float MaxHealth, float CurrentStamina, float MaxStamina);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Survival")
 	void StartPreviewRingCooldown(float Duration);
 
 protected:
@@ -78,6 +81,27 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> SurvivalCooldownRingMaterial;
+
+	UPROPERTY(Transient)
+	bool bUsePreviewSurvivalStatus = false;
+
+	UPROPERTY(Transient)
+	int32 PreviewCurrentSurvivalProtocol = 0;
+
+	UPROPERTY(Transient)
+	int32 PreviewPreviousSurvivalProtocol = 0;
+
+	UPROPERTY(Transient)
+	float PreviewCurrentHealth = 0.0f;
+
+	UPROPERTY(Transient)
+	float PreviewMaxHealth = 0.0f;
+
+	UPROPERTY(Transient)
+	float PreviewCurrentStamina = 0.0f;
+
+	UPROPERTY(Transient)
+	float PreviewMaxStamina = 0.0f;
 
 	float PreviewRingCooldownRemaining = 0.0f;
 };

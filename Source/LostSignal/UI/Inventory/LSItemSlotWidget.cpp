@@ -93,6 +93,12 @@ void ULSItemSlotWidget::ClearItem()
 	ClearTooltipItem();
 }
 
+void ULSItemSlotWidget::SetSlotLocked(const bool bInLocked)
+{
+	bIsLocked = bInLocked;
+	ApplyHoverVisual();
+}
+
 void ULSItemSlotWidget::SetDisplayOnlySlotContext()
 {
 	InventoryWidget.Reset();
@@ -104,6 +110,7 @@ void ULSItemSlotWidget::SetDisplayOnlySlotContext()
 	SlotIndex = INDEX_NONE;
 	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = false;
+	bIsLocked = false;
 }
 
 void ULSItemSlotWidget::NativePreConstruct()
@@ -116,7 +123,7 @@ void ULSItemSlotWidget::NativePreConstruct()
 	}
 }
 
-void ULSItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)
+void ULSItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem, const bool bInLocked)
 {
 	InventoryWidget = InInventoryWidget;
 	LootDropWidget.Reset();
@@ -127,6 +134,7 @@ void ULSItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, co
 	SlotIndex = InSlotIndex;
 	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = bInHasItem;
+	bIsLocked = bInLocked;
 }
 
 void ULSItemSlotWidget::SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, const int32 InSlotIndex, const bool bInHasItem)
@@ -140,6 +148,7 @@ void ULSItemSlotWidget::SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, 
 	SlotIndex = InSlotIndex;
 	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = bInHasItem;
+	bIsLocked = false;
 }
 
 void ULSItemSlotWidget::SetWarehouseSlotContext(ULSLobbyStorageWidget* InStorageWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)
@@ -153,6 +162,7 @@ void ULSItemSlotWidget::SetWarehouseSlotContext(ULSLobbyStorageWidget* InStorage
 	SlotIndex = InSlotIndex;
 	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = bInHasItem;
+	bIsLocked = false;
 }
 
 void ULSItemSlotWidget::SetChipStationSlotContext(ULSChipStationWidget* InChipStationWidget, const ELSInventorySlotArea InSourceArea, const int32 InSourceSlotIndex, const FName InItemRowName, const int32 InAmount, const TArray<FLSChipResolvedStat>& InChipStats)
@@ -169,6 +179,7 @@ void ULSItemSlotWidget::SetChipStationSlotContext(ULSChipStationWidget* InChipSt
 	DragAmount = InAmount;
 	DragChipStats = InChipStats;
 	bHasItem = !InItemRowName.IsNone() && InAmount > 0;
+	bIsLocked = false;
 }
 
 void ULSItemSlotWidget::SetChipEquipmentSlotContext(ULSChipEquipmentSlotWidget* InChipEquipmentSlotWidget, ULSChipStationWidget* InChipStationWidget, const int32 InEquipmentSlotIndex)
@@ -181,6 +192,7 @@ void ULSItemSlotWidget::SetChipEquipmentSlotContext(ULSChipEquipmentSlotWidget* 
 	SlotArea = ELSInventorySlotArea::Inventory;
 	SlotIndex = INDEX_NONE;
 	EquipmentSlotIndex = InEquipmentSlotIndex;
+	bIsLocked = false;
 }
 
 void ULSItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -229,7 +241,7 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 		return FReply::Handled();
 	}
 
-	if (InventoryWidget.IsValid() && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
+	if (InventoryWidget.IsValid() && !bIsLocked && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
 	{
 		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 		{
@@ -324,6 +336,11 @@ bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDro
 
 	bIsDragTarget = false;
 	ApplyHoverVisual();
+
+	if (bIsLocked)
+	{
+		return false;
+	}
 
 	if (ULSChipEquipmentSlotWidget* EquipmentSlotWidget = ChipEquipmentSlotWidget.Get())
 	{
@@ -436,6 +453,12 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 		return;
 	}
 
+	if (bIsLocked)
+	{
+		ItemIconImage->SetColorAndOpacity(LockedIconTint);
+		return;
+	}
+
 	if (bIsDragTarget)
 	{
 		ItemIconImage->SetColorAndOpacity(DragTargetIconTint);
@@ -448,6 +471,11 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 bool ULSItemSlotWidget::CanStartItemDrag() const
 {
 	if (!bHasItem)
+	{
+		return false;
+	}
+
+	if (bIsLocked)
 	{
 		return false;
 	}
@@ -468,7 +496,7 @@ bool ULSItemSlotWidget::CanStartItemDrag() const
 bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const
 {
 	const ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
-	if (!DragOperation || !InventoryWidget.IsValid() || SlotIndex == INDEX_NONE || DragOperation->SourceSlotIndex == INDEX_NONE)
+	if (!DragOperation || bIsLocked || !InventoryWidget.IsValid() || SlotIndex == INDEX_NONE || DragOperation->SourceSlotIndex == INDEX_NONE)
 	{
 		return false;
 	}

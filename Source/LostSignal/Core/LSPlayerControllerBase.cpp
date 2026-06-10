@@ -1115,9 +1115,28 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorld(const ELSInventorySlotArea 
 	return true;
 }
 
+bool ALSPlayerControllerBase::DropOverflowInventorySlotsToWorld(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection)
+{
+	DropDirection.Z = 0.0f;
+	DropDirection = DropDirection.GetSafeNormal();
+
+	if (HasAuthority())
+	{
+		return DropOverflowInventorySlotsToWorldInternal(DroppedItemClass, DropDirection);
+	}
+
+	ServerDropOverflowInventorySlotsToWorld(DroppedItemClass, DropDirection);
+	return true;
+}
+
 void ALSPlayerControllerBase::ServerDropSessionSlotToWorld_Implementation(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector_NetQuantizeNormal DropDirection)
 {
 	DropSessionSlotToWorldInternal(SlotArea, SlotIndex, DroppedItemClass, FVector(DropDirection));
+}
+
+void ALSPlayerControllerBase::ServerDropOverflowInventorySlotsToWorld_Implementation(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector_NetQuantizeNormal DropDirection)
+{
+	DropOverflowInventorySlotsToWorldInternal(DroppedItemClass, FVector(DropDirection));
 }
 
 bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector DropDirection)
@@ -1130,6 +1149,12 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 	ULSRaidInventoryComponent* InventoryComponent = GetRaidInventoryComponent();
 	const bool bUseRaidInventory = InventoryComponent && InventoryComponent->IsRaidActive() && SlotArea != ELSInventorySlotArea::Warehouse;
 	ULSSaveSubsystem* SaveSubsystem = nullptr;
+
+	if (bUseRaidInventory && SlotArea == ELSInventorySlotArea::Safe && SlotIndex >= InventoryComponent->GetMaxSafeSlotCount())
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop raid safe slot to world because source slot is locked. Index=%d"), SlotIndex);
+		return false;
+	}
 
 	FLSSessionItem SlotItem;
 	if (bUseRaidInventory)
@@ -1145,12 +1170,111 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 	{
 		UGameInstance* GameInstance = GetGameInstance();
 		SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+		if (SaveSubsystem && SlotArea == ELSInventorySlotArea::Safe && SlotIndex >= SaveSubsystem->GetMaxSafeStashSlotCount())
+		{
+			UE_LOG(LogLS, Warning, TEXT("Cannot drop stored safe slot to world because source slot is locked. Index=%d"), SlotIndex);
+			return false;
+		}
+
 		if (!SaveSubsystem || !SaveSubsystem->GetStoredSlotItem(SlotArea, SlotIndex, SlotItem))
 		{
 			UE_LOG(LogLS, Warning, TEXT("Cannot drop stored slot to world because source slot is invalid. Area=%d Index=%d"),
 				static_cast<int32>(SlotArea), SlotIndex);
 			return false;
 		}
+	}
+
+	const bool bClearedSourceSlot = bUseRaidInventory
+		? InventoryComponent->ClearSessionSlot(SlotArea, SlotIndex)
+		: SaveSubsystem && SaveSubsystem->ClearStoredSlot(SlotArea, SlotIndex);
+	if (!bClearedSourceSlot)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot drop slot to world because source slot could not be cleared. Area=%d Index=%d"),
+			static_cast<int32>(SlotArea), SlotIndex);
+		return false;
+	}
+
+	if (!SpawnDroppedItemToWorld(SlotItem, DroppedItemClass, DropDirection))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Failed to spawn dropped item for slot. Area=%d Index=%d"),
+			static_cast<int32>(SlotArea), SlotIndex);
+		FLSSessionItem IgnoredPreviousItem;
+		if (bUseRaidInventory)
+		{
+			InventoryComponent->ReplaceSessionSlotItem(SlotArea, SlotIndex, SlotItem, IgnoredPreviousItem);
+		}
+		else if (SaveSubsystem)
+		{
+			SaveSubsystem->ReplaceStoredSlotItem(SlotArea, SlotIndex, SlotItem, IgnoredPreviousItem);
+		}
+		return false;
+	}
+
+	if (bUseRaidInventory)
+	{
+		ClientSyncRaidSessionAndLoot(nullptr, InventoryComponent->GetSessionInventory(), InventoryComponent->GetSessionSafeInventory(), TArray<FLSDropResult>());
+	}
+	return true;
+}
+
+bool ALSPlayerControllerBase::DropOverflowInventorySlotsToWorldInternal(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector DropDirection)
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	ULSRaidInventoryComponent* InventoryComponent = GetRaidInventoryComponent();
+	const bool bUseRaidInventory = InventoryComponent && InventoryComponent->IsRaidActive();
+	const int32 MaxInventorySlotCount = bUseRaidInventory
+		? InventoryComponent->GetMaxInventorySlotCount()
+		: [this]()
+		{
+			UGameInstance* GameInstance = GetGameInstance();
+			const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+			return SaveSubsystem ? SaveSubsystem->GetMaxInventorySlotCount() : 0;
+		}();
+
+	int32 DroppedCount = 0;
+	if (bUseRaidInventory)
+	{
+		const TArray<FLSSessionItem>& InventoryItems = InventoryComponent->GetSessionInventory();
+		for (int32 SlotIndex = MaxInventorySlotCount; SlotIndex < InventoryItems.Num(); ++SlotIndex)
+		{
+			if (LSInventorySlotUtils::IsFilled(InventoryItems[SlotIndex]) &&
+				DropSessionSlotToWorldInternal(ELSInventorySlotArea::Inventory, SlotIndex, DroppedItemClass, DropDirection))
+			{
+				++DroppedCount;
+			}
+		}
+	}
+	else
+	{
+		UGameInstance* GameInstance = GetGameInstance();
+		ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+		const TArray<FLSSessionItem>* InventoryItems = SaveSubsystem ? &SaveSubsystem->GetInventory() : nullptr;
+		for (int32 SlotIndex = MaxInventorySlotCount; InventoryItems && SlotIndex < InventoryItems->Num(); ++SlotIndex)
+		{
+			if (LSInventorySlotUtils::IsFilled((*InventoryItems)[SlotIndex]) &&
+				DropSessionSlotToWorldInternal(ELSInventorySlotArea::Inventory, SlotIndex, DroppedItemClass, DropDirection))
+			{
+				++DroppedCount;
+			}
+		}
+	}
+
+	if (DroppedCount > 0)
+	{
+		UE_LOG(LogLS, Log, TEXT("Dropped %d overflow inventory slots to world on %s."), DroppedCount, *GetNameSafe(this));
+	}
+	return DroppedCount > 0;
+}
+
+bool ALSPlayerControllerBase::SpawnDroppedItemToWorld(const FLSSessionItem& SlotItem, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector DropDirection)
+{
+	if (!LSInventorySlotUtils::IsFilled(SlotItem))
+	{
+		return false;
 	}
 
 	FTransform SpawnTransform;
@@ -1164,16 +1288,6 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 	if (!World)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot drop slot to world because World is missing."));
-		return false;
-	}
-
-	const bool bClearedSourceSlot = bUseRaidInventory
-		? InventoryComponent->ClearSessionSlot(SlotArea, SlotIndex)
-		: SaveSubsystem && SaveSubsystem->ClearStoredSlot(SlotArea, SlotIndex);
-	if (!bClearedSourceSlot)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot drop slot to world because source slot could not be cleared. Area=%d Index=%d"),
-			static_cast<int32>(SlotArea), SlotIndex);
 		return false;
 	}
 
@@ -1193,26 +1307,11 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 
 	if (!DroppedItem)
 	{
-		UE_LOG(LogLS, Warning, TEXT("Failed to spawn dropped item for slot. Area=%d Index=%d"),
-			static_cast<int32>(SlotArea), SlotIndex);
-		FLSSessionItem IgnoredPreviousItem;
-		if (bUseRaidInventory)
-		{
-			InventoryComponent->ReplaceSessionSlotItem(SlotArea, SlotIndex, SlotItem, IgnoredPreviousItem);
-		}
-		else if (SaveSubsystem)
-		{
-			SaveSubsystem->ReplaceStoredSlotItem(SlotArea, SlotIndex, SlotItem, IgnoredPreviousItem);
-		}
 		return false;
 	}
 
 	DroppedItem->InitializeDroppedItem(SlotItem);
 	DroppedItem->FinishSpawning(SpawnTransform);
-	if (bUseRaidInventory)
-	{
-		ClientSyncRaidSessionAndLoot(nullptr, InventoryComponent->GetSessionInventory(), InventoryComponent->GetSessionSafeInventory(), TArray<FLSDropResult>());
-	}
 	return true;
 }
 
