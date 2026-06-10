@@ -293,6 +293,7 @@ private:
 	void UpdateStaminaRecovery(float DeltaSeconds);
 	bool HasStamina(float RequiredAmount) const;
 	bool TrySpendStamina(float Amount);
+	bool TrySpendRunStamina(float Amount);
 	void ApplyStaminaChange(float Amount);
 	void InitializeSurvivalOverheadWidget();
 	bool ShouldSyncFacingRotation(float NewYaw) const;

@@ -702,8 +702,7 @@ void ALSPlayerCharacter::UpdateRunStamina(float DeltaSeconds)
 		return;
 	}
 
-	TrySpendStamina(RunStaminaDrainPerSecond * DeltaSeconds);
-	if (!CanStartRunning())
+	if (!TrySpendRunStamina(RunStaminaDrainPerSecond * DeltaSeconds))
 	{
 		ApplyRunState(false);
 		ClientSetRunState(false);
@@ -746,6 +745,25 @@ bool ALSPlayerCharacter::TrySpendStamina(float Amount)
 	ApplyStaminaChange(-Amount);
 	LastStaminaSpendTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 	return true;
+}
+
+bool ALSPlayerCharacter::TrySpendRunStamina(const float Amount)
+{
+	if (!HasAuthority() || Amount <= 0.0f || !PlayerAttributeSet)
+	{
+		return false;
+	}
+
+	const float CurrentStamina = PlayerAttributeSet->GetCurrentStamina();
+	const float SpendAmount = FMath::Min(CurrentStamina, Amount);
+	if (SpendAmount <= 0.0f)
+	{
+		return false;
+	}
+
+	ApplyStaminaChange(-SpendAmount);
+	LastStaminaSpendTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	return CurrentStamina > SpendAmount + KINDA_SMALL_NUMBER;
 }
 
 void ALSPlayerCharacter::ApplyStaminaChange(float Amount)
