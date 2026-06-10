@@ -43,6 +43,7 @@ protected:
 	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 	virtual void NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 	virtual void NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation) override;
@@ -88,6 +89,11 @@ private:
 
 	void ApplyHoverVisual();
 	bool CanStartItemDrag() const;
+	bool IsQuickTransferPointerEvent(const FPointerEvent& InMouseEvent) const;
+	bool TryHandleQuickTransfer();
+	bool TryHandleLootQuickTransfer();
+	bool TryHandleInventoryQuickTransfer();
+	bool TryHandleWarehouseQuickTransfer();
 	bool IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidLootDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidWarehouseDropTarget(const UDragDropOperation* InOperation) const;

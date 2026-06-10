@@ -204,6 +204,10 @@ void ULSItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FP
 	{
 		OwningLootDropWidget->NotifyLootSlotHovered(SlotIndex);
 	}
+	if (IsQuickTransferPointerEvent(InMouseEvent))
+	{
+		TryHandleQuickTransfer();
+	}
 	ApplyHoverVisual();
 }
 
@@ -221,50 +225,9 @@ void ULSItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 
 FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (LootDropWidget.IsValid() && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
 	{
-		if (ULSLootDropWidget* OwningLootDropWidget = LootDropWidget.Get())
-		{
-			if (OwningLootDropWidget->TransferLootSlotToInventory(SlotIndex))
-			{
-				APlayerController* OwningPlayer = GetOwningPlayer();
-				if (OwningPlayer && OwningPlayer->HasAuthority())
-				{
-					if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
-					{
-						PlayerCharacter->RebuildInventoryWidgetSlots();
-					}
-				}
-			}
-		}
-
-		return FReply::Handled();
-	}
-
-	if (InventoryWidget.IsValid() && !bIsLocked && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
-	{
-		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
-		{
-			if (PlayerController->TransferInventorySlotToOpenContainer(SlotArea, SlotIndex))
-			{
-				if (PlayerController->HasAuthority() || PlayerController->IsLobbyStorageWidgetOpen())
-				{
-					InventoryWidget->RebuildInventorySlots();
-					InventoryWidget->RebuildConfirmedStorageSlots();
-				}
-			}
-		}
-
-		return FReply::Handled();
-	}
-
-	if (LobbyStorageWidget.IsValid() && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
-	{
-		if (ULSLobbyStorageWidget* StorageWidget = LobbyStorageWidget.Get())
-		{
-			StorageWidget->TransferStorageSlotToInventory(SlotIndex);
-		}
-
+		TryHandleQuickTransfer();
 		return FReply::Handled();
 	}
 
@@ -274,6 +237,16 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 	}
 
 	return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, EKeys::LeftMouseButton).NativeReply;
+}
+
+FReply ULSItemSlotWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (IsQuickTransferPointerEvent(InMouseEvent))
+	{
+		TryHandleQuickTransfer();
+	}
+
+	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
 }
 
 void ULSItemSlotWidget::NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
@@ -491,6 +464,85 @@ bool ULSItemSlotWidget::CanStartItemDrag() const
 	}
 
 	return SlotIndex != INDEX_NONE && (InventoryWidget.IsValid() || LootDropWidget.IsValid() || LobbyStorageWidget.IsValid());
+}
+
+bool ULSItemSlotWidget::IsQuickTransferPointerEvent(const FPointerEvent& InMouseEvent) const
+{
+	return InMouseEvent.IsShiftDown() && InMouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton);
+}
+
+bool ULSItemSlotWidget::TryHandleQuickTransfer()
+{
+	if (!bHasItem || SlotIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	if (LootDropWidget.IsValid())
+	{
+		return TryHandleLootQuickTransfer();
+	}
+
+	if (InventoryWidget.IsValid() && !bIsLocked)
+	{
+		return TryHandleInventoryQuickTransfer();
+	}
+
+	if (LobbyStorageWidget.IsValid())
+	{
+		return TryHandleWarehouseQuickTransfer();
+	}
+
+	return false;
+}
+
+bool ULSItemSlotWidget::TryHandleLootQuickTransfer()
+{
+	ULSLootDropWidget* OwningLootDropWidget = LootDropWidget.Get();
+	if (!OwningLootDropWidget || !OwningLootDropWidget->TransferLootSlotToInventory(SlotIndex))
+	{
+		return false;
+	}
+
+	bHasItem = false;
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	if (OwningPlayer && OwningPlayer->HasAuthority())
+	{
+		if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
+		{
+			PlayerCharacter->RebuildInventoryWidgetSlots();
+		}
+	}
+	return true;
+}
+
+bool ULSItemSlotWidget::TryHandleInventoryQuickTransfer()
+{
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController || !PlayerController->TransferInventorySlotToOpenContainer(SlotArea, SlotIndex))
+	{
+		return false;
+	}
+
+	bHasItem = false;
+	if (PlayerController->HasAuthority() || PlayerController->IsLobbyStorageWidgetOpen())
+	{
+		InventoryWidget->RebuildInventorySlots();
+		InventoryWidget->RebuildConfirmedStorageSlots();
+	}
+	return true;
+}
+
+bool ULSItemSlotWidget::TryHandleWarehouseQuickTransfer()
+{
+	ULSLobbyStorageWidget* StorageWidget = LobbyStorageWidget.Get();
+	if (!StorageWidget || !StorageWidget->TransferStorageSlotToInventory(SlotIndex))
+	{
+		return false;
+	}
+
+	bHasItem = false;
+	return true;
 }
 
 bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const
