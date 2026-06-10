@@ -96,7 +96,7 @@ ULSMinimapWidget
 | Lv.6 | 미니맵 시야각 안 아이템 |
 | Lv.8 | 미니맵 상 모든 몬스터, 아이템 위치 |
 
-`Protocol_Navigation_11`과 `Protocol_Navigation_12`는 `Protocol_Protected_Level=5`이므로 실제 장착 칩 상태에서 이전 탐색 레벨이 Lv.8 이상이면 현재 탐색 레벨이 Lv.5까지 내려가도 전체 몬스터/아이템 정보가 사라지지 않는다. 칩 스테이션 테스트 UI는 순수 레벨 확인용이므로 이전 레벨도 현재 레벨과 같게 둔다.
+`Protocol_Navigation_11`과 `Protocol_Navigation_12`는 `Protocol_Protected_Level=5`이므로 실제 장착 칩 상태에서 이전 탐색 레벨이 Lv.8 이상이면 현재 탐색 레벨이 Lv.5까지 내려가도 전체 몬스터/아이템 정보가 사라지지 않는다. `Protocol_Navigation_13`은 적재 프로토콜의 `Info_Retention` row처럼 툴팁에 Lv.5까지 정보 유지 안내를 노란색 강조로 표시하는 전용 row다. 칩 스테이션 테스트 UI는 순수 레벨 확인용이므로 이전 레벨도 현재 레벨과 같게 둔다.
 
 ## 지형 표시
 
