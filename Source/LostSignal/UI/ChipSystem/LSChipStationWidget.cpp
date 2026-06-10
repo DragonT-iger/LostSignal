@@ -606,13 +606,15 @@ void ULSChipStationWidget::SetPreviewSurvivalStatus(const int32 CurrentSurvivalP
 
 	const float MaxHealth = 1000.0f;
 	const float MaxStamina = 100.0f;
+	const float CurrentHealth = 720.0f;
 	SurvivalStatus->SetPreviewSurvivalStatus(
 		CurrentSurvivalProtocol,
 		PreviousSurvivalProtocol,
-		720.0f,
+		CurrentHealth,
 		MaxHealth,
 		65.0f,
 		MaxStamina);
+	SurvivalStatus->SetHealthPreview(860.0f, 0.0f, true);
 }
 
 bool ULSChipStationWidget::IsPointerInsideChipSlotBorder(const FVector2D ScreenPosition) const

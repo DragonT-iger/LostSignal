@@ -22,6 +22,7 @@ namespace
 {
 const FName ProgressParameterName(TEXT("Progress"));
 constexpr int32 HealthProgressFillProtocolLevel = 2;
+constexpr int32 HealthPreviewFillProtocolLevel = 3;
 constexpr int32 StaminaProgressFillProtocolLevel = 2;
 
 FText BuildSurvivalStatusValueText(const float CurrentValue, const float MaxValue)
@@ -48,6 +49,10 @@ void ULSSurvivalStatusWidget::NativeConstruct()
 	if (!HealthProgressBar)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s is missing required survival widget binding: HealthProgressBar."), *GetNameSafe(this));
+	}
+	if (!HealthPreviewProgressBar)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required survival widget binding: HealthPreviewProgressBar."), *GetNameSafe(this));
 	}
 	if (!StaminaProgressBar)
 	{
@@ -133,6 +138,34 @@ void ULSSurvivalStatusWidget::SetPreviewSurvivalStatus(
 	RefreshDisplay();
 }
 
+void ULSSurvivalStatusWidget::SetHealthPreview(const float TargetHealth, const float Duration, const bool bIsRecovery)
+{
+	const ULSCombatAttributeSet* CombatAttributeSet = ResolveCombatAttributeSet();
+	const float MaxHealth = bUsePreviewSurvivalStatus ? PreviewMaxHealth : (CombatAttributeSet ? CombatAttributeSet->GetMaxHealth() : 0.0f);
+	if (MaxHealth <= 0.0f)
+	{
+		ClearHealthPreview();
+		return;
+	}
+
+	bHasHealthPreview = true;
+	HealthPreviewTarget = FMath::Clamp(TargetHealth, 0.0f, MaxHealth);
+	HealthPreviewDuration = FMath::Max(0.0f, Duration);
+	HealthPreviewRemaining = HealthPreviewDuration;
+	bHealthPreviewIsRecovery = bIsRecovery;
+	RefreshDisplay();
+}
+
+void ULSSurvivalStatusWidget::ClearHealthPreview()
+{
+	bHasHealthPreview = false;
+	HealthPreviewTarget = 0.0f;
+	HealthPreviewDuration = 0.0f;
+	HealthPreviewRemaining = 0.0f;
+	bHealthPreviewIsRecovery = true;
+	RefreshDisplay();
+}
+
 void ULSSurvivalStatusWidget::StartPreviewRingCooldown(float Duration)
 {
 	PreviewRingCooldownDuration = FMath::Max(Duration, 0.0f);
@@ -145,6 +178,14 @@ void ULSSurvivalStatusWidget::NativeTick(const FGeometry& MyGeometry, float InDe
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
 	RefreshPreviewRingCooldown(InDeltaTime);
+	if (HealthPreviewRemaining > 0.0f && HealthPreviewDuration > 0.0f)
+	{
+		HealthPreviewRemaining = FMath::Max(HealthPreviewRemaining - InDeltaTime, 0.0f);
+		if (HealthPreviewRemaining <= 0.0f)
+		{
+			ClearHealthPreview();
+		}
+	}
 }
 
 void ULSSurvivalStatusWidget::BindToObservedASC(UAbilitySystemComponent* NewASC)
@@ -226,6 +267,13 @@ void ULSSurvivalStatusWidget::RefreshDisplay()
 		const bool bUpdateHealthProgress = CurrentSurvivalProtocolLevel >= HealthProgressFillProtocolLevel;
 		HealthProgressBar->SetPercent(bUpdateHealthProgress && MaxHealth > 0.0f ? CurrentHealth / MaxHealth : 0.0f);
 	}
+	if (HealthPreviewProgressBar)
+	{
+		const bool bUpdateHealthProgress = CurrentSurvivalProtocolLevel >= HealthProgressFillProtocolLevel;
+		const bool bUpdateHealthPreview = CurrentSurvivalProtocolLevel >= HealthPreviewFillProtocolLevel;
+		const float PreviewPercent = MaxHealth > 0.0f ? ((bHasHealthPreview ? HealthPreviewTarget : CurrentHealth) / MaxHealth) : 0.0f;
+		HealthPreviewProgressBar->SetPercent(bUpdateHealthProgress && bUpdateHealthPreview && MaxHealth > 0.0f ? PreviewPercent : 0.0f);
+	}
 	if (StaminaProgressBar)
 	{
 		const bool bUpdateStaminaProgress = CurrentSurvivalProtocolLevel >= StaminaProgressFillProtocolLevel;
@@ -248,6 +296,7 @@ void ULSSurvivalStatusWidget::RefreshVisibility()
 	SetWidgetVisibility(HealthText, bShowHealthText);
 	SetWidgetVisibility(StaminaText, bShowStaminaText);
 	SetWidgetVisibility(HealthProgressBar, bShowHealthBar);
+	SetWidgetVisibility(HealthPreviewProgressBar, bShowHealthBar);
 	SetWidgetVisibility(StaminaProgressBar, bShowStaminaBar);
 }
 

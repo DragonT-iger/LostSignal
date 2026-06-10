@@ -31,6 +31,12 @@ public:
 	void SetPreviewSurvivalStatus(int32 CurrentSurvivalProtocol, int32 PreviousSurvivalProtocol, float CurrentHealth, float MaxHealth, float CurrentStamina, float MaxStamina);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Survival")
+	void SetHealthPreview(float TargetHealth, float Duration, bool bIsRecovery);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Survival")
+	void ClearHealthPreview();
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Survival")
 	void StartPreviewRingCooldown(float Duration);
 
 protected:
@@ -44,6 +50,9 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UProgressBar> HealthProgressBar;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UProgressBar> HealthPreviewProgressBar;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UProgressBar> StaminaProgressBar;
@@ -102,6 +111,21 @@ private:
 
 	UPROPERTY(Transient)
 	float PreviewMaxStamina = 0.0f;
+
+	UPROPERTY(Transient)
+	bool bHasHealthPreview = false;
+
+	UPROPERTY(Transient)
+	float HealthPreviewTarget = 0.0f;
+
+	UPROPERTY(Transient)
+	float HealthPreviewDuration = 0.0f;
+
+	UPROPERTY(Transient)
+	float HealthPreviewRemaining = 0.0f;
+
+	UPROPERTY(Transient)
+	bool bHealthPreviewIsRecovery = true;
 
 	float PreviewRingCooldownRemaining = 0.0f;
 };
