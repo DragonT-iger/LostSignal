@@ -25,6 +25,18 @@ public:
 	void ShowNoiseEventDirection(const FLSNoiseEvent& NoiseEvent, float DurationSeconds = 1.0f);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI|SoundDirection")
+	void SetPreviewSoundDirectionParameters(FVector2D CenterUV, float DirectionAngle, float AspectRatio = 1.0f, float Opacity = 1.0f, float Strength = 1.0f);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|SoundDirection")
+	void SetPreviewSoundDirectionAspectRatio(float AspectRatio);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|SoundDirection")
+	void ApplyPreviewSoundDirectionParameters();
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|SoundDirection")
+	void ClearPreviewSoundDirectionParameters();
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|SoundDirection")
 	void HideSoundDirection();
 
 protected:
@@ -51,6 +63,24 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|SoundDirection")
 	FName StrengthParameterName = TEXT("Strength");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|SoundDirection")
+	bool bUsePreviewParameters = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|SoundDirection")
+	FVector2D PreviewCenterUV = FVector2D(0.5f, 0.5f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|SoundDirection")
+	float PreviewDirectionAngle = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|SoundDirection", meta=(ClampMin="0.01"))
+	float PreviewAspectRatio = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|SoundDirection", meta=(ClampMin="0.0", ClampMax="1.0"))
+	float PreviewOpacity = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|SoundDirection", meta=(ClampMin="0.0"))
+	float PreviewStrength = 1.0f;
 
 private:
 	void InitializeIndicatorMaterial();

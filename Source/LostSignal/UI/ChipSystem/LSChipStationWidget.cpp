@@ -23,6 +23,7 @@
 #include "UI/Minimap/LSMinimapWidget.h"
 #include "UI/Protocol/LSProtocolWidget.h"
 #include "UI/Survival/LSSurvivalStatusWidget.h"
+#include "UI/Noise/LSSoundDirectionIndicatorWidget.h"
 
 namespace
 {
@@ -615,6 +616,22 @@ void ULSChipStationWidget::SetPreviewSurvivalStatus(const int32 CurrentSurvivalP
 		65.0f,
 		MaxStamina);
 	SurvivalStatus->SetHealthPreview(860.0f, 0.0f, true);
+
+	if (!SoundIndicator)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SoundIndicator is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (CurrentSurvivalProtocol >= 5)
+	{
+		SoundIndicator->SetPreviewSoundDirectionAspectRatio(16.0f / 9.0f);
+		SoundIndicator->ApplyPreviewSoundDirectionParameters();
+	}
+	else
+	{
+		SoundIndicator->HideSoundDirection();
+	}
 }
 
 bool ULSChipStationWidget::IsPointerInsideChipSlotBorder(const FVector2D ScreenPosition) const

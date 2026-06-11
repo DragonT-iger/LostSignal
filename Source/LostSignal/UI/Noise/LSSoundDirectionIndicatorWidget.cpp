@@ -34,6 +34,46 @@ void ULSSoundDirectionIndicatorWidget::ShowNoiseEventDirection(const FLSNoiseEve
 	ShowSoundDirection(NoiseEvent.Location, DurationSeconds, Strength);
 }
 
+void ULSSoundDirectionIndicatorWidget::SetPreviewSoundDirectionParameters(
+	const FVector2D CenterUV,
+	const float DirectionAngle,
+	const float AspectRatio,
+	const float Opacity,
+	const float Strength)
+{
+	bUsePreviewParameters = true;
+	PreviewCenterUV = CenterUV;
+	PreviewDirectionAngle = DirectionAngle;
+	PreviewAspectRatio = FMath::Max(AspectRatio, KINDA_SMALL_NUMBER);
+	PreviewOpacity = FMath::Clamp(Opacity, 0.0f, 1.0f);
+	PreviewStrength = FMath::Max(0.0f, Strength);
+	ApplyPreviewSoundDirectionParameters();
+}
+
+void ULSSoundDirectionIndicatorWidget::SetPreviewSoundDirectionAspectRatio(const float AspectRatio)
+{
+	PreviewAspectRatio = FMath::Max(AspectRatio, KINDA_SMALL_NUMBER);
+}
+
+void ULSSoundDirectionIndicatorWidget::ApplyPreviewSoundDirectionParameters()
+{
+	bUsePreviewParameters = true;
+	bIndicatorActive = false;
+
+	if (IndicatorImage)
+	{
+		IndicatorImage->SetVisibility(PreviewOpacity > 0.0f ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+
+	RefreshIndicatorMaterial(PreviewOpacity);
+}
+
+void ULSSoundDirectionIndicatorWidget::ClearPreviewSoundDirectionParameters()
+{
+	bUsePreviewParameters = false;
+	HideSoundDirection();
+}
+
 void ULSSoundDirectionIndicatorWidget::HideSoundDirection()
 {
 	bIndicatorActive = false;
@@ -61,12 +101,24 @@ void ULSSoundDirectionIndicatorWidget::NativeConstruct()
 	}
 
 	InitializeIndicatorMaterial();
-	HideSoundDirection();
+	if (bUsePreviewParameters)
+	{
+		ApplyPreviewSoundDirectionParameters();
+	}
+	else
+	{
+		HideSoundDirection();
+	}
 }
 
 void ULSSoundDirectionIndicatorWidget::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	if (bUsePreviewParameters)
+	{
+		return;
+	}
 
 	if (!bIndicatorActive)
 	{
@@ -133,6 +185,15 @@ void ULSSoundDirectionIndicatorWidget::RefreshIndicatorMaterial(const float Alph
 
 bool ULSSoundDirectionIndicatorWidget::ResolveIndicatorParams(FVector2D& OutCenterUV, float& OutDirectionAngle, float& OutAspectRatio) const
 {
+	if (bUsePreviewParameters)
+	{
+		OutCenterUV = PreviewCenterUV;
+		OutDirectionAngle = FMath::DegreesToRadians(PreviewDirectionAngle);
+		OutAspectRatio = FMath::Max(PreviewAspectRatio, KINDA_SMALL_NUMBER);
+		UE_LOG(LogLS, Warning, TEXT("SoundIndicator Preview Parameter Resolved"))
+		return true;
+	}
+
 	APlayerController* PlayerController = GetOwningPlayer();
 	const APawn* Pawn = ResolveObservedPawn();
 	if (!PlayerController || !Pawn)
