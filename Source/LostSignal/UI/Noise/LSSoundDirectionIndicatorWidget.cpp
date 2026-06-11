@@ -1,0 +1,190 @@
+#include "UI/Noise/LSSoundDirectionIndicatorWidget.h"
+
+#include "Blueprint/WidgetLayoutLibrary.h"
+#include "Components/Image.h"
+#include "GameFramework/PlayerController.h"
+#include "LostSignal.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+
+void ULSSoundDirectionIndicatorWidget::InitializeSoundDirectionIndicator(APawn* InObservedPawn)
+{
+	ObservedPawn = InObservedPawn;
+}
+
+void ULSSoundDirectionIndicatorWidget::ShowSoundDirection(const FVector SoundWorldLocation, const float DurationSeconds, const float Strength)
+{
+	ActiveSoundWorldLocation = SoundWorldLocation;
+	ActiveDurationSeconds = FMath::Max(DurationSeconds, KINDA_SMALL_NUMBER);
+	ActiveElapsedSeconds = 0.0f;
+	ActiveStrength = FMath::Max(0.0f, Strength);
+	bIndicatorActive = true;
+
+	if (IndicatorImage)
+	{
+		IndicatorImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+
+	RefreshIndicatorMaterial(1.0f);
+}
+
+void ULSSoundDirectionIndicatorWidget::ShowNoiseEventDirection(const FLSNoiseEvent& NoiseEvent, const float DurationSeconds)
+{
+	const float Strength = NoiseEvent.RadiusCm > 0.0f ? NoiseEvent.RadiusCm : 1.0f;
+	ShowSoundDirection(NoiseEvent.Location, DurationSeconds, Strength);
+}
+
+void ULSSoundDirectionIndicatorWidget::HideSoundDirection()
+{
+	bIndicatorActive = false;
+	ActiveElapsedSeconds = 0.0f;
+
+	if (IndicatorMaterialInstance)
+	{
+		IndicatorMaterialInstance->SetScalarParameterValue(OpacityParameterName, 0.0f);
+	}
+
+	if (IndicatorImage)
+	{
+		IndicatorImage->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void ULSSoundDirectionIndicatorWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	if (!IndicatorImage)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required sound direction widget binding: IndicatorImage."), *GetNameSafe(this));
+		return;
+	}
+
+	InitializeIndicatorMaterial();
+	HideSoundDirection();
+}
+
+void ULSSoundDirectionIndicatorWidget::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	if (!bIndicatorActive)
+	{
+		return;
+	}
+
+	ActiveElapsedSeconds += InDeltaTime;
+	const float LifeAlpha = 1.0f - FMath::Clamp(ActiveElapsedSeconds / ActiveDurationSeconds, 0.0f, 1.0f);
+	if (LifeAlpha <= 0.0f)
+	{
+		HideSoundDirection();
+		return;
+	}
+
+	RefreshIndicatorMaterial(LifeAlpha);
+}
+
+void ULSSoundDirectionIndicatorWidget::InitializeIndicatorMaterial()
+{
+	if (!IndicatorImage)
+	{
+		return;
+	}
+
+	if (IndicatorMaterial)
+	{
+		IndicatorMaterialInstance = UMaterialInstanceDynamic::Create(IndicatorMaterial, this);
+		IndicatorImage->SetBrushFromMaterial(IndicatorMaterialInstance);
+		return;
+	}
+
+	IndicatorMaterialInstance = IndicatorImage->GetDynamicMaterial();
+	if (!IndicatorMaterialInstance)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot initialize sound direction material. Set IndicatorMaterial or assign a material brush to IndicatorImage."),
+			*GetNameSafe(this));
+	}
+}
+
+void ULSSoundDirectionIndicatorWidget::RefreshIndicatorMaterial(const float Alpha)
+{
+	if (!IndicatorMaterialInstance)
+	{
+		return;
+	}
+
+	FVector2D CenterUV = FVector2D::ZeroVector;
+	float DirectionAngle = 0.0f;
+	float AspectRatio = 1.0f;
+	if (!ResolveIndicatorParams(CenterUV, DirectionAngle, AspectRatio))
+	{
+		IndicatorMaterialInstance->SetScalarParameterValue(OpacityParameterName, 0.0f);
+		return;
+	}
+
+	IndicatorMaterialInstance->SetVectorParameterValue(
+		CenterUVParameterName,
+		FLinearColor(CenterUV.X, CenterUV.Y, 0.0f, 0.0f));
+	IndicatorMaterialInstance->SetScalarParameterValue(DirectionAngleParameterName, DirectionAngle);
+	IndicatorMaterialInstance->SetScalarParameterValue(AspectRatioParameterName, AspectRatio);
+	IndicatorMaterialInstance->SetScalarParameterValue(OpacityParameterName, Alpha);
+	IndicatorMaterialInstance->SetScalarParameterValue(StrengthParameterName, ActiveStrength);
+}
+
+bool ULSSoundDirectionIndicatorWidget::ResolveIndicatorParams(FVector2D& OutCenterUV, float& OutDirectionAngle, float& OutAspectRatio) const
+{
+	APlayerController* PlayerController = GetOwningPlayer();
+	const APawn* Pawn = ResolveObservedPawn();
+	if (!PlayerController || !Pawn)
+	{
+		return false;
+	}
+
+	FVector2D ListenerWidgetPosition = FVector2D::ZeroVector;
+	FVector2D SoundWidgetPosition = FVector2D::ZeroVector;
+	const bool bProjectedListener = UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
+		PlayerController,
+		Pawn->GetActorLocation(),
+		ListenerWidgetPosition,
+		true);
+	const bool bProjectedSound = UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
+		PlayerController,
+		ActiveSoundWorldLocation,
+		SoundWidgetPosition,
+		true);
+	if (!bProjectedListener || !bProjectedSound)
+	{
+		return false;
+	}
+
+	FVector2D ViewportSize = UWidgetLayoutLibrary::GetViewportSize(this);
+	const float ViewportScale = FMath::Max(UWidgetLayoutLibrary::GetViewportScale(this), KINDA_SMALL_NUMBER);
+	ViewportSize /= ViewportScale;
+	if (ViewportSize.X <= KINDA_SMALL_NUMBER || ViewportSize.Y <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	const FVector2D ToSound = SoundWidgetPosition - ListenerWidgetPosition;
+	if (ToSound.IsNearlyZero())
+	{
+		return false;
+	}
+
+	OutCenterUV = FVector2D(
+		ListenerWidgetPosition.X / ViewportSize.X,
+		ListenerWidgetPosition.Y / ViewportSize.Y);
+	OutDirectionAngle = FMath::Atan2(ToSound.X, -ToSound.Y);
+	OutAspectRatio = ViewportSize.X / ViewportSize.Y;
+	return true;
+}
+
+APawn* ULSSoundDirectionIndicatorWidget::ResolveObservedPawn() const
+{
+	if (ObservedPawn.IsValid())
+	{
+		return ObservedPawn.Get();
+	}
+
+	return GetOwningPlayerPawn();
+}

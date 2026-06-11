@@ -18,6 +18,7 @@ class ULSItemSlotWidget;
 class ULSMinimapWidget;
 class ULSProtocolWidget;
 class ULSSurvivalStatusWidget;
+class ULSSoundDirectionIndicatorWidget;
 class USlider;
 class UWrapBox;
 
@@ -133,6 +134,9 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Survival")
 	TObjectPtr<ULSSurvivalStatusWidget> SurvivalStatus;
+
+	UPROPERTY(meta = (BindWidget), BlueprintReadOnly, Category = "LS/UI|Survival")
+	TObjectPtr<ULSSoundDirectionIndicatorWidget> SoundIndicator;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip", meta=(ClampMin="0"))
 	int32 MaxChipMemory = 100;
