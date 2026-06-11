@@ -94,6 +94,7 @@ private:
 	bool TryHandleLootQuickTransfer();
 	bool TryHandleInventoryQuickTransfer();
 	bool TryHandleWarehouseQuickTransfer();
+	void RefreshStoredSlotVisual();
 	bool IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidLootDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidWarehouseDropTarget(const UDragDropOperation* InOperation) const;

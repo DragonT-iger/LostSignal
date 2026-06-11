@@ -903,7 +903,7 @@ bool ALSPlayerControllerBase::TransferInventorySlotToLootDrop(const ELSInventory
 	return LootDropWidgetInstance->TransferInventorySlotToFirstEmptyLootSlot(FromSlotArea, FromSlotIndex);
 }
 
-bool ALSPlayerControllerBase::TransferInventorySlotToOpenContainer(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex)
+bool ALSPlayerControllerBase::TransferInventorySlotToOpenContainer(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const bool bRefreshOpenContainer)
 {
 	if (TransferInventorySlotToLootDrop(FromSlotArea, FromSlotIndex))
 	{
@@ -932,7 +932,7 @@ bool ALSPlayerControllerBase::TransferInventorySlotToOpenContainer(const ELSInve
 	}
 
 	const bool bTransferred = SaveSubsystem->TransferStoredSlotToArea(FromSlotArea, FromSlotIndex, ELSInventorySlotArea::Warehouse);
-	if (bTransferred)
+	if (bTransferred && bRefreshOpenContainer)
 	{
 		LobbyStorageWidgetInstance->RefreshStorage();
 	}

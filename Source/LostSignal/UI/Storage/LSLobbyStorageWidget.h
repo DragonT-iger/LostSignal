@@ -45,7 +45,7 @@ public:
 
 	bool HandleStorageSlotDrop(ELSInventorySlotArea FromArea, int32 FromIndex, int32 ToWarehouseIndex);
 	bool TryDropStorageDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FPointerEvent& PointerEvent);
-	bool TransferStorageSlotToInventory(int32 WarehouseSlotIndex);
+	bool TransferStorageSlotToInventory(int32 WarehouseSlotIndex, bool bRefreshSourceStorage = true);
 
 protected:
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;

@@ -8,6 +8,7 @@
 #include "Engine/Texture2D.h"
 #include "InputCoreTypes.h"
 #include "LostSignal.h"
+#include "Session/LSSaveSubsystem.h"
 #include "UI/ChipSystem/LSChipEquipmentSlotWidget.h"
 #include "UI/ChipSystem/LSChipStationWidget.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
@@ -524,11 +525,18 @@ bool ULSItemSlotWidget::TryHandleInventoryQuickTransfer()
 		return false;
 	}
 
-	bHasItem = false;
-	if (PlayerController->HasAuthority() || PlayerController->IsLobbyStorageWidgetOpen())
+	if (PlayerController->IsLobbyStorageWidgetOpen())
+	{
+		RefreshStoredSlotVisual();
+	}
+	else if (PlayerController->HasAuthority())
 	{
 		InventoryWidget->RebuildInventorySlots();
 		InventoryWidget->RebuildConfirmedStorageSlots();
+	}
+	else
+	{
+		ClearItem();
 	}
 	return true;
 }
@@ -536,13 +544,43 @@ bool ULSItemSlotWidget::TryHandleInventoryQuickTransfer()
 bool ULSItemSlotWidget::TryHandleWarehouseQuickTransfer()
 {
 	ULSLobbyStorageWidget* StorageWidget = LobbyStorageWidget.Get();
-	if (!StorageWidget || !StorageWidget->TransferStorageSlotToInventory(SlotIndex))
+	if (!StorageWidget || !StorageWidget->TransferStorageSlotToInventory(SlotIndex, false))
 	{
 		return false;
 	}
 
-	bHasItem = false;
+	ClearItem();
 	return true;
+}
+
+void ULSItemSlotWidget::RefreshStoredSlotVisual()
+{
+	const UGameInstance* GameInstance = GetGameInstance();
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		ClearItem();
+		return;
+	}
+
+	const TArray<FLSSessionItem>* Slots = nullptr;
+	if (SlotArea == ELSInventorySlotArea::Inventory)
+	{
+		Slots = &SaveSubsystem->GetInventory();
+	}
+	else if (SlotArea == ELSInventorySlotArea::Safe)
+	{
+		Slots = &SaveSubsystem->GetSafeStash();
+	}
+
+	const FLSSessionItem* SlotItem = Slots && Slots->IsValidIndex(SlotIndex) ? &(*Slots)[SlotIndex] : nullptr;
+	if (SlotItem && !SlotItem->ItemRowName.IsNone() && SlotItem->Amount > 0)
+	{
+		SetItem(SlotItem->ItemRowName, SlotItem->Amount, SlotItem->ChipStats);
+		return;
+	}
+
+	ClearItem();
 }
 
 bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const

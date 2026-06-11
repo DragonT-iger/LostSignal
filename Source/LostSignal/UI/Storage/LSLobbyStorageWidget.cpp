@@ -254,7 +254,7 @@ bool ULSLobbyStorageWidget::TryDropStorageDragToWorld(const ULSInventoryDragDrop
 	return bDropped;
 }
 
-bool ULSLobbyStorageWidget::TransferStorageSlotToInventory(const int32 WarehouseSlotIndex)
+bool ULSLobbyStorageWidget::TransferStorageSlotToInventory(const int32 WarehouseSlotIndex, const bool bRefreshSourceStorage)
 {
 	ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn());
 	if (!PlayerCharacter || !PlayerCharacter->IsInventoryWidgetOpen())
@@ -275,7 +275,10 @@ bool ULSLobbyStorageWidget::TransferStorageSlotToInventory(const int32 Warehouse
 		ELSInventorySlotArea::Inventory);
 	if (bTransferred)
 	{
-		RefreshStorage();
+		if (bRefreshSourceStorage)
+		{
+			RefreshStorage();
+		}
 		PlayerCharacter->RebuildInventoryWidgetSlots();
 	}
 
