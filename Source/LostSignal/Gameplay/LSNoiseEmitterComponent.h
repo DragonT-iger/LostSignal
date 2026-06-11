@@ -24,6 +24,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Noise")
 	void EmitInteractNoise();
 
+	UFUNCTION(BlueprintCallable, Category="LS/Noise")
+	void SetNotifyMonsterSense(bool bInNotifyMonsterSense) { bNotifyMonsterSense = bInNotifyMonsterSense; }
+
 private:
 	void UpdateMovementNoise(float DeltaTime);
 	void EmitNoiseFromProfile(const FLSNoiseProfileRow& Profile);
@@ -53,6 +56,9 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Noise|Debug")
 	bool bLogNoiseDebug = false;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Noise")
+	bool bNotifyMonsterSense = true;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Noise|Debug", meta=(ClampMin="0.0"))
 	float NoiseDebugDuration = 0.35f;

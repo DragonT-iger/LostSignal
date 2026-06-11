@@ -90,7 +90,7 @@ void ULSMonsterSenseComponent::ApplyArchetype(const FLSMonsterArchetypeRow& Row)
 void ULSMonsterSenseComponent::RegisterNoiseEvent(const FLSNoiseEvent& NoiseEvent)
 {
 	const AActor* OwnerActor = GetOwner();
-	if (!OwnerActor || !OwnerActor->HasAuthority() || NoiseEvent.RadiusCm <= 0.0f)
+	if (!OwnerActor || !OwnerActor->HasAuthority() || NoiseEvent.RadiusCm <= 0.0f || NoiseEvent.NoiseInstigator == OwnerActor)
 	{
 		if (bLogNoiseDebug)
 		{

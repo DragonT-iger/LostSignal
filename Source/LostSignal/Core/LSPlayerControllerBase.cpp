@@ -12,6 +12,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "Gameplay/LSLootBox.h"
+#include "Gameplay/LSNoiseTypes.h"
 #include "Gameplay/LSWorldDroppedItem.h"
 #include "InputMappingContext.h"
 #include "Inventory/LSInventorySlotUtils.h"
@@ -640,6 +641,72 @@ void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
 	}
 
 	PlayerHUDWidgetInstance->InitializeHUDForPawn(CurrentPawn);
+}
+
+void ALSPlayerControllerBase::NotifyNoiseForHUD(const FLSNoiseEvent& NoiseEvent)
+{
+	UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] PC NotifyNoiseForHUD. PC=%s Local=%d Pawn=%s Instigator=%s RadiusCm=%.2f Location=%s"),
+		*GetNameSafe(this),
+		IsLocalPlayerController(),
+		*GetNameSafe(GetPawn()),
+		*GetNameSafe(NoiseEvent.NoiseInstigator),
+		NoiseEvent.RadiusCm,
+		*NoiseEvent.Location.ToCompactString());
+
+	if (NoiseEvent.RadiusCm <= 0.0f || GetPawn() == NoiseEvent.NoiseInstigator)
+	{
+		return;
+	}
+
+	if (IsLocalPlayerController())
+	{
+		HandleNoiseForHUD(NoiseEvent.Location, NoiseEvent.RadiusCm, NoiseEvent.NoiseTag, NoiseEvent.NoiseInstigator);
+		return;
+	}
+
+	ClientReceiveNoiseForHUD(NoiseEvent.Location, NoiseEvent.RadiusCm, NoiseEvent.NoiseTag, NoiseEvent.NoiseInstigator);
+}
+
+float ALSPlayerControllerBase::GetSoundIndicatorDetectionRadiusCm() const
+{
+	return FMath::Max(0.0f, SoundIndicatorDetectionRadiusMeters) * 100.0f;
+}
+
+void ALSPlayerControllerBase::ClientReceiveNoiseForHUD_Implementation(
+	const FVector_NetQuantize NoiseLocation,
+	const float RadiusCm,
+	const FGameplayTag NoiseTag,
+	AActor* NoiseInstigator)
+{
+	UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] PC ClientReceiveNoiseForHUD. PC=%s Location=%s RadiusCm=%.2f Instigator=%s"),
+		*GetNameSafe(this),
+		*NoiseLocation.ToCompactString(),
+		RadiusCm,
+		*GetNameSafe(NoiseInstigator));
+	HandleNoiseForHUD(NoiseLocation, RadiusCm, NoiseTag, NoiseInstigator);
+}
+
+void ALSPlayerControllerBase::HandleNoiseForHUD(
+	const FVector NoiseLocation,
+	const float RadiusCm,
+	const FGameplayTag NoiseTag,
+	AActor* NoiseInstigator)
+{
+	if (!IsLocalPlayerController() || !PlayerHUDWidgetInstance || GetPawn() == NoiseInstigator)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] PC HandleNoiseForHUD ignored. PC=%s Local=%d HUD=%s Pawn=%s Instigator=%s"),
+			*GetNameSafe(this),
+			IsLocalPlayerController(),
+			*GetNameSafe(PlayerHUDWidgetInstance),
+			*GetNameSafe(GetPawn()),
+			*GetNameSafe(NoiseInstigator));
+		return;
+	}
+
+	UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] PC HandleNoiseForHUD dispatch to HUD. PC=%s HUD=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(PlayerHUDWidgetInstance));
+	PlayerHUDWidgetInstance->HandleNoiseForSoundIndicator(NoiseLocation, RadiusCm, NoiseTag, NoiseInstigator);
 }
 
 bool ALSPlayerControllerBase::TransferLootDropSlotToSession(ALSLootBox* SourceLootBox, const int32 LootSlotIndex, const FName ItemRowName, const int32 Amount, FLSSessionItem& OutLootItem)

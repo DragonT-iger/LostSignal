@@ -42,6 +42,10 @@ void ULSNoiseEmitterComponent::EmitNoiseByRow(FName NoiseRowName)
 	const AActor* OwnerActor = GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority())
 	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Noise emit skipped by authority. Owner=%s HasAuthority=%d Row=%s"),
+			*GetNameSafe(OwnerActor),
+			OwnerActor ? OwnerActor->HasAuthority() : false,
+			*NoiseRowName.ToString());
 		if (bLogNoiseDebug)
 		{
 			UE_LOG(LogLS, Warning, TEXT("[NoiseEmitter] Emit skipped. Owner=%s HasAuthority=%d Row=%s"),
@@ -54,7 +58,17 @@ void ULSNoiseEmitterComponent::EmitNoiseByRow(FName NoiseRowName)
 
 	if (const FLSNoiseProfileRow* Profile = FindNoiseProfile(NoiseRowName))
 	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Noise emit by row. Owner=%s Row=%s"),
+			*GetNameSafe(OwnerActor),
+			*NoiseRowName.ToString());
 		EmitNoiseFromProfile(*Profile);
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Noise emit failed: profile missing. Owner=%s Row=%s Table=%s"),
+			*GetNameSafe(OwnerActor),
+			*NoiseRowName.ToString(),
+			*GetNameSafe(NoiseProfileTable));
 	}
 }
 
@@ -75,6 +89,11 @@ void ULSNoiseEmitterComponent::UpdateMovementNoise(float DeltaTime)
 	const FLSNoiseProfileRow* Profile = FindNoiseProfile(NoiseRowName);
 	if (!Profile || Profile->EmitIntervalSeconds <= 0.0f)
 	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Movement noise skipped. Owner=%s Row=%s Profile=%d Interval=%.2f"),
+			*GetNameSafe(GetOwner()),
+			*NoiseRowName.ToString(),
+			Profile != nullptr,
+			Profile ? Profile->EmitIntervalSeconds : 0.0f);
 		if (bLogNoiseDebug && !Profile)
 		{
 			UE_LOG(LogLS, Warning, TEXT("[NoiseEmitter] Movement noise profile missing. Owner=%s Row=%s"),
@@ -91,6 +110,9 @@ void ULSNoiseEmitterComponent::UpdateMovementNoise(float DeltaTime)
 	}
 
 	MovementNoiseElapsedSeconds = 0.0f;
+	UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Movement noise emitted. Owner=%s Row=%s"),
+		*GetNameSafe(GetOwner()),
+		*NoiseRowName.ToString());
 	EmitNoiseFromProfile(*Profile);
 }
 
@@ -100,6 +122,10 @@ void ULSNoiseEmitterComponent::EmitNoiseFromProfile(const FLSNoiseProfileRow& Pr
 	UWorld* World = GetWorld();
 	if (!OwnerActor || !World || Profile.RadiusMeters <= 0.0f)
 	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Noise skipped before subsystem. Owner=%s World=%d RadiusMeters=%.2f"),
+			*GetNameSafe(OwnerActor),
+			World != nullptr,
+			Profile.RadiusMeters);
 		if (bLogNoiseDebug)
 		{
 			UE_LOG(LogLS, Warning, TEXT("[NoiseEmitter] Noise skipped. Owner=%s World=%d RadiusMeters=%.2f Tag=%s"),
@@ -116,6 +142,7 @@ void ULSNoiseEmitterComponent::EmitNoiseFromProfile(const FLSNoiseProfileRow& Pr
 	NoiseEvent.Location = OwnerActor->GetActorLocation();
 	NoiseEvent.RadiusCm = Profile.RadiusMeters * 100.0f;
 	NoiseEvent.NoiseTag = Profile.NoiseTag;
+	NoiseEvent.bNotifyMonsterSense = bNotifyMonsterSense;
 
 #if !UE_BUILD_SHIPPING
 	DrawNoiseDebug(NoiseEvent.Location, NoiseEvent.RadiusCm);
@@ -132,6 +159,11 @@ void ULSNoiseEmitterComponent::EmitNoiseFromProfile(const FLSNoiseProfileRow& Pr
 
 	if (ULSNoiseSubsystem* NoiseSubsystem = World->GetSubsystem<ULSNoiseSubsystem>())
 	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Noise sent to subsystem. Owner=%s Location=%s RadiusCm=%.2f NotifyMonsterSense=%d"),
+			*GetNameSafe(OwnerActor),
+			*NoiseEvent.Location.ToCompactString(),
+			NoiseEvent.RadiusCm,
+			NoiseEvent.bNotifyMonsterSense);
 		NoiseSubsystem->EmitNoise(NoiseEvent);
 	}
 	else if (bLogNoiseDebug)

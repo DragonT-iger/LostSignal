@@ -22,6 +22,9 @@ public:
 	void ShowSoundDirection(FVector SoundWorldLocation, float DurationSeconds = 1.0f, float Strength = 1.0f);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI|SoundDirection")
+	void ShowSoundDirectionFromActor(AActor* SoundSourceActor, FVector FallbackSoundWorldLocation, float DurationSeconds = 1.0f, float Strength = 1.0f);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|SoundDirection")
 	void ShowNoiseEventDirection(const FLSNoiseEvent& NoiseEvent, float DurationSeconds = 1.0f);
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI|SoundDirection")
@@ -38,6 +41,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI|SoundDirection")
 	void HideSoundDirection();
+
+	bool IsSoundDirectionActive() const { return bIndicatorActive; }
+	float GetSoundDirectionRemainingTime() const;
 
 protected:
 	virtual void NativeConstruct() override;
@@ -93,6 +99,9 @@ private:
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<APawn> ObservedPawn;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AActor> ActiveSoundSourceActor;
 
 	FVector ActiveSoundWorldLocation = FVector::ZeroVector;
 	float ActiveDurationSeconds = 0.0f;

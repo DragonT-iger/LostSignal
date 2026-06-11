@@ -6,6 +6,7 @@
 #include "Data/LSProtocolTypes.h"
 #include "Data/LSDropSubsystem.h"
 #include "GameFramework/PlayerController.h"
+#include "GameplayTagContainer.h"
 #include "Session/LSSessionSubsystem.h"
 #include "LSPlayerControllerBase.generated.h"
 
@@ -18,6 +19,7 @@ class ULSRaidInventoryComponent;
 class ULSHpDebugWidget;
 class ULSLootDropWidget;
 class ULSPlayerHUDWidget;
+struct FLSNoiseEvent;
 
 UCLASS(Abstract)
 class LOSTSIGNAL_API ALSPlayerControllerBase : public APlayerController
@@ -111,6 +113,8 @@ public:
 	bool DropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
 	bool DropOverflowInventorySlotsToWorld(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
 	bool ResolveDropDirectionFromSlatePosition(FVector2D SlatePosition, FVector& OutDropDirection) const;
+	void NotifyNoiseForHUD(const FLSNoiseEvent& NoiseEvent);
+	float GetSoundIndicatorDetectionRadiusCm() const;
 
 protected:
 	UPROPERTY(EditAnywhere, Category="LS/Input")
@@ -124,6 +128,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
 	TSubclassOf<ULSPlayerHUDWidget> PlayerHUDWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Noise", meta=(ClampMin="0.0"))
+	float SoundIndicatorDetectionRadiusMeters = 10.0f;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSHpDebugWidget> DebugHpWidgetInstance;
@@ -234,6 +241,9 @@ private:
 	UFUNCTION(Client, Reliable)
 	void ClientSyncRaidSessionAndLoot(ALSLootBox* SourceLootBox, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSDropResult>& LootResults);
 
+	UFUNCTION(Client, Reliable)
+	void ClientReceiveNoiseForHUD(FVector_NetQuantize NoiseLocation, float RadiusCm, FGameplayTag NoiseTag, AActor* NoiseInstigator);
+
 	void ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 	void HideLootDropWidgetLocal();
 	void ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass);
@@ -246,6 +256,7 @@ private:
 	void StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
 	void ApplyRaidResultToLocalSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);
+	void HandleNoiseForHUD(FVector NoiseLocation, float RadiusCm, FGameplayTag NoiseTag, AActor* NoiseInstigator);
 	void SetProtocolTestLevel(ELSProtocolType ProtocolType, int32 Level);
 	void RefreshProtocolTestTargets();
 	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);

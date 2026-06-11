@@ -21,4 +21,7 @@ struct LOSTSIGNAL_API FLSNoiseEvent
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Noise")
 	FGameplayTag NoiseTag;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Noise")
+	bool bNotifyMonsterSense = true;
 };

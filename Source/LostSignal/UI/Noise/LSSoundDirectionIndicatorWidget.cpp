@@ -14,11 +14,30 @@ void ULSSoundDirectionIndicatorWidget::InitializeSoundDirectionIndicator(APawn* 
 
 void ULSSoundDirectionIndicatorWidget::ShowSoundDirection(const FVector SoundWorldLocation, const float DurationSeconds, const float Strength)
 {
-	ActiveSoundWorldLocation = SoundWorldLocation;
+	ShowSoundDirectionFromActor(nullptr, SoundWorldLocation, DurationSeconds, Strength);
+}
+
+void ULSSoundDirectionIndicatorWidget::ShowSoundDirectionFromActor(
+	AActor* SoundSourceActor,
+	const FVector FallbackSoundWorldLocation,
+	const float DurationSeconds,
+	const float Strength)
+{
+	ActiveSoundSourceActor = SoundSourceActor;
+	ActiveSoundWorldLocation = SoundSourceActor ? SoundSourceActor->GetActorLocation() : FallbackSoundWorldLocation;
 	ActiveDurationSeconds = FMath::Max(DurationSeconds, KINDA_SMALL_NUMBER);
 	ActiveElapsedSeconds = 0.0f;
 	ActiveStrength = FMath::Max(0.0f, Strength);
 	bIndicatorActive = true;
+
+	UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Show. Indicator=%s SourceActor=%s Location=%s Duration=%.2f Strength=%.2f Image=%s MaterialInstance=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(SoundSourceActor),
+		*ActiveSoundWorldLocation.ToCompactString(),
+		ActiveDurationSeconds,
+		ActiveStrength,
+		*GetNameSafe(IndicatorImage),
+		*GetNameSafe(IndicatorMaterialInstance));
 
 	if (IndicatorImage)
 	{
@@ -31,7 +50,7 @@ void ULSSoundDirectionIndicatorWidget::ShowSoundDirection(const FVector SoundWor
 void ULSSoundDirectionIndicatorWidget::ShowNoiseEventDirection(const FLSNoiseEvent& NoiseEvent, const float DurationSeconds)
 {
 	const float Strength = NoiseEvent.RadiusCm > 0.0f ? NoiseEvent.RadiusCm : 1.0f;
-	ShowSoundDirection(NoiseEvent.Location, DurationSeconds, Strength);
+	ShowSoundDirectionFromActor(NoiseEvent.NoiseInstigator, NoiseEvent.Location, DurationSeconds, Strength);
 }
 
 void ULSSoundDirectionIndicatorWidget::SetPreviewSoundDirectionParameters(
@@ -78,6 +97,7 @@ void ULSSoundDirectionIndicatorWidget::HideSoundDirection()
 {
 	bIndicatorActive = false;
 	ActiveElapsedSeconds = 0.0f;
+	ActiveSoundSourceActor.Reset();
 
 	if (IndicatorMaterialInstance)
 	{
@@ -109,6 +129,11 @@ void ULSSoundDirectionIndicatorWidget::NativeConstruct()
 	{
 		HideSoundDirection();
 	}
+}
+
+float ULSSoundDirectionIndicatorWidget::GetSoundDirectionRemainingTime() const
+{
+	return bIndicatorActive ? FMath::Max(ActiveDurationSeconds - ActiveElapsedSeconds, 0.0f) : 0.0f;
 }
 
 void ULSSoundDirectionIndicatorWidget::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
@@ -190,7 +215,6 @@ bool ULSSoundDirectionIndicatorWidget::ResolveIndicatorParams(FVector2D& OutCent
 		OutCenterUV = PreviewCenterUV;
 		OutDirectionAngle = FMath::DegreesToRadians(PreviewDirectionAngle);
 		OutAspectRatio = FMath::Max(PreviewAspectRatio, KINDA_SMALL_NUMBER);
-		UE_LOG(LogLS, Warning, TEXT("SoundIndicator Preview Parameter Resolved"))
 		return true;
 	}
 
@@ -198,11 +222,18 @@ bool ULSSoundDirectionIndicatorWidget::ResolveIndicatorParams(FVector2D& OutCent
 	const APawn* Pawn = ResolveObservedPawn();
 	if (!PlayerController || !Pawn)
 	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Resolve failed: missing controller or pawn. Indicator=%s PC=%s Pawn=%s"),
+			*GetNameSafe(this),
+			*GetNameSafe(PlayerController),
+			*GetNameSafe(Pawn));
 		return false;
 	}
 
 	FVector2D ListenerWidgetPosition = FVector2D::ZeroVector;
 	FVector2D SoundWidgetPosition = FVector2D::ZeroVector;
+	const FVector SoundWorldLocation = ActiveSoundSourceActor.IsValid()
+		? ActiveSoundSourceActor->GetActorLocation()
+		: ActiveSoundWorldLocation;
 	const bool bProjectedListener = UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
 		PlayerController,
 		Pawn->GetActorLocation(),
@@ -210,11 +241,16 @@ bool ULSSoundDirectionIndicatorWidget::ResolveIndicatorParams(FVector2D& OutCent
 		true);
 	const bool bProjectedSound = UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(
 		PlayerController,
-		ActiveSoundWorldLocation,
+		SoundWorldLocation,
 		SoundWidgetPosition,
 		true);
 	if (!bProjectedListener || !bProjectedSound)
 	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Resolve failed: projection. Indicator=%s ListenerProjected=%d SoundProjected=%d SoundLocation=%s"),
+			*GetNameSafe(this),
+			bProjectedListener,
+			bProjectedSound,
+			*SoundWorldLocation.ToCompactString());
 		return false;
 	}
 
@@ -223,20 +259,28 @@ bool ULSSoundDirectionIndicatorWidget::ResolveIndicatorParams(FVector2D& OutCent
 	ViewportSize /= ViewportScale;
 	if (ViewportSize.X <= KINDA_SMALL_NUMBER || ViewportSize.Y <= KINDA_SMALL_NUMBER)
 	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Resolve failed: viewport size. Indicator=%s Size=%s Scale=%.2f"),
+			*GetNameSafe(this),
+			*ViewportSize.ToString(),
+			ViewportScale);
 		return false;
 	}
 
 	const FVector2D ToSound = SoundWidgetPosition - ListenerWidgetPosition;
 	if (ToSound.IsNearlyZero())
 	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Resolve failed: zero direction. Indicator=%s Listener=%s Sound=%s"),
+			*GetNameSafe(this),
+			*ListenerWidgetPosition.ToString(),
+			*SoundWidgetPosition.ToString());
 		return false;
 	}
 
+	OutAspectRatio = ViewportSize.X / ViewportSize.Y;
 	OutCenterUV = FVector2D(
 		ListenerWidgetPosition.X / ViewportSize.X,
 		ListenerWidgetPosition.Y / ViewportSize.Y);
 	OutDirectionAngle = FMath::Atan2(ToSound.X, -ToSound.Y);
-	OutAspectRatio = ViewportSize.X / ViewportSize.Y;
 	return true;
 }
 

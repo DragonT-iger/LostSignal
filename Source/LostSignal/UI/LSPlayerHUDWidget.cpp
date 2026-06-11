@@ -1,8 +1,18 @@
 #include "UI/LSPlayerHUDWidget.h"
 
+#include "Components/CanvasPanelSlot.h"
+#include "Components/OverlaySlot.h"
+#include "Components/PanelWidget.h"
+#include "Core/LSPlayerControllerBase.h"
+#include "Data/LSChipStats.h"
+#include "Data/LSGameDataSubsystem.h"
+#include "Data/LSProtocolUnlockRow.h"
+#include "Data/LSProtocolTypes.h"
 #include "LostSignal.h"
+#include "Session/LSSaveSubsystem.h"
 #include "Skills/LSPlayerSkillComponent.h"
 #include "UI/Minimap/LSMinimapWidget.h"
+#include "UI/Noise/LSSoundDirectionIndicatorWidget.h"
 #include "UI/Skill/LSSkillBarWidget.h"
 #include "UI/Survival/LSSurvivalStatusWidget.h"
 
@@ -29,6 +39,15 @@ void ULSPlayerHUDWidget::InitializeHUDForPawn(APawn* InPawn)
 	else
 	{
 		SurvivalStatus->InitializeSurvivalStatusForPawn(InPawn);
+	}
+
+	if (!SoundIndicator)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot initialize HUD because SoundIndicator is not bound."), *GetNameSafe(this));
+	}
+	else
+	{
+		InitializeSoundIndicatorPool(InPawn);
 	}
 
 	ULSPlayerSkillComponent* SkillComponent = InPawn ? InPawn->FindComponentByClass<ULSPlayerSkillComponent>() : nullptr;
@@ -62,4 +81,211 @@ void ULSPlayerHUDWidget::NativeConstruct()
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s is missing required HUD widget binding: SurvivalStatus."), *GetNameSafe(this));
 	}
+	if (!SoundIndicator)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required HUD widget binding: SoundIndicator."), *GetNameSafe(this));
+	}
+}
+
+void ULSPlayerHUDWidget::HandleNoiseForSoundIndicator(
+	const FVector NoiseLocation,
+	const float RadiusCm,
+	const FGameplayTag NoiseTag,
+	AActor* NoiseInstigator)
+{
+	(void)NoiseTag;
+	(void)NoiseInstigator;
+
+	if (!SoundIndicator || RadiusCm <= 0.0f || !IsSoundIndicatorProtocolVisible())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] HUD ignored noise. SoundIndicator=%s RadiusCm=%.2f ProtocolVisible=%d"),
+			*GetNameSafe(SoundIndicator),
+			RadiusCm,
+			IsSoundIndicatorProtocolVisible());
+		return;
+	}
+
+	ULSSoundDirectionIndicatorWidget* Indicator = AcquireSoundIndicator();
+	if (!Indicator)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] HUD could not acquire indicator. PoolCount=%d"), SoundIndicatorPool.Num());
+		return;
+	}
+
+	UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] HUD dispatch noise. Indicator=%s Instigator=%s Location=%s RadiusCm=%.2f"),
+		*GetNameSafe(Indicator),
+		*GetNameSafe(NoiseInstigator),
+		*NoiseLocation.ToCompactString(),
+		RadiusCm);
+	Indicator->ShowSoundDirectionFromActor(NoiseInstigator, NoiseLocation, 1.0f, RadiusCm);
+}
+
+void ULSPlayerHUDWidget::InitializeSoundIndicatorPool(APawn* InPawn)
+{
+	if (!SoundIndicator)
+	{
+		return;
+	}
+
+	if (!SoundIndicatorPool.IsEmpty())
+	{
+		for (ULSSoundDirectionIndicatorWidget* Indicator : SoundIndicatorPool)
+		{
+			if (Indicator)
+			{
+				Indicator->InitializeSoundDirectionIndicator(InPawn);
+			}
+		}
+		return;
+	}
+
+	const int32 TargetCount = FMath::Clamp(MaxSoundIndicatorCount, 1, 5);
+	SoundIndicator->InitializeSoundDirectionIndicator(InPawn);
+	SoundIndicator->HideSoundDirection();
+	SoundIndicatorPool.Add(SoundIndicator);
+
+	UPanelWidget* ParentPanel = SoundIndicator->GetParent();
+	if (!ParentPanel)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot create pooled sound indicators because SoundIndicator has no parent panel."), *GetNameSafe(this));
+		return;
+	}
+
+	while (SoundIndicatorPool.Num() < TargetCount)
+	{
+		ULSSoundDirectionIndicatorWidget* PooledIndicator = CreatePooledSoundIndicator(ParentPanel);
+		if (!PooledIndicator)
+		{
+			break;
+		}
+
+		PooledIndicator->InitializeSoundDirectionIndicator(InPawn);
+		PooledIndicator->HideSoundDirection();
+		SoundIndicatorPool.Add(PooledIndicator);
+	}
+}
+
+ULSSoundDirectionIndicatorWidget* ULSPlayerHUDWidget::AcquireSoundIndicator()
+{
+	if (SoundIndicatorPool.IsEmpty())
+	{
+		InitializeSoundIndicatorPool(GetOwningPlayerPawn());
+	}
+
+	for (ULSSoundDirectionIndicatorWidget* Indicator : SoundIndicatorPool)
+	{
+		if (Indicator && !Indicator->IsSoundDirectionActive())
+		{
+			return Indicator;
+		}
+	}
+
+	ULSSoundDirectionIndicatorWidget* BestIndicator = nullptr;
+	float BestRemainingTime = TNumericLimits<float>::Max();
+	for (ULSSoundDirectionIndicatorWidget* Indicator : SoundIndicatorPool)
+	{
+		if (!Indicator)
+		{
+			continue;
+		}
+
+		const float RemainingTime = Indicator->GetSoundDirectionRemainingTime();
+		if (RemainingTime < BestRemainingTime)
+		{
+			BestRemainingTime = RemainingTime;
+			BestIndicator = Indicator;
+		}
+	}
+
+	return BestIndicator;
+}
+
+ULSSoundDirectionIndicatorWidget* ULSPlayerHUDWidget::CreatePooledSoundIndicator(UPanelWidget* ParentPanel)
+{
+	if (!ParentPanel || !SoundIndicator)
+	{
+		return nullptr;
+	}
+
+	ULSSoundDirectionIndicatorWidget* PooledIndicator = CreateWidget<ULSSoundDirectionIndicatorWidget>(
+		GetOwningPlayer(),
+		SoundIndicator->GetClass());
+	if (!PooledIndicator)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s failed to create pooled sound indicator."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	ParentPanel->AddChild(PooledIndicator);
+	ConfigurePooledSoundIndicatorSlot(PooledIndicator);
+	return PooledIndicator;
+}
+
+void ULSPlayerHUDWidget::ConfigurePooledSoundIndicatorSlot(ULSSoundDirectionIndicatorWidget* IndicatorWidget) const
+{
+	if (!IndicatorWidget)
+	{
+		return;
+	}
+
+	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(IndicatorWidget->Slot))
+	{
+		CanvasSlot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
+		CanvasSlot->SetOffsets(FMargin(0.0f));
+		CanvasSlot->SetAlignment(FVector2D::ZeroVector);
+		return;
+	}
+
+	if (UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(IndicatorWidget->Slot))
+	{
+		OverlaySlot->SetHorizontalAlignment(HAlign_Fill);
+		OverlaySlot->SetVerticalAlignment(VAlign_Fill);
+	}
+}
+
+bool ULSPlayerHUDWidget::IsSoundIndicatorProtocolVisible() const
+{
+	if (bDebugIgnoreSoundIndicatorProtocolLevel)
+	{
+		return true;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	if (!GameDataSubsystem)
+	{
+		return true;
+	}
+
+	int32 CurrentLevel = 0;
+	int32 PreviousLevel = 0;
+	bool bResolvedTestLevel = false;
+	if (const ALSPlayerControllerBase* PlayerController = GetOwningPlayer<ALSPlayerControllerBase>())
+	{
+		if (PlayerController->HasProtocolTestLevel(ELSProtocolType::Survival))
+		{
+			CurrentLevel = PlayerController->GetProtocolTestLevel(ELSProtocolType::Survival);
+			PreviousLevel = CurrentLevel;
+			bResolvedTestLevel = true;
+		}
+	}
+
+	if (!bResolvedTestLevel)
+	{
+		const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+		if (SaveSubsystem)
+		{
+			const int32 InactiveSlotCount = LSChipStats::ResolveInactiveSignalSlotCount(SaveSubsystem->GetChipSignalGaugePercent());
+			const TArray<FLSSessionItem> ActiveEquipmentItems =
+				LSChipStats::BuildSignalActiveEquipmentItems(SaveSubsystem->GetChipEquipmentSlots(), InactiveSlotCount);
+			CurrentLevel = LSChipStats::AggregateChipProtocolTotals(ActiveEquipmentItems, this).Survival;
+			PreviousLevel = LSChipStats::AggregateChipProtocolTotals(SaveSubsystem->GetChipEquipmentSlots(), this).Survival;
+		}
+	}
+
+	const FLSProtocolUnlockRow* Row = GameDataSubsystem->FindProtocolUnlockRowByEnableName(
+		ELSProtocolType::Survival,
+		TEXT("Monster_Sound"),
+		TEXT("PlayerHUDSoundIndicator"));
+	return Row ? GameDataSubsystem->IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel) : true;
 }
