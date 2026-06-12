@@ -104,9 +104,6 @@ private:
 	UPROPERTY(EditAnywhere, Category="LS/AI|Debug")
 	bool bDrawSenseDebug = false;
 
-	UPROPERTY(EditAnywhere, Category="LS/AI|Debug")
-	bool bLogNoiseDebug = false;
-
 	UPROPERTY(EditAnywhere, Category="LS/AI|Debug", meta=(ClampMin="0.0"))
 	float SenseDebugDrawHeight = 35.0f;
 

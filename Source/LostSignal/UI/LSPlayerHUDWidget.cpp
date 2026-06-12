@@ -11,6 +11,7 @@
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Skills/LSPlayerSkillComponent.h"
+#include "UI/Combat/LSDamageNumberWidget.h"
 #include "UI/Minimap/LSMinimapWidget.h"
 #include "UI/Noise/LSSoundDirectionIndicatorWidget.h"
 #include "UI/Skill/LSSkillBarWidget.h"
@@ -98,26 +99,32 @@ void ULSPlayerHUDWidget::HandleNoiseForSoundIndicator(
 
 	if (!SoundIndicator || RadiusCm <= 0.0f || !IsSoundIndicatorProtocolVisible())
 	{
-		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] HUD ignored noise. SoundIndicator=%s RadiusCm=%.2f ProtocolVisible=%d"),
-			*GetNameSafe(SoundIndicator),
-			RadiusCm,
-			IsSoundIndicatorProtocolVisible());
 		return;
 	}
 
 	ULSSoundDirectionIndicatorWidget* Indicator = AcquireSoundIndicator();
 	if (!Indicator)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] HUD could not acquire indicator. PoolCount=%d"), SoundIndicatorPool.Num());
 		return;
 	}
 
-	UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] HUD dispatch noise. Indicator=%s Instigator=%s Location=%s RadiusCm=%.2f"),
-		*GetNameSafe(Indicator),
-		*GetNameSafe(NoiseInstigator),
-		*NoiseLocation.ToCompactString(),
-		RadiusCm);
 	Indicator->ShowSoundDirectionFromActor(NoiseInstigator, NoiseLocation, 1.0f, RadiusCm);
+}
+
+void ULSPlayerHUDWidget::ShowDamageNumber(const FLSDamageNumberPayload& Payload)
+{
+	if (Payload.DamageAmount <= 0.0f || !IsDamageNumberProtocolVisible())
+	{
+		return;
+	}
+
+	ULSDamageNumberWidget* DamageNumber = AcquireDamageNumberWidget();
+	if (!DamageNumber)
+	{
+		return;
+	}
+
+	DamageNumber->ShowDamageNumber(Payload);
 }
 
 void ULSPlayerHUDWidget::InitializeSoundIndicatorPool(APawn* InPawn)
@@ -288,4 +295,106 @@ bool ULSPlayerHUDWidget::IsSoundIndicatorProtocolVisible() const
 		TEXT("Monster_Sound"),
 		TEXT("PlayerHUDSoundIndicator"));
 	return Row ? GameDataSubsystem->IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel) : true;
+}
+
+ULSDamageNumberWidget* ULSPlayerHUDWidget::AcquireDamageNumberWidget()
+{
+	for (ULSDamageNumberWidget* DamageNumber : DamageNumberPool)
+	{
+		if (DamageNumber && !DamageNumber->IsDamageNumberActive())
+		{
+			return DamageNumber;
+		}
+	}
+
+	if (DamageNumberPool.Num() < FMath::Clamp(MaxDamageNumberCount, 1, 40))
+	{
+		return CreateDamageNumberWidget();
+	}
+
+	ULSDamageNumberWidget* BestDamageNumber = nullptr;
+	float BestRemainingTime = TNumericLimits<float>::Max();
+	for (ULSDamageNumberWidget* DamageNumber : DamageNumberPool)
+	{
+		if (!DamageNumber)
+		{
+			continue;
+		}
+
+		const float RemainingTime = DamageNumber->GetRemainingLifeSeconds();
+		if (RemainingTime < BestRemainingTime)
+		{
+			BestRemainingTime = RemainingTime;
+			BestDamageNumber = DamageNumber;
+		}
+	}
+
+	return BestDamageNumber;
+}
+
+ULSDamageNumberWidget* ULSPlayerHUDWidget::CreateDamageNumberWidget()
+{
+	if (!DamageNumberWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot create damage number widget because DamageNumberWidgetClass is not set."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	ULSDamageNumberWidget* DamageNumber = CreateWidget<ULSDamageNumberWidget>(GetOwningPlayer(), DamageNumberWidgetClass);
+	if (!DamageNumber)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s failed to create damage number widget."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	DamageNumber->AddToViewport();
+	DamageNumberPool.Add(DamageNumber);
+	return DamageNumber;
+}
+
+bool ULSPlayerHUDWidget::IsDamageNumberProtocolVisible() const
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	if (!GameDataSubsystem)
+	{
+		return true;
+	}
+
+	int32 CurrentLevel = 0;
+	int32 PreviousLevel = 0;
+	ResolveBattleProtocolLevels(CurrentLevel, PreviousLevel);
+
+	const FLSProtocolUnlockRow* Row = GameDataSubsystem->FindProtocolUnlockRowByEnableName(
+		ELSProtocolType::Battle,
+		TEXT("Damage_Number"),
+		TEXT("PlayerHUDDamageNumber"));
+	return Row ? GameDataSubsystem->IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel) : true;
+}
+
+void ULSPlayerHUDWidget::ResolveBattleProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const
+{
+	OutCurrentLevel = 0;
+	OutPreviousLevel = 0;
+	if (const ALSPlayerControllerBase* PlayerController = GetOwningPlayer<ALSPlayerControllerBase>())
+	{
+		if (PlayerController->HasProtocolTestLevel(ELSProtocolType::Battle))
+		{
+			OutCurrentLevel = PlayerController->GetProtocolTestLevel(ELSProtocolType::Battle);
+			OutPreviousLevel = OutCurrentLevel;
+			return;
+		}
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		return;
+	}
+
+	const int32 InactiveSlotCount = LSChipStats::ResolveInactiveSignalSlotCount(SaveSubsystem->GetChipSignalGaugePercent());
+	const TArray<FLSSessionItem> ActiveEquipmentItems = LSChipStats::BuildSignalActiveEquipmentItems(SaveSubsystem->GetChipEquipmentSlots(), InactiveSlotCount);
+	OutCurrentLevel = LSChipStats::AggregateChipProtocolTotals(ActiveEquipmentItems, this).Battle;
+	OutPreviousLevel = LSChipStats::AggregateChipProtocolTotals(SaveSubsystem->GetChipEquipmentSlots(), this).Battle;
 }

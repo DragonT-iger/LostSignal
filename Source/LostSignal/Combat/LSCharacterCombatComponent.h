@@ -5,6 +5,7 @@
 #include "Components/ActorComponent.h"
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
+#include "UI/Combat/LSDamageNumberTypes.h"
 #include "LSCharacterCombatComponent.generated.h"
 
 class AActor;
@@ -72,6 +73,7 @@ private:
 	void RefreshDeathState();
 	void HandleDeathStateChanged(bool bIsDead);
 	void HandleStunStateChanged(bool bIsStunned);
+	void BroadcastDamageNumberToPlayers(const FLSDamageNumberPayload& Payload) const;
 	void FinishKnockback();
 	void ClearKnockback();
 	bool CanDamageTarget(AActor* TargetActor) const;
@@ -85,4 +87,7 @@ private:
 	bool bKnockbackActive = false;
 
 	bool bCachedIsDead = false;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Combat")
+	FVector DamageNumberWorldOffset = FVector(0.0f, 0.0f, 120.0f);
 };

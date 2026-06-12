@@ -8,6 +8,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameplayTagContainer.h"
 #include "Session/LSSessionSubsystem.h"
+#include "UI/Combat/LSDamageNumberTypes.h"
 #include "LSPlayerControllerBase.generated.h"
 
 class ALSLootBox;
@@ -114,6 +115,7 @@ public:
 	bool DropOverflowInventorySlotsToWorld(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
 	bool ResolveDropDirectionFromSlatePosition(FVector2D SlatePosition, FVector& OutDropDirection) const;
 	void NotifyNoiseForHUD(const FLSNoiseEvent& NoiseEvent);
+	void ShowDamageNumber(const FLSDamageNumberPayload& Payload);
 	float GetSoundIndicatorDetectionRadiusCm() const;
 
 protected:
@@ -244,6 +246,9 @@ private:
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveNoiseForHUD(FVector_NetQuantize NoiseLocation, float RadiusCm, FGameplayTag NoiseTag, AActor* NoiseInstigator);
 
+	UFUNCTION(Client, Unreliable)
+	void ClientShowDamageNumber(const FLSDamageNumberPayload& Payload);
+
 	void ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 	void HideLootDropWidgetLocal();
 	void ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass);
@@ -257,6 +262,7 @@ private:
 	void ApplyRaidResultToLocalSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);
 	void HandleNoiseForHUD(FVector NoiseLocation, float RadiusCm, FGameplayTag NoiseTag, AActor* NoiseInstigator);
+	void ShowDamageNumberLocal(const FLSDamageNumberPayload& Payload);
 	void SetProtocolTestLevel(ELSProtocolType ProtocolType, int32 Level);
 	void RefreshProtocolTestTargets();
 	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);

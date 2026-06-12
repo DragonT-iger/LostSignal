@@ -18,13 +18,7 @@ public:
 	void UnregisterListener(ULSMonsterSenseComponent* Listener);
 	void EmitNoise(const FLSNoiseEvent& NoiseEvent);
 
-	UFUNCTION(BlueprintCallable, Category="LS/Noise|Debug")
-	void SetLogNoiseDebug(bool bInLogNoiseDebug) { bLogNoiseDebug = bInLogNoiseDebug; }
-
 private:
 	UPROPERTY(Transient)
 	TSet<TObjectPtr<ULSMonsterSenseComponent>> Listeners;
-
-	UPROPERTY(Transient)
-	bool bLogNoiseDebug = false;
 };

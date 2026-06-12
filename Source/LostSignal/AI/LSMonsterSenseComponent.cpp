@@ -9,7 +9,6 @@
 #include "GameFramework/PlayerController.h"
 #include "Gameplay/LSNoiseSubsystem.h"
 #include "Gameplay/LSNoiseTypes.h"
-#include "LostSignal.h"
 
 ULSMonsterSenseComponent::ULSMonsterSenseComponent()
 {
@@ -92,62 +91,23 @@ void ULSMonsterSenseComponent::RegisterNoiseEvent(const FLSNoiseEvent& NoiseEven
 	const AActor* OwnerActor = GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority() || NoiseEvent.RadiusCm <= 0.0f || NoiseEvent.NoiseInstigator == OwnerActor)
 	{
-		if (bLogNoiseDebug)
-		{
-			UE_LOG(LogLS, Warning, TEXT("[MonsterSense] Noise ignored before distance check. Owner=%s HasAuthority=%d Instigator=%s RadiusCm=%.2f"),
-				*GetNameSafe(OwnerActor),
-				OwnerActor ? OwnerActor->HasAuthority() : false,
-				*GetNameSafe(NoiseEvent.NoiseInstigator),
-				NoiseEvent.RadiusCm);
-		}
 		return;
 	}
 
 	const float EffectiveHearingRadius = HearingRadius + NoiseEvent.RadiusCm;
 	if (EffectiveHearingRadius <= 0.0f)
 	{
-		if (bLogNoiseDebug)
-		{
-			UE_LOG(LogLS, Warning, TEXT("[MonsterSense] Noise rejected by invalid hearing radius. Owner=%s HearingRadius=%.2f NoiseRadius=%.2f Instigator=%s"),
-				*GetNameSafe(OwnerActor),
-				HearingRadius,
-				NoiseEvent.RadiusCm,
-				*GetNameSafe(NoiseEvent.NoiseInstigator));
-		}
 		return;
 	}
 
 	const float Distance2D = FVector::Dist2D(OwnerActor->GetActorLocation(), NoiseEvent.Location);
 	if (Distance2D > EffectiveHearingRadius)
 	{
-		if (bLogNoiseDebug)
-		{
-			UE_LOG(LogLS, Warning, TEXT("[MonsterSense] Noise rejected by distance. Owner=%s Instigator=%s Tag=%s Distance=%.2f CombinedRadius=%.2f HearingRadius=%.2f NoiseRadius=%.2f Location=%s"),
-				*GetNameSafe(OwnerActor),
-				*GetNameSafe(NoiseEvent.NoiseInstigator),
-				NoiseEvent.NoiseTag.IsValid() ? *NoiseEvent.NoiseTag.ToString() : TEXT("None"),
-				Distance2D,
-				EffectiveHearingRadius,
-				HearingRadius,
-				NoiseEvent.RadiusCm,
-				*NoiseEvent.Location.ToCompactString());
-		}
 		return;
 	}
 
 	InterestLocation = NoiseEvent.Location;
 	bHasInterestLocation = true;
-
-	if (bLogNoiseDebug)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[MonsterSense] Noise accepted. Owner=%s Instigator=%s Tag=%s Distance=%.2f CombinedRadius=%.2f InterestLocation=%s"),
-			*GetNameSafe(OwnerActor),
-			*GetNameSafe(NoiseEvent.NoiseInstigator),
-			NoiseEvent.NoiseTag.IsValid() ? *NoiseEvent.NoiseTag.ToString() : TEXT("None"),
-			Distance2D,
-			EffectiveHearingRadius,
-			*InterestLocation.ToCompactString());
-	}
 }
 
 void ULSMonsterSenseComponent::SetCurrentTargetFromDamage(AActor* DamageInstigator)
@@ -275,11 +235,6 @@ void ULSMonsterSenseComponent::UpdateSensing(float DeltaTime)
 		CurrentTarget = VisibleTarget;
 		InterestLocation = VisibleTarget->GetActorLocation();
 		bHasInterestLocation = true;
-
-		/*UE_LOG(LogLS, Warning, TEXT("Sense Hit: Owner=%s Target=%s HasVisual=%d"),
-			*GetNameSafe(GetOwner()),
-			*GetNameSafe(CurrentTarget.Get()),
-			HasVisualTarget());*/
 
 		return;
 	}

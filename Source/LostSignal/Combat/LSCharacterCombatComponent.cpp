@@ -10,6 +10,7 @@
 #include "Characters/LSEnemyCharacter.h"
 #include "Characters/LSPlayerCharacter.h"
 #include "Combat/LSCombatStateComponent.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -180,7 +181,7 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 		return false;
 	}
 
-	const ULSCharacterCombatComponent* TargetCombatComponent = TargetActor->FindComponentByClass<ULSCharacterCombatComponent>();
+	ULSCharacterCombatComponent* TargetCombatComponent = TargetActor->FindComponentByClass<ULSCharacterCombatComponent>();
 	const FLSImpactResolution ImpactResolution = TargetCombatComponent
 		? TargetCombatComponent->ResolveIncomingImpact(BreakPowerTier)
 		: FLSImpactResolution();
@@ -214,6 +215,7 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 	const float BeforeHealth = TargetASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
 	SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 	const float AfterHealth = TargetASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
+	const float ActualDamage = FMath::Max(0.0f, BeforeHealth - AfterHealth);
 
 	UE_LOG(
 		LogLS,
@@ -242,6 +244,15 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 				SenseComponent->SetCurrentTargetFromDamage(PlayerSource);
 			}
 		}
+	}
+
+	if (TargetCombatComponent && ActualDamage > 0.0f)
+	{
+		FLSDamageNumberPayload Payload;
+		Payload.DamageAmount = ActualDamage;
+		Payload.WorldLocation = FVector_NetQuantize(TargetActor->GetActorLocation() + TargetCombatComponent->DamageNumberWorldOffset);
+		Payload.bCritical = false;
+		TargetCombatComponent->BroadcastDamageNumberToPlayers(Payload);
 	}
 
 	return true;
@@ -422,6 +433,29 @@ void ULSCharacterCombatComponent::HandleStunStateChanged(bool bIsStunned)
 			{
 				AIController->BrainComponent->RestartLogic();
 			}
+		}
+	}
+}
+
+void ULSCharacterCombatComponent::BroadcastDamageNumberToPlayers(const FLSDamageNumberPayload& Payload) const
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority() || Payload.DamageAmount <= 0.0f)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(It->Get());
+		if (PlayerController)
+		{
+			PlayerController->ShowDamageNumber(Payload);
 		}
 	}
 }

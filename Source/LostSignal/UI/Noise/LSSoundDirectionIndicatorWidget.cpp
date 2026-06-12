@@ -30,15 +30,6 @@ void ULSSoundDirectionIndicatorWidget::ShowSoundDirectionFromActor(
 	ActiveStrength = FMath::Max(0.0f, Strength);
 	bIndicatorActive = true;
 
-	UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Show. Indicator=%s SourceActor=%s Location=%s Duration=%.2f Strength=%.2f Image=%s MaterialInstance=%s"),
-		*GetNameSafe(this),
-		*GetNameSafe(SoundSourceActor),
-		*ActiveSoundWorldLocation.ToCompactString(),
-		ActiveDurationSeconds,
-		ActiveStrength,
-		*GetNameSafe(IndicatorImage),
-		*GetNameSafe(IndicatorMaterialInstance));
-
 	if (IndicatorImage)
 	{
 		IndicatorImage->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -222,10 +213,6 @@ bool ULSSoundDirectionIndicatorWidget::ResolveIndicatorParams(FVector2D& OutCent
 	const APawn* Pawn = ResolveObservedPawn();
 	if (!PlayerController || !Pawn)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Resolve failed: missing controller or pawn. Indicator=%s PC=%s Pawn=%s"),
-			*GetNameSafe(this),
-			*GetNameSafe(PlayerController),
-			*GetNameSafe(Pawn));
 		return false;
 	}
 
@@ -246,11 +233,6 @@ bool ULSSoundDirectionIndicatorWidget::ResolveIndicatorParams(FVector2D& OutCent
 		true);
 	if (!bProjectedListener || !bProjectedSound)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Resolve failed: projection. Indicator=%s ListenerProjected=%d SoundProjected=%d SoundLocation=%s"),
-			*GetNameSafe(this),
-			bProjectedListener,
-			bProjectedSound,
-			*SoundWorldLocation.ToCompactString());
 		return false;
 	}
 
@@ -259,20 +241,12 @@ bool ULSSoundDirectionIndicatorWidget::ResolveIndicatorParams(FVector2D& OutCent
 	ViewportSize /= ViewportScale;
 	if (ViewportSize.X <= KINDA_SMALL_NUMBER || ViewportSize.Y <= KINDA_SMALL_NUMBER)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Resolve failed: viewport size. Indicator=%s Size=%s Scale=%.2f"),
-			*GetNameSafe(this),
-			*ViewportSize.ToString(),
-			ViewportScale);
 		return false;
 	}
 
 	const FVector2D ToSound = SoundWidgetPosition - ListenerWidgetPosition;
 	if (ToSound.IsNearlyZero())
 	{
-		UE_LOG(LogLS, Warning, TEXT("[SoundIndicator] Resolve failed: zero direction. Indicator=%s Listener=%s Sound=%s"),
-			*GetNameSafe(this),
-			*ListenerWidgetPosition.ToString(),
-			*SoundWidgetPosition.ToString());
 		return false;
 	}
 

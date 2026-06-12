@@ -54,9 +54,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Noise|Debug")
 	bool bDrawNoiseDebug = true;
 
-	UPROPERTY(EditDefaultsOnly, Category="LS/Noise|Debug")
-	bool bLogNoiseDebug = false;
-
 	UPROPERTY(EditDefaultsOnly, Category="LS/Noise")
 	bool bNotifyMonsterSense = true;
 

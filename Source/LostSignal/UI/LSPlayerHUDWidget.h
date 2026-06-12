@@ -3,8 +3,10 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "GameplayTagContainer.h"
+#include "UI/Combat/LSDamageNumberTypes.h"
 #include "LSPlayerHUDWidget.generated.h"
 
+class ULSDamageNumberWidget;
 class ULSSkillBarWidget;
 class ULSMinimapWidget;
 class ULSSoundDirectionIndicatorWidget;
@@ -22,6 +24,7 @@ public:
 	void InitializeHUDForPawn(APawn* InPawn);
 
 	void HandleNoiseForSoundIndicator(FVector NoiseLocation, float RadiusCm, FGameplayTag NoiseTag, AActor* NoiseInstigator);
+	void ShowDamageNumber(const FLSDamageNumberPayload& Payload);
 
 protected:
 	virtual void NativeConstruct() override;
@@ -44,13 +47,26 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Noise", meta=(ClampMin="1", ClampMax="5"))
 	int32 MaxSoundIndicatorCount = 5;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Combat")
+	TSubclassOf<ULSDamageNumberWidget> DamageNumberWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Combat", meta=(ClampMin="1", ClampMax="40"))
+	int32 MaxDamageNumberCount = 24;
+
 private:
 	void InitializeSoundIndicatorPool(APawn* InPawn);
 	ULSSoundDirectionIndicatorWidget* AcquireSoundIndicator();
 	ULSSoundDirectionIndicatorWidget* CreatePooledSoundIndicator(UPanelWidget* ParentPanel);
 	void ConfigurePooledSoundIndicatorSlot(ULSSoundDirectionIndicatorWidget* IndicatorWidget) const;
 	bool IsSoundIndicatorProtocolVisible() const;
+	ULSDamageNumberWidget* AcquireDamageNumberWidget();
+	ULSDamageNumberWidget* CreateDamageNumberWidget();
+	bool IsDamageNumberProtocolVisible() const;
+	void ResolveBattleProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULSSoundDirectionIndicatorWidget>> SoundIndicatorPool;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<ULSDamageNumberWidget>> DamageNumberPool;
 };
