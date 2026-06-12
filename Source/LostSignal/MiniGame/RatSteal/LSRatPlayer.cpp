@@ -122,6 +122,14 @@ void ALSRatPlayer::ApplyRatCameraPostProcess()
 	Settings.BloomIntensity = 0.f;
 	Settings.bOverride_VignetteIntensity = true;
 	Settings.VignetteIntensity = 0.f;
+	Settings.bOverride_MotionBlurAmount = true;
+	Settings.MotionBlurAmount = 0.f;
+	Settings.bOverride_MotionBlurMax = true;
+	Settings.MotionBlurMax = 0.f;
+	Settings.bOverride_DepthOfFieldScale = true;
+	Settings.DepthOfFieldScale = 0.f;
+	Settings.bOverride_SceneFringeIntensity = true;
+	Settings.SceneFringeIntensity = 0.f;
 }
 
 void ALSRatPlayer::ApplyRatSpriteMaterial()
