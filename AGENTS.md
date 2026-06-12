@@ -73,6 +73,14 @@
 | [Docs/Systems/MonsterAIControlStructure.md](Docs/Systems/MonsterAIControlStructure.md) | 몬스터 AI 제어·StateTree 전이 구조 |
 | [Docs/Systems/MinimapSystem.md](Docs/Systems/MinimapSystem.md) | 미니맵 표시 대상·지형 도형·탐색 프로토콜 연동 구조 |
 
+### 미니게임 (RatSteal — 몰래몰래팜)
+
+원작 D2DGame을 LostSignal 내장 미니게임으로 이식하는 별도 문서군. 폴더 전체가 기획의 단일 출처이며, 진입점은 Overview다.
+
+| 문서 | 단일 출처로 담당하는 내용 |
+|------|---------------------------|
+| [Docs/MiniGame/RatSteal/00_Overview.md](Docs/MiniGame/RatSteal/00_Overview.md) | RatSteal 컨셉·범위·**폴더 내 문서 인덱스**(나머지 문서는 여기서 색인) |
+
 ---
 
 ## 문서 워크플로우
@@ -91,6 +99,7 @@
   - 게임 수치(스탯·경제·쿨타임 등) → DataTable(`DT_`, Row 구조체 `FLS~`). 문서엔 수치 복붙 금지, 의미만.
   - 클래스/필드 구조 → C++ 헤더(`ALSCharacter.h` 등). 문서엔 코드 복붙 금지, 링크만.
   - 프로젝트 규칙(작업 원칙·코드 규칙·역할 분리·금지 사항) → 이 AGENTS.md.
+  - 미니게임 RatSteal 기획 → `Docs/MiniGame/RatSteal/`. 수치는 C++ `UPROPERTY` 기본값과 에디터 조정값으로 관리하고, 문서엔 의도/근거를 남긴다. 클래스 구조는 C++ 헤더가 단일 출처다.
 
 ---
 

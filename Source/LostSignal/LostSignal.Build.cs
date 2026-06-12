@@ -32,6 +32,7 @@ public class LostSignal : ModuleRules
 			"DeveloperSettings",
 			"Json",
 			"JsonUtilities",
+			"Paper2D",
 			"LostSignalVisionShaders"
 		});
 

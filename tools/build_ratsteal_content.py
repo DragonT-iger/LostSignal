@@ -1,0 +1,495 @@
+"""
+RatSteal content build script (run inside Unreal Editor Python).
+
+Pipeline:
+  1. Import source PNGs (delegates to import_ratsteal_assets.py)
+  2. Create PaperSprites (sheet frames from aseprite JSON + single textures)
+  3. Create PaperFlipbooks per frameTag
+  4. Create Blueprints (player/farmer/crop/spawn manager/bush/indicator/game modes) and assign assets
+  5. Create UMG widget blueprints (HUD/Result/Pause) with BindWidget-matching names
+  6. Create maps MG_RatSteal / MG_RatSteal_Tutorial
+
+Headless run:
+  UnrealEditor-Cmd.exe <uproject> -ExecutePythonScript="<this file>"
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import unreal
+
+TOOLS_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path(unreal.SystemLibrary.get_project_directory())
+SOURCE_ROOT = PROJECT_DIR / "Content" / "LostSignal" / "MiniGame" / "RatSteal" / "SourceAssets"
+
+ROOT = "/Game/LostSignal/MiniGame/RatSteal"
+TEX_ROOT = f"{ROOT}/Imported/Textures"
+SPR_ROOT = f"{ROOT}/Sprites"
+FB_ROOT = f"{ROOT}/Flipbooks"
+BP_ROOT = f"{ROOT}/Blueprints"
+UI_ROOT = f"{ROOT}/UI"
+MAP_ROOT = f"{ROOT}/Maps"
+
+ASSET_TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
+EAL = unreal.EditorAssetLibrary
+
+FLIPBOOK_FPS = 20.0  # frame_run = round(duration_ms / 50)
+
+CREATED = []
+FAILED = []
+
+
+def log(msg: str) -> None:
+    unreal.log(f"[RatStealBuild] {msg}")
+
+
+def log_error(msg: str) -> None:
+    unreal.log_error(f"[RatStealBuild] {msg}")
+
+
+def save(asset) -> None:
+    path = asset.get_path_name().split(".")[0]
+    EAL.save_asset(path, only_if_is_dirty=False)
+
+
+def load_texture(rel: str) -> unreal.Texture2D | None:
+    path = f"{TEX_ROOT}/{rel}"
+    tex = unreal.load_asset(path)
+    if not tex:
+        log_error(f"texture not found: {path}")
+    return tex
+
+
+# ---------------------------------------------------------------- sprites
+
+def create_sprite(name: str, texture: unreal.Texture2D,
+                  uv=None, dim=None, folder: str = SPR_ROOT) -> unreal.PaperSprite | None:
+    asset_path = f"{folder}/{name}"
+    if EAL.does_asset_exist(asset_path):
+        return unreal.load_asset(asset_path)
+    if not texture:
+        return None
+
+    factory = unreal.PaperSpriteFactory()
+    sprite = ASSET_TOOLS.create_asset(name, folder, unreal.PaperSprite, factory)
+    if not sprite:
+        log_error(f"sprite create failed: {asset_path}")
+        FAILED.append(asset_path)
+        return None
+
+    sprite.set_editor_property("source_texture", texture)
+    if uv is not None:
+        sprite.set_editor_property("source_uv", unreal.Vector2D(uv[0], uv[1]))
+    if dim is not None:
+        sprite.set_editor_property("source_dimension", unreal.Vector2D(dim[0], dim[1]))
+    sprite.set_editor_property("pixels_per_unreal_unit", 1.0)
+    save(sprite)
+    CREATED.append(asset_path)
+    return sprite
+
+
+def load_aseprite_json(rel: str) -> dict:
+    with open(SOURCE_ROOT / rel, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def build_sheet_flipbooks(json_rel: str, texture_rel: str, prefix: str) -> dict[str, unreal.PaperFlipbook]:
+    """Create per-frame sprites + per-tag flipbooks from an aseprite sheet json."""
+    data = load_aseprite_json(json_rel)
+    texture = load_texture(texture_rel)
+    if not texture:
+        return {}
+
+    frames = data["frames"]
+    if isinstance(frames, dict):  # hash export fallback
+        frames = list(frames.values())
+
+    sprites = []
+    durations = []
+    for idx, fr in enumerate(frames):
+        rect = fr["frame"]
+        spr = create_sprite(
+            f"SPR_{prefix}_{idx:02d}", texture,
+            uv=(rect["x"], rect["y"]), dim=(rect["w"], rect["h"]),
+            folder=f"{SPR_ROOT}/{prefix}")
+        sprites.append(spr)
+        durations.append(int(fr.get("duration", 100)))
+
+    flipbooks = {}
+    for tag in data["meta"].get("frameTags", []):
+        name = f"FB_{prefix}_{tag['name']}"
+        fb = create_flipbook(
+            name,
+            [(sprites[i], durations[i]) for i in range(int(tag["from"]), int(tag["to"]) + 1)])
+        if fb:
+            flipbooks[tag["name"]] = fb
+    return flipbooks
+
+
+def create_flipbook(name: str, keyframes) -> unreal.PaperFlipbook | None:
+    asset_path = f"{FB_ROOT}/{name}"
+    if EAL.does_asset_exist(asset_path):
+        return unreal.load_asset(asset_path)
+
+    factory = unreal.PaperFlipbookFactory()
+    fb = ASSET_TOOLS.create_asset(name, FB_ROOT, unreal.PaperFlipbook, factory)
+    if not fb:
+        log_error(f"flipbook create failed: {asset_path}")
+        FAILED.append(asset_path)
+        return None
+
+    kfs = []
+    for sprite, duration_ms in keyframes:
+        if not sprite:
+            continue
+        kf = unreal.PaperFlipbookKeyFrame()
+        kf.set_editor_property("sprite", sprite)
+        kf.set_editor_property("frame_run", max(1, round(duration_ms / (1000.0 / FLIPBOOK_FPS))))
+        kfs.append(kf)
+
+    fb.set_editor_property("frames_per_second", FLIPBOOK_FPS)
+    fb.set_editor_property("key_frames", kfs)
+    save(fb)
+    CREATED.append(asset_path)
+    return fb
+
+
+# ---------------------------------------------------------------- blueprints
+
+def create_blueprint(name: str, parent_class) -> tuple[unreal.Blueprint | None, object | None]:
+    asset_path = f"{BP_ROOT}/{name}"
+    if EAL.does_asset_exist(asset_path):
+        bp = unreal.load_asset(asset_path)
+    else:
+        factory = unreal.BlueprintFactory()
+        factory.set_editor_property("parent_class", parent_class)
+        bp = ASSET_TOOLS.create_asset(name, BP_ROOT, None, factory)
+        if bp:
+            CREATED.append(asset_path)
+    if not bp:
+        log_error(f"blueprint create failed: {asset_path}")
+        FAILED.append(asset_path)
+        return None, None
+
+    gen_class = unreal.load_object(None, f"{asset_path}.{name}_C")
+    return bp, gen_class
+
+
+def set_cdo(gen_class, props: dict, component_props: dict | None = None) -> None:
+    cdo = unreal.get_default_object(gen_class)
+    for key, value in props.items():
+        try:
+            cdo.set_editor_property(key, value)
+        except Exception as exc:  # noqa: BLE001 - log and continue per property
+            log_error(f"set_cdo {gen_class.get_name()}.{key} failed: {exc}")
+    for comp_name, comp_values in (component_props or {}).items():
+        try:
+            comp = cdo.get_editor_property(comp_name)
+            for key, value in comp_values.items():
+                comp.set_editor_property(key, value)
+        except Exception as exc:  # noqa: BLE001
+            log_error(f"set_cdo {gen_class.get_name()}.{comp_name} failed: {exc}")
+
+
+# ---------------------------------------------------------------- widgets
+
+def create_widget_bp(name: str, parent_class):
+    asset_path = f"{UI_ROOT}/{name}"
+    if EAL.does_asset_exist(asset_path):
+        return unreal.load_asset(asset_path)
+
+    factory = unreal.WidgetBlueprintFactory()
+    factory.set_editor_property("parent_class", parent_class)
+    wbp = ASSET_TOOLS.create_asset(name, UI_ROOT, None, factory)
+    if wbp:
+        CREATED.append(asset_path)
+    return wbp
+
+
+def widget_tree_of(wbp):
+    return wbp.get_editor_property("widget_tree")
+
+
+def make_canvas_root(wbp):
+    tree = widget_tree_of(wbp)
+    root = unreal.new_object(unreal.CanvasPanel, outer=tree, name="RootCanvas")
+    tree.set_editor_property("root_widget", root)
+    return tree, root
+
+
+def add_text(tree, root, name: str, x: float, y: float, size: int, text: str = ""):
+    block = unreal.new_object(unreal.TextBlock, outer=tree, name=name)
+    block.set_editor_property("text", unreal.Text(text))
+    font = block.get_editor_property("font")
+    font.set_editor_property("size", size)
+    block.set_editor_property("font", font)
+    slot = root.add_child_to_canvas(block)
+    slot.set_position(unreal.Vector2D(x, y))
+    slot.set_auto_size(True)
+    return block
+
+
+def add_image(tree, root, name: str, x: float, y: float, w: float, h: float, texture=None):
+    img = unreal.new_object(unreal.Image, outer=tree, name=name)
+    if texture:
+        brush = unreal.SlateBrush()
+        brush.set_editor_property("resource_object", texture)
+        brush.set_editor_property("image_size", unreal.DeprecateSlateVector2D(w, h))
+        img.set_editor_property("brush", brush)
+    slot = root.add_child_to_canvas(img)
+    slot.set_position(unreal.Vector2D(x, y))
+    slot.set_size(unreal.Vector2D(w, h))
+    return img
+
+
+def add_progress_bar(tree, root, name: str, x: float, y: float, w: float, h: float):
+    bar = unreal.new_object(unreal.ProgressBar, outer=tree, name=name)
+    bar.set_editor_property("percent", 1.0)
+    slot = root.add_child_to_canvas(bar)
+    slot.set_position(unreal.Vector2D(x, y))
+    slot.set_size(unreal.Vector2D(w, h))
+    return bar
+
+
+def build_widgets() -> dict[str, object]:
+    """Returns widget generated classes by key. Failures are logged and skipped."""
+    classes = {}
+    heart_tex = load_texture("UI/Icon_Heart")
+
+    # HUD
+    try:
+        wbp = create_widget_bp("WBP_RatStealHUD", unreal.LSRatHUDWidget)
+        tree, root = make_canvas_root(wbp)
+        add_text(tree, root, "ScoreText", 1700.0, 30.0, 48, "0")
+        add_text(tree, root, "TimerText", 900.0, 30.0, 48, "3:00")
+        add_progress_bar(tree, root, "FullnessBar", 60.0, 980.0, 400.0, 30.0)
+        add_image(tree, root, "Heart1", 60.0, 900.0, 72.0, 65.0, heart_tex)
+        add_image(tree, root, "Heart2", 145.0, 900.0, 72.0, 65.0, heart_tex)
+        add_image(tree, root, "Heart3", 230.0, 900.0, 72.0, 65.0, heart_tex)
+        save(wbp)
+        classes["hud"] = unreal.load_object(None, f"{UI_ROOT}/WBP_RatStealHUD.WBP_RatStealHUD_C")
+    except Exception as exc:  # noqa: BLE001
+        log_error(f"HUD widget build failed: {exc}")
+
+    # Result
+    try:
+        wbp = create_widget_bp("WBP_RatStealResult", unreal.LSRatResultWidget)
+        tree, root = make_canvas_root(wbp)
+        add_text(tree, root, "ReasonText", 760.0, 300.0, 64)
+        add_text(tree, root, "ScoreText", 820.0, 420.0, 48)
+        add_text(tree, root, "GradeText", 850.0, 510.0, 56)
+        add_text(tree, root, "CountsText", 720.0, 620.0, 36)
+        add_text(tree, root, "HintText", 700.0, 760.0, 28, "Enter / Space : 돌아가기")
+        save(wbp)
+        classes["result"] = unreal.load_object(None, f"{UI_ROOT}/WBP_RatStealResult.WBP_RatStealResult_C")
+    except Exception as exc:  # noqa: BLE001
+        log_error(f"Result widget build failed: {exc}")
+
+    # Pause
+    try:
+        wbp = create_widget_bp("WBP_RatStealPause", unreal.LSRatPauseWidget)
+        tree, root = make_canvas_root(wbp)
+        add_text(tree, root, "PauseTitleText", 830.0, 400.0, 64, "일시정지")
+        add_text(tree, root, "PauseHintText", 760.0, 520.0, 32, "Esc : 계속하기")
+        save(wbp)
+        classes["pause"] = unreal.load_object(None, f"{UI_ROOT}/WBP_RatStealPause.WBP_RatStealPause_C")
+    except Exception as exc:  # noqa: BLE001
+        log_error(f"Pause widget build failed: {exc}")
+
+    return classes
+
+
+# ---------------------------------------------------------------- maps
+
+def get_subsystems():
+    les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
+    return les, eas, ues
+
+
+def spawn_bp(eas, bp_asset, x: float, z: float, y: float = 0.0):
+    return eas.spawn_actor_from_object(bp_asset, unreal.Vector(x, y, z))
+
+
+def spawn_cls(eas, cls, x: float, z: float, y: float = 0.0):
+    return eas.spawn_actor_from_class(cls, unreal.Vector(x, y, z))
+
+
+def set_world_game_mode(ues, gm_class) -> None:
+    world = ues.get_editor_world()
+    settings = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.WorldSettings)
+    if settings:
+        settings[0].set_editor_property("default_game_mode", gm_class)
+    else:
+        log_error("WorldSettings not found — game mode override skipped")
+
+
+def build_map(level_path: str, gm_class, bps: dict, sprites: dict, tutorial: bool) -> None:
+    les, eas, ues = get_subsystems()
+
+    if EAL.does_asset_exist(level_path):
+        log(f"map exists, skipping: {level_path}")
+        return
+    if not les.new_level(level_path):
+        log_error(f"new_level failed: {level_path}")
+        FAILED.append(level_path)
+        return
+
+    set_world_game_mode(ues, gm_class)
+
+    # 배경 (원작 order -200000)
+    bg_key = "background_tutorial" if tutorial else "background"
+    if sprites.get(bg_key):
+        bg = spawn_cls(eas, unreal.PaperSpriteActor, 0.0, 0.0, y=500.0)
+        comp = bg.get_editor_property("render_component")
+        comp.set_editor_property("source_sprite", sprites[bg_key])
+        comp.set_editor_property("translucency_sort_priority", -200000)
+        bg.set_actor_label("Background")
+
+    sm = spawn_bp(eas, bps["spawn_manager"], 0.0, 0.0)
+    sm.set_actor_label("RatSpawnManager")
+
+    start = spawn_cls(eas, unreal.PlayerStart, 0.0, -300.0)
+    start.set_actor_label("PlayerStart")
+
+    if tutorial:
+        # 축소판: 제출존 1, 부쉬 1, 농부 1(외곽) — 32_Tutorial
+        spawn_cls(eas, unreal.LSRatSubmissionArea, 3580.0, 0.0).set_actor_label("SubmissionArea_R")
+        spawn_bp(eas, bps["bush"], -100.0, 0.0).set_actor_label("Bush_1")
+        spawn_bp(eas, bps["farmer"], 2400.0, 1500.0).set_actor_label("Farmer_1")
+    else:
+        # 원작 MainScene: 제출존 x=±3580, 부쉬 (-100,0) + 동선용 추가
+        spawn_cls(eas, unreal.LSRatSubmissionArea, 3580.0, 0.0).set_actor_label("SubmissionArea_R")
+        spawn_cls(eas, unreal.LSRatSubmissionArea, -3580.0, 0.0).set_actor_label("SubmissionArea_L")
+        for idx, (bx, bz) in enumerate([(-100.0, 0.0), (-1600.0, 900.0), (1600.0, -900.0),
+                                        (-2600.0, -1600.0), (2600.0, 1600.0)]):
+            spawn_bp(eas, bps["bush"], bx, bz).set_actor_label(f"Bush_{idx + 1}")
+        for idx, (fx, fz) in enumerate([(1500.0, 700.0), (-1500.0, -700.0)]):
+            spawn_bp(eas, bps["farmer"], fx, fz).set_actor_label(f"Farmer_{idx + 1}")
+
+    les.save_current_level()
+    CREATED.append(level_path)
+    log(f"map created: {level_path}")
+
+
+# ---------------------------------------------------------------- main
+
+def main() -> None:
+    # 1) 원본 PNG 임포트
+    sys.path.insert(0, str(TOOLS_DIR))
+    import import_ratsteal_assets  # noqa: PLC0415
+
+    import_ratsteal_assets.import_ratsteal_assets()
+
+    # 2) 시트 → 스프라이트 + 플립북
+    mole_fbs = build_sheet_flipbooks("Player/mole_final.json", "Player/mole_final", "Mole")
+    farmer_fbs = build_sheet_flipbooks("Farmer/farmer_final.json", "Farmer/farmer_final", "Farmer")
+    sparkle_fbs = build_sheet_flipbooks("Crops/crop_sparkle/crop_sparkle.json", "Crops/crop_sparkle/crop_sparkle", "Sparkle")
+
+    # 3) 단일 스프라이트 (작물 단계 Born=plant 공용 / 부쉬 / 지시자 / 배경)
+    singles = {
+        "plant": "Crops/plant",
+        "eggplantS": "Crops/eggplantS", "eggplantM": "Crops/eggplantM", "eggplantL": "Crops/eggplantL",
+        "potatoS": "Crops/potatoS", "potatoM": "Crops/potatoM", "potatoL": "Crops/potatoL",
+        "pumpkinS": "Crops/pumpkinS", "pumpkinM": "Crops/pumpkinM", "pumpkinL": "Crops/pumpkinL",
+        "bush": "Ground/bush_1",
+        "redCircle": "Farmer/redCircle",
+        "background": "Ground/background_test_1",
+        "background_tutorial": "Ground/TutorialBackground",
+    }
+    sprites = {key: create_sprite(f"SPR_{key}", load_texture(rel)) for key, rel in singles.items()}
+
+    # 4) 블루프린트 + 에셋 할당
+    bps = {}
+
+    bp, indicator_class = create_blueprint("BP_RatAttackIndicator", unreal.LSRatAttackIndicator)
+    set_cdo(indicator_class, {"indicator_sprite": sprites["redCircle"]})
+    save(bp)
+    bps["indicator"] = bp
+
+    bp, player_class = create_blueprint("BP_RatPlayer", unreal.LSRatPlayer)
+    set_cdo(player_class, {
+        "idle_flipbook": mole_fbs.get("idle"),
+        "walk_flipbook": mole_fbs.get("walk"),
+    })
+    save(bp)
+    bps["player"] = bp
+
+    bp, farmer_class = create_blueprint("BP_RatFarmer", unreal.LSRatFarmer)
+    set_cdo(farmer_class, {
+        "idle_flipbook": farmer_fbs.get("idle"),
+        "angry_idle_flipbook": farmer_fbs.get("angryidle"),
+        "walk_flipbook": farmer_fbs.get("walk"),
+        "angry_walk_flipbook": farmer_fbs.get("angrywalk"),
+        "attack_flipbook": farmer_fbs.get("attack"),
+        "indicator_class": indicator_class,
+    })
+    save(bp)
+    bps["farmer"] = bp
+
+    bp, crop_class = create_blueprint("BP_RatCrop", unreal.LSRatCrop)
+    set_cdo(crop_class, {}, component_props={
+        "sparkle_effect": {"source_flipbook": sparkle_fbs.get("sparkle")},
+    })
+    save(bp)
+    bps["crop"] = bp
+
+    bp, _bush_class = create_blueprint("BP_RatBush", unreal.LSRatBush)
+    set_cdo(_bush_class, {}, component_props={
+        "sprite": {"source_sprite": sprites["bush"]},
+    })
+    save(bp)
+    bps["bush"] = bp
+
+    def visual_set(stage_keys):
+        vs = unreal.LSRatCropVisualSet()
+        vs.set_editor_property("stage_sprites", [sprites[k] for k in stage_keys])
+        return vs
+
+    bp, sm_class = create_blueprint("BP_RatSpawnManager", unreal.LSRatSpawnManager)
+    set_cdo(sm_class, {
+        "crop_class": crop_class,
+        "crop_visuals": {
+            unreal.LSRatCropType.EGGPLANT: visual_set(["plant", "eggplantS", "eggplantM", "eggplantL"]),
+            unreal.LSRatCropType.POTATO: visual_set(["plant", "potatoS", "potatoM", "potatoL"]),
+            unreal.LSRatCropType.PUMPKIN: visual_set(["plant", "pumpkinS", "pumpkinM", "pumpkinL"]),
+        },
+    })
+    save(bp)
+    bps["spawn_manager"] = bp
+
+    # 5) 위젯
+    widget_classes = build_widgets()
+
+    # 6) 게임모드 BP (위젯/폰 클래스 연결)
+    gm_props = {
+        "default_pawn_class": player_class,
+        "hud_widget_class": widget_classes.get("hud"),
+        "result_widget_class": widget_classes.get("result"),
+        "pause_widget_class": widget_classes.get("pause"),
+    }
+    gm_props = {k: v for k, v in gm_props.items() if v}
+
+    bp, gm_class = create_blueprint("BP_RatGameMode", unreal.LSRatGameMode)
+    set_cdo(gm_class, gm_props)
+    save(bp)
+
+    bp, tut_gm_class = create_blueprint("BP_RatTutorialGameMode", unreal.LSRatTutorialGameMode)
+    set_cdo(tut_gm_class, gm_props)
+    save(bp)
+
+    # 7) 맵
+    build_map(f"{MAP_ROOT}/MG_RatSteal", gm_class, bps, sprites, tutorial=False)
+    build_map(f"{MAP_ROOT}/MG_RatSteal_Tutorial", tut_gm_class, bps, sprites, tutorial=True)
+
+    log(f"done. created={len(CREATED)} failed={len(FAILED)}")
+    for path in FAILED:
+        log_error(f"FAILED: {path}")
+
+
+if __name__ == "__main__":
+    main()
