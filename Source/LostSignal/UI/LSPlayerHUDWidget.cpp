@@ -11,7 +11,9 @@
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Skills/LSPlayerSkillComponent.h"
+#include "UI/Combat/LSCombatBuffListWidget.h"
 #include "UI/Combat/LSDamageNumberWidget.h"
+#include "UI/Combat/LSSkillCastGaugeWidget.h"
 #include "UI/Minimap/LSMinimapWidget.h"
 #include "UI/Noise/LSSoundDirectionIndicatorWidget.h"
 #include "UI/Skill/LSSkillBarWidget.h"
@@ -51,6 +53,15 @@ void ULSPlayerHUDWidget::InitializeHUDForPawn(APawn* InPawn)
 		InitializeSoundIndicatorPool(InPawn);
 	}
 
+	if (!CombatBuffList)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot initialize HUD because CombatBuffList is not bound."), *GetNameSafe(this));
+	}
+	else
+	{
+		CombatBuffList->InitializeBuffListForPawn(InPawn);
+	}
+
 	ULSPlayerSkillComponent* SkillComponent = InPawn ? InPawn->FindComponentByClass<ULSPlayerSkillComponent>() : nullptr;
 	if (!SkillComponent)
 	{
@@ -85,6 +96,14 @@ void ULSPlayerHUDWidget::NativeConstruct()
 	if (!SoundIndicator)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s is missing required HUD widget binding: SoundIndicator."), *GetNameSafe(this));
+	}
+	if (!CombatBuffList)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required HUD widget binding: CombatBuffList."), *GetNameSafe(this));
+	}
+	if (!SkillCastGauge)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required HUD widget binding: SkillCastGauge."), *GetNameSafe(this));
 	}
 }
 
@@ -125,6 +144,25 @@ void ULSPlayerHUDWidget::ShowDamageNumber(const FLSDamageNumberPayload& Payload)
 	}
 
 	DamageNumber->ShowDamageNumber(Payload);
+}
+
+void ULSPlayerHUDWidget::ShowSkillCastGauge(const FText Label, const float Duration)
+{
+	if (!SkillCastGauge)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot show skill cast gauge because SkillCastGauge is not bound."), *GetNameSafe(this));
+		return;
+	}
+
+	SkillCastGauge->StartCastGauge(Label, Duration);
+}
+
+void ULSPlayerHUDWidget::HideSkillCastGauge()
+{
+	if (SkillCastGauge)
+	{
+		SkillCastGauge->StopCastGauge();
+	}
 }
 
 void ULSPlayerHUDWidget::InitializeSoundIndicatorPool(APawn* InPawn)

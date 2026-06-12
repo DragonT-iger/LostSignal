@@ -6,8 +6,12 @@
 #include "Abilities/GameplayAbilityTypes.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Components/CapsuleComponent.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSCharacterSkillRow.h"
+#include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
+#include "Data/LSProtocolTypes.h"
+#include "Data/LSProtocolUnlockRow.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/GameInstance.h"
 #include "GameFramework/Pawn.h"
@@ -20,6 +24,7 @@
 #include "GAS/LSGameplayTags.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
+#include "Session/LSSaveSubsystem.h"
 #include "Skills/LSPassiveSkillDataAsset.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
@@ -79,7 +84,7 @@ bool ULSPlayerSkillComponent::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 
 	ULSSkillDataAsset* SkillData = GetSkillData(Slot);
 	ULSSkillPreviewComponent* PreviewComponent = ResolvePreviewComponent();
-	if (!SkillData || !PreviewComponent)
+	if (!SkillData)
 	{
 		return false;
 	}
@@ -92,15 +97,21 @@ bool ULSPlayerSkillComponent::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 
 	if (ActiveSkillData)
 	{
-		PreviewComponent->EndAreaPreview();
+		if (PreviewComponent)
+		{
+			PreviewComponent->EndAreaPreview();
+		}
 	}
 
 	ActiveSkillData = nullptr;
 	ActiveSlot = Slot;
 
-	if (!PreviewComponent->BeginAreaPreview(BuildPreviewSpecForSkill(SkillData)))
+	if (IsSkillRangeProtocolVisible())
 	{
-		return false;
+		if (!PreviewComponent || !PreviewComponent->BeginAreaPreview(BuildPreviewSpecForSkill(SkillData)))
+		{
+			return false;
+		}
 	}
 
 	ActiveSkillData = SkillData;
@@ -367,6 +378,55 @@ bool ULSPlayerSkillComponent::CanUseLocalPreview() const
 
 	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	return OwnerPawn && OwnerPawn->IsLocallyControlled();
+}
+
+bool ULSPlayerSkillComponent::IsSkillRangeProtocolVisible() const
+{
+	int32 CurrentLevel = 0;
+	int32 PreviousLevel = 0;
+	ResolveBattleProtocolLevels(CurrentLevel, PreviousLevel);
+
+	const UWorld* World = GetWorld();
+	const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	if (!GameDataSubsystem)
+	{
+		return CurrentLevel >= 2;
+	}
+
+	const FLSProtocolUnlockRow* Row = GameDataSubsystem->FindProtocolUnlockRowByEnableName(
+		ELSProtocolType::Battle,
+		TEXT("Skill_Range"),
+		TEXT("PlayerSkillRangeProtocol"));
+	return Row ? GameDataSubsystem->IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel) : CurrentLevel >= 2;
+}
+
+void ULSPlayerSkillComponent::ResolveBattleProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const
+{
+	OutCurrentLevel = 0;
+	OutPreviousLevel = 0;
+
+	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	const ALSPlayerControllerBase* PlayerController = OwnerPawn ? Cast<ALSPlayerControllerBase>(OwnerPawn->GetController()) : nullptr;
+	if (PlayerController && PlayerController->HasProtocolTestLevel(ELSProtocolType::Battle))
+	{
+		OutCurrentLevel = PlayerController->GetProtocolTestLevel(ELSProtocolType::Battle);
+		OutPreviousLevel = OutCurrentLevel;
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		return;
+	}
+
+	const int32 InactiveSlotCount = LSChipStats::ResolveInactiveSignalSlotCount(SaveSubsystem->GetChipSignalGaugePercent());
+	const TArray<FLSSessionItem> ActiveEquipmentItems = LSChipStats::BuildSignalActiveEquipmentItems(SaveSubsystem->GetChipEquipmentSlots(), InactiveSlotCount);
+	OutCurrentLevel = LSChipStats::AggregateChipProtocolTotals(ActiveEquipmentItems, this).Battle;
+	OutPreviousLevel = LSChipStats::AggregateChipProtocolTotals(SaveSubsystem->GetChipEquipmentSlots(), this).Battle;
 }
 
 ULSSkillPreviewComponent* ULSPlayerSkillComponent::ResolvePreviewComponent() const

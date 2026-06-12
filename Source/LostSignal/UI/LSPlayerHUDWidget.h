@@ -7,7 +7,9 @@
 #include "LSPlayerHUDWidget.generated.h"
 
 class ULSDamageNumberWidget;
+class ULSCombatBuffListWidget;
 class ULSSkillBarWidget;
+class ULSSkillCastGaugeWidget;
 class ULSMinimapWidget;
 class ULSSoundDirectionIndicatorWidget;
 class ULSSurvivalStatusWidget;
@@ -25,6 +27,11 @@ public:
 
 	void HandleNoiseForSoundIndicator(FVector NoiseLocation, float RadiusCm, FGameplayTag NoiseTag, AActor* NoiseInstigator);
 	void ShowDamageNumber(const FLSDamageNumberPayload& Payload);
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Combat")
+	void ShowSkillCastGauge(FText Label, float Duration);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Combat")
+	void HideSkillCastGauge();
 
 protected:
 	virtual void NativeConstruct() override;
@@ -37,6 +44,12 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSSurvivalStatusWidget> SurvivalStatus;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Combat")
+	TObjectPtr<ULSCombatBuffListWidget> CombatBuffList;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Combat")
+	TObjectPtr<ULSSkillCastGaugeWidget> SkillCastGauge;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Noise")
 	TObjectPtr<ULSSoundDirectionIndicatorWidget> SoundIndicator;

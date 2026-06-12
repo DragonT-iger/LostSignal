@@ -2,11 +2,19 @@
 
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
+#include "GameplayEffectComponents/TargetTagsGameplayEffectComponent.h"
 
 ULSGE_AttackSpeedBuff::ULSGE_AttackSpeedBuff(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 	DurationPolicy = EGameplayEffectDurationType::HasDuration;
+
+	UTargetTagsGameplayEffectComponent* TargetTagsComp =
+		ObjectInitializer.CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(this, TEXT("AttackSpeedBuffTargetTags"));
+	FInheritedTagContainer TagContainer;
+	TagContainer.Added.AddTag(LSGameplayTags::Buff_AttackSpeed);
+	TargetTagsComp->SetAndApplyTargetTagChanges(TagContainer);
+	GEComponents.Add(TargetTagsComp);
 
 	FSetByCallerFloat AttackSpeedSetByCaller;
 	AttackSpeedSetByCaller.DataTag = LSGameplayTags::Data_Buff_AttackSpeed;

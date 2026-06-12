@@ -22,6 +22,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Skill")
 	void InitializeSlot(ULSPlayerSkillComponent* InSkillComponent, ELSPlayerSkillSlot InSlot);
 
+	void SetPreviewBattleProtocolLevels(int32 CurrentBattleProtocol, int32 PreviousBattleProtocol);
+	void ClearPreviewBattleProtocolLevels();
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
@@ -38,6 +41,9 @@ protected:
 private:
 	void RefreshSkillIcon();
 	void RefreshCooldown();
+	bool IsCooldownNumberProtocolVisible() const;
+	bool IsCooldownGaugeProtocolVisible() const;
+	void ResolveBattleProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULSPlayerSkillComponent> SkillComponent;
@@ -46,4 +52,7 @@ private:
 	TObjectPtr<ULSSkillDataAsset> CachedSkillData;
 
 	ELSPlayerSkillSlot Slot = ELSPlayerSkillSlot::Skill1;
+	int32 PreviewCurrentBattleProtocol = 0;
+	int32 PreviewPreviousBattleProtocol = 0;
+	bool bUsePreviewBattleProtocolLevels = false;
 };

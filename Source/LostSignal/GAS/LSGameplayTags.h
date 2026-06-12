@@ -36,6 +36,7 @@ namespace LSGameplayTags
 
 	// Buff tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buff_CombatAcceleration)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Buff_AttackSpeed)
 
 	// Gameplay event tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Combat_BasicAttackHit)

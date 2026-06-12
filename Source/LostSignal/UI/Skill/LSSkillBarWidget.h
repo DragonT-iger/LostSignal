@@ -17,6 +17,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Skill")
 	void InitializeSkillBar(ULSPlayerSkillComponent* InSkillComponent);
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Skill")
+	void SetPreviewBattleProtocolLevels(int32 CurrentBattleProtocol, int32 PreviousBattleProtocol);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Skill")
+	void ClearPreviewBattleProtocolLevels();
+
 protected:
 	virtual void NativeConstruct() override;
 
@@ -36,6 +42,14 @@ protected:
 	TObjectPtr<ULSSkillSlotWidget> UltimateSlot;
 
 private:
+	void RefreshProtocolVisibility();
+	bool IsSkillSlotProtocolVisible() const;
+	void ResolveBattleProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const;
+
 	UPROPERTY(Transient)
 	TObjectPtr<ULSPlayerSkillComponent> SkillComponent;
+
+	int32 PreviewCurrentBattleProtocol = 0;
+	int32 PreviewPreviousBattleProtocol = 0;
+	bool bUsePreviewBattleProtocolLevels = false;
 };

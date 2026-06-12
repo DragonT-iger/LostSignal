@@ -88,6 +88,8 @@ private:
 	void ServerRequestActivateSkill(ELSPlayerSkillSlot Slot, FVector_NetQuantize TargetLocation, float AimYaw);
 
 	bool CanUseLocalPreview() const;
+	bool IsSkillRangeProtocolVisible() const;
+	void ResolveBattleProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const;
 	bool ActivateSkillOnServer(ELSPlayerSkillSlot Slot, const FVector& TargetLocation, float AimYaw);
 	const FLSCharacterSkillRow* ResolveActiveSkillRow(const ULSSkillDataAsset* SkillData, const TCHAR* Context) const;
 	FLSSkillAreaPreviewSpec BuildPreviewSpecForSkill(const ULSSkillDataAsset* SkillData) const;

@@ -22,6 +22,7 @@
 #include "UI/Inventory/LSItemSlotWidget.h"
 #include "UI/Minimap/LSMinimapWidget.h"
 #include "UI/Protocol/LSProtocolWidget.h"
+#include "UI/Skill/LSSkillBarWidget.h"
 #include "UI/Survival/LSSurvivalStatusWidget.h"
 #include "UI/Noise/LSSoundDirectionIndicatorWidget.h"
 
@@ -203,6 +204,10 @@ void ULSChipStationWidget::NativeConstruct()
 	if (!SurvivalStatus)
 	{
 		UE_LOG(LogLS, Warning, TEXT("SurvivalStatus is not bound on %s."), *GetNameSafe(this));
+	}
+	if (!SkillBar)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SkillBar is not bound on %s."), *GetNameSafe(this));
 	}
 
 	InitializeEquipmentSlots();
@@ -392,6 +397,7 @@ void ULSChipStationWidget::RefreshEquippedChipSummary()
 	const int32 TemporaryProtocolLevel = CalculateTemporaryProtocolPreviewLevel(GetSignalGaugePercent());
 	SetPreviewMinimapNavigationLevels(TemporaryProtocolLevel, TemporaryProtocolLevel);
 	SetPreviewSurvivalStatus(TemporaryProtocolLevel, TemporaryProtocolLevel);
+	SetPreviewBattleProtocol(TemporaryProtocolLevel, TemporaryProtocolLevel);
 	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), ELSProtocolType::Survival, TemporaryProtocolLevel, TemporaryProtocolLevel);
 	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), ELSProtocolType::Carrying, TemporaryProtocolLevel, TemporaryProtocolLevel);
 	SetProtocolWidget(Protocol_Battle, TEXT("Protocol_Battle"), ELSProtocolType::Battle, TemporaryProtocolLevel, TemporaryProtocolLevel);
@@ -632,6 +638,22 @@ void ULSChipStationWidget::SetPreviewSurvivalStatus(const int32 CurrentSurvivalP
 	{
 		SoundIndicator->HideSoundDirection();
 	}
+}
+
+void ULSChipStationWidget::SetPreviewBattleProtocol(const int32 CurrentBattleProtocol, const int32 PreviousBattleProtocol)
+{
+	if (!SkillBar)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SkillBar is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
+	{
+		SkillBar->InitializeSkillBar(PlayerCharacter->GetPlayerSkillComponent());
+	}
+
+	SkillBar->SetPreviewBattleProtocolLevels(CurrentBattleProtocol, PreviousBattleProtocol);
 }
 
 bool ULSChipStationWidget::IsPointerInsideChipSlotBorder(const FVector2D ScreenPosition) const

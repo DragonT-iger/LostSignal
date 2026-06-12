@@ -25,6 +25,7 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Combat_NextAttack_ComboIndexOverride, "LS.Combat.NextAttack.ComboIndexOverride")
 
 	UE_DEFINE_GAMEPLAY_TAG(Buff_CombatAcceleration, "LS.Buff.CombatAcceleration")
+	UE_DEFINE_GAMEPLAY_TAG(Buff_AttackSpeed, "LS.Buff.AttackSpeed")
 
 	UE_DEFINE_GAMEPLAY_TAG(Event_Combat_BasicAttackHit, "LS.Event.Combat.BasicAttackHit")
 

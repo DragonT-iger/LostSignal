@@ -4,27 +4,35 @@
 
 전투 프로토콜 UI는 전투 중 플레이어에게 공개되는 전투 정보를 프로토콜 단계별로 관리한다.
 
+데이터 테이블과 연계되는 변수의 이름은 반드시 데이터 테이블 기준으로 변수명을 설정한다.
+
+데이터 테이블에 존재하지 않는 변수명을 데이터 테이블에 추가하지 않는다.
+
 전투 판정, 데미지 계산, 체력 변경은 [CombatImplementationFlow.md](CombatImplementationFlow.md)와 [SkillSystemStructure.md](SkillSystemStructure.md)를 단일 출처로 둔다. 이 문서는 전투 결과를 어떤 UI로 보여줄지와 프로토콜 단계별 해금 기준만 다룬다.
 
 ## 단계 구성
 
 전투 프로토콜은 5단계로 구성한다.
 
-| 단계 | UI 범위 | 상태 |
-|------|---------|------|
-| 1 | 데미지 수치 표시 | 구현 대상 |
-| 2 | 미정 | 보류 |
-| 3 | 미정 | 보류 |
-| 4 | 미정 | 보류 |
-| 5 | 미정 | 보류 |
+| 단계 | UI 범위 | 구현 방향 |
+|------|---------|-----------|
+| 1 | 데미지 수치 표시, 스킬 슬롯 UI 표시 | 데미지 수치는 `ULSDamageNumberWidget`, 스킬 슬롯은 기존 `ULSSkillBarWidget`/`ULSSkillSlotWidget` 사용 |
+| 2 | 스킬 범위 표시, 스킬 쿨타임 숫자 UI 표시 | 스킬 범위는 기존 `ULSSkillPreviewComponent` 제어 흐름 사용, 쿨타임 숫자는 스킬 슬롯 UI 확장 |
+| 3 | 캐스팅, 버프 지속 시간, 스킬 쿨타임 게이지바 UI 표시 | 캐스팅 게이지와 버프 표시 UI 추가 필요, 쿨타임 게이지는 스킬 슬롯 UI 확장 |
+| 4 | 적 공격 타이밍 및 공격 범위 UI 표시 | 적 공격 범위/타이밍 표시 구조 추가 필요 |
+| 5 | 적 체력바 UI 표시 | 적 체력바 UI 추가 필요 |
 
-2~5단계는 기획 범위가 확정되면 이 문서에 추가한다. 아직 확정되지 않은 기능명이나 수치는 문서에 임의로 적지 않는다.
+4단계의 `적 하단 원형 표시`는 기획에서 제외되었으므로 구현하지 않는다.
+
+이미 해금된 정보가 일정 단계까지 사라지지 않는 규칙은 `DT_ProtocolUnlock`의 `Protocol_Protected_Level`로 관리한다. 전투 프로토콜에서는 Lv.3, Lv.5 기준의 정보 유지 규칙을 데이터로 표현하고, 코드에는 특정 단계 수치를 하드코딩하지 않는다.
 
 ## 1단계: 데미지 수치 표시
 
-1단계에서 해금되는 기능은 적 또는 플레이어가 피해를 받을 때 해당 월드 위치 주변에 데미지 숫자를 표시하는 것이다.
+1단계에서 해금되는 기능은 적 또는 플레이어가 피해를 받을 때 해당 월드 위치 주변에 데미지 숫자를 표시하고, 플레이어 스킬 슬롯 UI를 표시하는 것이다.
 
 분류는 월드 위치 기반 UI다. 다만 실제 렌더링은 각 클라이언트의 `WBP_PlayerHUD`에서 월드 좌표를 화면 좌표로 투영해 표시한다. 짧게 많이 생성되는 UI라서 대상 액터마다 `WidgetComponent`를 붙이지 않고, HUD가 `ULSDamageNumberWidget` 풀을 관리한다.
+
+스킬 슬롯 UI는 기존 `ULSPlayerHUDWidget`이 `ULSSkillBarWidget`을 초기화하는 흐름을 사용한다. 1단계에서는 새 스킬 슬롯 클래스를 만들지 않는다.
 
 ## 해금 기준
 
@@ -38,9 +46,71 @@ Protocol_Enable_Name = Damage_Number
 Protocol_Required_Level = 1
 ```
 
-정확한 row 이름은 프로토콜 데이터 테이블 규칙을 따른다. UI 코드는 `ULSGameDataSubsystem::FindProtocolUnlockRowByEnableName(ELSProtocolType::Battle, "Damage_Number")`로 조회한다.
+스킬 슬롯 UI도 전투 프로토콜 1단계부터 노출되어야 한다. `DT_ProtocolUnlock`에는 다음 의미의 row를 추가한다.
+
+```text
+Protocol_Enable_Type = Battle
+Protocol_Enable_Name = Skill_Slot
+Protocol_Required_Level = 1
+```
+
+정확한 row 이름은 프로토콜 데이터 테이블 규칙을 따른다. UI 코드는 `ULSGameDataSubsystem::FindProtocolUnlockRowByEnableName`으로 `Damage_Number`, `Skill_Slot` 해금명을 각각 조회한다.
 
 테스트 중에는 `LSTestBattleProtocol 1`로 1단계 표시 여부를 확인한다.
+
+## 2단계: 스킬 범위와 쿨타임 숫자
+
+2단계에서 해금되는 기능은 스킬 사용 전 범위 표시와 스킬 슬롯의 쿨타임 남은 시간 숫자 표시다.
+
+스킬 범위는 기존 `ULSPlayerSkillComponent`의 스킬 타겟팅 흐름과 `ULSSkillPreviewComponent`를 사용한다. 전투 프로토콜 2단계 미만에서는 스킬 타겟팅과 확정 입력은 유지하되, 월드 범위 메시만 표시하지 않는다. 즉 프로토콜은 조작 가능 여부가 아니라 정보 표시량만 제어한다.
+
+쿨타임 숫자는 `ULSSkillSlotWidget`의 `CooldownText`만 제어한다. 3단계 기능인 쿨타임 게이지바는 `CooldownBar`로 분리하고, 2단계에서는 표시하지 않는다.
+
+`DT_ProtocolUnlock`에는 다음 의미의 row를 추가한다.
+
+```text
+Protocol_Enable_Type = Battle
+Protocol_Enable_Name = Skill_Range
+Protocol_Required_Level = 2
+```
+
+```text
+Protocol_Enable_Type = Battle
+Protocol_Enable_Name = Skill_Cooldown
+Protocol_Required_Level = 2
+```
+
+3단계 쿨타임 게이지바는 다음 해금명을 사용한다.
+
+```text
+Protocol_Enable_Type = Battle
+Protocol_Enable_Name = Skill_Cooldown_Gauge
+Protocol_Required_Level = 3
+```
+
+## 3단계: 캐스팅, 버프 지속 시간, 쿨타임 게이지바
+
+3단계에서 해금되는 기능은 스킬 캐스팅 게이지바, 버프 지속 시간 표시, 스킬 쿨타임 게이지바 표시다.
+
+스킬 쿨타임 게이지바는 `ULSSkillSlotWidget`의 `CooldownBar`가 담당한다. 2단계의 `Skill_Cooldown`은 숫자만 표시하고, 3단계의 `Skill_Cooldown_Gauge`가 열려야 게이지바가 표시된다.
+
+버프 지속 시간은 `ULSCombatBuffListWidget`이 플레이어의 AbilitySystemComponent에서 지속 중인 `LS.Buff.*` 계열 GameplayEffect를 조회해 표시한다. 현재 표시 대상은 `LS.Buff.CombatAcceleration`, `LS.Buff.AttackSpeed`다. 개별 버프 표시는 `ULSCombatBuffIconWidget`이 담당한다.
+
+스킬 캐스팅 게이지바는 `ULSSkillCastGaugeWidget`이 담당한다. 아직 실제 캐스팅 시스템이 없으므로 HUD의 `ShowSkillCastGauge`/`HideSkillCastGauge` API와 디버그 명령 `LSTestSkillCastGauge <Duration>`으로 표시 경로를 먼저 열어 둔다.
+
+`DT_ProtocolUnlock`에는 다음 의미의 row를 추가한다.
+
+```text
+Protocol_Enable_Type = Battle
+Protocol_Enable_Name = Skill_Casting_Gauge
+Protocol_Required_Level = 3
+```
+
+```text
+Protocol_Enable_Type = Battle
+Protocol_Enable_Name = Buff_Duration
+Protocol_Required_Level = 3
+```
 
 ## 표시 흐름
 
@@ -68,6 +138,29 @@ Protocol_Required_Level = 1
 | `ULSPlayerHUDWidget` | 전투 프로토콜 1단계 해금 여부를 확인하고 데미지 숫자 위젯 풀을 관리한다. |
 | `ULSDamageNumberWidget` | 숫자 하나의 텍스트, 투영 위치, 상승/페이드 수명을 담당한다. |
 | `FLSDamageNumberPayload` | 데미지량, 월드 위치, 치명타 여부 같은 표시 입력값을 담는다. |
+| `ULSSkillBarWidget` | `Skill_Slot` 해금 여부에 따라 스킬 슬롯 UI 표시 여부를 결정한다. |
+| `ULSSkillSlotWidget` | `Skill_Cooldown`/`Skill_Cooldown_Gauge` 해금 여부에 따라 쿨타임 숫자와 게이지바를 분리 표시한다. |
+| `ULSPlayerSkillComponent` | `Skill_Range` 해금 여부에 따라 스킬 범위 메시 표시 여부를 결정한다. |
+| `ULSChipStationWidget` | 칩 신호율 임시 레벨을 전투 프로토콜 프리뷰로 전달한다. |
+| `ULSCombatBuffListWidget` | `Buff_Duration` 해금 여부에 따라 플레이어 버프 지속 시간 목록을 표시한다. |
+| `ULSCombatBuffIconWidget` | 버프 하나의 아이콘 이미지, 스택 텍스트, 남은 시간 게이지를 표시한다. |
+| `ULSSkillCastGaugeWidget` | `Skill_Casting_Gauge` 해금 여부에 따라 캐스팅 진행률을 표시한다. |
+
+## 칩스테이션 프리뷰
+
+`WBP_ChipStation`에는 전투 프로토콜 프리뷰용 `SkillBar` 자식 위젯을 둔다. 이 위젯의 부모 클래스는 `ULSSkillBarWidget`이다.
+
+칩스테이션은 신호율 슬라이더 값으로 임시 프로토콜 레벨을 계산하고, `SetPreviewBattleProtocol`을 통해 `ULSSkillBarWidget::SetPreviewBattleProtocolLevels`에 전달한다. 이 프리뷰 값은 칩스테이션 내부 표시 전용이며 실제 플레이 HUD의 전투 프로토콜 레벨을 변경하지 않는다.
+
+## 향후 필요한 UI 클래스
+
+아직 실제 사용 지점이 없으므로 1단계 작업에서는 아래 클래스를 만들지 않는다. 해당 단계 구현 시점에 사용 경로와 데이터 공급자가 확정되면 추가한다.
+
+| 클래스 후보 | 담당 단계 | 책임 |
+|-------------|-----------|------|
+| `ULSEnemyHealthBarWidget` | 5 | 적의 현재/최대 체력 표시 |
+
+스킬 범위 표시는 새 `UUserWidget`을 만들지 않고 기존 `ULSSkillPreviewComponent`와 `FLSSkillAreaPreviewSpec` 흐름을 사용한다. 적 공격 범위 표시는 공격 판정 데이터와 연결되어야 하므로 4단계 구현 시 월드 메시/데칼/머티리얼 방식 중 하나로 별도 결정한다.
 
 ## 현재 제한
 

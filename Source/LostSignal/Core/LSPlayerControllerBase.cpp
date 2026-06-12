@@ -883,6 +883,22 @@ void ALSPlayerControllerBase::LSTestAllProtocols(const int32 Survival, const int
 		NavigationProtocolTestLevel);
 }
 
+void ALSPlayerControllerBase::LSTestSkillCastGauge(const float Duration)
+{
+	if (!PlayerHUDWidgetInstance)
+	{
+		CreatePlayerHUDWidgetLocal();
+	}
+
+	if (!PlayerHUDWidgetInstance)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[SkillCastGaugeTest] Cannot show cast gauge because player HUD is missing."));
+		return;
+	}
+
+	PlayerHUDWidgetInstance->ShowSkillCastGauge(NSLOCTEXT("LSPlayerControllerBase", "TestSkillCastGauge", "캐스팅"), FMath::Max(Duration, 0.0f));
+}
+
 void ALSPlayerControllerBase::LSClearSurvivalProtocolTest()
 {
 	SurvivalProtocolTestLevel = -1;

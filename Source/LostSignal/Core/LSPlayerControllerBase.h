@@ -90,6 +90,9 @@ public:
 	void LSTestAllProtocols(int32 Survival, int32 Carrying, int32 Battle, int32 Navigation);
 
 	UFUNCTION(Exec)
+	void LSTestSkillCastGauge(float Duration);
+
+	UFUNCTION(Exec)
 	void LSClearSurvivalProtocolTest();
 
 	UFUNCTION(Exec)

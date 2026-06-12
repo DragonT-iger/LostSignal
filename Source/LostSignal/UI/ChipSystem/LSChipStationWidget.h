@@ -17,6 +17,7 @@ class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
 class ULSMinimapWidget;
 class ULSProtocolWidget;
+class ULSSkillBarWidget;
 class ULSSurvivalStatusWidget;
 class ULSSoundDirectionIndicatorWidget;
 class USlider;
@@ -64,6 +65,7 @@ protected:
 	void InitializeEquipmentSlots();
 	void SetPreviewMinimapNavigationLevels(int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol);
 	void SetPreviewSurvivalStatus(int32 CurrentSurvivalProtocol, int32 PreviousSurvivalProtocol);
+	void SetPreviewBattleProtocol(int32 CurrentBattleProtocol, int32 PreviousBattleProtocol);
 	bool IsPointerInsideChipSlotBorder(FVector2D ScreenPosition) const;
 	float GetSignalGaugePercent() const;
 	int32 GetInactiveSignalSlotCount() const;
@@ -134,6 +136,9 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Survival")
 	TObjectPtr<ULSSurvivalStatusWidget> SurvivalStatus;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
+	TObjectPtr<ULSSkillBarWidget> SkillBar;
 
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly, Category = "LS/UI|Survival")
 	TObjectPtr<ULSSoundDirectionIndicatorWidget> SoundIndicator;
