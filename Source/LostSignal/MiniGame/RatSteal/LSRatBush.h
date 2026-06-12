@@ -9,8 +9,8 @@ class UPaperSpriteComponent;
 class ULSRatYSortComponent;
 
 /**
- * 은신용 부쉬 (15_Mechanic_Stealth).
- * 플레이어 진입 시 Hide(Farmer 추적 해제), 부쉬는 반투명(0.7) 표시.
+ * 은신용 부쉬(15_Mechanic_Stealth).
+ * 플레이어 진입 시 Hide 상태가 되며, 시각 피드백은 플레이어 알파로만 처리한다.
  */
 UCLASS()
 class LOSTSIGNAL_API ALSRatBush : public AActor
@@ -21,6 +21,8 @@ public:
 	ALSRatBush();
 
 protected:
+	virtual void BeginPlay() override;
+
 	UFUNCTION()
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
@@ -38,8 +40,4 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "LS/RatSteal")
 	TObjectPtr<ULSRatYSortComponent> YSort;
-
-	/** 플레이어가 안에 있을 때 부쉬 투명도 (원작 0.7) */
-	UPROPERTY(EditAnywhere, Category = "LS/RatSteal|Balance")
-	float HiddenOpacity = 0.7f;
 };

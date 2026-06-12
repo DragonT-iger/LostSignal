@@ -13,6 +13,7 @@
 부쉬 이탈        Visibility = Visible
 효과             Hide 상태면 Farmer가 감지하지 않음.
                  Chase/Attack 중에도 Hide 감지 시 Patrol로 복귀.
+시각 피드백       부쉬는 불투명 유지, 플레이어만 반투명 처리.
 ```
 
 ## 설계 의도
@@ -26,6 +27,5 @@
 
 ```text
 - 부쉬 안에서 이동/훔치기 가능 여부
-- 은신 중 시각 피드백(반투명 등)
 - 부쉬 개수/배치 → 30_Level_Layout
 ```

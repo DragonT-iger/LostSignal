@@ -43,6 +43,10 @@ def _normalize_asset_path(path: str) -> str:
     return path.replace("\\", "/").rstrip("/")
 
 
+def _normalize_asset_name(name: str) -> str:
+    return name.replace(" ", "_")
+
+
 def _asset_path_for(candidate: ImportCandidate) -> str:
     return f"{candidate.destination_path}/{candidate.asset_name}"
 
@@ -78,7 +82,7 @@ def _collect_candidates() -> list[ImportCandidate]:
             ImportCandidate(
                 source_file=source_file,
                 destination_path=destination_path,
-                asset_name=source_file.stem,
+                asset_name=_normalize_asset_name(source_file.stem),
             )
         )
 

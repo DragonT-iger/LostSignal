@@ -16,6 +16,7 @@ Headless run:
 from __future__ import annotations
 
 import json
+import struct
 import sys
 from pathlib import Path
 
@@ -63,22 +64,48 @@ def load_texture(rel: str) -> unreal.Texture2D | None:
     return tex
 
 
+def load_sound(rel: str):
+    path = f"{ROOT}/Imported/Audio/Sounds/{rel}"
+    sound = unreal.load_asset(path)
+    if not sound:
+        log_error(f"sound not found: {path}")
+    return sound
+
+
 # ---------------------------------------------------------------- sprites
+
+def png_dimensions(rel: str) -> tuple[int, int] | None:
+    path = SOURCE_ROOT / f"{rel}.png"
+    if not path.exists():
+        log_error(f"source png not found: {path}")
+        return None
+
+    with open(path, "rb") as f:
+        header = f.read(24)
+    if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+        log_error(f"invalid png header: {path}")
+        return None
+
+    width, height = struct.unpack(">II", header[16:24])
+    return width, height
+
 
 def create_sprite(name: str, texture: unreal.Texture2D,
                   uv=None, dim=None, folder: str = SPR_ROOT) -> unreal.PaperSprite | None:
     asset_path = f"{folder}/{name}"
     if EAL.does_asset_exist(asset_path):
-        return unreal.load_asset(asset_path)
-    if not texture:
-        return None
+        sprite = unreal.load_asset(asset_path)
+    else:
+        if not texture:
+            return None
 
-    factory = unreal.PaperSpriteFactory()
-    sprite = ASSET_TOOLS.create_asset(name, folder, unreal.PaperSprite, factory)
-    if not sprite:
-        log_error(f"sprite create failed: {asset_path}")
-        FAILED.append(asset_path)
-        return None
+        factory = unreal.PaperSpriteFactory()
+        sprite = ASSET_TOOLS.create_asset(name, folder, unreal.PaperSprite, factory)
+        if not sprite:
+            log_error(f"sprite create failed: {asset_path}")
+            FAILED.append(asset_path)
+            return None
+        CREATED.append(asset_path)
 
     sprite.set_editor_property("source_texture", texture)
     if uv is not None:
@@ -87,7 +114,6 @@ def create_sprite(name: str, texture: unreal.Texture2D,
         sprite.set_editor_property("source_dimension", unreal.Vector2D(dim[0], dim[1]))
     sprite.set_editor_property("pixels_per_unreal_unit", 1.0)
     save(sprite)
-    CREATED.append(asset_path)
     return sprite
 
 
@@ -256,50 +282,12 @@ def add_progress_bar(tree, root, name: str, x: float, y: float, w: float, h: flo
 
 def build_widgets() -> dict[str, object]:
     """Returns widget generated classes by key. Failures are logged and skipped."""
-    classes = {}
-    heart_tex = load_texture("UI/Icon_Heart")
-
-    # HUD
-    try:
-        wbp = create_widget_bp("WBP_RatStealHUD", unreal.LSRatHUDWidget)
-        tree, root = make_canvas_root(wbp)
-        add_text(tree, root, "ScoreText", 1700.0, 30.0, 48, "0")
-        add_text(tree, root, "TimerText", 900.0, 30.0, 48, "3:00")
-        add_progress_bar(tree, root, "FullnessBar", 60.0, 980.0, 400.0, 30.0)
-        add_image(tree, root, "Heart1", 60.0, 900.0, 72.0, 65.0, heart_tex)
-        add_image(tree, root, "Heart2", 145.0, 900.0, 72.0, 65.0, heart_tex)
-        add_image(tree, root, "Heart3", 230.0, 900.0, 72.0, 65.0, heart_tex)
-        save(wbp)
-        classes["hud"] = unreal.load_object(None, f"{UI_ROOT}/WBP_RatStealHUD.WBP_RatStealHUD_C")
-    except Exception as exc:  # noqa: BLE001
-        log_error(f"HUD widget build failed: {exc}")
-
-    # Result
-    try:
-        wbp = create_widget_bp("WBP_RatStealResult", unreal.LSRatResultWidget)
-        tree, root = make_canvas_root(wbp)
-        add_text(tree, root, "ReasonText", 760.0, 300.0, 64)
-        add_text(tree, root, "ScoreText", 820.0, 420.0, 48)
-        add_text(tree, root, "GradeText", 850.0, 510.0, 56)
-        add_text(tree, root, "CountsText", 720.0, 620.0, 36)
-        add_text(tree, root, "HintText", 700.0, 760.0, 28, "Enter / Space : 돌아가기")
-        save(wbp)
-        classes["result"] = unreal.load_object(None, f"{UI_ROOT}/WBP_RatStealResult.WBP_RatStealResult_C")
-    except Exception as exc:  # noqa: BLE001
-        log_error(f"Result widget build failed: {exc}")
-
-    # Pause
-    try:
-        wbp = create_widget_bp("WBP_RatStealPause", unreal.LSRatPauseWidget)
-        tree, root = make_canvas_root(wbp)
-        add_text(tree, root, "PauseTitleText", 830.0, 400.0, 64, "일시정지")
-        add_text(tree, root, "PauseHintText", 760.0, 520.0, 32, "Esc : 계속하기")
-        save(wbp)
-        classes["pause"] = unreal.load_object(None, f"{UI_ROOT}/WBP_RatStealPause.WBP_RatStealPause_C")
-    except Exception as exc:  # noqa: BLE001
-        log_error(f"Pause widget build failed: {exc}")
-
-    return classes
+    # UI는 현재 C++ 폴백 레이아웃을 사용한다. WBP는 아트 패스에서 별도 제작/할당.
+    return {
+        "hud": unreal.LSRatHUDWidget,
+        "result": unreal.LSRatResultWidget,
+        "pause": unreal.LSRatPauseWidget,
+    }
 
 
 # ---------------------------------------------------------------- maps
@@ -319,6 +307,43 @@ def spawn_cls(eas, cls, x: float, z: float, y: float = 0.0):
     return eas.spawn_actor_from_class(cls, unreal.Vector(x, y, z))
 
 
+def find_actor_by_label(eas, label: str):
+    for actor in eas.get_all_level_actors():
+        if actor.get_actor_label() == label:
+            return actor
+    return None
+
+
+def place_actor(actor, x: float, z: float, y: float = 0.0):
+    actor.set_actor_location(unreal.Vector(x, y, z), False, False)
+    return actor
+
+
+def ensure_bp_actor(eas, bp_asset, label: str, x: float, z: float, y: float = 0.0):
+    actor = find_actor_by_label(eas, label)
+    if not actor:
+        actor = spawn_bp(eas, bp_asset, x, z, y)
+        actor.set_actor_label(label)
+    return place_actor(actor, x, z, y)
+
+
+def replace_bp_actor(eas, bp_asset, label: str, x: float, z: float, y: float = 0.0):
+    actor = find_actor_by_label(eas, label)
+    if actor:
+        eas.destroy_actor(actor)
+    actor = spawn_bp(eas, bp_asset, x, z, y)
+    actor.set_actor_label(label)
+    return actor
+
+
+def ensure_cls_actor(eas, cls, label: str, x: float, z: float, y: float = 0.0):
+    actor = find_actor_by_label(eas, label)
+    if not actor:
+        actor = spawn_cls(eas, cls, x, z, y)
+        actor.set_actor_label(label)
+    return place_actor(actor, x, z, y)
+
+
 def set_world_game_mode(ues, gm_class) -> None:
     world = ues.get_editor_world()
     settings = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.WorldSettings)
@@ -332,9 +357,12 @@ def build_map(level_path: str, gm_class, bps: dict, sprites: dict, tutorial: boo
     les, eas, ues = get_subsystems()
 
     if EAL.does_asset_exist(level_path):
-        log(f"map exists, skipping: {level_path}")
-        return
-    if not les.new_level(level_path):
+        if not les.load_level(level_path):
+            log_error(f"load_level failed: {level_path}")
+            FAILED.append(level_path)
+            return
+        log(f"map exists, updating: {level_path}")
+    elif not les.new_level(level_path):
         log_error(f"new_level failed: {level_path}")
         FAILED.append(level_path)
         return
@@ -344,32 +372,30 @@ def build_map(level_path: str, gm_class, bps: dict, sprites: dict, tutorial: boo
     # 배경 (원작 order -200000)
     bg_key = "background_tutorial" if tutorial else "background"
     if sprites.get(bg_key):
-        bg = spawn_cls(eas, unreal.PaperSpriteActor, 0.0, 0.0, y=500.0)
+        bg = ensure_cls_actor(eas, unreal.PaperSpriteActor, "Background", 0.0, 0.0, y=500.0)
         comp = bg.get_editor_property("render_component")
         comp.set_editor_property("source_sprite", sprites[bg_key])
         comp.set_editor_property("translucency_sort_priority", -200000)
-        bg.set_actor_label("Background")
 
-    sm = spawn_bp(eas, bps["spawn_manager"], 0.0, 0.0)
-    sm.set_actor_label("RatSpawnManager")
+    replace_bp_actor(eas, bps["spawn_manager"], "RatSpawnManager", 0.0, 0.0)
 
-    start = spawn_cls(eas, unreal.PlayerStart, 0.0, -300.0)
-    start.set_actor_label("PlayerStart")
+    ensure_cls_actor(eas, unreal.PlayerStart, "PlayerStart", 0.0, 0.0)
 
     if tutorial:
         # 축소판: 제출존 1, 부쉬 1, 농부 1(외곽) — 32_Tutorial
-        spawn_cls(eas, unreal.LSRatSubmissionArea, 3580.0, 0.0).set_actor_label("SubmissionArea_R")
-        spawn_bp(eas, bps["bush"], -100.0, 0.0).set_actor_label("Bush_1")
-        spawn_bp(eas, bps["farmer"], 2400.0, 1500.0).set_actor_label("Farmer_1")
+        ensure_cls_actor(eas, unreal.LSRatSubmissionArea, "SubmissionArea_R", 3580.0, 0.0)
+        ensure_bp_actor(eas, bps["bush"], "Bush_1", -100.0, 0.0)
+        replace_bp_actor(eas, bps["farmer"], "Farmer_1", 2400.0, 1500.0)
     else:
         # 원작 MainScene: 제출존 x=±3580, 부쉬 (-100,0) + 동선용 추가
-        spawn_cls(eas, unreal.LSRatSubmissionArea, 3580.0, 0.0).set_actor_label("SubmissionArea_R")
-        spawn_cls(eas, unreal.LSRatSubmissionArea, -3580.0, 0.0).set_actor_label("SubmissionArea_L")
+        ensure_cls_actor(eas, unreal.LSRatSubmissionArea, "SubmissionArea_R", 3580.0, 0.0)
+        ensure_cls_actor(eas, unreal.LSRatSubmissionArea, "SubmissionArea_L", -3580.0, 0.0)
         for idx, (bx, bz) in enumerate([(-100.0, 0.0), (-1600.0, 900.0), (1600.0, -900.0),
                                         (-2600.0, -1600.0), (2600.0, 1600.0)]):
-            spawn_bp(eas, bps["bush"], bx, bz).set_actor_label(f"Bush_{idx + 1}")
-        for idx, (fx, fz) in enumerate([(1500.0, 700.0), (-1500.0, -700.0)]):
-            spawn_bp(eas, bps["farmer"], fx, fz).set_actor_label(f"Farmer_{idx + 1}")
+            ensure_bp_actor(eas, bps["bush"], f"Bush_{idx + 1}", bx, bz)
+        for idx, (fx, fz) in enumerate([(1500.0, 700.0), (-1500.0, -700.0),
+                                        (1500.0, -700.0), (-1500.0, 700.0)]):
+            replace_bp_actor(eas, bps["farmer"], f"Farmer_{idx + 1}", fx, fz)
 
     les.save_current_level()
     CREATED.append(level_path)
@@ -396,12 +422,18 @@ def main() -> None:
         "eggplantS": "Crops/eggplantS", "eggplantM": "Crops/eggplantM", "eggplantL": "Crops/eggplantL",
         "potatoS": "Crops/potatoS", "potatoM": "Crops/potatoM", "potatoL": "Crops/potatoL",
         "pumpkinS": "Crops/pumpkinS", "pumpkinM": "Crops/pumpkinM", "pumpkinL": "Crops/pumpkinL",
+        "eggplant_item": "Crops/eggplant_item",
+        "potato_item": "Crops/potato_item",
+        "pumpkin_item": "Crops/pumpkin_item",
         "bush": "Ground/bush_1",
         "redCircle": "Farmer/redCircle",
         "background": "Ground/background_test_1",
         "background_tutorial": "Ground/TutorialBackground",
     }
-    sprites = {key: create_sprite(f"SPR_{key}", load_texture(rel)) for key, rel in singles.items()}
+    sprites = {
+        key: create_sprite(f"SPR_{key}", load_texture(rel), dim=png_dimensions(rel))
+        for key, rel in singles.items()
+    }
 
     # 4) 블루프린트 + 에셋 할당
     bps = {}
@@ -415,6 +447,18 @@ def main() -> None:
     set_cdo(player_class, {
         "idle_flipbook": mole_fbs.get("idle"),
         "walk_flipbook": mole_fbs.get("walk"),
+        "steal_flipbook": mole_fbs.get("steal"),
+        "throw_sprites": {
+            unreal.LSRatCropType.EGGPLANT: sprites["eggplant_item"],
+            unreal.LSRatCropType.POTATO: sprites["potato_item"],
+            unreal.LSRatCropType.PUMPKIN: sprites["pumpkin_item"],
+        },
+        "steal_sound": load_sound("SFX/1"),
+        "throw_sound": load_sound("SFX/2"),
+        "hit_sound": load_sound("SFX/3"),
+        "submit_sound": load_sound("UI/1"),
+    }, component_props={
+        "camera": {"ortho_width": 950.0},
     })
     save(bp)
     bps["player"] = bp
@@ -427,6 +471,7 @@ def main() -> None:
         "angry_walk_flipbook": farmer_fbs.get("angrywalk"),
         "attack_flipbook": farmer_fbs.get("attack"),
         "indicator_class": indicator_class,
+        "attack_sound": load_sound("SFX/4"),
     })
     save(bp)
     bps["farmer"] = bp

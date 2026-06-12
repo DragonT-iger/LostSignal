@@ -6,8 +6,10 @@
 #include "LSRatFarmer.generated.h"
 
 class UBoxComponent;
+class UMaterialInterface;
 class UPaperFlipbook;
 class UPaperFlipbookComponent;
+class USoundBase;
 class ULSRatYSortComponent;
 class ALSRatAttackIndicator;
 class ALSRatPlayer;
@@ -40,8 +42,13 @@ protected:
 	void ChangeState(ELSRatFarmerState NewState);
 
 	void CreateIndicators();
+	TArray<FVector2D> PickAttackOffsets() const;
 	void ExecuteAttack();
 	void ClearIndicators();
+	void PlayAttackAnimation();
+	float GetAttackAnimationDuration() const;
+	void PlaySfx(USoundBase* Sound) const;
+	void ApplyRatSpriteMaterial();
 
 	void MoveTowards(const FVector2D& TargetXZ, float DeltaSeconds);
 	void FaceDirection(float DirX);
@@ -58,6 +65,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "LS/RatSteal")
 	TObjectPtr<ULSRatYSortComponent> YSort;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Visual")
+	TObjectPtr<UMaterialInterface> RatSpriteMaterial;
 
 	// ---- 밸런스 (50_Content_Balance, 원작 그대로) ----
 
@@ -111,6 +121,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Anim")
 	TObjectPtr<UPaperFlipbook> AttackFlipbook;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Audio")
+	TObjectPtr<USoundBase> AttackSound;
 
 private:
 	ELSRatFarmerState State = ELSRatFarmerState::Patrol;

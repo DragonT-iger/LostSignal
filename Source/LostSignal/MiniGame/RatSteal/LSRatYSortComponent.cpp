@@ -33,13 +33,12 @@ void ULSRatYSortComponent::Apply()
 		return;
 	}
 
-	const int32 Priority = static_cast<int32>(-Owner->GetActorLocation().Z) + SortOffset;
-
 	TInlineComponentArray<UMeshComponent*> MeshComponents(Owner);
 	for (UMeshComponent* Mesh : MeshComponents)
 	{
 		if (Mesh)
 		{
+			const int32 Priority = FMath::RoundToInt(-Mesh->GetComponentLocation().Z * 10.f) + SortOffset;
 			Mesh->SetTranslucentSortPriority(Priority);
 		}
 	}

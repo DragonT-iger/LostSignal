@@ -73,3 +73,10 @@ Player           → ALSRatPlayer (APawn 또는 ACharacter 경량)
 - 무적: 원작 ivc_T=15(프레임)의 초 변환은 플레이로 미세조정
 - 포만은 코드상 Player 멤버지만 결말이 BabyStarved → "아기 포만"으로 표기 통일(13_Baby)
 ```
+
+## 현재 UE 구현 메모
+
+- 훔치기 성공 시 `StealFlipbook`을 짧게 재생하고, 해당 시간 동안 Idle/Walk 전환이 애니메이션을 덮어쓰지 않는다.
+- 피격 시 `HitFlipbook`을 짧게 재생하고, 해당 시간 동안 Idle/Walk 전환이 애니메이션을 덮어쓰지 않는다.
+- 버리기 성공 시 플레이어의 마지막 이동 방향으로 짧은 대시 보정을 적용한다.
+- 버린 작물은 `ALSRatThrownCrop` 액터로 표시하며, 작물별 스프라이트가 포물선 보간 후 자동 제거된다.

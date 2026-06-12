@@ -9,12 +9,14 @@ ALSRatSpawnManager::ALSRatSpawnManager()
 	PrimaryActorTick.bCanEverTick = true;
 
 	CropClass = ALSRatCrop::StaticClass();
+	PrimaryActorTick.bStartWithTickEnabled = true;
 
 	// 원작 SpawnManager::Awake 기본값
 	FLSRatFarmConfig FarmA;
 	FarmA.Rank = ELSRatFarmRank::RankA;
 	FarmA.HalfExtent = FVector2D(1070.f, 720.f);
 	FarmA.MaxRate = 20;
+	FarmA.InitialSpawnCount = 8;
 	FarmA.SpawnInterval = 3.f;
 	FarmA.GrowSeconds = FVector(5.f, 7.f, 7.f);
 
@@ -22,6 +24,7 @@ ALSRatSpawnManager::ALSRatSpawnManager()
 	FarmB.Rank = ELSRatFarmRank::RankB;
 	FarmB.HalfExtent = FVector2D(2130.f, 1330.f);
 	FarmB.MaxRate = 15;
+	FarmB.InitialSpawnCount = 6;
 	FarmB.SpawnInterval = 4.f;
 	FarmB.GrowSeconds = FVector(5.f, 7.f, 12.f);
 
@@ -29,10 +32,45 @@ ALSRatSpawnManager::ALSRatSpawnManager()
 	FarmC.Rank = ELSRatFarmRank::RankC;
 	FarmC.HalfExtent = FVector2D(3210.f, 2110.f);
 	FarmC.MaxRate = 10;
+	FarmC.InitialSpawnCount = 4;
 	FarmC.SpawnInterval = 5.f;
 	FarmC.GrowSeconds = FVector(5.f, 12.f, 0.f); // C랭크는 M 최대 → M→L 미사용
 
 	Farms = { FarmA, FarmB, FarmC };
+}
+
+void ALSRatSpawnManager::BeginPlay()
+{
+	Super::BeginPlay();
+
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.SetTickFunctionEnable(true);
+	SetActorTickEnabled(true);
+
+	const ALSRatSpawnManager* ClassDefault = GetClass()->GetDefaultObject<ALSRatSpawnManager>();
+	if (ClassDefault && ClassDefault != this)
+	{
+		if (!CropClass && ClassDefault->CropClass)
+		{
+			CropClass = ClassDefault->CropClass;
+		}
+		if (CropVisuals.IsEmpty() && !ClassDefault->CropVisuals.IsEmpty())
+		{
+			CropVisuals = ClassDefault->CropVisuals;
+			UE_LOG(LogLS, Log, TEXT("[RatSteal] SpawnManager %s: 빈 CropVisuals를 클래스 기본값으로 복구"), *GetName());
+		}
+	}
+
+	if (CropVisuals.IsEmpty())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[RatSteal] SpawnManager %s: CropVisuals 비어 있음 — 작물 스폰 불가"), *GetName());
+	}
+	else
+	{
+		UE_LOG(LogLS, Log, TEXT("[RatSteal] SpawnManager %s: CropClass=%s VisualTypes=%d TickEnabled=%d"),
+			*GetName(), *GetNameSafe(CropClass.Get()), CropVisuals.Num(), IsActorTickEnabled());
+		SpawnInitialCrops();
+	}
 }
 
 void ALSRatSpawnManager::Tick(float DeltaSeconds)
@@ -66,6 +104,26 @@ void ALSRatSpawnManager::Tick(float DeltaSeconds)
 		if (ALSRatCrop* NewCrop = SpawnCrop(Farm, InnerHalfExtent))
 		{
 			Farm.Crops.Add(NewCrop);
+		}
+	}
+}
+
+void ALSRatSpawnManager::SpawnInitialCrops()
+{
+	for (int32 Index = 0; Index < Farms.Num(); ++Index)
+	{
+		FLSRatFarmConfig& Farm = Farms[Index];
+		const FVector2D InnerHalfExtent = (Index == 0) ? HomeHalfExtent : Farms[Index - 1].HalfExtent;
+		const int32 TargetCount = FMath::Clamp(Farm.InitialSpawnCount, 0, Farm.MaxRate);
+
+		while (Farm.Crops.Num() < TargetCount)
+		{
+			if (ALSRatCrop* NewCrop = SpawnCrop(Farm, InnerHalfExtent))
+			{
+				Farm.Crops.Add(NewCrop);
+				continue;
+			}
+			break;
 		}
 	}
 }
@@ -110,9 +168,14 @@ ALSRatCrop* ALSRatSpawnManager::SpawnCrop(FLSRatFarmConfig& Farm, const FVector2
 	{
 		Stages = Visuals->StageSprites;
 	}
+	if (!HasRequiredStageSprites(Stages, MaxSize, Type))
+	{
+		Crop->Destroy();
+		return nullptr;
+	}
 
 	Crop->InitCrop(this, Farm.Rank, Type, Farm.GrowSeconds, MaxSize, Stages);
-	UE_LOG(LogLS, Verbose, TEXT("[RatSteal] 작물 스폰 %s rank=%d at (%.0f, %.0f) sprites=%d"),
+	UE_LOG(LogLS, Log, TEXT("[RatSteal] 작물 스폰 %s rank=%d at (%.0f, %.0f) sprites=%d"),
 		*UEnum::GetValueAsString(Type), static_cast<int32>(Farm.Rank),
 		SpawnLocation.X, SpawnLocation.Z, Stages.Num());
 	return Crop;
@@ -161,24 +224,50 @@ bool ALSRatSpawnManager::FindSpawnPoint(const FLSRatFarmConfig& Farm, const FVec
 	return false;
 }
 
+bool ALSRatSpawnManager::HasRequiredStageSprites(const TArray<TObjectPtr<UPaperSprite>>& Stages, ELSRatCropSize MaxSize, ELSRatCropType Type) const
+{
+	const int32 RequiredCount = static_cast<int32>(MaxSize) + 1;
+	if (Stages.Num() < RequiredCount)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[RatSteal] SpawnManager: %s 작물 단계 스프라이트 부족 (필요=%d, 현재=%d)"),
+			*UEnum::GetValueAsString(Type), RequiredCount, Stages.Num());
+		return false;
+	}
+
+	for (int32 Index = 0; Index < RequiredCount; ++Index)
+	{
+		if (!Stages[Index])
+		{
+			UE_LOG(LogLS, Warning, TEXT("[RatSteal] SpawnManager: %s 작물 단계 %d 스프라이트 미할당"),
+				*UEnum::GetValueAsString(Type), Index);
+			return false;
+		}
+	}
+	return true;
+}
+
 ELSRatCropType ALSRatSpawnManager::PickCropType(const FIntVector& Probability) const
 {
 	// 원작 RandomCrop(가지, 감자, 호박) — 매개변수 합이 100이어야 함
 	const int32 EggplantCut = Probability.X;
 	const int32 PotatoCut = EggplantCut + Probability.Y;
 	const int32 PumpkinCut = PotatoCut + Probability.Z;
+	if (PumpkinCut != 100)
+	{
+		return ELSRatCropType::None;
+	}
 
 	const int32 Random = FMath::RandRange(0, 99);
 
-	if (Random <= EggplantCut)
+	if (Random < EggplantCut)
 	{
 		return ELSRatCropType::Eggplant;
 	}
-	if (Random <= PotatoCut)
+	if (Random < PotatoCut)
 	{
 		return ELSRatCropType::Potato;
 	}
-	if (Random <= PumpkinCut)
+	if (Random < PumpkinCut)
 	{
 		return ELSRatCropType::Pumpkin;
 	}

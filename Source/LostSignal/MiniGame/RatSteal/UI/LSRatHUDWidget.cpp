@@ -163,10 +163,18 @@ void ULSRatHUDWidget::BuildBottomPanel(UCanvasPanel* Canvas)
 
 	FullnessBar = WidgetTree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(), TEXT("FullnessBar"));
 	FullnessBar->SetPercent(1.f);
-	FullnessBar->SetFillColorAndOpacity(FLinearColor(1.f, 0.55f, 0.1f));
+	FProgressBarStyle BarStyle;
+	BarStyle.BackgroundImage.TintColor = FSlateColor(FLinearColor::Transparent);
+	BarStyle.FillImage.TintColor = FSlateColor(FLinearColor::White);
+	if (UTexture2D* FillTexture = LoadHUDTexture(TEXT("UI/guage_fill")))
+	{
+		BarStyle.FillImage.SetResourceObject(FillTexture);
+		BarStyle.FillImage.ImageSize = FVector2D(260.f, 26.f);
+	}
+	FullnessBar->SetWidgetStyle(BarStyle);
 	if (UCanvasPanelSlot* PanelSlot = Canvas->AddChildToCanvas(FullnessBar))
 	{
-		PlaceBottom(PanelSlot, 770.f, 880.f, 260.f, 26.f);
+		PlaceBottom(PanelSlot, 770.f, 881.f, 258.f, 24.f);
 	}
 
 	// 하트 x3 (원작 (685/770/855, 980) 72x65)
@@ -337,21 +345,19 @@ void ULSRatHUDWidget::HandleInventoryChanged()
 			Widgets.Frame->SetBrushFromTexture(FrameTex, false);
 		}
 
-		const bool bHasItem = Slots.IsValidIndex(Index) && !Slots[Index].IsEmpty();
-		if (bHasItem)
+		const ELSRatCropType SlotType = Inventory->GetSlotCropType(Index);
+		const bool bHasItem = Slots.IsValidIndex(Index) && Slots[Index].Count > 0;
+		if (UTexture2D* ItemTexture = GetItemTexture(SlotType))
 		{
-			if (UTexture2D* ItemTexture = GetItemTexture(Slots[Index].Type))
-			{
-				Widgets.Item->SetBrushFromTexture(ItemTexture, false);
-			}
+			Widgets.Item->SetBrushFromTexture(ItemTexture, false);
 			Widgets.Item->SetVisibility(ESlateVisibility::Visible);
-			Widgets.Count->SetText(FText::AsNumber(Slots[Index].Count));
+			Widgets.Item->SetColorAndOpacity(FLinearColor::White);
 		}
 		else
 		{
 			Widgets.Item->SetVisibility(ESlateVisibility::Hidden);
-			Widgets.Count->SetText(FText::GetEmpty());
 		}
+		Widgets.Count->SetText(FText::AsNumber(bHasItem ? Slots[Index].Count : 0));
 	}
 }
 

@@ -1,8 +1,11 @@
 #include "MiniGame/RatSteal/LSRatGameMode.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Components/AudioComponent.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
+#include "MiniGame/RatSteal/LSRatFarmer.h"
 #include "MiniGame/RatSteal/LSRatPlayer.h"
 #include "MiniGame/RatSteal/LSRatPlayerController.h"
 #include "MiniGame/RatSteal/LSRatStealSubsystem.h"
@@ -45,6 +48,7 @@ void ALSRatGameMode::BeginPlay()
 	}
 
 	SetPhase(ELSRatPhase::Ready);
+	StartBgm();
 }
 
 void ALSRatGameMode::Tick(float DeltaSeconds)
@@ -62,6 +66,8 @@ void ALSRatGameMode::Tick(float DeltaSeconds)
 		break;
 
 	case ELSRatPhase::Playing:
+		UpdateBgmByFarmerState();
+
 		if (bTimerEnabled)
 		{
 			RemainingTime -= DeltaSeconds;
@@ -123,6 +129,7 @@ void ALSRatGameMode::EndGame(ELSRatEndReason Reason)
 	}
 
 	SetPhase(ELSRatPhase::End);
+	StopBgm();
 
 	FLSRatResult Result;
 	Result.EndReason = Reason;
@@ -235,4 +242,80 @@ int32 ALSRatGameMode::ComputeStars(int32 Score) const
 		}
 	}
 	return Stars;
+}
+
+void ALSRatGameMode::StartBgm()
+{
+	PlayBgm(BgmSound);
+}
+
+void ALSRatGameMode::PlayBgm(USoundBase* Sound)
+{
+	if (!Sound || CurrentBgmSound == Sound)
+	{
+		return;
+	}
+
+	StopBgm();
+	CurrentBgmSound = Sound;
+	BgmAudioComponent = UGameplayStatics::SpawnSound2D(this, Sound, BgmVolume, 1.f, 0.f, nullptr, true, false);
+	if (BgmAudioComponent)
+	{
+		BgmAudioComponent->OnAudioFinished.AddDynamic(this, &ALSRatGameMode::HandleBgmFinished);
+	}
+}
+
+void ALSRatGameMode::StopBgm()
+{
+	if (BgmAudioComponent)
+	{
+		BgmAudioComponent->Stop();
+		BgmAudioComponent = nullptr;
+	}
+	CurrentBgmSound = nullptr;
+}
+
+void ALSRatGameMode::HandleBgmFinished()
+{
+	USoundBase* FinishedSound = CurrentBgmSound;
+	BgmAudioComponent = nullptr;
+	CurrentBgmSound = nullptr;
+	if (Phase != ELSRatPhase::End)
+	{
+		PlayBgm(FinishedSound);
+	}
+}
+
+void ALSRatGameMode::UpdateBgmByFarmerState()
+{
+	USoundBase* DesiredBgm = ShouldUseFarmerNearBgm() && FarmerNearBgmSound ? FarmerNearBgmSound : BgmSound;
+	PlayBgm(DesiredBgm);
+}
+
+bool ALSRatGameMode::ShouldUseFarmerNearBgm() const
+{
+	const APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!PlayerPawn)
+	{
+		return false;
+	}
+
+	const FVector PlayerLocation = PlayerPawn->GetActorLocation();
+	for (TActorIterator<ALSRatFarmer> It(GetWorld()); It; ++It)
+	{
+		const ALSRatFarmer* Farmer = *It;
+		if (!Farmer)
+		{
+			continue;
+		}
+
+		if (Farmer->GetFarmerState() == ELSRatFarmerState::Chase ||
+			Farmer->GetFarmerState() == ELSRatFarmerState::Attack ||
+			FVector::DistSquared(Farmer->GetActorLocation(), PlayerLocation) <= FMath::Square(FarmerNearBgmDistance))
+		{
+			return true;
+		}
+	}
+
+	return false;
 }

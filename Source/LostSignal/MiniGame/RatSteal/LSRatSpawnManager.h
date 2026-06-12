@@ -36,6 +36,9 @@ struct FLSRatFarmConfig
 	UPROPERTY(EditAnywhere, Category = "LS/RatSteal")
 	int32 MaxRate = 20;
 
+	UPROPERTY(EditAnywhere, Category = "LS/RatSteal")
+	int32 InitialSpawnCount = 8;
+
 	/** 스폰 간격 초 (원작 spawnTime: A3 / B4 / C5) */
 	UPROPERTY(EditAnywhere, Category = "LS/RatSteal")
 	float SpawnInterval = 3.f;
@@ -73,8 +76,12 @@ public:
 	void NotifyCropRemoved(ALSRatCrop* Crop);
 
 protected:
+	virtual void BeginPlay() override;
+
 	ALSRatCrop* SpawnCrop(FLSRatFarmConfig& Farm, const FVector2D& InnerHalfExtent);
+	void SpawnInitialCrops();
 	bool FindSpawnPoint(const FLSRatFarmConfig& Farm, const FVector2D& InnerHalfExtent, FVector2D& OutPoint) const;
+	bool HasRequiredStageSprites(const TArray<TObjectPtr<UPaperSprite>>& Stages, ELSRatCropSize MaxSize, ELSRatCropType Type) const;
 	ELSRatCropType PickCropType(const FIntVector& Probability) const;
 
 	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal")

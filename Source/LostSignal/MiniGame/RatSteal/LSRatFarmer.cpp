@@ -2,10 +2,13 @@
 
 #include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "LostSignal.h"
+#include "Materials/MaterialInterface.h"
 #include "MiniGame/RatSteal/LSRatAttackIndicator.h"
 #include "MiniGame/RatSteal/LSRatGameMode.h"
 #include "MiniGame/RatSteal/LSRatPlayer.h"
 #include "MiniGame/RatSteal/LSRatYSortComponent.h"
+#include "PaperFlipbook.h"
 #include "PaperFlipbookComponent.h"
 
 ALSRatFarmer::ALSRatFarmer()
@@ -24,10 +27,13 @@ ALSRatFarmer::ALSRatFarmer()
 	Sprite = CreateDefaultSubobject<UPaperFlipbookComponent>(TEXT("Sprite"));
 	Sprite->SetupAttachment(CollisionBox);
 	Sprite->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Sprite->SetRelativeLocation(FVector(0.f, -4.f, 0.f));
 	// 원작 스케일 0.35
 	Sprite->SetRelativeScale3D(FVector(0.35f, 1.f, 0.35f));
+	ApplyRatSpriteMaterial();
 
 	YSort = CreateDefaultSubobject<ULSRatYSortComponent>(TEXT("YSort"));
+	YSort->SortOffset = 30;
 
 	IndicatorClass = ALSRatAttackIndicator::StaticClass();
 }
@@ -36,8 +42,42 @@ void ALSRatFarmer::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (YSort)
+	{
+		YSort->SortOffset = 30;
+	}
+
+	if (Sprite)
+	{
+		Sprite->SetRelativeLocation(FVector(0.f, -4.f, 0.f));
+		ApplyRatSpriteMaterial();
+	}
+
+	const ALSRatFarmer* ClassDefault = GetClass()->GetDefaultObject<ALSRatFarmer>();
+	if (ClassDefault && ClassDefault != this)
+	{
+		if (!IdleFlipbook) { IdleFlipbook = ClassDefault->IdleFlipbook; }
+		if (!AngryIdleFlipbook) { AngryIdleFlipbook = ClassDefault->AngryIdleFlipbook; }
+		if (!WalkFlipbook) { WalkFlipbook = ClassDefault->WalkFlipbook; }
+		if (!AngryWalkFlipbook) { AngryWalkFlipbook = ClassDefault->AngryWalkFlipbook; }
+		if (!AttackFlipbook) { AttackFlipbook = ClassDefault->AttackFlipbook; }
+		if (!IndicatorClass) { IndicatorClass = ClassDefault->IndicatorClass; }
+	}
+
 	InitialPosition = GetXZ(GetActorLocation());
 	SetFlipbookSafe(IdleFlipbook);
+
+	if (!IdleFlipbook || !AngryIdleFlipbook || !WalkFlipbook || !AngryWalkFlipbook || !AttackFlipbook)
+	{
+		UE_LOG(LogLS, Warning,
+			TEXT("[RatSteal] Farmer %s 플립북 미할당: Idle=%s AngryIdle=%s Walk=%s AngryWalk=%s Attack=%s"),
+			*GetName(),
+			*GetNameSafe(IdleFlipbook.Get()),
+			*GetNameSafe(AngryIdleFlipbook.Get()),
+			*GetNameSafe(WalkFlipbook.Get()),
+			*GetNameSafe(AngryWalkFlipbook.Get()),
+			*GetNameSafe(AttackFlipbook.Get()));
+	}
 }
 
 void ALSRatFarmer::Tick(float DeltaSeconds)
@@ -183,8 +223,7 @@ void ALSRatFarmer::DoAttack(float DeltaSeconds)
 		if (AttackTimer >= AttackDelay)
 		{
 			ExecuteAttack();
-			SetFlipbookSafe(AttackFlipbook);
-			AttackAnimRemaining = AttackAnimDuration;
+			PlayAttackAnimation();
 		}
 	}
 }
@@ -203,7 +242,7 @@ void ALSRatFarmer::CreateIndicators()
 	}
 
 	// 원작 오프셋: {0,0}, {0,+attackRadius}, {0,-attackRadius} (세로 십자형)
-	const FVector2D Offsets[] = { FVector2D(0.f, 0.f), FVector2D(0.f, AttackRadius), FVector2D(0.f, -AttackRadius) };
+	const TArray<FVector2D> Offsets = PickAttackOffsets();
 	const FVector PlayerLocation = Player->GetActorLocation();
 
 	for (const FVector2D& Offset : Offsets)
@@ -215,6 +254,26 @@ void ALSRatFarmer::CreateIndicators()
 		{
 			Indicators.Add(Indicator);
 		}
+	}
+}
+
+TArray<FVector2D> ALSRatFarmer::PickAttackOffsets() const
+{
+	const float R = AttackRadius;
+	const int32 PatternIndex = FMath::RandRange(0, 4);
+
+	switch (PatternIndex)
+	{
+	case 0:
+		return { FVector2D(0.f, 0.f), FVector2D(0.f, R), FVector2D(0.f, -R) };
+	case 1:
+		return { FVector2D(0.f, 0.f), FVector2D(R, 0.f), FVector2D(-R, 0.f) };
+	case 2:
+		return { FVector2D(0.f, 0.f), FVector2D(R, 0.f), FVector2D(-R, 0.f), FVector2D(0.f, R), FVector2D(0.f, -R) };
+	case 3:
+		return { FVector2D(0.f, 0.f), FVector2D(R, R), FVector2D(-R, R), FVector2D(R, -R), FVector2D(-R, -R) };
+	default:
+		return { FVector2D(0.f, 0.f), FVector2D(R, R), FVector2D(-R, -R) };
 	}
 }
 
@@ -236,6 +295,62 @@ void ALSRatFarmer::ExecuteAttack()
 	}
 
 	ClearIndicators();
+}
+
+void ALSRatFarmer::PlayAttackAnimation()
+{
+	if (!Sprite || !AttackFlipbook)
+	{
+		AttackAnimRemaining = AttackAnimDuration;
+		return;
+	}
+
+	Sprite->SetLooping(false);
+	Sprite->SetFlipbook(AttackFlipbook);
+	Sprite->PlayFromStart();
+	PlaySfx(AttackSound);
+	AttackAnimRemaining = GetAttackAnimationDuration();
+}
+
+float ALSRatFarmer::GetAttackAnimationDuration() const
+{
+	if (AttackFlipbook)
+	{
+		return FMath::Max(AttackFlipbook->GetTotalDuration(), AttackAnimDuration);
+	}
+	return AttackAnimDuration;
+}
+
+void ALSRatFarmer::PlaySfx(USoundBase* Sound) const
+{
+	if (Sound)
+	{
+		UGameplayStatics::PlaySound2D(this, Sound);
+	}
+}
+
+void ALSRatFarmer::ApplyRatSpriteMaterial()
+{
+	if (!Sprite)
+	{
+		return;
+	}
+
+	if (!RatSpriteMaterial)
+	{
+		RatSpriteMaterial = LoadObject<UMaterialInterface>(
+			nullptr,
+			TEXT("/Paper2D/TranslucentUnlitSpriteMaterial.TranslucentUnlitSpriteMaterial"));
+	}
+
+	if (RatSpriteMaterial)
+	{
+		Sprite->SetMaterial(0, RatSpriteMaterial);
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("[RatSteal] RatSpriteMaterial missing. Farmer sprite may be affected by scene lighting."));
+	}
 }
 
 void ALSRatFarmer::ClearIndicators()
@@ -293,8 +408,20 @@ void ALSRatFarmer::FaceDirection(float DirX)
 
 void ALSRatFarmer::SetFlipbookSafe(UPaperFlipbook* Flipbook)
 {
-	if (Sprite && Flipbook && Sprite->GetFlipbook() != Flipbook)
+	if (!Sprite || !Flipbook)
+	{
+		return;
+	}
+
+	const bool bChanged = Sprite->GetFlipbook() != Flipbook;
+	Sprite->SetLooping(true);
+	if (bChanged)
 	{
 		Sprite->SetFlipbook(Flipbook);
+		Sprite->PlayFromStart();
+	}
+	else if (!Sprite->IsPlaying())
+	{
+		Sprite->Play();
 	}
 }

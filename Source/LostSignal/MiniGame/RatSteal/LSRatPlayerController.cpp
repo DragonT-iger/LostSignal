@@ -85,12 +85,12 @@ void ALSRatPlayerController::BuildDefaultInputAssets()
 	};
 
 	// X=좌우, Y=상하 (Swizzle로 키 입력을 Y축으로)
-	MapMoveKey(EKeys::D, false, false);
-	MapMoveKey(EKeys::A, false, true);
+	MapMoveKey(EKeys::D, false, true);
+	MapMoveKey(EKeys::A, false, false);
 	MapMoveKey(EKeys::W, true, false);
 	MapMoveKey(EKeys::S, true, true);
-	MapMoveKey(EKeys::Right, false, false);
-	MapMoveKey(EKeys::Left, false, true);
+	MapMoveKey(EKeys::Right, false, true);
+	MapMoveKey(EKeys::Left, false, false);
 	MapMoveKey(EKeys::Up, true, false);
 	MapMoveKey(EKeys::Down, true, true);
 
@@ -138,10 +138,10 @@ void ALSRatPlayerController::HandleThrow(const FInputActionValue& Value)
 		return;
 	}
 
-	const ALSRatPlayer* RatPlayer = Cast<ALSRatPlayer>(GetPawn());
-	if (RatPlayer && RatPlayer->GetInventory())
+	ALSRatPlayer* RatPlayer = Cast<ALSRatPlayer>(GetPawn());
+	if (RatPlayer)
 	{
-		RatPlayer->GetInventory()->ThrowItem();
+		RatPlayer->TryThrowItem();
 		LastThrowTime = Now;
 	}
 }

@@ -8,6 +8,8 @@
 class ULSRatHUDWidget;
 class ULSRatPauseWidget;
 class ULSRatResultWidget;
+class UAudioComponent;
+class USoundBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FLSRatOnScoreChanged, int32, TotalScore, int32, DeltaScore);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLSRatOnPhaseChanged, ELSRatPhase, NewPhase);
@@ -66,6 +68,14 @@ public:
 protected:
 	void SetPhase(ELSRatPhase NewPhase);
 	int32 ComputeStars(int32 Score) const;
+	void StartBgm();
+	void PlayBgm(USoundBase* Sound);
+	void StopBgm();
+	void UpdateBgmByFarmerState();
+	bool ShouldUseFarmerNearBgm() const;
+
+	UFUNCTION()
+	void HandleBgmFinished();
 
 	/** 제한 시간 3분 (50_Content_Balance 확정) */
 	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Balance", meta = (ClampMin = 1))
@@ -96,6 +106,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|UI")
 	TSubclassOf<ULSRatPauseWidget> PauseWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Audio")
+	TObjectPtr<USoundBase> BgmSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Audio")
+	TObjectPtr<USoundBase> FarmerNearBgmSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Audio", meta = (ClampMin = 0.0, ClampMax = 1.0))
+	float BgmVolume = 0.45f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Audio", meta = (ClampMin = 0.0))
+	float FarmerNearBgmDistance = 650.f;
+
 	UPROPERTY()
 	TObjectPtr<ULSRatHUDWidget> HUDWidget;
 
@@ -104,6 +126,12 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<ULSRatPauseWidget> PauseWidget;
+
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> BgmAudioComponent;
+
+	UPROPERTY()
+	TObjectPtr<USoundBase> CurrentBgmSound;
 
 private:
 	ELSRatPhase Phase = ELSRatPhase::Ready;

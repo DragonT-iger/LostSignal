@@ -70,6 +70,7 @@ Rank_C   최대 성장 M까지 (저급 밭)
 ```text
 Crop         → ALSRatCrop (AActor)
 성장         → 타이머/누적시간 → 단계별 UPaperSprite 교체
+표시 크기     → 단계별 Visual Scale을 함께 조정해 Born/S/M/L 성장감을 보강
 콜라이더     → UBoxComponent (S 단계부터 활성)
 종류/랭크/크기 → FLSRatCropRow (DataTable) 또는 데이터 에셋
 이펙트       → UPaperFlipbook(반짝임) 자식

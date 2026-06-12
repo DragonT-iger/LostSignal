@@ -48,6 +48,14 @@ Content/LostSignal/MiniGame/RatSteal/
 BGM / 발걸음 / 훔치기 / 제출 / 농부 공격 / 패배·승리 등 (목록화 필요)
 ```
 
+## 현재 UE 오디오 연결 메모
+
+- 원본 `PlayerSound`는 걷기 발소리만 구현되어 있고, `Action::Hit`/`Steal` 사운드는 비어 있다. 원본 메인 씬 BGM 호출도 주석 상태다.
+- `ALSRatGameMode`는 `BgmSound`가 지정되어 있을 때만 BGM을 재생한다. 코드에서 숫자형 BGM 에셋을 임의로 자동 선택하지 않는다.
+- `ALSRatGameMode`는 플레이어가 농부 근처에 있거나 농부가 Chase/Attack 상태일 때 `FarmerNearBgmSound`가 지정되어 있으면 그 사운드로 전환한다.
+- `ALSRatPlayer`는 `HitSound`가 지정되어 있으면 해당 사운드를 재생하고, 비어 있으면 임포트된 `Imported/Audio/Sounds/SFX/18`을 기본 후보로 사용한다.
+- 숫자형 원본 사운드의 정확한 의미 목록은 아직 미정이므로, 아트/기획 패스에서 BP 기본값으로 최종 사운드를 지정한다.
+
 ## 데이터 (원작 CSV/JSON → C++ 기본값/에디터 설정)
 
 ```text

@@ -30,7 +30,7 @@ public:
 
 	/** 현재 슬롯 카운트 1 감소 (C키, 버리기 → 즉시 가속) */
 	UFUNCTION(BlueprintCallable, Category = "LS/RatSteal")
-	void ThrowItem();
+	bool ThrowItem();
 
 	/** 제출: 전 슬롯 데이터 반환 후 비움 (원작 SubMissonItem) */
 	UFUNCTION(BlueprintCallable, Category = "LS/RatSteal")
@@ -49,11 +49,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "LS/RatSteal")
 	int32 GetCurrentSlotIndex() const { return CurrentSlotIndex; }
 
+	UFUNCTION(BlueprintPure, Category = "LS/RatSteal")
+	ELSRatCropType GetSlotCropType(int32 SlotIndex) const;
+
+	UFUNCTION(BlueprintPure, Category = "LS/RatSteal")
+	ELSRatCropType GetCurrentSlotCropType() const { return GetSlotCropType(CurrentSlotIndex); }
+
 	UPROPERTY(BlueprintAssignable, Category = "LS/RatSteal")
 	FLSRatOnInventoryChanged OnInventoryChanged;
 
 private:
 	/** 1카운트당 감속률 (원작: 감자0.01/가지0.02/호박0.03, 복리) */
+	void ResetFixedSlots();
+	int32 GetSlotIndexForType(ELSRatCropType Type) const;
+
 	UPROPERTY(EditAnywhere, Category = "LS/RatSteal|Balance")
 	float PotatoBonus = 0.01f;
 

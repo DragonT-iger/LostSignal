@@ -5,6 +5,7 @@
 #include "MiniGame/RatSteal/LSRatSpawnManager.h"
 #include "MiniGame/RatSteal/LSRatYSortComponent.h"
 #include "PaperFlipbookComponent.h"
+#include "PaperSprite.h"
 #include "PaperSpriteComponent.h"
 
 ALSRatCrop::ALSRatCrop()
@@ -23,12 +24,14 @@ ALSRatCrop::ALSRatCrop()
 	Sprite = CreateDefaultSubobject<UPaperSpriteComponent>(TEXT("Sprite"));
 	Sprite->SetupAttachment(CollisionBox);
 	Sprite->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Sprite->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
 	// 원작 작물 스케일 0.2 (512px 원본 → 약 102px)
 	Sprite->SetRelativeScale3D(FVector(0.2f, 1.f, 0.2f));
 
 	SparkleEffect = CreateDefaultSubobject<UPaperFlipbookComponent>(TEXT("SparkleEffect"));
 	SparkleEffect->SetupAttachment(CollisionBox);
 	SparkleEffect->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SparkleEffect->SetRelativeLocation(FVector(0.f, -2.f, 0.f));
 	SparkleEffect->SetRelativeScale3D(FVector(0.2f, 1.f, 0.2f));
 	SparkleEffect->SetVisibility(false);
 
@@ -47,6 +50,14 @@ void ALSRatCrop::InitCrop(ALSRatSpawnManager* InSpawnManager, ELSRatFarmRank InR
 	Stages = StageSprites;
 
 	SetStage(ELSRatCropSize::Born);
+	if (Sprite)
+	{
+		Sprite->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
+	}
+	if (SparkleEffect)
+	{
+		SparkleEffect->SetRelativeLocation(FVector(0.f, -2.f, 0.f));
+	}
 	bInitialized = true;
 }
 
@@ -82,9 +93,21 @@ void ALSRatCrop::SetStage(ELSRatCropSize NewSize)
 	Size = NewSize;
 
 	const int32 StageIndex = static_cast<int32>(Size);
+	const float StageScale = StageScales[StageIndex];
+	if (Sprite)
+	{
+		Sprite->SetRelativeScale3D(FVector(StageScale, 1.f, StageScale));
+	}
+
 	if (Sprite && Stages.IsValidIndex(StageIndex) && Stages[StageIndex])
 	{
 		Sprite->SetSprite(Stages[StageIndex]);
+		const FVector2D SourceSize = Stages[StageIndex]->GetSourceSize();
+		if (SourceSize.IsNearlyZero())
+		{
+			UE_LOG(LogLS, Warning, TEXT("[RatSteal] 작물 %s 단계 %d 스프라이트 source size 0x0: %s"),
+				*GetName(), StageIndex, *GetNameSafe(Stages[StageIndex]));
+		}
 	}
 	else
 	{
@@ -99,6 +122,11 @@ void ALSRatCrop::SetStage(ELSRatCropSize NewSize)
 
 	if (Size == ELSRatCropSize::L && SparkleEffect)
 	{
+		SparkleEffect->SetRelativeScale3D(FVector(StageScale, 1.f, StageScale));
+		if (!SparkleEffect->GetFlipbook())
+		{
+			UE_LOG(LogLS, Warning, TEXT("[RatSteal] 작물 %s SparkleEffect 플립북 미할당"), *GetName());
+		}
 		SparkleEffect->SetVisibility(true);
 		SparkleEffect->Play();
 	}

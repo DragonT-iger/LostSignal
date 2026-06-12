@@ -7,11 +7,15 @@
 
 class UBoxComponent;
 class UCameraComponent;
+class UMaterialInterface;
 class UPaperFlipbook;
 class UPaperFlipbookComponent;
+class UPaperSprite;
+class USoundBase;
 class USpringArmComponent;
 class ULSRatInventoryComponent;
 class ULSRatYSortComponent;
+class ALSRatThrownCrop;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLSRatOnHpChanged, int32, NewHp);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FLSRatOnFullnessChanged, float, Fullness, float, MaxFullness);
@@ -37,6 +41,9 @@ public:
 	/** Z키: 겹친 작물 중 가장 가까운 것 훔치기 (03_Controls) */
 	UFUNCTION(BlueprintCallable, Category = "LS/RatSteal")
 	void TrySteal();
+
+	UFUNCTION(BlueprintCallable, Category = "LS/RatSteal")
+	void TryThrowItem();
 
 	/** 제출존 진입 시: 인벤토리 정산 → 점수 → FeedBaby(점수) */
 	UFUNCTION(BlueprintCallable, Category = "LS/RatSteal")
@@ -83,8 +90,15 @@ protected:
 
 	void TickFullness(float DeltaSeconds);
 	void TickMovement(float DeltaSeconds);
+	void TickThrowDash(float DeltaSeconds);
+	void FaceHorizontalInput(float InputX);
+	void PlayStealAnimation();
+	void PlayHitAnimation();
+	void SpawnThrownCropVisual(ELSRatCropType Type);
+	void PlaySfx(USoundBase* Sound) const;
 	void FeedBaby(float Amount);
 	void Die();
+	void ApplyRatSpriteMaterial();
 
 	UPROPERTY(VisibleAnywhere, Category = "LS/RatSteal")
 	TObjectPtr<UBoxComponent> CollisionBox;
@@ -103,6 +117,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "LS/RatSteal")
 	TObjectPtr<ULSRatYSortComponent> YSort;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Visual")
+	TObjectPtr<UMaterialInterface> RatSpriteMaterial;
 
 	// ---- 밸런스 (50_Content_Balance, 원작 그대로) ----
 
@@ -141,12 +158,60 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Anim")
 	TObjectPtr<UPaperFlipbook> WalkFlipbook;
 
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Anim")
+	TObjectPtr<UPaperFlipbook> StealFlipbook;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Anim")
+	float StealAnimDuration = 0.35f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Anim")
+	TObjectPtr<UPaperFlipbook> HitFlipbook;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Anim")
+	float HitAnimDuration = 0.65f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Visual")
+	TMap<ELSRatCropType, TObjectPtr<UPaperSprite>> ThrowSprites;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Visual")
+	TSubclassOf<ALSRatThrownCrop> ThrownCropClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Balance")
+	float ThrowDashDuration = 0.12f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Balance")
+	float ThrowDashSpeed = 900.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Visual", meta = (ClampMin = 0.0, ClampMax = 1.0))
+	float HiddenOpacity = 0.55f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Audio")
+	TObjectPtr<USoundBase> StealSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Audio")
+	TObjectPtr<USoundBase> ThrowSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Audio")
+	TObjectPtr<USoundBase> HitSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Audio")
+	TObjectPtr<USoundBase> SubmitSound;
+
 private:
+	void ApplyRatCameraPostProcess();
+	void ApplyCameraBounds();
+	void ResolveDefaultAssets();
+
 	FVector2D MoveInput = FVector2D::ZeroVector;
+	FVector LastMoveDirection = FVector(1.f, 0.f, 0.f);
+	FVector ThrowDashDirection = FVector::ZeroVector;
 
 	int32 Hp = 3;
 	float Fullness = 1000.f;
 	float FullnessElapsed = 0.f;
 	float InvincibleRemaining = 0.f;
+	float StealAnimRemaining = 0.f;
+	float HitAnimRemaining = 0.f;
+	float ThrowDashRemaining = 0.f;
 	int32 BushOverlapCount = 0;
 };

@@ -4,6 +4,7 @@ ULSRatInventoryComponent::ULSRatInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	Slots.SetNum(3);
+	ResetFixedSlots();
 }
 
 void ULSRatInventoryComponent::AddCrop(ELSRatCropType Type, ELSRatCropSize Size)
@@ -13,56 +14,52 @@ void ULSRatInventoryComponent::AddCrop(ELSRatCropType Type, ELSRatCropSize Size)
 		return;
 	}
 
-	if (Slots.Num() != SlotNum)
-	{
-		Slots.SetNum(SlotNum);
-	}
+	ResetFixedSlots();
 
-	// 원작 Inventory::AddCrop — 순서대로 "빈 슬롯 또는 같은 종류" 첫 슬롯에 적재
-	for (FLSRatSlotData& Slot : Slots)
-	{
-		if (Slot.IsEmpty() || Slot.Type == Type)
-		{
-			Slot.Type = Type;
-			Slot.Count += LSRat::GetCountForSize(Size);
-			OnInventoryChanged.Broadcast();
-			return;
-		}
-	}
-}
-
-void ULSRatInventoryComponent::ChangeSlot()
-{
-	CurrentSlotIndex = (CurrentSlotIndex + 1) % FMath::Max(1, Slots.Num());
-	OnInventoryChanged.Broadcast();
-}
-
-void ULSRatInventoryComponent::ThrowItem()
-{
-	if (!Slots.IsValidIndex(CurrentSlotIndex))
+	const int32 SlotIndex = GetSlotIndexForType(Type);
+	if (!Slots.IsValidIndex(SlotIndex))
 	{
 		return;
 	}
 
-	FLSRatSlotData& Slot = Slots[CurrentSlotIndex];
-	if (Slot.Count > 0)
+	Slots[SlotIndex].Count += LSRat::GetCountForSize(Size);
+	OnInventoryChanged.Broadcast();
+}
+
+void ULSRatInventoryComponent::ChangeSlot()
+{
+	ResetFixedSlots();
+	CurrentSlotIndex = (CurrentSlotIndex + 1) % FMath::Max(1, Slots.Num());
+	OnInventoryChanged.Broadcast();
+}
+
+bool ULSRatInventoryComponent::ThrowItem()
+{
+	ResetFixedSlots();
+	if (!Slots.IsValidIndex(CurrentSlotIndex))
 	{
-		Slot.Count--;
-		if (Slot.Count == 0)
-		{
-			Slot.Reset();
-		}
-		OnInventoryChanged.Broadcast();
+		return false;
 	}
+
+	FLSRatSlotData& Slot = Slots[CurrentSlotIndex];
+	if (Slot.Count <= 0)
+	{
+		return false;
+	}
+
+	Slot.Count--;
+	OnInventoryChanged.Broadcast();
+	return true;
 }
 
 TArray<FLSRatSlotData> ULSRatInventoryComponent::SubmitAll()
 {
+	ResetFixedSlots();
 	TArray<FLSRatSlotData> Datas = Slots;
 
 	for (FLSRatSlotData& Slot : Slots)
 	{
-		Slot.Reset();
+		Slot.Count = 0;
 	}
 	OnInventoryChanged.Broadcast();
 
@@ -77,7 +74,7 @@ float ULSRatInventoryComponent::GetSpeedMultiplier() const
 
 	for (const FLSRatSlotData& Slot : Slots)
 	{
-		if (Slot.IsEmpty())
+		if (Slot.Count <= 0)
 		{
 			continue;
 		}
@@ -97,4 +94,43 @@ float ULSRatInventoryComponent::GetSpeedMultiplier() const
 	Mult *= FMath::Pow(1.0 + PumpkinBonus, static_cast<double>(Pumpkin));
 
 	return static_cast<float>(Mult);
+}
+
+ELSRatCropType ULSRatInventoryComponent::GetSlotCropType(int32 SlotIndex) const
+{
+	switch (SlotIndex)
+	{
+	case 0:  return ELSRatCropType::Eggplant;
+	case 1:  return ELSRatCropType::Potato;
+	case 2:  return ELSRatCropType::Pumpkin;
+	default: return ELSRatCropType::None;
+	}
+}
+
+void ULSRatInventoryComponent::ResetFixedSlots()
+{
+	SlotNum = 3;
+	if (Slots.Num() != SlotNum)
+	{
+		Slots.SetNum(SlotNum);
+	}
+
+	for (int32 Index = 0; Index < Slots.Num(); ++Index)
+	{
+		Slots[Index].Type = GetSlotCropType(Index);
+		Slots[Index].Count = FMath::Max(0, Slots[Index].Count);
+	}
+
+	CurrentSlotIndex = FMath::Clamp(CurrentSlotIndex, 0, FMath::Max(0, Slots.Num() - 1));
+}
+
+int32 ULSRatInventoryComponent::GetSlotIndexForType(ELSRatCropType Type) const
+{
+	switch (Type)
+	{
+	case ELSRatCropType::Eggplant: return 0;
+	case ELSRatCropType::Potato:   return 1;
+	case ELSRatCropType::Pumpkin:  return 2;
+	default:                       return INDEX_NONE;
+	}
 }

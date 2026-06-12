@@ -63,6 +63,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "LS/RatSteal")
 	TObjectPtr<ULSRatYSortComponent> YSort;
 
+	/** 단계별 표시 스케일. 스프라이트 원본이 같은 512 기준이라 성장감 보정용으로 함께 키운다. */
+	UPROPERTY(EditDefaultsOnly, Category = "LS/RatSteal|Visual")
+	FVector4f StageScales = FVector4f(0.15f, 0.20f, 0.25f, 0.30f);
+
 private:
 	UPROPERTY()
 	TObjectPtr<ALSRatSpawnManager> SpawnManager;
