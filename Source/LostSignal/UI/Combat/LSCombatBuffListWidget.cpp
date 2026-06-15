@@ -57,7 +57,14 @@ void ULSCombatBuffListWidget::RefreshBuffList()
 	BuildBuffDisplays(Displays);
 	if (Displays.IsEmpty())
 	{
-		SetVisibility(ESlateVisibility::Collapsed);
+		SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		for (ULSCombatBuffIconWidget* IconWidget : BuffIconPool)
+		{
+			if (IconWidget)
+			{
+				IconWidget->SetVisibility(ESlateVisibility::Collapsed);
+			}
+		}
 		return;
 	}
 
@@ -101,9 +108,20 @@ void ULSCombatBuffListWidget::BuildBuffDisplays(TArray<FLSCombatBuffDisplayData>
 		FGameplayTagContainer QueryTags;
 		QueryTags.AddTag(BuffTag);
 
-		const FGameplayEffectQuery Query = FGameplayEffectQuery::MakeQuery_MatchAllOwningTags(QueryTags);
-		for (const FActiveGameplayEffectHandle& Handle : ASC->GetActiveEffects(Query))
+		TArray<FActiveGameplayEffectHandle> Handles = ASC->GetActiveEffects(FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(QueryTags));
+		Handles.Append(ASC->GetActiveEffects(FGameplayEffectQuery::MakeQuery_MatchAnyEffectTags(QueryTags)));
+		Handles.Append(ASC->GetActiveEffects(FGameplayEffectQuery::MakeQuery_MatchAnySourceSpecTags(QueryTags)));
+
+		TSet<FActiveGameplayEffectHandle> UniqueHandles;
+		for (const FActiveGameplayEffectHandle& Handle : Handles)
 		{
+			if (UniqueHandles.Contains(Handle))
+			{
+				continue;
+			}
+
+			UniqueHandles.Add(Handle);
+
 			const float TotalDuration = ASC->GetGameplayEffectDuration(Handle);
 			const float RemainingTime = UAbilitySystemBlueprintLibrary::GetActiveGameplayEffectRemainingDuration(ObservedPawn.Get(), Handle);
 			if (TotalDuration <= 0.0f || RemainingTime <= 0.0f)

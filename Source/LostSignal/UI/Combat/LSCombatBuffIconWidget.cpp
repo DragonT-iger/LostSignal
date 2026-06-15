@@ -27,12 +27,9 @@ void ULSCombatBuffIconWidget::SetBuffDisplay(const FLSCombatBuffDisplayData& InD
 		if (InDisplayData.IconTexture)
 		{
 			IconImage->SetBrushFromTexture(InDisplayData.IconTexture);
-			IconImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 		}
-		else
-		{
-			IconImage->SetVisibility(ESlateVisibility::Collapsed);
-		}
+
+		IconImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
 
 	if (StackText)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ActiveGameplayEffectHandle.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Combat/LSCombatBuffTypes.h"
 
