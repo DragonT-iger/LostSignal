@@ -20,7 +20,7 @@
 | 2 | 스킬 범위 표시, 스킬 쿨타임 숫자 UI 표시 | 스킬 범위는 기존 `ULSSkillPreviewComponent` 제어 흐름 사용, 쿨타임 숫자는 스킬 슬롯 UI 확장 |
 | 3 | 캐스팅, 버프 지속 시간, 스킬 쿨타임 게이지바 UI 표시 | 캐스팅 게이지와 버프 표시 UI 추가 필요, 쿨타임 게이지는 스킬 슬롯 UI 확장 |
 | 4 | 적 공격 타이밍 및 공격 범위 UI 표시 | 적 공격 범위/타이밍 표시 구조 추가 필요 |
-| 5 | 적 체력바 UI 표시 | 적 체력바 UI 추가 필요 |
+| 5 | 적 체력바 UI 표시 | `ULSEnemyHealthBarComponent`가 월드 스페이스 `UWidgetComponent` 체력바를 표시 |
 
 4단계의 `적 하단 원형 표시`는 기획에서 제외되었으므로 구현하지 않는다.
 
@@ -112,6 +112,24 @@ Protocol_Enable_Name = Buff_Duration
 Protocol_Required_Level = 3
 ```
 
+## 5단계: 적 체력바
+
+5단계에서 해금되는 기능은 살아 있는 적의 머리 위에 현재/최대 체력바를 표시하는 것이다.
+
+적 체력바는 `WBP_PlayerHUD` 뷰포트 위젯이 아니라 `ALSEnemyCharacter`에 붙은 `ULSEnemyHealthBarComponent`가 월드 스페이스 `UWidgetComponent`로 표시한다. 컴포넌트는 로컬 플레이어 기준으로 전투 프로토콜 5단계 표시 여부를 확인하고, 적의 AbilitySystemComponent에서 `ULSCombatAttributeSet::CurrentHealth`와 `MaxHealth` 변경 delegate를 구독해 채움 비율을 갱신한다. 화면 텍스트는 표시하지 않는다.
+
+체력바 위젯은 `ULSEnemyHealthBarWidget`이 담당하며, 필수 바인딩은 `HealthProgressBar` 하나다. `ULSEnemyHealthBarComponent`는 `HealthBarWidgetClass`, `WidgetOffset`, `DrawSize`, `Pivot`, `WidgetSpace`를 에디터에서 설정할 수 있게 열어 둔다. `WidgetSpace`가 `World`이고 `bFaceCamera`가 켜져 있으면 Tick에서 로컬 카메라를 향하도록 위젯 컴포넌트만 회전시킨다.
+
+`DT_ProtocolUnlock`에는 다음 의미의 row를 둔다.
+
+```text
+Protocol_Enable_Type = Battle
+Protocol_Enable_Name = Enemy_Health_Bar
+Protocol_Required_Level = 5
+```
+
+현재 샌드박스 데이터에는 같은 의미의 기존 이름 `Enemy_HP`가 남아 있을 수 있다. 코드에서는 `Enemy_Health_Bar`를 먼저 찾고, 없으면 `Enemy_HP`를 호환 이름으로 조회한다. 새 데이터는 `Enemy_Health_Bar`를 기준으로 작성한다.
+
 ## 표시 흐름
 
 ```text
@@ -145,20 +163,14 @@ Protocol_Required_Level = 3
 | `ULSCombatBuffListWidget` | `Buff_Duration` 해금 여부에 따라 플레이어 버프 지속 시간 목록을 표시한다. |
 | `ULSCombatBuffIconWidget` | 버프 하나의 아이콘 이미지, 스택 텍스트, 남은 시간 게이지를 표시한다. |
 | `ULSSkillCastGaugeWidget` | `Skill_Casting_Gauge` 해금 여부에 따라 캐스팅 진행률을 표시한다. |
+| `ULSEnemyHealthBarComponent` | 전투 프로토콜 5단계 해금 여부에 따라 적 머리 위 월드 스페이스 위젯 체력바를 표시한다. |
+| `ULSEnemyHealthBarWidget` | 텍스트 없이 `HealthProgressBar`의 체력 비율만 표시한다. |
 
 ## 칩스테이션 프리뷰
 
 `WBP_ChipStation`에는 전투 프로토콜 프리뷰용 `SkillBar` 자식 위젯을 둔다. 이 위젯의 부모 클래스는 `ULSSkillBarWidget`이다.
 
 칩스테이션은 신호율 슬라이더 값으로 임시 프로토콜 레벨을 계산하고, `SetPreviewBattleProtocol`을 통해 `ULSSkillBarWidget::SetPreviewBattleProtocolLevels`에 전달한다. 이 프리뷰 값은 칩스테이션 내부 표시 전용이며 실제 플레이 HUD의 전투 프로토콜 레벨을 변경하지 않는다.
-
-## 향후 필요한 UI 클래스
-
-아직 실제 사용 지점이 없으므로 1단계 작업에서는 아래 클래스를 만들지 않는다. 해당 단계 구현 시점에 사용 경로와 데이터 공급자가 확정되면 추가한다.
-
-| 클래스 후보 | 담당 단계 | 책임 |
-|-------------|-----------|------|
-| `ULSEnemyHealthBarWidget` | 5 | 적의 현재/최대 체력 표시 |
 
 스킬 범위 표시는 새 `UUserWidget`을 만들지 않고 기존 `ULSSkillPreviewComponent`와 `FLSSkillAreaPreviewSpec` 흐름을 사용한다. 적 공격 범위 표시는 공격 판정 데이터와 연결되어야 하므로 4단계 구현 시 월드 메시/데칼/머티리얼 방식 중 하나로 별도 결정한다.
 

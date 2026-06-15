@@ -79,6 +79,7 @@ FText GetEnableDisplayText(const FName EnableName)
 		{ TEXT("Buff_Duration"), LOCTEXT("BuffDuration", "버프 지속 시간 UI 표시") },
 		{ TEXT("Enemy_Attack_Range"), LOCTEXT("EnemyAttackRange", "적 공격 범위 UI 표시") },
 		{ TEXT("Enemy_Health_Bar"), LOCTEXT("EnemyHealthBar", "적 체력바 UI 표시") },
+		{ TEXT("Enemy_HP"), LOCTEXT("EnemyHP", "적 체력바 UI 표시") },
 		{ TEXT("Minimap"), LOCTEXT("Minimap", "미니맵 UI 활성화, 지형지물 표시") },
 		{ TEXT("Player_Point"), LOCTEXT("PlayerPoint", "플레이어 위치 UI 표시") },
 		{ TEXT("Minimap_Looting_Object"), LOCTEXT("MinimapLootingObject", "루팅 오브젝트 UI 표시") },

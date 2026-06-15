@@ -16,6 +16,7 @@ class ULSMinimapMarkerComponent;
 class ULSMonsterCombatComponent;
 class ULSMonsterSenseComponent;
 class ULSNoiseEmitterComponent;
+class ULSEnemyHealthBarComponent;
 struct FLSMonsterArchetypeRow;
 
 /**
@@ -58,6 +59,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/Noise")
 	ULSNoiseEmitterComponent* GetNoiseEmitterComponent() const { return NoiseEmitterComponent; }
+
+	UFUNCTION(BlueprintPure, Category="LS/UI|Combat")
+	ULSEnemyHealthBarComponent* GetHealthBarComponent() const { return HealthBarComponent; }
 
 	UFUNCTION(BlueprintPure, Category="LS/GAS")
 	ULSCharacterAttributeSet* GetMonsterAttributeSet() const { return MonsterAttributeSet; }
@@ -108,6 +112,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Noise")
 	TObjectPtr<ULSNoiseEmitterComponent> NoiseEmitterComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/UI|Combat")
+	TObjectPtr<ULSEnemyHealthBarComponent> HealthBarComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/GAS")
 	TObjectPtr<ULSCharacterAttributeSet> MonsterAttributeSet;

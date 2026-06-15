@@ -18,6 +18,7 @@
 #include "LostSignal.h"
 #include "Minimap/LSMinimapMarkerComponent.h"
 #include "UI/Debug/LSHpDebugWidget.h"
+#include "UI/Combat/LSEnemyHealthBarComponent.h"
 
 namespace
 {
@@ -40,6 +41,8 @@ ALSEnemyCharacter::ALSEnemyCharacter()
 	MonsterCombatComponent = CreateDefaultSubobject<ULSMonsterCombatComponent>(TEXT("MonsterCombatComponent"));
 	MinimapMarkerComponent = CreateDefaultSubobject<ULSMinimapMarkerComponent>(TEXT("MinimapMarkerComponent"));
 	NoiseEmitterComponent = CreateDefaultSubobject<ULSNoiseEmitterComponent>(TEXT("NoiseEmitterComponent"));
+	HealthBarComponent = CreateDefaultSubobject<ULSEnemyHealthBarComponent>(TEXT("HealthBarComponent"));
+	HealthBarComponent->SetupAttachment(GetRootComponent());
 	NoiseEmitterComponent->SetNotifyMonsterSense(false);
 	MinimapMarkerComponent->SetMarkerType(ELSMinimapMarkerType::Enemy);
 	MinimapMarkerComponent->SetMarkerColor(FLinearColor(1.0f, 0.12f, 0.1f, 1.0f));
