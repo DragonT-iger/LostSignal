@@ -384,6 +384,10 @@ ReturnHome -> Combat
 조건:
 bHasVisualTarget
 
+ReturnHome -> InvestigateInterest
+조건:
+!bHasVisualTarget && bHasInterestLocation
+
 ReturnHome -> Patrol
 조건:
 HomeLocation 또는 순찰 복귀 지점 도착
@@ -395,13 +399,13 @@ HomeLocation 또는 순찰 복귀 지점 도착
 ReturnHome
 -> LS Set Return Home Mode
    - Focus Clear
+   - State Enter 시점의 오래된 InterestLocation 정리
    - SenseComponent ForceMaxSightRadius = true
    - CharacterMovement MaxWalkSpeed *= AlertMoveSpeedMultiplier
 -> MoveTo HomeLocation 또는 순찰 복귀 지점
--> LS Clear Interest
 ```
 
-`LS Set Return Home Mode`는 State Enter에서 포커스와 현재 VisualTarget을 끊고, State Exit에서 시야 반경 강제와 이동 속도를 복구한다. 따라서 이 Task는 ReturnHome 상태에 머무는 동안 유지되는 Running Task로 둔다. ReturnHome 중 플레이어가 최대 시야 안에서 다시 보이면 `bHasVisualTarget`이 다시 true가 되며 Combat로 재진입한다.
+`LS Set Return Home Mode`는 State Enter에서 포커스와 기존 추적 잔상을 끊고, State Exit에서 시야 반경 강제와 이동 속도를 복구한다. State Exit에서는 `InterestLocation`을 지우지 않는다. ReturnHome 중 플레이어가 최대 시야 안에서 다시 보이면 `bHasVisualTarget`이 다시 true가 되며 Combat로 재진입하고, 소음이나 피격으로 새 `InterestLocation`이 생기면 InvestigateInterest로 재진입할 수 있어야 한다.
 
 ## 상태 태그 규칙
 

@@ -29,6 +29,9 @@ struct FLSSTTask_SetReturnHomeModeInstanceData
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bClearFocusOnEnter = true;
 
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	bool bClearStaleInterestOnEnter = true;
+
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI")
 	float PreviousMaxWalkSpeed = 0.0f;
 };

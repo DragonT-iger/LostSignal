@@ -42,7 +42,11 @@ EStateTreeRunStatus FLSSTTask_SetReturnHomeMode::EnterState(FStateTreeExecutionC
 		InstanceData.AIController->ClearFocus(EAIFocusPriority::Gameplay);
 	}
 
-	InstanceData.SenseComponent->ClearInterest();
+	if (InstanceData.bClearStaleInterestOnEnter)
+	{
+		InstanceData.SenseComponent->ClearInterest();
+	}
+
 	InstanceData.SenseComponent->SetForceMaxSightRadius(true);
 
 	if (UCharacterMovementComponent* MovementComponent = InstanceData.EnemyCharacter->GetCharacterMovement())
@@ -62,7 +66,6 @@ void FLSSTTask_SetReturnHomeMode::ExitState(FStateTreeExecutionContext& Context,
 
 	if (InstanceData.SenseComponent)
 	{
-		InstanceData.SenseComponent->ClearInterest();
 		InstanceData.SenseComponent->SetForceMaxSightRadius(false);
 	}
 
