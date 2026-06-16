@@ -8,7 +8,7 @@
 
 namespace
 {
-bool IsPlayerNoiseInstigator(const AActor* NoiseInstigator)
+bool IsNoiseInstigatorPlayerForHUDNotification(const AActor* NoiseInstigator)
 {
 	if (!NoiseInstigator)
 	{
@@ -26,7 +26,7 @@ bool IsPlayerNoiseInstigator(const AActor* NoiseInstigator)
 
 bool ShouldNotifyPlayerController(const ALSPlayerControllerBase* PlayerController, const FLSNoiseEvent& NoiseEvent)
 {
-	if (!PlayerController || IsPlayerNoiseInstigator(NoiseEvent.NoiseInstigator))
+	if (!PlayerController || IsNoiseInstigatorPlayerForHUDNotification(NoiseEvent.NoiseInstigator))
 	{
 		return false;
 	}

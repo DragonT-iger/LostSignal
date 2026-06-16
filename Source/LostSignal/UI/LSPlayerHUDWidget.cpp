@@ -19,6 +19,11 @@
 #include "UI/Skill/LSSkillBarWidget.h"
 #include "UI/Survival/LSSurvivalStatusWidget.h"
 
+namespace
+{
+constexpr int32 SoundIndicatorFallbackSurvivalProtocolLevel = 5;
+}
+
 void ULSPlayerHUDWidget::InitializeHUDForPawn(APawn* InPawn)
 {
 	if (!SkillBar)
@@ -318,15 +323,6 @@ bool ULSPlayerHUDWidget::IsSoundIndicatorProtocolVisible() const
 
 	UGameInstance* GameInstance = GetGameInstance();
 	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
-	if (!GameDataSubsystem)
-	{
-		if (!bLoggedMissingSoundIndicatorProtocolData)
-		{
-			UE_LOG(LogLS, Warning, TEXT("%s cannot resolve sound indicator protocol visibility because GameDataSubsystem is missing."), *GetNameSafe(this));
-			bLoggedMissingSoundIndicatorProtocolData = true;
-		}
-		return false;
-	}
 
 	int32 CurrentLevel = 0;
 	int32 PreviousLevel = 0;
@@ -354,6 +350,18 @@ bool ULSPlayerHUDWidget::IsSoundIndicatorProtocolVisible() const
 		}
 	}
 
+	if (!GameDataSubsystem)
+	{
+		if (!bLoggedMissingSoundIndicatorProtocolData)
+		{
+			UE_LOG(LogLS, Warning, TEXT("%s cannot resolve sound indicator protocol row because GameDataSubsystem is missing. Falling back to Survival level >= %d."),
+				*GetNameSafe(this),
+				SoundIndicatorFallbackSurvivalProtocolLevel);
+			bLoggedMissingSoundIndicatorProtocolData = true;
+		}
+		return CurrentLevel >= SoundIndicatorFallbackSurvivalProtocolLevel;
+	}
+
 	const FLSProtocolUnlockRow* Row = GameDataSubsystem->FindProtocolUnlockRowByEnableName(
 		ELSProtocolType::Survival,
 		TEXT("Monster_Sound"),
@@ -362,10 +370,12 @@ bool ULSPlayerHUDWidget::IsSoundIndicatorProtocolVisible() const
 	{
 		if (!bLoggedMissingSoundIndicatorProtocolData)
 		{
-			UE_LOG(LogLS, Warning, TEXT("%s cannot resolve sound indicator protocol visibility because Monster_Sound unlock row is missing."), *GetNameSafe(this));
+			UE_LOG(LogLS, Warning, TEXT("%s cannot resolve sound indicator protocol row because Monster_Sound unlock row is missing. Falling back to Survival level >= %d."),
+				*GetNameSafe(this),
+				SoundIndicatorFallbackSurvivalProtocolLevel);
 			bLoggedMissingSoundIndicatorProtocolData = true;
 		}
-		return false;
+		return CurrentLevel >= SoundIndicatorFallbackSurvivalProtocolLevel;
 	}
 
 	return GameDataSubsystem->IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel);

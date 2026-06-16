@@ -30,7 +30,7 @@
 
 namespace
 {
-bool IsPlayerNoiseInstigator(const AActor* NoiseInstigator)
+bool IsNoiseInstigatorPlayerForHUDDisplay(const AActor* NoiseInstigator)
 {
 	if (!NoiseInstigator)
 	{
@@ -666,7 +666,7 @@ void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
 
 void ALSPlayerControllerBase::NotifyNoiseForHUD(const FLSNoiseEvent& NoiseEvent)
 {
-	if (NoiseEvent.RadiusCm <= 0.0f || GetPawn() == NoiseEvent.NoiseInstigator || IsPlayerNoiseInstigator(NoiseEvent.NoiseInstigator))
+	if (NoiseEvent.RadiusCm <= 0.0f || GetPawn() == NoiseEvent.NoiseInstigator || IsNoiseInstigatorPlayerForHUDDisplay(NoiseEvent.NoiseInstigator))
 	{
 		return;
 	}
@@ -716,7 +716,7 @@ void ALSPlayerControllerBase::HandleNoiseForHUD(
 	const FGameplayTag NoiseTag,
 	AActor* NoiseInstigator)
 {
-	if (!IsLocalPlayerController() || !PlayerHUDWidgetInstance || GetPawn() == NoiseInstigator || IsPlayerNoiseInstigator(NoiseInstigator))
+	if (!IsLocalPlayerController() || !PlayerHUDWidgetInstance || GetPawn() == NoiseInstigator || IsNoiseInstigatorPlayerForHUDDisplay(NoiseInstigator))
 	{
 		return;
 	}
