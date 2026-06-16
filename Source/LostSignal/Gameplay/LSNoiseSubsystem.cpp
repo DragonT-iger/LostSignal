@@ -1,14 +1,32 @@
 #include "Gameplay/LSNoiseSubsystem.h"
 
 #include "AI/LSMonsterSenseComponent.h"
+#include "Characters/LSPlayerCharacter.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Engine/World.h"
+#include "GameFramework/Pawn.h"
 
 namespace
 {
+bool IsPlayerNoiseInstigator(const AActor* NoiseInstigator)
+{
+	if (!NoiseInstigator)
+	{
+		return false;
+	}
+
+	if (NoiseInstigator->IsA<ALSPlayerCharacter>())
+	{
+		return true;
+	}
+
+	const APawn* InstigatorPawn = Cast<APawn>(NoiseInstigator);
+	return InstigatorPawn && InstigatorPawn->IsPlayerControlled();
+}
+
 bool ShouldNotifyPlayerController(const ALSPlayerControllerBase* PlayerController, const FLSNoiseEvent& NoiseEvent)
 {
-	if (!PlayerController)
+	if (!PlayerController || IsPlayerNoiseInstigator(NoiseEvent.NoiseInstigator))
 	{
 		return false;
 	}

@@ -2,8 +2,6 @@
 
 #include "Core/LSPlayerControllerBase.h"
 
-#include "AbilitySystemBlueprintLibrary.h"
-#include "AbilitySystemComponent.h"
 #include "Blueprint/SlateBlueprintLibrary.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Camera/CameraComponent.h"
@@ -11,16 +9,13 @@
 #include "Characters/LSPlayerCharacter.h"
 #include "Core/LSFarmingGameMode.h"
 #include "Core/LSLobbyGameMode.h"
-#include "Debug/DebugDrawService.h"
 #include "EnhancedInputSubsystems.h"
-#include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
-#include "GAS/LSGameplayTags.h"
+#include "GameFramework/Pawn.h"
 #include "Gameplay/LSLootBox.h"
 #include "Gameplay/LSNoiseTypes.h"
 #include "Gameplay/LSWorldDroppedItem.h"
-#include "GameplayEffect.h"
 #include "InputMappingContext.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
@@ -32,6 +27,25 @@
 #include "UI/Protocol/LSProtocolUIWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
 #include "UI/ChipSystem/LSChipStationWidget.h"
+
+namespace
+{
+bool IsPlayerNoiseInstigator(const AActor* NoiseInstigator)
+{
+	if (!NoiseInstigator)
+	{
+		return false;
+	}
+
+	if (NoiseInstigator->IsA<ALSPlayerCharacter>())
+	{
+		return true;
+	}
+
+	const APawn* InstigatorPawn = Cast<APawn>(NoiseInstigator);
+	return InstigatorPawn && InstigatorPawn->IsPlayerControlled();
+}
+}
 
 ALSPlayerControllerBase::ALSPlayerControllerBase()
 {
@@ -59,13 +73,6 @@ void ALSPlayerControllerBase::BeginPlay()
 
 	UWidgetBlueprintLibrary::SetFocusToGameViewport();
 
-	if (!CombatAccelerationDebugDrawHandle.IsValid())
-	{
-		CombatAccelerationDebugDrawHandle = UDebugDrawService::Register(
-			TEXT("Game"),
-			FDebugDrawDelegate::CreateUObject(this, &ALSPlayerControllerBase::DrawCombatAccelerationDebug));
-	}
-
 	if (DebugHpWidgetClass && !DebugHpWidgetInstance)
 	{
 		DebugHpWidgetInstance = CreateWidget<ULSHpDebugWidget>(this, DebugHpWidgetClass);
@@ -77,17 +84,6 @@ void ALSPlayerControllerBase::BeginPlay()
 	}
 
 	CreatePlayerHUDWidgetLocal();
-}
-
-void ALSPlayerControllerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	if (CombatAccelerationDebugDrawHandle.IsValid())
-	{
-		UDebugDrawService::Unregister(CombatAccelerationDebugDrawHandle);
-		CombatAccelerationDebugDrawHandle.Reset();
-	}
-
-	Super::EndPlay(EndPlayReason);
 }
 
 void ALSPlayerControllerBase::OnPossess(APawn* InPawn)
@@ -670,7 +666,7 @@ void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
 
 void ALSPlayerControllerBase::NotifyNoiseForHUD(const FLSNoiseEvent& NoiseEvent)
 {
-	if (NoiseEvent.RadiusCm <= 0.0f || GetPawn() == NoiseEvent.NoiseInstigator)
+	if (NoiseEvent.RadiusCm <= 0.0f || GetPawn() == NoiseEvent.NoiseInstigator || IsPlayerNoiseInstigator(NoiseEvent.NoiseInstigator))
 	{
 		return;
 	}
@@ -720,7 +716,7 @@ void ALSPlayerControllerBase::HandleNoiseForHUD(
 	const FGameplayTag NoiseTag,
 	AActor* NoiseInstigator)
 {
-	if (!IsLocalPlayerController() || !PlayerHUDWidgetInstance || GetPawn() == NoiseInstigator)
+	if (!IsLocalPlayerController() || !PlayerHUDWidgetInstance || GetPawn() == NoiseInstigator || IsPlayerNoiseInstigator(NoiseInstigator))
 	{
 		return;
 	}
@@ -741,44 +737,6 @@ void ALSPlayerControllerBase::ShowDamageNumberLocal(const FLSDamageNumberPayload
 	}
 
 	PlayerHUDWidgetInstance->ShowDamageNumber(Payload);
-}
-
-void ALSPlayerControllerBase::DrawCombatAccelerationDebug(UCanvas* Canvas, APlayerController* PlayerController)
-{
-	if (!Canvas || PlayerController != this || !IsLocalPlayerController())
-	{
-		return;
-	}
-
-	const int32 StackCount = GetCombatAccelerationStackCount();
-	const bool bApplied = StackCount > 0;
-	const FString DebugText = FString::Printf(
-		TEXT("CombatAcceleration: %s | Stack: %d"),
-		bApplied ? TEXT("ON") : TEXT("OFF"),
-		StackCount);
-
-	Canvas->SetDrawColor(bApplied ? FColor::Green : FColor::Yellow);
-	Canvas->DrawText(UEngine::GetSmallFont(), DebugText, 16.0f, 16.0f, 1.0f, 1.0f);
-}
-
-int32 ALSPlayerControllerBase::GetCombatAccelerationStackCount() const
-{
-	const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
-	if (!ASC)
-	{
-		return 0;
-	}
-
-	FGameplayTagContainer BuffTags;
-	BuffTags.AddTag(LSGameplayTags::Buff_CombatAcceleration);
-
-	int32 StackCount = 0;
-	for (const FActiveGameplayEffectHandle& Handle : ASC->GetActiveEffects(FGameplayEffectQuery::MakeQuery_MatchAllOwningTags(BuffTags)))
-	{
-		StackCount += FMath::Max(0, ASC->GetCurrentStackCount(Handle));
-	}
-
-	return StackCount;
 }
 
 bool ALSPlayerControllerBase::TransferLootDropSlotToSession(ALSLootBox* SourceLootBox, const int32 LootSlotIndex, const FName ItemRowName, const int32 Amount, FLSSessionItem& OutLootItem)

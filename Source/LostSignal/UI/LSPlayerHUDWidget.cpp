@@ -51,6 +51,10 @@ void ULSPlayerHUDWidget::InitializeHUDForPawn(APawn* InPawn)
 	else
 	{
 		InitializeSoundIndicatorPool(InPawn);
+		if (!IsSoundIndicatorProtocolVisible())
+		{
+			HideSoundIndicatorPool();
+		}
 	}
 
 	if (!CombatBuffList)
@@ -116,8 +120,14 @@ void ULSPlayerHUDWidget::HandleNoiseForSoundIndicator(
 	(void)NoiseTag;
 	(void)NoiseInstigator;
 
-	if (!SoundIndicator || RadiusCm <= 0.0f || !IsSoundIndicatorProtocolVisible())
+	if (!SoundIndicator || RadiusCm <= 0.0f)
 	{
+		return;
+	}
+
+	if (!IsSoundIndicatorProtocolVisible())
+	{
+		HideSoundIndicatorPool();
 		return;
 	}
 
@@ -210,6 +220,17 @@ void ULSPlayerHUDWidget::InitializeSoundIndicatorPool(APawn* InPawn)
 	}
 }
 
+void ULSPlayerHUDWidget::HideSoundIndicatorPool()
+{
+	for (ULSSoundDirectionIndicatorWidget* Indicator : SoundIndicatorPool)
+	{
+		if (Indicator)
+		{
+			Indicator->HideSoundDirection();
+		}
+	}
+}
+
 ULSSoundDirectionIndicatorWidget* ULSPlayerHUDWidget::AcquireSoundIndicator()
 {
 	if (SoundIndicatorPool.IsEmpty())
@@ -299,7 +320,12 @@ bool ULSPlayerHUDWidget::IsSoundIndicatorProtocolVisible() const
 	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
 	if (!GameDataSubsystem)
 	{
-		return true;
+		if (!bLoggedMissingSoundIndicatorProtocolData)
+		{
+			UE_LOG(LogLS, Warning, TEXT("%s cannot resolve sound indicator protocol visibility because GameDataSubsystem is missing."), *GetNameSafe(this));
+			bLoggedMissingSoundIndicatorProtocolData = true;
+		}
+		return false;
 	}
 
 	int32 CurrentLevel = 0;
@@ -332,7 +358,17 @@ bool ULSPlayerHUDWidget::IsSoundIndicatorProtocolVisible() const
 		ELSProtocolType::Survival,
 		TEXT("Monster_Sound"),
 		TEXT("PlayerHUDSoundIndicator"));
-	return Row ? GameDataSubsystem->IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel) : true;
+	if (!Row)
+	{
+		if (!bLoggedMissingSoundIndicatorProtocolData)
+		{
+			UE_LOG(LogLS, Warning, TEXT("%s cannot resolve sound indicator protocol visibility because Monster_Sound unlock row is missing."), *GetNameSafe(this));
+			bLoggedMissingSoundIndicatorProtocolData = true;
+		}
+		return false;
+	}
+
+	return GameDataSubsystem->IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel);
 }
 
 ULSDamageNumberWidget* ULSPlayerHUDWidget::AcquireDamageNumberWidget()

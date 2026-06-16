@@ -20,7 +20,6 @@ class ULSRaidInventoryComponent;
 class ULSHpDebugWidget;
 class ULSLootDropWidget;
 class ULSPlayerHUDWidget;
-class UCanvas;
 struct FLSNoiseEvent;
 
 UCLASS(Abstract)
@@ -185,7 +184,6 @@ protected:
 
 protected:
 	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SetupInputComponent() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void AcknowledgePossession(APawn* InPawn) override;
@@ -268,8 +266,6 @@ private:
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);
 	void HandleNoiseForHUD(FVector NoiseLocation, float RadiusCm, FGameplayTag NoiseTag, AActor* NoiseInstigator);
 	void ShowDamageNumberLocal(const FLSDamageNumberPayload& Payload);
-	void DrawCombatAccelerationDebug(UCanvas* Canvas, APlayerController* PlayerController);
-	int32 GetCombatAccelerationStackCount() const;
 	void SetProtocolTestLevel(ELSProtocolType ProtocolType, int32 Level);
 	void RefreshProtocolTestTargets();
 	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
@@ -280,6 +276,4 @@ private:
 	bool TransferLootDropSlotToSessionSlotInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
 	bool TransferSessionSlotToLootDropSlotInternal(ALSLootBox* SourceLootBox, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, int32 LootSlotIndex, FLSSessionItem& OutLootItem);
 	bool DropLootDropSlotInternal(ALSLootBox* SourceLootBox, int32 FromLootSlotIndex, int32 ToLootSlotIndex);
-
-	FDelegateHandle CombatAccelerationDebugDrawHandle;
 };

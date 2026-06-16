@@ -68,6 +68,7 @@ protected:
 
 private:
 	void InitializeSoundIndicatorPool(APawn* InPawn);
+	void HideSoundIndicatorPool();
 	ULSSoundDirectionIndicatorWidget* AcquireSoundIndicator();
 	ULSSoundDirectionIndicatorWidget* CreatePooledSoundIndicator(UPanelWidget* ParentPanel);
 	void ConfigurePooledSoundIndicatorSlot(ULSSoundDirectionIndicatorWidget* IndicatorWidget) const;
@@ -82,4 +83,6 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULSDamageNumberWidget>> DamageNumberPool;
+
+	mutable bool bLoggedMissingSoundIndicatorProtocolData = false;
 };

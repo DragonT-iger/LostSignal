@@ -326,6 +326,9 @@ ULSNoiseSubsystem
 - 월드 단위 소음 브로커
 - MonsterSenseComponent 등록 목록 관리
 - 소음 이벤트를 등록된 감지 컴포넌트에 전달
+- HUD 사운드 인디케이터 알림에서는 플레이어 캐릭터/플레이어 컨트롤 Pawn이 낸 소음을 제외
+
+HUD 사운드 인디케이터의 실제 표시는 `DT_Protocol`의 생존 프로토콜 `Monster_Sound` 해금 row가 보이는 경우에만 허용한다. 해당 row나 데이터 서브시스템을 찾지 못하면 표시하지 않는다.
 
 ULSMonsterSenseComponent
 - BeginPlay/EndPlay에서 NoiseSubsystem에 등록/해제
