@@ -47,6 +47,7 @@ EStateTreeRunStatus FLSSTTask_SetReturnHomeMode::EnterState(FStateTreeExecutionC
 		InstanceData.SenseComponent->ClearInterest();
 	}
 
+	InstanceData.SenseComponent->SetReturnHomeMode(true);
 	InstanceData.SenseComponent->SetForceMaxSightRadius(true);
 
 	if (UCharacterMovementComponent* MovementComponent = InstanceData.EnemyCharacter->GetCharacterMovement())
@@ -66,6 +67,7 @@ void FLSSTTask_SetReturnHomeMode::ExitState(FStateTreeExecutionContext& Context,
 
 	if (InstanceData.SenseComponent)
 	{
+		InstanceData.SenseComponent->SetReturnHomeMode(false);
 		InstanceData.SenseComponent->SetForceMaxSightRadius(false);
 	}
 

@@ -106,6 +106,11 @@ void ULSMonsterSenseComponent::RegisterNoiseEvent(const FLSNoiseEvent& NoiseEven
 		return;
 	}
 
+	if (ShouldSuppressReturnHomeInterest(NoiseEvent.Location))
+	{
+		return;
+	}
+
 	InterestLocation = NoiseEvent.Location;
 	bHasInterestLocation = true;
 }
@@ -118,8 +123,14 @@ void ULSMonsterSenseComponent::SetCurrentTargetFromDamage(AActor* DamageInstigat
 		return;
 	}
 
+	const FVector DamageInstigatorLocation = DamageInstigator->GetActorLocation();
+	if (ShouldSuppressReturnHomeInterest(DamageInstigatorLocation))
+	{
+		return;
+	}
+
 	CurrentTarget = DamageInstigator;
-	InterestLocation = DamageInstigator->GetActorLocation();
+	InterestLocation = DamageInstigatorLocation;
 	bHasInterestLocation = true;
 }
 
@@ -167,6 +178,11 @@ void ULSMonsterSenseComponent::SetThreatMultiplier(float InThreatMultiplier)
 void ULSMonsterSenseComponent::SetForceMaxSightRadius(bool bInForceMaxSightRadius)
 {
 	bForceMaxSightRadius = bInForceMaxSightRadius;
+}
+
+void ULSMonsterSenseComponent::SetReturnHomeMode(bool bInReturnHomeMode)
+{
+	bReturnHomeMode = bInReturnHomeMode;
 }
 
 void ULSMonsterSenseComponent::ClearVisualTarget()
@@ -232,8 +248,15 @@ void ULSMonsterSenseComponent::UpdateSensing(float DeltaTime)
 	AActor* VisibleTarget = FindBestVisibleTarget();
 	if (VisibleTarget)
 	{
+		const FVector VisibleTargetLocation = VisibleTarget->GetActorLocation();
+		if (ShouldSuppressReturnHomeInterest(VisibleTargetLocation))
+		{
+			CurrentTarget.Reset();
+			return;
+		}
+
 		CurrentTarget = VisibleTarget;
-		InterestLocation = VisibleTarget->GetActorLocation();
+		InterestLocation = VisibleTargetLocation;
 		bHasInterestLocation = true;
 
 		return;
@@ -281,6 +304,16 @@ AActor* ULSMonsterSenseComponent::FindBestVisibleTarget() const
 	}
 
 	return BestTarget;
+}
+
+bool ULSMonsterSenseComponent::IsLocationBeyondLeashDistance(const FVector& Location) const
+{
+	return LeashDistance > 0.0f && FVector::Dist2D(Location, HomeLocation) > LeashDistance;
+}
+
+bool ULSMonsterSenseComponent::ShouldSuppressReturnHomeInterest(const FVector& InterestCandidateLocation) const
+{
+	return bReturnHomeMode && IsLocationBeyondLeashDistance(InterestCandidateLocation);
 }
 
 bool ULSMonsterSenseComponent::IsOwnerDead() const

@@ -66,6 +66,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="AI|Sense")
 	void SetForceMaxSightRadius(bool bInForceMaxSightRadius);
 
+	UFUNCTION(BlueprintCallable, Category="LS/AI|Sense")
+	void SetReturnHomeMode(bool bInReturnHomeMode);
+
 	UFUNCTION(BlueprintCallable, Category="AI|Sense")
 	void ClearVisualTarget();
 
@@ -77,6 +80,8 @@ public:
 private:
 	void UpdateSensing(float DeltaTime);
 	AActor* FindBestVisibleTarget() const;
+	bool IsLocationBeyondLeashDistance(const FVector& Location) const;
+	bool ShouldSuppressReturnHomeInterest(const FVector& InterestCandidateLocation) const;
 	bool IsOwnerDead() const;
 	void DrawSenseDebug() const;
 
@@ -124,4 +129,7 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	bool bForceMaxSightRadius = false;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI|Sense")
+	bool bReturnHomeMode = false;
 };

@@ -385,11 +385,11 @@ LS Has Visual Target(bInvert=true) && LS Is Beyond Leash Distance
 
 ReturnHome -> Combat
 조건:
-bHasVisualTarget
+bHasVisualTarget && !bIsBeyondLeashDistance
 
 ReturnHome -> InvestigateInterest
 조건:
-!bHasVisualTarget && bHasInterestLocation
+!bHasVisualTarget && !bIsBeyondLeashDistance && bHasInterestLocation
 
 ReturnHome -> Patrol
 조건:
@@ -403,12 +403,13 @@ ReturnHome
 -> LS Set Return Home Mode
    - Focus Clear
    - State Enter 시점의 오래된 InterestLocation 정리
+   - ReturnHome 중 Leash 밖의 위치가 InterestLocation으로 저장되는 것 억제
    - SenseComponent ForceMaxSightRadius = true
    - CharacterMovement MaxWalkSpeed *= AlertMoveSpeedMultiplier
 -> MoveTo HomeLocation 또는 순찰 복귀 지점
 ```
 
-`LS Set Return Home Mode`는 State Enter에서 포커스와 기존 추적 잔상을 끊고, State Exit에서 시야 반경 강제와 이동 속도를 복구한다. State Exit에서는 `InterestLocation`을 지우지 않는다. ReturnHome 중 플레이어가 최대 시야 안에서 다시 보이면 `bHasVisualTarget`이 다시 true가 되며 Combat로 재진입하고, 소음이나 피격으로 새 `InterestLocation`이 생기면 InvestigateInterest로 재진입할 수 있어야 한다.
+`LS Set Return Home Mode`는 State Enter에서 포커스와 기존 추적 잔상을 끊고, State Exit에서 시야 반경 강제와 이동 속도를 복구한다. State Exit에서는 `InterestLocation`을 지우지 않는다. 대신 ReturnHome 중에는 Home 기준 Leash 밖의 시야 타겟, 소음, 피격 위치를 `InterestLocation`으로 다시 만들지 않는다. Leash 안의 새 감지만 Combat 또는 InvestigateInterest 전이에 사용한다.
 
 ## 상태 태그 규칙
 
