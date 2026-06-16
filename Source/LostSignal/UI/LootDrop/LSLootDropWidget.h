@@ -74,5 +74,4 @@ private:
 
 	void SetLootSlotFromSessionItem(int32 SlotIndex, const FLSSessionItem& SessionItem);
 	void RebuildLootSlots();
-	ULSItemSlotWidget* CreateLootSlotWidget() const;
 };

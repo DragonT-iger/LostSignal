@@ -11,6 +11,7 @@
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
+#include "UI/Inventory/LSSlotWidgetSync.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 
 namespace
@@ -102,8 +103,6 @@ void ULSInventoryWidget::RebuildInventorySlots()
 		return;
 	}
 
-	InventoryWrapBox->ClearChildren();
-
 	if (!ItemSlotWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("ItemSlotWidgetClass is not set on %s."), *GetNameSafe(this));
@@ -152,35 +151,23 @@ void ULSInventoryWidget::RebuildInventorySlots()
 
 	UE_LOG(LogLS, Log, TEXT("InventoryWidget rebuilt with %d slot items on %s."), InventoryItems.Num(), *GetNameSafe(this));
 
-	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
-	{
-		ULSItemSlotWidget* SlotWidget = OwningPlayer
-			? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
-			: CreateWidget<ULSItemSlotWidget>(World, ItemSlotWidgetClass);
-
-		if (SlotWidget)
+	LSSlotWidgetSync::SyncSlotWidgets(InventoryWrapBox, ItemSlotWidgetClass, OwningPlayer, World, SlotCountToBuild,
+		[this, &InventoryItems](const int32 SlotIndex, ULSItemSlotWidget& SlotWidget)
 		{
 			const bool bHasSlotItem = InventoryItems.IsValidIndex(SlotIndex) &&
 				!InventoryItems[SlotIndex].ItemRowName.IsNone() &&
 				InventoryItems[SlotIndex].Amount > 0;
-			SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Inventory, SlotIndex, bHasSlotItem);
+			SlotWidget.SetSlotContext(this, ELSInventorySlotArea::Inventory, SlotIndex, bHasSlotItem);
 
 			if (bHasSlotItem)
 			{
-				SlotWidget->SetItem(InventoryItems[SlotIndex].ItemRowName, InventoryItems[SlotIndex].Amount, InventoryItems[SlotIndex].ChipStats);
+				SlotWidget.SetItem(InventoryItems[SlotIndex].ItemRowName, InventoryItems[SlotIndex].Amount, InventoryItems[SlotIndex].ChipStats);
 			}
 			else
 			{
-				SlotWidget->ClearItem();
+				SlotWidget.ClearItem();
 			}
-
-			InventoryWrapBox->AddChildToWrapBox(SlotWidget);
-		}
-		else
-		{
-			UE_LOG(LogLS, Warning, TEXT("Failed to create inventory slot widget at index %d on %s."), SlotIndex, *GetNameSafe(this));
-		}
-	}
+		});
 }
 
 bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex)
@@ -315,8 +302,6 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 		return;
 	}
 
-	ConfirmedStorageSlotWrapBox->ClearChildren();
-
 	if (!ItemSlotWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("ItemSlotWidgetClass is not set on %s. Confirmed storage slots use the same widget class."), *GetNameSafe(this));
@@ -359,34 +344,23 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 		}
 	}
 
-	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
-	{
-		ULSItemSlotWidget* SlotWidget = OwningPlayer
-			? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
-			: CreateWidget<ULSItemSlotWidget>(World, ItemSlotWidgetClass);
-
-		if (SlotWidget)
+	LSSlotWidgetSync::SyncSlotWidgets(ConfirmedStorageSlotWrapBox, ItemSlotWidgetClass, OwningPlayer, World, SlotCountToBuild,
+		[this, &SafeItems](const int32 SlotIndex, ULSItemSlotWidget& SlotWidget)
 		{
 			const bool bHasSlotItem = SafeItems.IsValidIndex(SlotIndex) &&
 				!SafeItems[SlotIndex].ItemRowName.IsNone() &&
 				SafeItems[SlotIndex].Amount > 0;
 			const bool bIsLocked = IsSlotLocked(ELSInventorySlotArea::Safe, SlotIndex);
-			SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Safe, SlotIndex, bHasSlotItem, bIsLocked);
+			SlotWidget.SetSlotContext(this, ELSInventorySlotArea::Safe, SlotIndex, bHasSlotItem, bIsLocked);
 			if (bHasSlotItem)
 			{
-				SlotWidget->SetItem(SafeItems[SlotIndex].ItemRowName, SafeItems[SlotIndex].Amount, SafeItems[SlotIndex].ChipStats);
+				SlotWidget.SetItem(SafeItems[SlotIndex].ItemRowName, SafeItems[SlotIndex].Amount, SafeItems[SlotIndex].ChipStats);
 			}
 			else
 			{
-				SlotWidget->ClearItem();
+				SlotWidget.ClearItem();
 			}
-			ConfirmedStorageSlotWrapBox->AddChildToWrapBox(SlotWidget);
-		}
-		else
-		{
-			UE_LOG(LogLS, Warning, TEXT("Failed to create confirmed storage slot widget at index %d on %s."), SlotIndex, *GetNameSafe(this));
-		}
-	}
+		});
 }
 
 void ULSInventoryWidget::SetStoreAllButtonVisible(const bool bVisible)

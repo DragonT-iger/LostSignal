@@ -40,6 +40,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Storage")
 	void RefreshStorage();
 
+	void RefreshStorageCountText();
+
 	UFUNCTION(BlueprintPure, Category="LS/UI|Storage")
 	int32 GetMaxStorageSlotCount() const { return MaxStorageSlotCount; }
 

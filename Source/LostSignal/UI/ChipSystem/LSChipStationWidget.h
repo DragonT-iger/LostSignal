@@ -61,7 +61,6 @@ protected:
 	void SetEquippedChipMemoryText(int32 CurrentMemory);
 	void QueueRefreshChipStation();
 	void HandleCarryingSlotCapacityChanged();
-	ULSItemSlotWidget* CreateChipSlotWidget() const;
 	void InitializeEquipmentSlots();
 	void SetPreviewMinimapNavigationLevels(int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol);
 	void SetPreviewSurvivalStatus(int32 CurrentSurvivalProtocol, int32 PreviousSurvivalProtocol);

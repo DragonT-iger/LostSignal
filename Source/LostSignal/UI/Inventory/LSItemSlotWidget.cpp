@@ -16,6 +16,12 @@
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
 
+namespace
+{
+// 빈 슬롯(기본 텍스처)이 적용된 상태를 나타내는 예약 키. 실제 아이템 행 이름과 겹치지 않는다.
+const FName EmptySlotIconKey(TEXT("__LSEmptySlot__"));
+}
+
 void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats)
 {
 	if (!ItemIconImage)
@@ -37,16 +43,24 @@ void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, con
 		return;
 	}
 
-	UTexture2D* IconTexture = LoadIconTextureByRowName(ItemRowName);
-	if (!IconTexture)
+	// 같은 아이템을 다시 표시하는 경우 동기 텍스처 로딩과 브러시 갱신을 건너뛴다.
+	if (DisplayedIconKey != ItemRowName)
 	{
-		IconTexture = LoadDefaultIconTexture();
-		UE_LOG(LogLS, Warning, TEXT("Using default item slot icon for row '%s' on %s."), *ItemRowName.ToString(), *GetNameSafe(this));
-	}
+		UTexture2D* IconTexture = LoadIconTextureByRowName(ItemRowName);
+		const bool bUsedItemIcon = IconTexture != nullptr;
+		if (!IconTexture)
+		{
+			IconTexture = LoadDefaultIconTexture();
+			UE_LOG(LogLS, Warning, TEXT("Using default item slot icon for row '%s' on %s."), *ItemRowName.ToString(), *GetNameSafe(this));
+		}
 
-	if (IconTexture)
-	{
-		ItemIconImage->SetBrushFromTexture(IconTexture);
+		if (IconTexture)
+		{
+			ItemIconImage->SetBrushFromTexture(IconTexture);
+		}
+
+		// 실제 아이템 아이콘이 적용된 경우에만 캐시한다. 기본 아이콘 대체 시에는 다음 호출에서 다시 시도한다.
+		DisplayedIconKey = bUsedItemIcon ? ItemRowName : NAME_None;
 	}
 
 	ApplyHoverVisual();
@@ -74,13 +88,19 @@ void ULSItemSlotWidget::ClearItem()
 		return;
 	}
 
-	if (UTexture2D* DefaultIconTexture = LoadSlotDefaultTexture())
+	// 이미 빈 슬롯 텍스처가 적용돼 있으면 다시 로드하지 않는다.
+	if (DisplayedIconKey != EmptySlotIconKey)
 	{
-		ItemIconImage->SetBrushFromTexture(DefaultIconTexture);
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("ClearItem could not load default icon on %s."), *GetNameSafe(this));
+		if (UTexture2D* DefaultIconTexture = LoadSlotDefaultTexture())
+		{
+			ItemIconImage->SetBrushFromTexture(DefaultIconTexture);
+			DisplayedIconKey = EmptySlotIconKey;
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("ClearItem could not load default icon on %s."), *GetNameSafe(this));
+			DisplayedIconKey = NAME_None;
+		}
 	}
 
 	ApplyHoverVisual();
@@ -418,6 +438,14 @@ void ULSItemSlotWidget::RestoreDragSourceVisual()
 	SetVisibility(ESlateVisibility::Visible);
 	SetRenderOpacity(1.0f);
 	ApplyHoverVisual();
+}
+
+void ULSItemSlotWidget::ResetTransientSlotState()
+{
+	bIsHovered = false;
+	bIsDragTarget = false;
+	SetVisibility(ESlateVisibility::Visible);
+	SetRenderOpacity(1.0f);
 }
 
 void ULSItemSlotWidget::ApplyHoverVisual()

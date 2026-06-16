@@ -20,6 +20,7 @@
 #include "UI/ChipSystem/LSChipStatWidget.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
+#include "UI/Inventory/LSSlotWidgetSync.h"
 #include "UI/Minimap/LSMinimapWidget.h"
 #include "UI/Protocol/LSProtocolWidget.h"
 #include "UI/Skill/LSSkillBarWidget.h"
@@ -269,8 +270,6 @@ void ULSChipStationWidget::RefreshChipSlots()
 		return;
 	}
 
-	ChipSlotWrapBox->ClearChildren();
-
 	if (!ItemSlotWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("ItemSlotWidgetClass is not set on %s."), *GetNameSafe(this));
@@ -291,18 +290,13 @@ void ULSChipStationWidget::RefreshChipSlots()
 	AddChipViewItems(SaveSubsystem->GetWarehouseItems(), ELSInventorySlotArea::Warehouse, ChipTable, this, ViewItems);
 	SortChipViewItems(ViewItems);
 
-	for (const FLSChipStationViewItem& ViewItem : ViewItems)
-	{
-		ULSItemSlotWidget* SlotWidget = CreateChipSlotWidget();
-		if (!SlotWidget)
+	LSSlotWidgetSync::SyncSlotWidgets(ChipSlotWrapBox, ItemSlotWidgetClass, GetOwningPlayer(), GetWorld(), ViewItems.Num(),
+		[this, &ViewItems](const int32 SlotIndex, ULSItemSlotWidget& SlotWidget)
 		{
-			continue;
-		}
-
-		SlotWidget->SetItem(ViewItem.Item.ItemRowName, ViewItem.Item.Amount, ViewItem.Item.ChipStats);
-		SlotWidget->SetChipStationSlotContext(this, ViewItem.SourceArea, ViewItem.SourceSlotIndex, ViewItem.Item.ItemRowName, ViewItem.Item.Amount, ViewItem.Item.ChipStats);
-		ChipSlotWrapBox->AddChildToWrapBox(SlotWidget);
-	}
+			const FLSChipStationViewItem& ViewItem = ViewItems[SlotIndex];
+			SlotWidget.SetItem(ViewItem.Item.ItemRowName, ViewItem.Item.Amount, ViewItem.Item.ChipStats);
+			SlotWidget.SetChipStationSlotContext(this, ViewItem.SourceArea, ViewItem.SourceSlotIndex, ViewItem.Item.ItemRowName, ViewItem.Item.Amount, ViewItem.Item.ChipStats);
+		});
 }
 
 void ULSChipStationWidget::RefreshEquipmentSlots()
@@ -670,27 +664,6 @@ bool ULSChipStationWidget::IsPointerInsideChipSlotBorder(const FVector2D ScreenP
 		LocalPosition.Y >= 0.0f &&
 		LocalPosition.X <= ChipSlotBorderGeometry.GetLocalSize().X &&
 		LocalPosition.Y <= ChipSlotBorderGeometry.GetLocalSize().Y;
-}
-
-ULSItemSlotWidget* ULSChipStationWidget::CreateChipSlotWidget() const
-{
-	APlayerController* OwningPlayer = GetOwningPlayer();
-	UWorld* World = GetWorld();
-	if (!OwningPlayer && !World)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot create chip slot because owner/world is missing on %s."), *GetNameSafe(this));
-		return nullptr;
-	}
-
-	ULSItemSlotWidget* SlotWidget = OwningPlayer
-		? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
-		: CreateWidget<ULSItemSlotWidget>(World, ItemSlotWidgetClass);
-	if (!SlotWidget)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Failed to create chip slot widget on %s."), *GetNameSafe(this));
-	}
-
-	return SlotWidget;
 }
 
 void ULSChipStationWidget::SetChipStat(FName StatKey, int32 StatValue, int32 SignalLoss)

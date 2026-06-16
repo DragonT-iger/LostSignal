@@ -38,6 +38,9 @@ public:
 	void SetChipEquipmentSlotContext(ULSChipEquipmentSlotWidget* InChipEquipmentSlotWidget, ULSChipStationWidget* InChipStationWidget, int32 InEquipmentSlotIndex);
 	void RestoreDragSourceVisual();
 
+	// 슬롯 위젯을 재사용할 때 이전 상호작용의 잔여 시각 상태를 초기화한다.
+	void ResetTransientSlotState();
+
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
@@ -86,6 +89,10 @@ private:
 	bool bIsLocked = false;
 	bool bIsHovered = false;
 	bool bIsDragTarget = false;
+
+	// 현재 아이콘 브러시를 식별하는 키. 같은 아이템을 다시 표시할 때 동기 텍스처 로딩을 건너뛰기 위한 캐시다.
+	// 아이템 행 이름, 빈 슬롯 키, NAME_None(미적용/로드 실패) 중 하나를 가진다.
+	FName DisplayedIconKey;
 
 	void ApplyHoverVisual();
 	bool CanStartItemDrag() const;

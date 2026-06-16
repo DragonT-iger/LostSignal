@@ -7,6 +7,7 @@
 #include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
+#include "UI/Inventory/LSSlotWidgetSync.h"
 
 void ULSLootDropWidget::NativeConstruct()
 {
@@ -73,37 +74,27 @@ void ULSLootDropWidget::RebuildLootSlots()
 		return;
 	}
 
-	LootItemWrapBox->ClearChildren();
-
 	if (!ItemSlotWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("ItemSlotWidgetClass is not set on %s."), *GetNameSafe(this));
 		return;
 	}
 
-	for (int32 SlotIndex = 0; SlotIndex < LootItems.Num(); ++SlotIndex)
-	{
-		const FLSDropResult& Item = LootItems[SlotIndex];
-		ULSItemSlotWidget* SlotWidget = CreateLootSlotWidget();
-		if (!SlotWidget)
+	LSSlotWidgetSync::SyncSlotWidgets(LootItemWrapBox, ItemSlotWidgetClass, GetOwningPlayer(), GetWorld(), LootItems.Num(),
+		[this](const int32 SlotIndex, ULSItemSlotWidget& SlotWidget)
 		{
-			UE_LOG(LogLS, Warning, TEXT("Failed to create loot slot widget on %s."), *GetNameSafe(this));
-			continue;
-		}
-
-		const bool bHasItem = !Item.ItemRowName.IsNone() && Item.Amount > 0;
-		SlotWidget->SetLootSlotContext(this, SlotIndex, bHasItem);
-		if (bHasItem)
-		{
-			SlotWidget->SetItem(Item.ItemRowName, Item.Amount, Item.ChipStats);
-		}
-		else
-		{
-			SlotWidget->ClearItem();
-		}
-
-		LootItemWrapBox->AddChildToWrapBox(SlotWidget);
-	}
+			const FLSDropResult& Item = LootItems[SlotIndex];
+			const bool bHasItem = !Item.ItemRowName.IsNone() && Item.Amount > 0;
+			SlotWidget.SetLootSlotContext(this, SlotIndex, bHasItem);
+			if (bHasItem)
+			{
+				SlotWidget.SetItem(Item.ItemRowName, Item.Amount, Item.ChipStats);
+			}
+			else
+			{
+				SlotWidget.ClearItem();
+			}
+		});
 }
 
 void ULSLootDropWidget::ClearLootItems()
@@ -367,19 +358,4 @@ bool ULSLootDropWidget::HasLootItems() const
 	}
 
 	return false;
-}
-
-ULSItemSlotWidget* ULSLootDropWidget::CreateLootSlotWidget() const
-{
-	APlayerController* OwningPlayer = GetOwningPlayer();
-	UWorld* World = GetWorld();
-	if (!OwningPlayer && !World)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot create loot slot because owner/world is missing on %s."), *GetNameSafe(this));
-		return nullptr;
-	}
-
-	return OwningPlayer
-		? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
-		: CreateWidget<ULSItemSlotWidget>(World, ItemSlotWidgetClass);
 }

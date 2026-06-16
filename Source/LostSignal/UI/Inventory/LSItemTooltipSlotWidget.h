@@ -26,6 +26,9 @@ protected:
 	bool HasTooltipItem() const { return bHasTooltipItem && !CurrentTooltipItemRowName.IsNone(); }
 
 private:
+	// UPROPERTY로 GC가 추적하게 한다. 없으면 슬롯 위젯이 풀링으로 오래 살아남는 동안
+	// 툴팁 위젯이 GC되어 댕글링 포인터가 된다.
+	UPROPERTY(Transient)
 	TObjectPtr<ULSItemTooltipWidget> ItemTooltipWidget;
 	FName CurrentTooltipItemRowName;
 	int32 CurrentTooltipAmount = 0;
