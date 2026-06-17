@@ -5,6 +5,8 @@
 #include "Minimap/LSMinimapTypes.h"
 #include "LSMinimapMarkerComponent.generated.h"
 
+class UTexture2D;
+
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
 class LOSTSIGNAL_API ULSMinimapMarkerComponent : public UActorComponent
 {
@@ -35,6 +37,12 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Minimap", meta=(AllowPrivateAccess="true", ClampMin="1.0"))
 	float DrawRadius = 4.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Minimap", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UTexture2D> MarkerTexture;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Minimap", meta=(AllowPrivateAccess="true", ClampMin="1.0"))
+	FVector2D TextureDrawSize = FVector2D(16.0f, 16.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Minimap", meta=(AllowPrivateAccess="true"))
 	int32 Priority = 0;

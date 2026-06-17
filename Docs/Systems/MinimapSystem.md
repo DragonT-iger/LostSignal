@@ -37,6 +37,8 @@ ALSMinimapShapeActor
 `WBP_PlayerHUD`는 `ULSPlayerHUDWidget`을 부모로 쓰고, 필수 자식 위젯 `Minimap`을 `BindWidget`으로 제공해야 한다. `Minimap`의 부모 클래스는 `ULSMinimapWidget`이다.
 `WBP_ChipStation`도 칩 장착/신호 게이지 조작 결과를 즉시 보여주려면 같은 부모 클래스의 자식 위젯을 `Minimap` 이름으로 배치해야 한다. 이 미니맵은 실제 월드 데이터를 복제하지 않고 고정 더미 지형/마커를 그리는 프리뷰 모드로 동작한다. 테스트 UI에서는 신호 게이지 퍼센트로 계산한 임시 탐색 레벨을 현재/이전 레벨에 같이 넘겨 순수 레벨별 표시를 확인한다.
 
+`ULSMinimapWidget`은 플레이어, 적, 루팅 오브젝트, 월드 드랍 아이템, 탈출구, 지역, 퀘스트 프리뷰 마커별 기본 텍스처와 드로우 크기를 `LS/Minimap` 파라미터로 제공한다. 텍스처가 비어 있으면 기존 색상 원형 마커로 fallback한다. 실제 월드 마커는 각 `ULSMinimapMarkerComponent`의 `MarkerTexture`와 `TextureDrawSize`로 개별 override할 수 있고, 개별 텍스처가 없으면 위젯의 타입별 기본 텍스처를 사용한다.
+
 ## 표시 대상
 
 | 대상 | 연결 방식 |

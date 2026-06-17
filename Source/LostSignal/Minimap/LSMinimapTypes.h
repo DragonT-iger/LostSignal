@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "LSMinimapTypes.generated.h"
 
+class UTexture2D;
+
 UENUM(BlueprintType)
 enum class ELSMinimapMarkerType : uint8
 {
@@ -58,6 +60,12 @@ struct LOSTSIGNAL_API FLSMinimapMarkerSnapshot
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Minimap")
 	float DrawRadius = 4.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Minimap")
+	TObjectPtr<UTexture2D> MarkerTexture = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category="LS/Minimap")
+	FVector2D TextureDrawSize = FVector2D(16.0f, 16.0f);
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Minimap")
 	int32 Priority = 0;

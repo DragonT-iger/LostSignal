@@ -42,6 +42,8 @@ FLSMinimapMarkerSnapshot ULSMinimapMarkerComponent::BuildSnapshot() const
 	Snapshot.WorldLocation = Owner ? Owner->GetActorLocation() : FVector::ZeroVector;
 	Snapshot.Color = MarkerColor;
 	Snapshot.DrawRadius = DrawRadius;
+	Snapshot.MarkerTexture = MarkerTexture;
+	Snapshot.TextureDrawSize = TextureDrawSize;
 	Snapshot.Priority = Priority;
 	Snapshot.bAlwaysVisible = bAlwaysVisible;
 	Snapshot.bVisible = bVisibleOnMinimap;

@@ -9,6 +9,7 @@
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSProtocolUnlockRow.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Texture2D.h"
 #include "Fonts/SlateFontInfo.h"
 #include "Internationalization/Text.h"
 #include "LostSignal.h"
@@ -18,6 +19,7 @@
 #include "Minimap/LSMinimapSubsystem.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Styling/CoreStyle.h"
+#include "Styling/SlateBrush.h"
 #include "Vision/LSVisionOccluderComponent.h"
 #include "Vision/LSVisionSurfaceComponent.h"
 #include "Vision/LSVisionSubsystem.h"
@@ -67,6 +69,26 @@ TArray<FLSSessionItem> BuildMinimapSignalActiveEquipmentItems(const TArray<FLSSe
 	}
 
 	return ActiveItems;
+}
+
+const FSlateBrush* FindOrAddMinimapTextureBrush(UTexture2D* Texture, const FVector2D& DrawSize)
+{
+	if (!Texture)
+	{
+		return nullptr;
+	}
+
+	const FString BrushKey = FString::Printf(
+		TEXT("%s_%d_%d"),
+		*Texture->GetPathName(),
+		FMath::RoundToInt(DrawSize.X * 100.0f),
+		FMath::RoundToInt(DrawSize.Y * 100.0f));
+
+	static TMap<FString, FSlateBrush> TextureBrushes;
+	FSlateBrush& Brush = TextureBrushes.FindOrAdd(BrushKey);
+	Brush.SetResourceObject(Texture);
+	Brush.ImageSize = DrawSize;
+	return &Brush;
 }
 }
 
@@ -189,18 +211,27 @@ int32 ULSMinimapWidget::NativePaint(
 
 			const bool bOffscreen = FVector2D::Distance(Projected, Center) > Radius;
 			const FVector2D DrawPoint = bOffscreen ? ClampToMinimapEdge(Projected, Center, Radius - 4.0f) : Projected;
-			DrawFilledCircle(OutDrawElements, ++CurrentLayer, AllottedGeometry, DrawPoint, Marker.DrawRadius, ResolveMarkerColor(Marker));
+			const FLinearColor MarkerColor = ResolveMarkerColor(Marker);
+			DrawMarker(
+				OutDrawElements,
+				++CurrentLayer,
+				AllottedGeometry,
+				DrawPoint,
+				Marker.DrawRadius,
+				MarkerColor,
+				ResolveMarkerTexture(Marker),
+				ResolveMarkerTextureDrawSize(Marker));
 
 			if (ShouldDrawMarkerDistance(Marker))
 			{
-				DrawText(OutDrawElements, ++CurrentLayer, AllottedGeometry, DrawPoint + FVector2D(6.0f, -6.0f), BuildMarkerDistanceText(Marker), ResolveMarkerColor(Marker));
+				DrawText(OutDrawElements, ++CurrentLayer, AllottedGeometry, DrawPoint + FVector2D(6.0f, -6.0f), BuildMarkerDistanceText(Marker), MarkerColor);
 			}
 		}
 	}
 
 	if (IsNavigationFeatureVisible(TEXT("Player_Point"), CurrentNavigationProtocol, PreviousNavigationProtocol, true))
 	{
-		DrawFilledCircle(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, 5.0f, PlayerColor);
+		DrawMarker(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, 5.0f, PlayerColor, PlayerMarkerTexture, PlayerMarkerTextureDrawSize);
 	}
 	return CurrentLayer;
 }
@@ -407,7 +438,7 @@ void ULSMinimapWidget::DrawPreviewData(
 
 	if (IsNavigationFeatureVisible(TEXT("Player_Point"), CurrentNavigationProtocol, PreviousNavigationProtocol, true))
 	{
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center, 5.0f, PlayerColor);
+		DrawMarker(OutDrawElements, ++LayerId, Geometry, Center, 5.0f, PlayerColor, PlayerMarkerTexture, PlayerMarkerTextureDrawSize);
 	}
 }
 
@@ -447,13 +478,13 @@ void ULSMinimapWidget::DrawPreviewObjectiveMarkers(
 
 	if (IsNavigationFeatureVisible(TEXT("Minimap_Region"), CurrentNavigationProtocol, PreviousNavigationProtocol, false))
 	{
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.55f, Radius * 0.42f), 6.0f, FLinearColor(0.35f, 0.65f, 1.0f, 1.0f));
+		DrawMarker(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.55f, Radius * 0.42f), 6.0f, FLinearColor(0.35f, 0.65f, 1.0f, 1.0f), RegionMarkerTexture, RegionMarkerTextureDrawSize);
 	}
 
 	if (IsNavigationFeatureVisible(TEXT("Region_Quest"), CurrentNavigationProtocol, PreviousNavigationProtocol, false))
 	{
 		const FVector2D RegionQuestPoint = Center + FVector2D(-Radius * 0.48f, Radius * 0.32f);
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, RegionQuestPoint, 4.0f, FLinearColor(0.9f, 0.55f, 1.0f, 1.0f));
+		DrawMarker(OutDrawElements, ++LayerId, Geometry, RegionQuestPoint, 4.0f, FLinearColor(0.9f, 0.55f, 1.0f, 1.0f), QuestMarkerTexture, QuestMarkerTextureDrawSize);
 	}
 
 	const bool bShowQuest = IsNavigationFeatureVisible(TEXT("Quest"), CurrentNavigationProtocol, PreviousNavigationProtocol, false);
@@ -462,7 +493,7 @@ void ULSMinimapWidget::DrawPreviewObjectiveMarkers(
 	{
 		const FVector2D QuestPoint = Center + FVector2D(Radius * 0.12f, Radius * 0.46f);
 		const FLinearColor QuestColor(0.95f, 0.78f, 1.0f, 1.0f);
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, QuestPoint, 4.5f, QuestColor);
+		DrawMarker(OutDrawElements, ++LayerId, Geometry, QuestPoint, 4.5f, QuestColor, QuestMarkerTexture, QuestMarkerTextureDrawSize);
 		if (bShowDistance)
 		{
 			DrawText(OutDrawElements, ++LayerId, Geometry, QuestPoint + FVector2D(6.0f, -6.0f), FText::AsNumber(92), QuestColor);
@@ -473,7 +504,7 @@ void ULSMinimapWidget::DrawPreviewObjectiveMarkers(
 	{
 		const FVector2D ExitPoint = Center + FVector2D(Radius * 0.62f, -Radius * 0.58f);
 		const FLinearColor ExitColor(0.28f, 1.0f, 0.45f, 1.0f);
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, ExitPoint, 5.0f, ExitColor);
+		DrawMarker(OutDrawElements, ++LayerId, Geometry, ExitPoint, 5.0f, ExitColor, ExtractionMarkerTexture, ExtractionMarkerTextureDrawSize);
 		if (bShowDistance)
 		{
 			DrawText(OutDrawElements, ++LayerId, Geometry, ExitPoint + FVector2D(6.0f, -6.0f), FText::AsNumber(184), ExitColor);
@@ -494,11 +525,13 @@ void ULSMinimapWidget::DrawPreviewCombatMarkers(
 	const bool bShowSightPreviewLoot = IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Looting_Object"), CurrentNavigationProtocol, PreviousNavigationProtocol, false);
 	if (bShowSightPreviewLoot || bShowAllPreviewLoot)
 	{
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(Radius * 0.05f, -Radius * 0.38f), 4.0f, FLinearColor(1.0f, 0.82f, 0.18f, 1.0f));
+		const FLinearColor LootColor(1.0f, 0.82f, 0.18f, 1.0f);
+		const FLinearColor DroppedItemColor(0.25f, 1.0f, 0.42f, 1.0f);
+		DrawMarker(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(Radius * 0.05f, -Radius * 0.38f), 4.0f, LootColor, LootMarkerTexture, LootMarkerTextureDrawSize);
 		if (bShowAllPreviewLoot)
 		{
-			DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.42f, -Radius * 0.22f), 4.0f, FLinearColor(1.0f, 0.82f, 0.18f, 1.0f));
-			DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(Radius * 0.34f, Radius * 0.16f), 3.5f, FLinearColor(0.25f, 1.0f, 0.42f, 1.0f));
+			DrawMarker(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.42f, -Radius * 0.22f), 4.0f, LootColor, LootMarkerTexture, LootMarkerTextureDrawSize);
+			DrawMarker(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(Radius * 0.34f, Radius * 0.16f), 3.5f, DroppedItemColor, DroppedItemMarkerTexture, DroppedItemMarkerTextureDrawSize);
 		}
 	}
 
@@ -507,10 +540,10 @@ void ULSMinimapWidget::DrawPreviewCombatMarkers(
 	if (bShowSightPreviewEnemies || bShowAllPreviewEnemies)
 	{
 		const FLinearColor EnemyColor(1.0f, 0.12f, 0.1f, 1.0f);
-		DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.12f, -Radius * 0.52f), 4.0f, EnemyColor);
+		DrawMarker(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(-Radius * 0.12f, -Radius * 0.52f), 4.0f, EnemyColor, EnemyMarkerTexture, EnemyMarkerTextureDrawSize);
 		if (bShowAllPreviewEnemies)
 		{
-			DrawFilledCircle(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(Radius * 0.5f, Radius * 0.18f), 4.0f, EnemyColor);
+			DrawMarker(OutDrawElements, ++LayerId, Geometry, Center + FVector2D(Radius * 0.5f, Radius * 0.18f), 4.0f, EnemyColor, EnemyMarkerTexture, EnemyMarkerTextureDrawSize);
 		}
 	}
 }
@@ -786,6 +819,102 @@ void ULSMinimapWidget::DrawSightCone(FSlateWindowElementList& OutDrawElements, c
 	OutlinePoints.Add(Center + RightDirection * (Radius - 0.75f));
 	OutlinePoints.Add(Center);
 	DrawPolyline(OutDrawElements, LayerId, Geometry, OutlinePoints, Color, 1.5f, false);
+}
+
+void ULSMinimapWidget::DrawMarker(
+	FSlateWindowElementList& OutDrawElements,
+	const int32 LayerId,
+	const FGeometry& Geometry,
+	const FVector2D& Center,
+	const float DrawRadius,
+	const FLinearColor& Color,
+	UTexture2D* Texture,
+	const FVector2D& TextureDrawSize) const
+{
+	if (Texture)
+	{
+		DrawMarkerTexture(OutDrawElements, LayerId, Geometry, Center, Texture, TextureDrawSize, Color);
+		return;
+	}
+
+	DrawFilledCircle(OutDrawElements, LayerId, Geometry, Center, DrawRadius, Color);
+}
+
+void ULSMinimapWidget::DrawMarkerTexture(
+	FSlateWindowElementList& OutDrawElements,
+	const int32 LayerId,
+	const FGeometry& Geometry,
+	const FVector2D& Center,
+	UTexture2D* Texture,
+	const FVector2D& DrawSize,
+	const FLinearColor& Tint) const
+{
+	if (!Texture)
+	{
+		return;
+	}
+
+	const FVector2D SafeDrawSize(
+		FMath::Max(1.0f, DrawSize.X),
+		FMath::Max(1.0f, DrawSize.Y));
+
+	const FSlateBrush* Brush = FindOrAddMinimapTextureBrush(Texture, SafeDrawSize);
+	if (!Brush)
+	{
+		return;
+	}
+
+	FSlateDrawElement::MakeBox(
+		OutDrawElements,
+		LayerId,
+		Geometry.ToPaintGeometry(FVector2f(SafeDrawSize), FSlateLayoutTransform(FVector2f(Center - (SafeDrawSize * 0.5f)))),
+		Brush,
+		ESlateDrawEffect::None,
+		Tint);
+}
+
+UTexture2D* ULSMinimapWidget::ResolveMarkerTexture(const FLSMinimapMarkerSnapshot& Marker) const
+{
+	if (Marker.MarkerTexture)
+	{
+		return Marker.MarkerTexture;
+	}
+
+	switch (Marker.MarkerType)
+	{
+	case ELSMinimapMarkerType::Enemy:
+		return EnemyMarkerTexture;
+	case ELSMinimapMarkerType::Loot:
+		return LootMarkerTexture;
+	case ELSMinimapMarkerType::DroppedItem:
+		return DroppedItemMarkerTexture;
+	case ELSMinimapMarkerType::Extraction:
+		return ExtractionMarkerTexture;
+	default:
+		return nullptr;
+	}
+}
+
+FVector2D ULSMinimapWidget::ResolveMarkerTextureDrawSize(const FLSMinimapMarkerSnapshot& Marker) const
+{
+	if (Marker.MarkerTexture)
+	{
+		return Marker.TextureDrawSize;
+	}
+
+	switch (Marker.MarkerType)
+	{
+	case ELSMinimapMarkerType::Enemy:
+		return EnemyMarkerTextureDrawSize;
+	case ELSMinimapMarkerType::Loot:
+		return LootMarkerTextureDrawSize;
+	case ELSMinimapMarkerType::DroppedItem:
+		return DroppedItemMarkerTextureDrawSize;
+	case ELSMinimapMarkerType::Extraction:
+		return ExtractionMarkerTextureDrawSize;
+	default:
+		return FVector2D(16.0f, 16.0f);
+	}
 }
 
 void ULSMinimapWidget::DrawFilledPolygonInCircle(FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FGeometry& Geometry, const TArray<FVector2D>& Points, const FVector2D& Center, const float Radius, const FLinearColor& Color) const
