@@ -73,7 +73,6 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	{
 		MovementComponent->MaxWalkSpeed = WalkSpeed;
 		MovementComponent->MaxStepHeight = MaxAllowedStepHeight;
-		MovementComponent->SetWalkableFloorAngle(MaxWalkableSlopeAngle);
 	}
 }
 
@@ -100,6 +99,52 @@ void ALSPlayerCharacter::Tick(float DeltaSeconds)
 	UpdateActiveSkillPreview();
 	UpdateRunStamina(DeltaSeconds);
 	UpdateStaminaRecovery(DeltaSeconds);
+	UpdateClimbCeiling();
+}
+
+void ALSPlayerCharacter::UpdateClimbCeiling()
+{
+	UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
+	if (!MovementComponent)
+	{
+		return;
+	}
+
+	const float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const float CurrentBottomZ = GetActorLocation().Z - HalfHeight;
+
+	// 시작(첫 착지) 위치의 Z를 기준 바닥(최저지면)으로 1회 고정
+	if (!bBaseFloorZInitialized)
+	{
+		if (!MovementComponent->IsMovingOnGround())
+		{
+			return; // 아직 착지 전이면 기준 확정을 미룸
+		}
+		BaseFloorZ = CurrentBottomZ;
+		bBaseFloorZInitialized = true;
+	}
+
+	const float Ceiling = BaseFloorZ + MaxAllowedStepHeight;
+
+	// 1) 수직 턱(step): StepUp 게이트를 남은 높이만큼으로 조여 차단
+	if (MovementComponent->IsMovingOnGround())
+	{
+		const float Remaining = Ceiling - CurrentBottomZ;
+		MovementComponent->MaxStepHeight = FMath::Clamp(Remaining, 0.0f, MaxAllowedStepHeight);
+	}
+
+	// 2) 경사면 등 걷기로 올라가는 경로: 천장(기준 +N cm) 초과 시 하드 클램프
+	if (CurrentBottomZ > Ceiling)
+	{
+		FVector NewLocation = GetActorLocation();
+		NewLocation.Z = Ceiling + HalfHeight;
+		SetActorLocation(NewLocation, false);
+
+		if (MovementComponent->Velocity.Z > 0.0f)
+		{
+			MovementComponent->Velocity.Z = 0.0f;
+		}
+	}
 }
 
 void ALSPlayerCharacter::ApplyFacingRotation(const FRotator& NewRotation)

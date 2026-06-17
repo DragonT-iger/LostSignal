@@ -209,10 +209,11 @@ protected:
 	float StaminaRecoveryPerSecond = 20.0f;
 
 	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0"))
-	float MaxAllowedStepHeight = 10.0f;
+	float MaxAllowedStepHeight = 50.0f;
 
-	UPROPERTY(EditAnywhere, Category="LS/Movement", meta=(ClampMin="0.0", ClampMax="90.0"))
-	float MaxWalkableSlopeAngle = 5.0f;
+	// 시작(첫 착지) 위치 Z로 1회 고정되는 기준 바닥. climb 천장 = BaseFloorZ + MaxAllowedStepHeight
+	float BaseFloorZ = 0.0f;
+	bool bBaseFloorZInitialized = false;
 
 	UPROPERTY(EditAnywhere, Category="LS/Camera")
 	float TopDownCameraPitch = -60.0f;
@@ -291,6 +292,7 @@ private:
 	bool IsMovingForRunStaminaDrain() const;
 	void UpdateRunStamina(float DeltaSeconds);
 	void UpdateStaminaRecovery(float DeltaSeconds);
+	void UpdateClimbCeiling();
 	bool HasStamina(float RequiredAmount) const;
 	bool TrySpendStamina(float Amount);
 	bool TrySpendRunStamina(float Amount);
