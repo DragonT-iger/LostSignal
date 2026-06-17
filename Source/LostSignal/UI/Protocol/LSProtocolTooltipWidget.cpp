@@ -92,6 +92,13 @@ FText GetEnableDisplayText(const FName EnableName)
 		{ TEXT("Minimap_View_Angle_Enemy"), LOCTEXT("MinimapViewAngleEnemy", "시야각 안 적 위치 UI 표시") },
 		{ TEXT("Minimap_View_Angle_Looting_Object"), LOCTEXT("MinimapViewAngleLootingObject", "시야각 안 루팅 오브젝트 UI 표시") },
 		{ TEXT("Protected_Level"), LOCTEXT("ProtectedLevel", "해금 정보 보호") },
+		{ TEXT("Damage_Value"), LOCTEXT("DamageValue", "데미지 수치 표시") },
+		{ TEXT("Skill"), LOCTEXT("Skill", "스킬 슬롯 UI 표시") },
+		{ TEXT("Skill_Cooldown_Bar"), LOCTEXT("SkillCoolDownBar", "스킬 쿨타임 게이지 바 UI 표시") },
+		{ TEXT("Skill_Effect_Duration"), LOCTEXT("SkillEffectDuration", "버프 스킬, 상태이상 UI 표시") },
+		{ TEXT("Skill_Time"), LOCTEXT("SkillTime", "스킬 캐스팅 시간 표시") },
+		{ TEXT("Enemy_Attack_Timing"), LOCTEXT("EnemyAttackTiming", "적 공격 타이밍 표시") },
+		{ TEXT("View_Angle"), LOCTEXT("ViewAngle", "시야각 증가") },
 	};
 
 	const FName NormalizedEnableName = LSProtocol::NormalizeProtocolEnableName(EnableName);
