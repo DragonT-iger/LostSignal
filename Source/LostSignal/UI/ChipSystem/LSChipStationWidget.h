@@ -7,6 +7,8 @@
 
 enum class ELSInventorySlotArea : uint8;
 
+struct FLSSessionItem;
+
 class UBorder;
 class UDragDropOperation;
 class UProgressBar;
@@ -64,6 +66,7 @@ protected:
 	void InitializeEquipmentSlots();
 	void SetPreviewMinimapNavigationLevels(int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol);
 	void SetPreviewSurvivalStatus(int32 CurrentSurvivalProtocol, int32 PreviousSurvivalProtocol);
+	void SetPreviewSignalChip(const TArray<FLSSessionItem>& EquipmentItems, float SignalPercent);
 	void SetPreviewBattleProtocol(int32 CurrentBattleProtocol, int32 PreviousBattleProtocol);
 	bool IsPointerInsideChipSlotBorder(FVector2D ScreenPosition) const;
 	float GetSignalGaugePercent() const;

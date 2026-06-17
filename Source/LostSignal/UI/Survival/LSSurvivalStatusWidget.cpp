@@ -9,21 +9,53 @@
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSProtocolUnlockRow.h"
+#include "Engine/Texture2D.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "LostSignal.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSubsystem.h"
+#include "Inventory/LSInventorySlotUtils.h"
 
 #define LOCTEXT_NAMESPACE "LSSurvivalStatusWidget"
 
 namespace
 {
 const FName ProgressParameterName(TEXT("Progress"));
+const FName IconTextureParameterName(TEXT("IconTexture"));
 constexpr int32 HealthProgressFillProtocolLevel = 2;
 constexpr int32 HealthPreviewFillProtocolLevel = 3;
 constexpr int32 StaminaProgressFillProtocolLevel = 2;
+
+FString BuildChipIconObjectPath(const FName ChipItemRowName)
+{
+	const FString IconName = ChipItemRowName.ToString();
+	return FString::Printf(TEXT("/Game/LostSignal/UI/Icons/Chips/%s.%s"), *IconName, *IconName);
+}
+
+int32 CalculateDisappearingSignalSlotIndex(const float SignalPercent)
+{
+	const float ClampedPercent = FMath::Clamp(SignalPercent, 0.0f, 1.0f);
+	if (ClampedPercent <= 0.0f)
+	{
+		return INDEX_NONE;
+	}
+
+	return FMath::Clamp(FMath::FloorToInt((1.0f - ClampedPercent) * 10.0f + KINDA_SMALL_NUMBER), 0, 9);
+}
+
+float CalculateSignalSlotDisappearProgress(const float SignalPercent, const int32 SlotIndex)
+{
+	if (SlotIndex == INDEX_NONE)
+	{
+		return 0.0f;
+	}
+
+	const float ClampedPercent = FMath::Clamp(SignalPercent, 0.0f, 1.0f);
+	const float SlotInactiveThreshold = 1.0f - (static_cast<float>(SlotIndex + 1) * 0.1f);
+	return FMath::Clamp((ClampedPercent - SlotInactiveThreshold) / 0.1f, 0.0f, 1.0f);
+}
 
 FText BuildSurvivalStatusValueText(const float CurrentValue, const float MaxValue)
 {
@@ -62,6 +94,10 @@ void ULSSurvivalStatusWidget::NativeConstruct()
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s is missing required survival widget binding: SurvivalCooldownRingImage."), *GetNameSafe(this));
 	}
+	if (!ChipImage)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required survival widget binding: ChipImage."), *GetNameSafe(this));
+	}
 
 	if (SurvivalCooldownRingImage)
 	{
@@ -69,6 +105,14 @@ void ULSSurvivalStatusWidget::NativeConstruct()
 		if (!SurvivalCooldownRingMaterial)
 		{
 			UE_LOG(LogLS, Warning, TEXT("%s cannot create survival cooldown ring material. Check SurvivalCooldownRingImage brush material."), *GetNameSafe(this));
+		}
+	}
+	if (ChipImage)
+	{
+		ChipImageMaterial = ChipImage->GetDynamicMaterial();
+		if (!ChipImageMaterial)
+		{
+			UE_LOG(LogLS, Warning, TEXT("%s cannot create chip image material. Check ChipImage brush material uses M_UI_CircleIcon."), *GetNameSafe(this));
 		}
 	}
 
@@ -80,6 +124,7 @@ void ULSSurvivalStatusWidget::NativeConstruct()
 	{
 		SetRingCooldownProgress(0.0f);
 	}
+	ClearPreviewSignalChip();
 
 	RefreshDisplay();
 }
@@ -173,11 +218,43 @@ void ULSSurvivalStatusWidget::StartPreviewRingCooldown(float Duration)
 	SetRingCooldownProgress(PreviewRingCooldownDuration > 0.0f ? 1.0f : 0.0f);
 }
 
+void ULSSurvivalStatusWidget::SetPreviewSignalChip(const FName ChipItemRowName, const float DisappearProgress)
+{
+	if (ChipItemRowName.IsNone())
+	{
+		ClearPreviewSignalChip();
+		return;
+	}
+
+	if (PreviewSignalChipRowName != ChipItemRowName)
+	{
+		UTexture2D* IconTexture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *BuildChipIconObjectPath(ChipItemRowName)));
+		if (!IconTexture)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Failed to load preview signal chip icon for row '%s' on %s."), *ChipItemRowName.ToString(), *GetNameSafe(this));
+		}
+
+		SetChipImageTexture(IconTexture);
+		PreviewSignalChipRowName = IconTexture ? ChipItemRowName : NAME_None;
+	}
+	else if (ChipImage)
+	{
+		ChipImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+
+	PreviewRingCooldownRemaining = 0.0f;
+	SetRingCooldownProgress(DisappearProgress);
+}
+
 void ULSSurvivalStatusWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
 	RefreshPreviewRingCooldown(InDeltaTime);
+	if (!bUsePreviewSurvivalStatus)
+	{
+		RefreshSignalChipFromSave();
+	}
 	if (HealthPreviewRemaining > 0.0f && HealthPreviewDuration > 0.0f)
 	{
 		HealthPreviewRemaining = FMath::Max(HealthPreviewRemaining - InDeltaTime, 0.0f);
@@ -311,6 +388,31 @@ void ULSSurvivalStatusWidget::RefreshPreviewRingCooldown(float InDeltaTime)
 	SetRingCooldownProgress(PreviewRingCooldownRemaining / PreviewRingCooldownDuration);
 }
 
+void ULSSurvivalStatusWidget::RefreshSignalChipFromSave()
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		ClearPreviewSignalChip();
+		return;
+	}
+
+	const float SignalPercent = SaveSubsystem->GetChipSignalGaugePercent();
+	const int32 DisappearingSlotIndex = CalculateDisappearingSignalSlotIndex(SignalPercent);
+	const TArray<FLSSessionItem>& EquipmentItems = SaveSubsystem->GetChipEquipmentSlots();
+	const FLSSessionItem* DisappearingItem = EquipmentItems.IsValidIndex(DisappearingSlotIndex)
+		? &EquipmentItems[DisappearingSlotIndex]
+		: nullptr;
+	if (!DisappearingItem || !LSInventorySlotUtils::IsFilled(*DisappearingItem))
+	{
+		ClearPreviewSignalChip();
+		return;
+	}
+
+	SetPreviewSignalChip(DisappearingItem->ItemRowName, CalculateSignalSlotDisappearProgress(SignalPercent, DisappearingSlotIndex));
+}
+
 void ULSSurvivalStatusWidget::SetRingCooldownProgress(float Progress)
 {
 	if (SurvivalCooldownRingImage)
@@ -321,6 +423,36 @@ void ULSSurvivalStatusWidget::SetRingCooldownProgress(float Progress)
 	{
 		SurvivalCooldownRingMaterial->SetScalarParameterValue(ProgressParameterName, FMath::Clamp(Progress, 0.0f, 1.0f));
 	}
+}
+
+void ULSSurvivalStatusWidget::SetChipImageTexture(UTexture2D* Texture)
+{
+	if (!ChipImage)
+	{
+		return;
+	}
+
+	if (!Texture)
+	{
+		ChipImage->SetVisibility(ESlateVisibility::Collapsed);
+		return;
+	}
+
+	if (ChipImageMaterial)
+	{
+		ChipImageMaterial->SetTextureParameterValue(IconTextureParameterName, Texture);
+	}
+	else
+	{
+		ChipImage->SetBrushFromTexture(Texture);
+	}
+	ChipImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+void ULSSurvivalStatusWidget::ClearPreviewSignalChip()
+{
+	PreviewSignalChipRowName = NAME_None;
+	SetChipImageTexture(nullptr);
 }
 
 void ULSSurvivalStatusWidget::ResolveSurvivalProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const

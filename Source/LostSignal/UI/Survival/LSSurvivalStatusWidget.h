@@ -12,6 +12,7 @@ class UImage;
 class UMaterialInstanceDynamic;
 class UProgressBar;
 class UTextBlock;
+class UTexture2D;
 class UWidget;
 struct FOnAttributeChangeData;
 
@@ -39,6 +40,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Survival")
 	void StartPreviewRingCooldown(float Duration);
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Survival")
+	void SetPreviewSignalChip(FName ChipItemRowName, float DisappearProgress);
+
 protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
@@ -60,6 +64,9 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UImage> SurvivalCooldownRingImage;
 
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UImage> ChipImage;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Survival", meta=(ClampMin="0.0"))
 	float PreviewRingCooldownDuration = 5.0f;
 
@@ -80,7 +87,10 @@ private:
 	void RefreshDisplay();
 	void RefreshVisibility();
 	void RefreshPreviewRingCooldown(float InDeltaTime);
+	void RefreshSignalChipFromSave();
 	void SetRingCooldownProgress(float Progress);
+	void SetChipImageTexture(UTexture2D* Texture);
+	void ClearPreviewSignalChip();
 	void ResolveSurvivalProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const;
 	bool IsSurvivalFeatureVisible(FName EnableName) const;
 	void SetWidgetVisibility(UWidget* Widget, bool bVisible) const;
@@ -90,6 +100,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> SurvivalCooldownRingMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ChipImageMaterial;
+
+	UPROPERTY(Transient)
+	FName PreviewSignalChipRowName;
 
 	UPROPERTY(Transient)
 	bool bUsePreviewSurvivalStatus = false;

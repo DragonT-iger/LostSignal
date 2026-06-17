@@ -116,6 +116,29 @@ int32 CalculateInactiveSignalSlotCount(const float SignalPercent)
 	return FMath::Clamp(FMath::FloorToInt((100.0f - SignalPercent100 + KINDA_SMALL_NUMBER) / 10.0f), 0, 10);
 }
 
+int32 CalculateDisappearingSignalSlotIndex(const float SignalPercent)
+{
+	const float ClampedPercent = FMath::Clamp(SignalPercent, 0.0f, 1.0f);
+	if (ClampedPercent <= 0.0f)
+	{
+		return INDEX_NONE;
+	}
+
+	return FMath::Clamp(FMath::FloorToInt((1.0f - ClampedPercent) * 10.0f + KINDA_SMALL_NUMBER), 0, 9);
+}
+
+float CalculateSignalSlotDisappearProgress(const float SignalPercent, const int32 SlotIndex)
+{
+	if (SlotIndex == INDEX_NONE)
+	{
+		return 0.0f;
+	}
+
+	const float ClampedPercent = FMath::Clamp(SignalPercent, 0.0f, 1.0f);
+	const float SlotInactiveThreshold = 1.0f - (static_cast<float>(SlotIndex + 1) * 0.1f);
+	return FMath::Clamp((ClampedPercent - SlotInactiveThreshold) / 0.1f, 0.0f, 1.0f);
+}
+
 int32 CalculateTemporaryProtocolPreviewLevel(const float SignalPercent)
 {
 	const float ClampedPercent = FMath::Clamp(SignalPercent, 0.0f, 1.0f);
@@ -391,6 +414,7 @@ void ULSChipStationWidget::RefreshEquippedChipSummary()
 	const int32 TemporaryProtocolLevel = CalculateTemporaryProtocolPreviewLevel(GetSignalGaugePercent());
 	SetPreviewMinimapNavigationLevels(TemporaryProtocolLevel, TemporaryProtocolLevel);
 	SetPreviewSurvivalStatus(TemporaryProtocolLevel, TemporaryProtocolLevel);
+	SetPreviewSignalChip(EquipmentItems, GetSignalGaugePercent());
 	SetPreviewBattleProtocol(TemporaryProtocolLevel, TemporaryProtocolLevel);
 	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), ELSProtocolType::Survival, TemporaryProtocolLevel, TemporaryProtocolLevel);
 	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), ELSProtocolType::Carrying, TemporaryProtocolLevel, TemporaryProtocolLevel);
@@ -632,6 +656,28 @@ void ULSChipStationWidget::SetPreviewSurvivalStatus(const int32 CurrentSurvivalP
 	{
 		SoundIndicator->HideSoundDirection();
 	}
+}
+
+void ULSChipStationWidget::SetPreviewSignalChip(const TArray<FLSSessionItem>& EquipmentItems, const float SignalPercent)
+{
+	if (!SurvivalStatus)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SurvivalStatus is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	const int32 DisappearingSlotIndex = CalculateDisappearingSignalSlotIndex(SignalPercent);
+	const FLSSessionItem* DisappearingItem = EquipmentItems.IsValidIndex(DisappearingSlotIndex)
+		? &EquipmentItems[DisappearingSlotIndex]
+		: nullptr;
+	if (!DisappearingItem || !LSInventorySlotUtils::IsFilled(*DisappearingItem))
+	{
+		SurvivalStatus->SetPreviewSignalChip(NAME_None, 0.0f);
+		return;
+	}
+
+	const float DisappearProgress = CalculateSignalSlotDisappearProgress(SignalPercent, DisappearingSlotIndex);
+	SurvivalStatus->SetPreviewSignalChip(DisappearingItem->ItemRowName, DisappearProgress);
 }
 
 void ULSChipStationWidget::SetPreviewBattleProtocol(const int32 CurrentBattleProtocol, const int32 PreviousBattleProtocol)
