@@ -71,6 +71,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TArray<TObjectPtr<ULSPassiveSkillDataAsset>> PassiveSkills;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/Skill|Debug")
+	bool bAlwaysShowSkillPreviewDebug = false;
+
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill")
 	TObjectPtr<ULSSkillDataAsset> ActiveSkillData;
 

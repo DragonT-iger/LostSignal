@@ -265,6 +265,13 @@ void ULSGA_Execution::PerformSheathHit()
 		{
 			UniqueTargets.Add(TargetActor);
 			++ValidHitCount;
+
+			// 스킬 row에 정의된 상태이상을 명중 대상/자신에게 적용한다(서버 권위).
+			if (bHasCachedSkillRow)
+			{
+				SourceCombatComponent->ApplyStatusEffectFromRow(CachedSkillRow.Status_ID, CachedSkillRow.Effect_Target, CachedSkillRow.Skill_Effect_Duration, TargetActor);
+				SourceCombatComponent->ApplyStatusEffectFromRow(CachedSkillRow.Status_ID_2, CachedSkillRow.Effect_Target_2, CachedSkillRow.Skill_Effect_Duration_2, TargetActor);
+			}
 		}
 	}
 

@@ -74,6 +74,11 @@ Protocol_Enable_Name = Skill_Range
 Protocol_Required_Level = 2
 ```
 
+디버그 예외:
+
+- `ULSPlayerSkillComponent::bAlwaysShowSkillPreviewDebug`가 켜져 있으면 전투 프로토콜 레벨과 관계없이 스킬 범위 프리뷰 메시를 표시한다.
+- 이 플래그는 로컬 디버깅 전용이다. 쿨타임, 스킬 데이터 유효성, 서버 발동 판정은 우회하지 않는다.
+
 ```text
 Protocol_Enable_Type = Battle
 Protocol_Enable_Name = Skill_Cooldown

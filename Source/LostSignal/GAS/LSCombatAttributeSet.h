@@ -3,14 +3,11 @@
 #include "AbilitySystemComponent.h"
 #include "AttributeSet.h"
 #include "CoreMinimal.h"
+#include "GAS/LSAttributeSetMacros.h"
 #include "LSCombatAttributeSet.generated.h"
 
-#define LS_ATTRIBUTE_ACCESSORS(ClassName, PropertyName)        \
-	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
-	GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName)               \
-	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName)               \
-	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
-
+// 생명력 풀 전담 AttributeSet: MaxHealth / CurrentHealth + 데미지 적용용 임시 Damage.
+// 공격/방어/치명/관통/쿨감/이동/대시/스태미나 같은 능력치는 ULSCharacterAttributeSet이 보유한다.
 UCLASS()
 class LOSTSIGNAL_API ULSCombatAttributeSet : public UAttributeSet
 {

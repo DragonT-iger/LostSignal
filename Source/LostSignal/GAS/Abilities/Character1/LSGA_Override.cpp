@@ -261,6 +261,13 @@ void ULSGA_Override::ActivateAbility(
 
 		++ValidHitCount;
 
+		// 스킬 row에 정의된 상태이상(스탯 디버프 등)을 명중 대상/자신에게 적용한다. CC_Type 처리와는 별개.
+		if (Row)
+		{
+			SourceCombatComponent->ApplyStatusEffectFromRow(Row->Status_ID, Row->Effect_Target, Row->Skill_Effect_Duration, TargetActor);
+			SourceCombatComponent->ApplyStatusEffectFromRow(Row->Status_ID_2, Row->Effect_Target_2, Row->Skill_Effect_Duration_2, TargetActor);
+		}
+
 		if (ResolvedCCType == ELSCharacterSkillCrowdControlType::None)
 		{
 			continue;

@@ -353,17 +353,24 @@ Combo Attack row의 시간 값은 기본 공격 Ability에서 사용한다. `Com
 
 `ULSGameDataSubsystem`은 GameplayEffect를 직접 적용하지 않는다. Subsystem이 GE까지 적용하면 데이터 조회, 게임 규칙, 대상 ASC 처리, 서버 권한 처리가 한 곳에 섞여 테스트와 멀티 전환이 어려워진다.
 
-상태이상 적용 흐름:
+상태이상 적용 흐름 (구현됨):
 
 ```text
-GameplayAbility 서버 권한에서 명중/대상 확정
--> Skill row의 Status_ID / Effect_Target / Skill_Effect_Duration 확인
--> ULSGameDataSubsystem에서 FLSStatusEffectRow 조회
--> 대상 Actor의 ULSStatusEffectComponent에 적용 요청
--> ULSStatusEffectComponent가 Source ASC / Target ASC 확인
--> FLSStatusEffectRow의 Stack_Rule / Max_Stack / Stat_Modifiers 기준으로 GameplayEffect Spec 생성
--> Target ASC에 GameplayEffect 적용
+GameplayAbility/콤보 서버 권한에서 명중/대상 확정
+-> ULSCharacterCombatComponent::ApplyStatusEffectFromRow(StatusID, Effect_Target, Duration, HitTarget)
+   (Effect_Target: Self=자신, Target=피격 대상, Ally=미지원)
+-> 대상 Actor의 ULSStatusEffectComponent::ApplyStatusEffectByID
+-> ULSGameDataSubsystem::FindStatusEffectRowByID로 FLSStatusEffectRow 조회
+-> Stat_Modifiers의 Target_Stat -> 어트리뷰트 매핑 (Char_*/Mon_* -> ULSCharacterAttributeSet)
+-> Stack_Rule / Max_Stack에 따라 동적 UGameplayEffect 생성 (Flat=Additive, Percent=Multiplicitive)
+-> 대상 ASC에 적용, 어트리뷰트 복제로 클라 반영
 ```
+
+구현 메모:
+- 진입점은 `ULSCharacterCombatComponent::ApplyStatusEffectFromRow` (스킬/콤보 공용). 액티브 스킬(Override/Overclock/Execution)과 기본 공격 콤보 명중 시 row의 `Status_ID`/`Status_ID_2`를 적용한다.
+- `Stat_Modifiers` 배열을 단일 출처로 쓰고 평면 `Target_Stat`/`_2`는 배열이 빈 경우만 fallback (CSV 중복 컬럼 이중 집계 방지).
+- **전투가속 패시브는 이 컴포넌트로 통합하지 않는다.** 전투가속은 전용 `ULSGE_CombatAcceleration`(네이티브 GE 스태킹 AggregateBySource·StackLimit=5 + `UTargetTagsGameplayEffectComponent`로 `LS.Buff.CombatAcceleration` 부여)을 쓰고, Overclock/Execution이 그 부여 태그와 `GetCurrentStackCount`로 스택을 소비한다. 동적 GE는 호출마다 다른 객체라 네이티브 스태킹을 합칠 수 없으므로 이 계약을 재현할 수 없다. 범용 컴포넌트는 그런 특수 계약이 없는 신규 상태이상(Refresh/단일 스택 디버프 등)에 쓴다.
+- 미지원: `CC`/`Tag` 그룹(기절·무적 등 — Status_ID→GameplayTag 매핑/데이터 필요), 자원 stat(예: `2002`), 일반 패시브 `Skill_Effects[]` 배열 배선, ShortCircuit 장판/Bypass 경로. 버프 아이콘 UI(`LSCombatBuffListWidget`)는 현재 `LS.Buff.*` 부여 태그를 감시하므로, 범용 컴포넌트가 적용하는 신규 버프를 표시하려면 부여 태그 연동이 별도로 필요하다.
 
 책임 분리:
 
@@ -394,7 +401,7 @@ GameplayAbility 서버 권한에서 명중/대상 확정
 2. 패시브 스킬 row는 `FLSCharacterPassiveSkillRow`로 분리한다.
 3. 상태이상 row는 `FLSStatusEffectRow`로 분리한다.
 4. `ULSGameDataSettings`와 `ULSGameDataSubsystem`으로 액티브, 패시브, 상태이상 테이블 조회를 연결한다.
-5. `ULSStatusEffectComponent`를 추가하고 `Self` / `Target` 상태이상 적용만 우선 구현한다.
+5. `ULSStatusEffectComponent`를 추가하고 `Self` / `Target` 상태이상 적용만 우선 구현한다. (완료 — Buff/Debuff stat modifier 적용. `Ally`·`CC`/`Tag`·자원 stat은 미지원.)
 6. 이후 Resource 테이블 조회를 같은 Subsystem 구조로 확장한다.
 
 ## 데미지 구조

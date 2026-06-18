@@ -168,6 +168,13 @@ void ULSGA_Overclock::ActivateAbility(
 			ResolvedBreakPower))
 		{
 			++ValidHitCount;
+
+			// 스킬 row에 정의된 상태이상을 명중 대상/자신에게 적용한다(서버 권위).
+			if (Row)
+			{
+				SourceCombatComponent->ApplyStatusEffectFromRow(Row->Status_ID, Row->Effect_Target, Row->Skill_Effect_Duration, TargetActor);
+				SourceCombatComponent->ApplyStatusEffectFromRow(Row->Status_ID_2, Row->Effect_Target_2, Row->Skill_Effect_Duration_2, TargetActor);
+			}
 		}
 	}
 

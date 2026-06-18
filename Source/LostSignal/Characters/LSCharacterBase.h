@@ -11,6 +11,7 @@ class UGameplayAbility;
 class UAnimMontage;
 class ULSCharacterCombatComponent;
 class ULSCombatStateComponent;
+class ULSStatusEffectComponent;
 
 UCLASS(Abstract)
 class LOSTSIGNAL_API ALSCharacterBase : public ACharacter, public IAbilitySystemInterface
@@ -30,6 +31,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	ULSCombatStateComponent* GetCombatStateComponent() const { return CombatStateComponent; }
+
+	UFUNCTION(BlueprintPure, Category="LS/StatusEffect")
+	ULSStatusEffectComponent* GetStatusEffectComponent() const { return StatusEffectComponent; }
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastPlayLSMontage(UAnimMontage* Montage, FName StartSection = NAME_None, float PlayRate = 1.0f);
@@ -59,4 +63,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Combat")
 	TObjectPtr<ULSCombatStateComponent> CombatStateComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/StatusEffect")
+	TObjectPtr<ULSStatusEffectComponent> StatusEffectComponent;
 };

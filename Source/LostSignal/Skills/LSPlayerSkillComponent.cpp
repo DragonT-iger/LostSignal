@@ -382,6 +382,11 @@ bool ULSPlayerSkillComponent::CanUseLocalPreview() const
 
 bool ULSPlayerSkillComponent::IsSkillRangeProtocolVisible() const
 {
+	if (bAlwaysShowSkillPreviewDebug)
+	{
+		return true;
+	}
+
 	int32 CurrentLevel = 0;
 	int32 PreviousLevel = 0;
 	ResolveBattleProtocolLevels(CurrentLevel, PreviousLevel);

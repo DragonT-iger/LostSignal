@@ -84,7 +84,7 @@ Chase_Speed
 Action_Group
 ```
 
-현재 코드 연결 기준:
+현재 코드 연결 기준 (AttributeSet 역할: `ULSCombatAttributeSet`=체력 전담, `ULSCharacterAttributeSet`=공격/방어 등 능력치 전담):
 
 ```text
 Sight_Radius

@@ -651,6 +651,13 @@ int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection, 
 			BasicAttackBreakPower))
 		{
 			UniqueTargets.Add(HitActor);
+
+			// 콤보 row에 정의된 상태이상을 명중 대상/자신에게 적용한다(서버 권위).
+			if (ComboRow)
+			{
+				SharedCombatComponent->ApplyStatusEffectFromRow(ComboRow->Status_ID, ComboRow->Effect_Target, ComboRow->Effect_Duration, HitActor);
+				SharedCombatComponent->ApplyStatusEffectFromRow(ComboRow->Status_ID_2, ComboRow->Effect_Target_2, ComboRow->Effect_Duration_2, HitActor);
+			}
 		}
 	}
 

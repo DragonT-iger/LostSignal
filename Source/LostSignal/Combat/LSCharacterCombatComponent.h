@@ -13,6 +13,7 @@ class ALSCharacterBase;
 class UAbilitySystemComponent;
 class UGameplayEffect;
 struct FOnAttributeChangeData;
+enum class ELSCharacterSkillEffectTarget : uint8;
 
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
 class LOSTSIGNAL_API ULSCharacterCombatComponent : public UActorComponent
@@ -61,6 +62,13 @@ public:
 		float AttackCoefficient = 0.0f,
 		bool bCanCrit = false,
 		ELSBreakPowerTier BreakPowerTier = ELSBreakPowerTier::NormalAttack) const;
+
+	/**
+	 * DataTable row의 상태이상 항목 하나를 Effect_Target에 따라 자신/대상에게 적용한다(서버 전용).
+	 * 스킬/콤보 row가 공통으로 사용하는 진입점. 실제 적용은 대상의 ULSStatusEffectComponent가 담당한다.
+	 * @return 적용되면 true (StatusID<=0, None/Ally 대상, 컴포넌트 부재 시 false)
+	 */
+	bool ApplyStatusEffectFromRow(int32 StatusID, ELSCharacterSkillEffectTarget EffectTarget, float Duration, AActor* HitTarget) const;
 
 protected:
 	virtual void BeginPlay() override;

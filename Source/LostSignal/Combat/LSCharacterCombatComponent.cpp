@@ -10,7 +10,9 @@
 #include "Characters/LSEnemyCharacter.h"
 #include "Characters/LSPlayerCharacter.h"
 #include "Combat/LSCombatStateComponent.h"
+#include "Combat/LSStatusEffectComponent.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Data/LSCharacterSkillRow.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -256,6 +258,46 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 	}
 
 	return true;
+}
+
+bool ULSCharacterCombatComponent::ApplyStatusEffectFromRow(int32 StatusID, ELSCharacterSkillEffectTarget EffectTarget, float Duration, AActor* HitTarget) const
+{
+	if (StatusID <= 0)
+	{
+		return false;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor || !OwnerActor->HasAuthority())
+	{
+		return false;
+	}
+
+	AActor* EffectActor = nullptr;
+	switch (EffectTarget)
+	{
+	case ELSCharacterSkillEffectTarget::Self:
+		EffectActor = OwnerActor;
+		break;
+	case ELSCharacterSkillEffectTarget::Target:
+		EffectActor = HitTarget;
+		break;
+	case ELSCharacterSkillEffectTarget::Ally:
+		// 아군 타겟팅 정책이 정해지면 확장한다.
+		UE_LOG(LogLS, Verbose, TEXT("StatusEffect: Effect_Target=Ally는 아직 미지원 (StatusID=%d)."), StatusID);
+		return false;
+	default:
+		return false; // None
+	}
+
+	ALSCharacterBase* EffectCharacter = Cast<ALSCharacterBase>(EffectActor);
+	ULSStatusEffectComponent* StatusEffectComponent = EffectCharacter ? EffectCharacter->GetStatusEffectComponent() : nullptr;
+	if (!StatusEffectComponent)
+	{
+		return false;
+	}
+
+	return StatusEffectComponent->ApplyStatusEffectByID(StatusID, OwnerActor, Duration);
 }
 
 void ULSCharacterCombatComponent::BeginPlay()

@@ -271,8 +271,17 @@ GameplayAbility::ActivateAbility
 -> Source ASC와 Target ASC 지정
 -> Target ASC에 GameplayEffect 적용
 -> ULSDamageExecutionCalculation 실행
--> ULSCharacterAttributeSet.Health 변경
+-> ULSCombatAttributeSet.CurrentHealth 변경
 ```
+
+AttributeSet 역할 분리:
+
+```text
+ULSCombatAttributeSet     생명력 풀 전담 (MaxHealth / CurrentHealth + 데미지 적용용 임시 Damage)
+ULSCharacterAttributeSet  캐릭터 능력치 전담 (공격/방어/치명/관통/쿨감/이동/대시/스태미나)
+```
+
+데미지 계산은 `ULSCharacterAttributeSet`의 공격/방어 수치를 읽어 최종값을 `ULSCombatAttributeSet.CurrentHealth`에 반영한다.
 
 ASC와 AttributeSet 관계:
 
