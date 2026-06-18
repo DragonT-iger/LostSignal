@@ -159,7 +159,7 @@ Protocol_Required_Level = 5
 | `ULSSkillBarWidget` | `Skill_Slot` 해금 여부에 따라 스킬 슬롯 UI 표시 여부를 결정한다. |
 | `ULSSkillSlotWidget` | `Skill_Cooldown`/`Skill_Cooldown_Gauge` 해금 여부에 따라 쿨타임 숫자와 게이지바를 분리 표시한다. |
 | `ULSPlayerSkillComponent` | `Skill_Range` 해금 여부에 따라 스킬 범위 메시 표시 여부를 결정한다. |
-| `ULSChipStationWidget` | 칩 신호율 임시 레벨을 전투 프로토콜 프리뷰로 전달한다. |
+| `ULSChipStationWidget` | 디버그 패널이 떠 있고 오버라이드가 설정됐을 때만 그 값을, 아니면 장착 칩 프로토콜 합산값을 프리뷰로 전달한다. |
 | `ULSCombatBuffListWidget` | `Buff_Duration` 해금 여부에 따라 플레이어 버프 지속 시간 목록을 표시한다. |
 | `ULSCombatBuffIconWidget` | 버프 하나의 아이콘 이미지, 스택 텍스트, 남은 시간 게이지를 표시한다. |
 | `ULSSkillCastGaugeWidget` | `Skill_Casting_Gauge` 해금 여부에 따라 캐스팅 진행률을 표시한다. |
@@ -170,7 +170,7 @@ Protocol_Required_Level = 5
 
 `WBP_ChipStation`에는 전투 프로토콜 프리뷰용 `SkillBar` 자식 위젯을 둔다. 이 위젯의 부모 클래스는 `ULSSkillBarWidget`이다.
 
-칩스테이션은 신호율 슬라이더 값으로 임시 프로토콜 레벨을 계산하고, `SetPreviewBattleProtocol`을 통해 `ULSSkillBarWidget::SetPreviewBattleProtocolLevels`에 전달한다. 이 프리뷰 값은 칩스테이션 내부 표시 전용이며 실제 플레이 HUD의 전투 프로토콜 레벨을 변경하지 않는다.
+칩스테이션은 기본적으로 장착 칩의 전투 프로토콜 합산값(현재=신호 활성 칩, 이전=전체 칩)을 `SetPreviewBattleProtocol`을 통해 `ULSSkillBarWidget::SetPreviewBattleProtocolLevels`에 전달한다. 프로토콜 디버그 패널이 떠 있고 오버라이드가 설정됐을 때만 그 디버그 값을 따른다. 신호율 슬라이더는 활성 칩 집합을 바꿔 현재 레벨에 반영된다. 이 프리뷰 값은 칩스테이션 내부 표시 전용이며 실제 플레이 HUD의 전투 프로토콜 레벨을 변경하지 않는다. 디버그 패널을 토글하거나 값을 바꾸면 `ALSPlayerControllerBase::RefreshProtocolTestTargets`가 열린 칩스테이션을 다시 그려 로비에서도 즉시 반영된다.
 
 스킬 범위 표시는 새 `UUserWidget`을 만들지 않고 기존 `ULSSkillPreviewComponent`와 `FLSSkillAreaPreviewSpec` 흐름을 사용한다. 적 공격 범위 표시는 공격 판정 데이터와 연결되어야 하므로 4단계 구현 시 월드 메시/데칼/머티리얼 방식 중 하나로 별도 결정한다.
 

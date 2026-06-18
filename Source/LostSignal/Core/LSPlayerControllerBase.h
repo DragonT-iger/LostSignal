@@ -17,9 +17,11 @@ class UInputMappingContext;
 class ULSLobbyStorageWidget;
 class ULSChipStationWidget;
 class ULSRaidInventoryComponent;
+class ULSSaveSubsystem;
 class ULSHpDebugWidget;
 class ULSLootDropWidget;
 class ULSPlayerHUDWidget;
+class ULSProtocolDebugWidget;
 struct FLSNoiseEvent;
 
 UCLASS(Abstract)
@@ -98,10 +100,21 @@ public:
 	UFUNCTION(Exec)
 	void LSClearProtocolTest();
 
+	// 시연용: 프로토콜 조정 패널 토글 (기본 F1, 콘솔 백업 경로 제공).
+	UFUNCTION(Exec)
+	void LSToggleProtocolDebug();
+
+	void ToggleProtocolDebugWidget();
+
+	// 프로토콜 디버그 패널이 현재 화면에 떠 있는지. 칩스테이션은 패널이 떠 있을 때만 오버라이드를 따른다.
+	bool IsProtocolDebugWidgetVisible() const;
+
 	bool HasSurvivalProtocolTestLevel() const { return HasProtocolTestLevel(ELSProtocolType::Survival); }
 	int32 GetSurvivalProtocolTestLevel() const { return GetProtocolTestLevel(ELSProtocolType::Survival); }
 	bool HasProtocolTestLevel(ELSProtocolType ProtocolType) const;
 	int32 GetProtocolTestLevel(ELSProtocolType ProtocolType) const;
+	// 현재 적용 중인 프로토콜 레벨: 오버라이드가 있으면 그 값, 없으면 신호 활성 장착 칩의 합산값.
+	int32 GetEffectiveProtocolLevel(ELSProtocolType ProtocolType) const;
 
 	UFUNCTION(Client, Reliable)
 	void ClientStartRaidSession(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
@@ -151,6 +164,10 @@ protected:
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSChipStationWidget> ChipStationWidgetInstance;
+
+	// 시연용 프로토콜 조정 패널 인스턴스.
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug")
+	TObjectPtr<ULSProtocolDebugWidget> ProtocolDebugWidgetInstance;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Input")
 	bool bDefaultMappingContextsApplied = false;
@@ -246,6 +263,10 @@ private:
 	UFUNCTION(Client, Reliable)
 	void ClientSyncRaidSessionAndLoot(ALSLootBox* SourceLootBox, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSDropResult>& LootResults);
 
+	// 로비 파밍용: 레이드 세션이 없을 때 룻박스/세이브 기반 인벤토리 UI를 갱신한다.
+	UFUNCTION(Client, Reliable)
+	void ClientRefreshLobbyLoot(ALSLootBox* SourceLootBox, const TArray<FLSDropResult>& LootResults);
+
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveNoiseForHUD(FVector_NetQuantize NoiseLocation, float RadiusCm, FGameplayTag NoiseTag, AActor* NoiseInstigator);
 
@@ -264,6 +285,9 @@ private:
 	void StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
 	void ApplyRaidResultToLocalSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);
+	// 로비 파밍용: 레이드 세션이 비활성(=로비)이면 룻박스 아이템을 세이브에 직접 적재한다.
+	bool IsLobbyLootMode() const;
+	ULSSaveSubsystem* ResolveSaveSubsystem() const;
 	void HandleNoiseForHUD(FVector NoiseLocation, float RadiusCm, FGameplayTag NoiseTag, AActor* NoiseInstigator);
 	void ShowDamageNumberLocal(const FLSDamageNumberPayload& Payload);
 	void SetProtocolTestLevel(ELSProtocolType ProtocolType, int32 Level);

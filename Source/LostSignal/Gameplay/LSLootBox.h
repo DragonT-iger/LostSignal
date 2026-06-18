@@ -7,6 +7,7 @@
 #include "LSLootBox.generated.h"
 
 class ULSRaidInventoryComponent;
+class ULSSaveSubsystem;
 class ULSMinimapMarkerComponent;
 
 UCLASS()
@@ -27,6 +28,11 @@ public:
 	bool TransferLootSlotToSession(int32 LootSlotIndex, ULSRaidInventoryComponent* RaidInventory, FLSSessionItem& OutRemainingLootItem);
 	bool TransferLootSlotToSessionSlot(int32 LootSlotIndex, ULSRaidInventoryComponent* RaidInventory, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutRemainingLootItem);
 	bool TransferSessionSlotToLootSlot(int32 LootSlotIndex, ULSRaidInventoryComponent* RaidInventory, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, FLSSessionItem& OutLootItem);
+
+	// 로비 파밍용: 레이드 세션이 없을 때 룻박스 아이템을 영구 세이브(SaveSubsystem)에 직접 전송한다.
+	bool TransferLootSlotToSave(int32 LootSlotIndex, ULSSaveSubsystem* SaveSubsystem, FLSSessionItem& OutRemainingLootItem);
+	bool TransferLootSlotToSaveSlot(int32 LootSlotIndex, ULSSaveSubsystem* SaveSubsystem, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutRemainingLootItem);
+	bool TransferSaveSlotToLootSlot(int32 LootSlotIndex, ULSSaveSubsystem* SaveSubsystem, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, FLSSessionItem& OutLootItem);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="LS/Loot")
 	void OnLootResultReceived(const TArray<FLSDropResult>& Results);

@@ -8,6 +8,7 @@
 enum class ELSInventorySlotArea : uint8;
 
 struct FLSSessionItem;
+struct FLSChipProtocolTotals;
 
 class UBorder;
 class UDragDropOperation;
@@ -51,6 +52,11 @@ public:
 	bool UnequipChipToWarehouse(const ULSInventoryDragDropOperation& DragOperation);
 	bool SwapEquippedChipWithStoredSlot(const ULSInventoryDragDropOperation& DragOperation, ELSInventorySlotArea TargetArea, int32 TargetSlotIndex);
 
+	// Shift+좌클릭 빠른 조작: 칩 목록 슬롯을 첫 빈 장착 슬롯(index 0부터)에 순서대로 장착한다.
+	bool QuickEquipChipToFirstEmptyHardwareSlot(ELSInventorySlotArea SourceArea, int32 SourceSlotIndex);
+	// Shift+좌클릭 빠른 조작: 장착된 칩을 창고로 해제한다.
+	bool QuickUnequipEquippedChipToWarehouse(int32 EquipmentSlotIndex);
+
 protected:
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
@@ -68,6 +74,8 @@ protected:
 	void SetPreviewSurvivalStatus(int32 CurrentSurvivalProtocol, int32 PreviousSurvivalProtocol);
 	void SetPreviewSignalChip(const TArray<FLSSessionItem>& EquipmentItems, float SignalPercent);
 	void SetPreviewBattleProtocol(int32 CurrentBattleProtocol, int32 PreviousBattleProtocol);
+	// 프로토콜 디버그 오버라이드가 켜져 있으면 그 값을, 아니면 장착 칩 합산값(현재=활성칩, 이전=전체칩)을 돌려준다.
+	void ResolveProtocolPreviewLevels(ELSProtocolType ProtocolType, const FLSChipProtocolTotals& ActiveTotals, const FLSChipProtocolTotals& AllTotals, int32& OutCurrentLevel, int32& OutPreviousLevel) const;
 	bool IsPointerInsideChipSlotBorder(FVector2D ScreenPosition) const;
 	float GetSignalGaugePercent() const;
 	int32 GetInactiveSignalSlotCount() const;

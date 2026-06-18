@@ -6,6 +6,8 @@
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "Characters/LSCharacterBase.h"
+#include "Components/InputComponent.h"
+#include "InputCoreTypes.h"
 #include "Characters/LSPlayerCharacter.h"
 #include "Core/LSFarmingGameMode.h"
 #include "Core/LSLobbyGameMode.h"
@@ -17,11 +19,13 @@
 #include "Gameplay/LSNoiseTypes.h"
 #include "Gameplay/LSWorldDroppedItem.h"
 #include "InputMappingContext.h"
+#include "Data/LSChipStats.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Debug/LSHpDebugWidget.h"
+#include "UI/Debug/LSProtocolDebugWidget.h"
 #include "UI/LSPlayerHUDWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Protocol/LSProtocolUIWidget.h"
@@ -105,6 +109,12 @@ void ALSPlayerControllerBase::SetupInputComponent()
 	if (!IsLocalPlayerController() || bDefaultMappingContextsApplied)
 	{
 		return;
+	}
+
+	if (InputComponent)
+	{
+		// 시연용 프로토콜 패널 토글 (레거시 BindKey; Enhanced Input 과 공존).
+		InputComponent->BindKey(EKeys::Insert, IE_Pressed, this, &ALSPlayerControllerBase::ToggleProtocolDebugWidget);
 	}
 
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -939,6 +949,80 @@ void ALSPlayerControllerBase::LSClearProtocolTest()
 	UE_LOG(LogLS, Log, TEXT("[ProtocolTest] All overrides cleared."));
 }
 
+void ALSPlayerControllerBase::LSToggleProtocolDebug()
+{
+	ToggleProtocolDebugWidget();
+}
+
+void ALSPlayerControllerBase::ToggleProtocolDebugWidget()
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	if (!ProtocolDebugWidgetInstance)
+	{
+		// C++ 전용 위젯이라 Blueprint 에셋 없이 StaticClass 로 생성한다.
+		ProtocolDebugWidgetInstance = CreateWidget<ULSProtocolDebugWidget>(this, ULSProtocolDebugWidget::StaticClass());
+		if (ProtocolDebugWidgetInstance)
+		{
+			ProtocolDebugWidgetInstance->AddToViewport(1000);
+		}
+		// 패널이 떠서 오버라이드가 활성화되었으므로 프로토콜 표시를 다시 그린다.
+		RefreshProtocolTestTargets();
+		return;
+	}
+
+	const bool bCurrentlyVisible = ProtocolDebugWidgetInstance->GetVisibility() != ESlateVisibility::Collapsed;
+	const bool bWillBeVisible = !bCurrentlyVisible;
+	ProtocolDebugWidgetInstance->SetVisibility(bWillBeVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	// 다시 켤 때 현재 효과 레벨로 패널 숫자를 갱신한다.
+	if (bWillBeVisible)
+	{
+		ProtocolDebugWidgetInstance->RefreshLevelTexts();
+	}
+	// 패널 표시/숨김에 따라 오버라이드 적용 여부가 바뀌므로 프로토콜 표시를 다시 그린다.
+	RefreshProtocolTestTargets();
+}
+
+bool ALSPlayerControllerBase::IsProtocolDebugWidgetVisible() const
+{
+	return ProtocolDebugWidgetInstance && ProtocolDebugWidgetInstance->GetVisibility() != ESlateVisibility::Collapsed;
+}
+
+int32 ALSPlayerControllerBase::GetEffectiveProtocolLevel(const ELSProtocolType ProtocolType) const
+{
+	if (HasProtocolTestLevel(ProtocolType))
+	{
+		return GetProtocolTestLevel(ProtocolType);
+	}
+
+	const UGameInstance* GameInstance = GetGameInstance();
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		return 0;
+	}
+
+	const int32 InactiveSlotCount = LSChipStats::ResolveInactiveSignalSlotCount(SaveSubsystem->GetChipSignalGaugePercent());
+	const TArray<FLSSessionItem> ActiveItems = LSChipStats::BuildSignalActiveEquipmentItems(SaveSubsystem->GetChipEquipmentSlots(), InactiveSlotCount);
+	const FLSChipProtocolTotals Totals = LSChipStats::AggregateChipProtocolTotals(ActiveItems, this);
+	switch (ProtocolType)
+	{
+	case ELSProtocolType::Survival:
+		return Totals.Survival;
+	case ELSProtocolType::Carrying:
+		return Totals.Carrying;
+	case ELSProtocolType::Battle:
+		return Totals.Battle;
+	case ELSProtocolType::Navigation:
+		return Totals.Navigation;
+	default:
+		return 0;
+	}
+}
+
 bool ALSPlayerControllerBase::HasProtocolTestLevel(const ELSProtocolType ProtocolType) const
 {
 	return GetProtocolTestLevel(ProtocolType) >= 0;
@@ -1003,6 +1087,12 @@ void ALSPlayerControllerBase::RefreshProtocolTestTargets()
 		{
 			ProtocolUIWidget->RefreshProtocolUI();
 		}
+	}
+
+	// 로비 프로토콜 표시는 칩스테이션이 담당하므로, 열려 있으면 디버그 오버라이드 변경을 즉시 반영한다.
+	if (ChipStationWidgetInstance && ChipStationWidgetInstance->IsVisible())
+	{
+		ChipStationWidgetInstance->RefreshChipStation();
 	}
 }
 
@@ -1155,6 +1245,15 @@ void ALSPlayerControllerBase::SyncRaidSessionAndLootFromServer(ALSLootBox* Sourc
 		return;
 	}
 
+	const TArray<FLSDropResult> LootResults = SourceLootBox ? SourceLootBox->GetLootResults() : TArray<FLSDropResult>();
+
+	// 로비 파밍: 레이드 세션이 없으므로 세이브 기반 인벤토리/룻박스 UI만 갱신한다.
+	if (IsLobbyLootMode())
+	{
+		ClientRefreshLobbyLoot(SourceLootBox, LootResults);
+		return;
+	}
+
 	ULSRaidInventoryComponent* InventoryComponent = GetRaidInventoryComponent();
 	if (!InventoryComponent)
 	{
@@ -1162,12 +1261,33 @@ void ALSPlayerControllerBase::SyncRaidSessionAndLootFromServer(ALSLootBox* Sourc
 		return;
 	}
 
-	const TArray<FLSDropResult> LootResults = SourceLootBox ? SourceLootBox->GetLootResults() : TArray<FLSDropResult>();
 	ClientSyncRaidSessionAndLoot(
 		SourceLootBox,
 		InventoryComponent->GetSessionInventory(),
 		InventoryComponent->GetSessionSafeInventory(),
 		LootResults);
+}
+
+void ALSPlayerControllerBase::ClientRefreshLobbyLoot_Implementation(ALSLootBox* SourceLootBox, const TArray<FLSDropResult>& LootResults)
+{
+	RefreshLootDropWidgetForSource(SourceLootBox, LootResults);
+
+	if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->RebuildInventoryWidgetSlots();
+	}
+}
+
+bool ALSPlayerControllerBase::IsLobbyLootMode() const
+{
+	const ULSRaidInventoryComponent* RaidInventory = GetRaidInventoryComponent();
+	return !RaidInventory || !RaidInventory->IsRaidActive();
+}
+
+ULSSaveSubsystem* ALSPlayerControllerBase::ResolveSaveSubsystem() const
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	return GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
 }
 
 bool ALSPlayerControllerBase::TransferLootDropSlotToSessionInternal(ALSLootBox* SourceLootBox, const int32 LootSlotIndex, FLSSessionItem& OutLootItem)
@@ -1176,6 +1296,11 @@ bool ALSPlayerControllerBase::TransferLootDropSlotToSessionInternal(ALSLootBox* 
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot drop slot because source loot box is missing."));
 		return false;
+	}
+
+	if (IsLobbyLootMode())
+	{
+		return SourceLootBox->TransferLootSlotToSave(LootSlotIndex, ResolveSaveSubsystem(), OutLootItem);
 	}
 
 	return SourceLootBox->TransferLootSlotToSession(LootSlotIndex, GetRaidInventoryComponent(), OutLootItem);
@@ -1189,6 +1314,11 @@ bool ALSPlayerControllerBase::TransferLootDropSlotToSessionSlotInternal(ALSLootB
 		return false;
 	}
 
+	if (IsLobbyLootMode())
+	{
+		return SourceLootBox->TransferLootSlotToSaveSlot(LootSlotIndex, ResolveSaveSubsystem(), ToSlotArea, ToSlotIndex, OutLootItem);
+	}
+
 	return SourceLootBox->TransferLootSlotToSessionSlot(LootSlotIndex, GetRaidInventoryComponent(), ToSlotArea, ToSlotIndex, OutLootItem);
 }
 
@@ -1198,6 +1328,11 @@ bool ALSPlayerControllerBase::TransferSessionSlotToLootDropSlotInternal(ALSLootB
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot transfer session slot to loot drop because source loot box is missing."));
 		return false;
+	}
+
+	if (IsLobbyLootMode())
+	{
+		return SourceLootBox->TransferSaveSlotToLootSlot(LootSlotIndex, ResolveSaveSubsystem(), FromSlotArea, FromSlotIndex, OutLootItem);
 	}
 
 	return SourceLootBox->TransferSessionSlotToLootSlot(LootSlotIndex, GetRaidInventoryComponent(), FromSlotArea, FromSlotIndex, OutLootItem);

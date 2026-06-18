@@ -69,6 +69,8 @@ public:
 	bool DropStoredSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool TransferStoredSlotToArea(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea);
 	bool TransferAllInventoryToWarehouse(int32 WarehouseMaxSlotCount, bool& bOutStoppedBecauseFull);
+	// 외부 아이템(예: 룻박스 결과)을 인벤토리/금고의 특정 슬롯에 스택/배치한다. 남은 수량은 InOut 인자로 돌려준다.
+	bool DropExternalItemToStoredSlot(FLSSessionItem& InOutExternalItem, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool GetStoredSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, FLSSessionItem& OutItem) const;
 	bool ClearStoredSlot(ELSInventorySlotArea SlotArea, int32 SlotIndex);
 	bool ReplaceStoredSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem);

@@ -101,6 +101,8 @@ private:
 	bool TryHandleLootQuickTransfer();
 	bool TryHandleInventoryQuickTransfer();
 	bool TryHandleWarehouseQuickTransfer();
+	bool TryHandleChipEquipmentQuickTransfer();
+	bool TryHandleChipStationQuickTransfer();
 	void RefreshStoredSlotVisual();
 	bool IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidLootDropTarget(const UDragDropOperation* InOperation) const;

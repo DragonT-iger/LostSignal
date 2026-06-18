@@ -139,10 +139,21 @@ float CalculateSignalSlotDisappearProgress(const float SignalPercent, const int3
 	return FMath::Clamp((ClampedPercent - SlotInactiveThreshold) / 0.1f, 0.0f, 1.0f);
 }
 
-int32 CalculateTemporaryProtocolPreviewLevel(const float SignalPercent)
+int32 GetProtocolTotalByType(const FLSChipProtocolTotals& Totals, const ELSProtocolType ProtocolType)
 {
-	const float ClampedPercent = FMath::Clamp(SignalPercent, 0.0f, 1.0f);
-	return FMath::Clamp(FMath::FloorToInt(ClampedPercent * 10.0f), 0, 9);
+	switch (ProtocolType)
+	{
+	case ELSProtocolType::Survival:
+		return Totals.Survival;
+	case ELSProtocolType::Carrying:
+		return Totals.Carrying;
+	case ELSProtocolType::Battle:
+		return Totals.Battle;
+	case ELSProtocolType::Navigation:
+		return Totals.Navigation;
+	default:
+		return 0;
+	}
 }
 
 TArray<FLSSessionItem> BuildInactiveSignalEquipmentItems(const TArray<FLSSessionItem>& Items, const int32 InactiveSlotCount)
@@ -411,15 +422,28 @@ void ULSChipStationWidget::RefreshEquippedChipSummary()
 	SetChipStat(TEXT("Chip_Recovery"), GetStatTotal(TEXT("Chip_Recovery")), GetSignalLossTotal(TEXT("Chip_Recovery")));
 	SetChipStat(TEXT("Chip_Move_Speed"), GetStatTotal(TEXT("Chip_Move_Speed")), GetSignalLossTotal(TEXT("Chip_Move_Speed")));
 
-	const int32 TemporaryProtocolLevel = CalculateTemporaryProtocolPreviewLevel(GetSignalGaugePercent());
-	SetPreviewMinimapNavigationLevels(TemporaryProtocolLevel, TemporaryProtocolLevel);
-	SetPreviewSurvivalStatus(TemporaryProtocolLevel, TemporaryProtocolLevel);
+	// 프로토콜 표시는 디버그 오버라이드가 켜져 있으면 그 값을, 아니면 장착 칩 합산값(현재=활성칩, 이전=전체칩)을 따라간다.
+	const TArray<FLSSessionItem> ActiveEquipmentItems = LSChipStats::BuildSignalActiveEquipmentItems(EquipmentItems, InactiveSlotCount);
+	const FLSChipProtocolTotals ActiveProtocolTotals = LSChipStats::AggregateChipProtocolTotals(ActiveEquipmentItems, this);
+	const FLSChipProtocolTotals AllProtocolTotals = LSChipStats::AggregateChipProtocolTotals(AllEquipmentItems, this);
+
+	int32 SurvivalCurrent = 0, SurvivalPrevious = 0;
+	int32 CarryingCurrent = 0, CarryingPrevious = 0;
+	int32 BattleCurrent = 0, BattlePrevious = 0;
+	int32 NavigationCurrent = 0, NavigationPrevious = 0;
+	ResolveProtocolPreviewLevels(ELSProtocolType::Survival, ActiveProtocolTotals, AllProtocolTotals, SurvivalCurrent, SurvivalPrevious);
+	ResolveProtocolPreviewLevels(ELSProtocolType::Carrying, ActiveProtocolTotals, AllProtocolTotals, CarryingCurrent, CarryingPrevious);
+	ResolveProtocolPreviewLevels(ELSProtocolType::Battle, ActiveProtocolTotals, AllProtocolTotals, BattleCurrent, BattlePrevious);
+	ResolveProtocolPreviewLevels(ELSProtocolType::Navigation, ActiveProtocolTotals, AllProtocolTotals, NavigationCurrent, NavigationPrevious);
+
+	SetPreviewMinimapNavigationLevels(NavigationCurrent, NavigationPrevious);
+	SetPreviewSurvivalStatus(SurvivalCurrent, SurvivalPrevious);
 	SetPreviewSignalChip(EquipmentItems, GetSignalGaugePercent());
-	SetPreviewBattleProtocol(TemporaryProtocolLevel, TemporaryProtocolLevel);
-	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), ELSProtocolType::Survival, TemporaryProtocolLevel, TemporaryProtocolLevel);
-	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), ELSProtocolType::Carrying, TemporaryProtocolLevel, TemporaryProtocolLevel);
-	SetProtocolWidget(Protocol_Battle, TEXT("Protocol_Battle"), ELSProtocolType::Battle, TemporaryProtocolLevel, TemporaryProtocolLevel);
-	SetProtocolWidget(Protocol_Navigation, TEXT("Protocol_Navigation"), ELSProtocolType::Navigation, TemporaryProtocolLevel, TemporaryProtocolLevel);
+	SetPreviewBattleProtocol(BattleCurrent, BattlePrevious);
+	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), ELSProtocolType::Survival, SurvivalCurrent, SurvivalPrevious);
+	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), ELSProtocolType::Carrying, CarryingCurrent, CarryingPrevious);
+	SetProtocolWidget(Protocol_Battle, TEXT("Protocol_Battle"), ELSProtocolType::Battle, BattleCurrent, BattlePrevious);
+	SetProtocolWidget(Protocol_Navigation, TEXT("Protocol_Navigation"), ELSProtocolType::Navigation, NavigationCurrent, NavigationPrevious);
 }
 
 void ULSChipStationWidget::QueueRefreshChipStation()
@@ -581,6 +605,64 @@ bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDrag
 	return bSwapped;
 }
 
+bool ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot(const ELSInventorySlotArea SourceArea, const int32 SourceSlotIndex)
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot quick-equip chip because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	// 장착 슬롯 수는 SaveSubsystem이 단일 출처다. 첫 빈 칸을 index 0부터 찾는다.
+	const TArray<FLSSessionItem>& EquipmentItems = SaveSubsystem->GetChipEquipmentSlots();
+	int32 TargetEquipmentSlotIndex = INDEX_NONE;
+	for (int32 SlotIndex = 0; SlotIndex < EquipmentItems.Num(); ++SlotIndex)
+	{
+		if (!LSInventorySlotUtils::IsFilled(EquipmentItems[SlotIndex]))
+		{
+			TargetEquipmentSlotIndex = SlotIndex;
+			break;
+		}
+	}
+
+	if (TargetEquipmentSlotIndex == INDEX_NONE)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot quick-equip chip because every hardware slot is full on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const bool bEquipped = SaveSubsystem->EquipChipFromStoredSlot(SourceArea, SourceSlotIndex, TargetEquipmentSlotIndex);
+	if (bEquipped)
+	{
+		HandleCarryingSlotCapacityChanged();
+		QueueRefreshChipStation();
+	}
+
+	return bEquipped;
+}
+
+bool ULSChipStationWidget::QuickUnequipEquippedChipToWarehouse(const int32 EquipmentSlotIndex)
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot quick-unequip chip because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const bool bUnequipped = SaveSubsystem->UnequipChipToWarehouse(EquipmentSlotIndex);
+	if (bUnequipped)
+	{
+		HandleCarryingSlotCapacityChanged();
+		QueueRefreshChipStation();
+	}
+
+	return bUnequipped;
+}
+
 void ULSChipStationWidget::InitializeEquipmentSlots()
 {
 	TArray<ULSChipEquipmentSlotWidget*> EquipmentSlots = {
@@ -694,6 +776,24 @@ void ULSChipStationWidget::SetPreviewBattleProtocol(const int32 CurrentBattlePro
 	}
 
 	SkillBar->SetPreviewBattleProtocolLevels(CurrentBattleProtocol, PreviousBattleProtocol);
+}
+
+void ULSChipStationWidget::ResolveProtocolPreviewLevels(const ELSProtocolType ProtocolType, const FLSChipProtocolTotals& ActiveTotals, const FLSChipProtocolTotals& AllTotals, int32& OutCurrentLevel, int32& OutPreviousLevel) const
+{
+	// 프로토콜 디버그 패널이 떠 있고 오버라이드 값이 설정돼 있을 때만 그 값을 따라간다.
+	// 패널이 닫혀 있으면 잔존 오버라이드는 무시하고 장착 칩 합산값을 쓴다.
+	if (const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		if (PlayerController->IsProtocolDebugWidgetVisible() && PlayerController->HasProtocolTestLevel(ProtocolType))
+		{
+			OutCurrentLevel = PlayerController->GetProtocolTestLevel(ProtocolType);
+			OutPreviousLevel = OutCurrentLevel;
+			return;
+		}
+	}
+
+	OutCurrentLevel = GetProtocolTotalByType(ActiveTotals, ProtocolType);
+	OutPreviousLevel = GetProtocolTotalByType(AllTotals, ProtocolType);
 }
 
 bool ULSChipStationWidget::IsPointerInsideChipSlotBorder(const FVector2D ScreenPosition) const

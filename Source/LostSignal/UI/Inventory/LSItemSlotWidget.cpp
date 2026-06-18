@@ -503,9 +503,21 @@ bool ULSItemSlotWidget::IsQuickTransferPointerEvent(const FPointerEvent& InMouse
 
 bool ULSItemSlotWidget::TryHandleQuickTransfer()
 {
+	// 칩 장착 슬롯: Shift+좌클릭 -> 창고로 해제. (장착 슬롯은 SlotIndex가 INDEX_NONE이라 아래 가드보다 먼저 처리한다.)
+	if (ChipEquipmentSlotWidget.IsValid())
+	{
+		return TryHandleChipEquipmentQuickTransfer();
+	}
+
 	if (!bHasItem || SlotIndex == INDEX_NONE)
 	{
 		return false;
+	}
+
+	// 칩 목록 슬롯(인벤토리/창고): Shift+좌클릭 -> 첫 빈 장착 슬롯에 순서대로 장착.
+	if (ChipStationWidget.IsValid())
+	{
+		return TryHandleChipStationQuickTransfer();
 	}
 
 	if (LootDropWidget.IsValid())
@@ -580,6 +592,23 @@ bool ULSItemSlotWidget::TryHandleWarehouseQuickTransfer()
 
 	ClearItem();
 	return true;
+}
+
+bool ULSItemSlotWidget::TryHandleChipEquipmentQuickTransfer()
+{
+	if (!bHasItem || EquipmentSlotIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	ULSChipStationWidget* OwningChipStation = ChipStationWidget.Get();
+	return OwningChipStation && OwningChipStation->QuickUnequipEquippedChipToWarehouse(EquipmentSlotIndex);
+}
+
+bool ULSItemSlotWidget::TryHandleChipStationQuickTransfer()
+{
+	ULSChipStationWidget* OwningChipStation = ChipStationWidget.Get();
+	return OwningChipStation && OwningChipStation->QuickEquipChipToFirstEmptyHardwareSlot(SlotArea, SlotIndex);
 }
 
 void ULSItemSlotWidget::RefreshStoredSlotVisual()

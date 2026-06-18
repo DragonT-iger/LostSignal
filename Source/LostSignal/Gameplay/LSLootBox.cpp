@@ -5,6 +5,7 @@
 #include "LostSignal.h"
 #include "Minimap/LSMinimapMarkerComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Session/LSSaveSubsystem.h"
 
 ALSLootBox::ALSLootBox()
 {
@@ -199,6 +200,111 @@ bool ALSLootBox::TransferSessionSlotToLootSlot(const int32 LootSlotIndex, ULSRai
 	}
 
 	if (!RaidInventory->ReplaceSessionSlotItem(FromSlotArea, FromSlotIndex, CurrentLootItem, OutLootItem))
+	{
+		return false;
+	}
+
+	LSInventorySlotUtils::SetDropResultFromSessionItem(LootResults[LootSlotIndex], OutLootItem);
+	NotifyLootResultsChanged();
+	ForceNetUpdate();
+	return true;
+}
+
+bool ALSLootBox::TransferLootSlotToSave(const int32 LootSlotIndex, ULSSaveSubsystem* SaveSubsystem, FLSSessionItem& OutRemainingLootItem)
+{
+	OutRemainingLootItem = FLSSessionItem();
+	if (!LootResults.IsValidIndex(LootSlotIndex) || LootResults[LootSlotIndex].ItemRowName.IsNone() || LootResults[LootSlotIndex].Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot to save because slot is invalid. Index=%d"), LootSlotIndex);
+		return false;
+	}
+
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot to save because SaveSubsystem is missing."));
+		return false;
+	}
+
+	if (!SaveSubsystem->TryAddToInventory(LootResults[LootSlotIndex].ItemRowName, LootResults[LootSlotIndex].Amount, LootResults[LootSlotIndex].ChipStats, OutRemainingLootItem))
+	{
+		return false;
+	}
+
+	if (OutRemainingLootItem.ItemRowName.IsNone() || OutRemainingLootItem.Amount <= 0)
+	{
+		ClearLootSlot(LootSlotIndex);
+	}
+	else
+	{
+		LSInventorySlotUtils::SetDropResultFromSessionItem(LootResults[LootSlotIndex], OutRemainingLootItem);
+	}
+	NotifyLootResultsChanged();
+	ForceNetUpdate();
+	return true;
+}
+
+bool ALSLootBox::TransferLootSlotToSaveSlot(const int32 LootSlotIndex, ULSSaveSubsystem* SaveSubsystem, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex, FLSSessionItem& OutRemainingLootItem)
+{
+	OutRemainingLootItem = FLSSessionItem();
+	if (!LootResults.IsValidIndex(LootSlotIndex) || LootResults[LootSlotIndex].ItemRowName.IsNone() || LootResults[LootSlotIndex].Amount <= 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot to save slot because slot is invalid. Index=%d"), LootSlotIndex);
+		return false;
+	}
+
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer loot slot to save slot because SaveSubsystem is missing."));
+		return false;
+	}
+
+	FLSSessionItem ExternalItem = LSInventorySlotUtils::ToSessionItem(LootResults[LootSlotIndex]);
+	if (!SaveSubsystem->DropExternalItemToStoredSlot(ExternalItem, ToSlotArea, ToSlotIndex))
+	{
+		return false;
+	}
+
+	OutRemainingLootItem = ExternalItem;
+	if (ExternalItem.ItemRowName.IsNone() || ExternalItem.Amount <= 0)
+	{
+		ClearLootSlot(LootSlotIndex);
+	}
+	else
+	{
+		LSInventorySlotUtils::SetDropResultFromSessionItem(LootResults[LootSlotIndex], ExternalItem);
+	}
+
+	NotifyLootResultsChanged();
+	ForceNetUpdate();
+	return true;
+}
+
+bool ALSLootBox::TransferSaveSlotToLootSlot(const int32 LootSlotIndex, ULSSaveSubsystem* SaveSubsystem, const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, FLSSessionItem& OutLootItem)
+{
+	OutLootItem = FLSSessionItem();
+	if (!LootResults.IsValidIndex(LootSlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer save slot to loot slot because loot index is invalid. Index=%d"), LootSlotIndex);
+		return false;
+	}
+
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer save slot to loot slot because SaveSubsystem is missing."));
+		return false;
+	}
+
+	FLSSessionItem CurrentLootItem = LSInventorySlotUtils::ToSessionItem(LootResults[LootSlotIndex]);
+
+	FLSSessionItem SourceItem;
+	if (!SaveSubsystem->GetStoredSlotItem(FromSlotArea, FromSlotIndex, SourceItem))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot transfer save slot to loot slot because source slot is empty. Area=%d Index=%d"),
+			static_cast<int32>(FromSlotArea), FromSlotIndex);
+		return false;
+	}
+
+	if (!SaveSubsystem->ReplaceStoredSlotItem(FromSlotArea, FromSlotIndex, CurrentLootItem, OutLootItem))
 	{
 		return false;
 	}

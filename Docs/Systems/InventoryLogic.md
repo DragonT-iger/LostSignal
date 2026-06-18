@@ -160,6 +160,20 @@ Warehouse 슬롯 Shift+좌클릭
 
 중요한 의도는 "인벤토리만 켜져 있는 상태에서는 Shift-click이 동작하지 않는다"이다. 빠른 이동은 대상 컨테이너가 명확할 때만 처리한다.
 
+칩스테이션 안에서는 대상이 칩 장착(하드웨어)이라 컨테이너 조건 없이 동작한다.
+
+```text
+칩 목록 슬롯(인벤토리/창고의 칩) Shift+좌클릭
+-> 첫 빈 장착 슬롯(index 0부터)에 순서대로 장착
+-> ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot (SaveSubsystem::EquipChipFromStoredSlot)
+
+칩 장착 슬롯 Shift+좌클릭
+-> 창고로 해제
+-> ULSChipStationWidget::QuickUnequipEquippedChipToWarehouse (SaveSubsystem::UnequipChipToWarehouse)
+```
+
+장착 슬롯 수의 단일 출처는 `ULSSaveSubsystem`이며, 첫 빈 칸 탐색은 `GetChipEquipmentSlots()`를 스캔한다. 모든 장착 칸이 차 있으면 장착하지 않고 `UE_LOG(LogLS, Warning, ...)`만 남긴다.
+
 Shift+좌클릭 상태를 유지한 채 마우스를 다른 슬롯으로 이동하면, 마우스가 지나가는 아이템 슬롯은 같은 빠른 이동 규칙으로 차례대로 이동한다. 빈 슬롯, 잠긴 슬롯, 대상 컨테이너가 없는 상태는 기존 Shift-click과 같이 무시한다.
 
 ## 전부 보관
@@ -187,9 +201,19 @@ ALSLootBox::Interact (서버 권한에서만 드랍 생성)
 -> PlayerController::ShowLootDropWidget(ClientShowLootDropWidget RPC)로 루팅 UI 표시
 ```
 
-박스를 연 뒤 슬롯을 옮기는 transfer/drop 조작은 서버에서 확정되고 `ClientSyncRaidSessionAndLoot`로 인벤토리/루팅 UI를 다시 미러링한다.
+박스를 연 뒤 슬롯을 옮기는 transfer/drop 조작은 서버에서 확정된다. 레이드 중이면 `ClientSyncRaidSessionAndLoot`로 인벤토리/루팅 UI를 미러링하고, 레이드가 아니면(로비 파밍) `ClientRefreshLobbyLoot`로 루팅 UI와 SaveSubsystem 기반 인벤토리 UI를 다시 그린다.
 
-루트 박스에서 인벤토리로 옮길 때는 `FLSDropResult`를 `FLSSessionItem` 형태로 변환하고, 레이드 중이면 서버의 `ULSRaidInventoryComponent`에 추가한다.
+루트 박스에서 인벤토리로 옮길 때는 `FLSDropResult`를 `FLSSessionItem` 형태로 변환한다.
+
+```text
+LootBox 슬롯 -> 인벤토리
+-> 레이드 중이면 ALSLootBox::TransferLootSlotToSession / TransferLootSlotToSessionSlot (RaidInventoryComponent)
+-> 레이드가 아니면 ALSLootBox::TransferLootSlotToSave / TransferLootSlotToSaveSlot (SaveSubsystem)
+
+인벤토리 슬롯 -> LootBox
+-> 레이드 중이면 ALSLootBox::TransferSessionSlotToLootSlot (RaidInventoryComponent)
+-> 레이드가 아니면 ALSLootBox::TransferSaveSlotToLootSlot (SaveSubsystem)
+```
 
 월드 드랍은 `ALSWorldDroppedItem`이 담당한다.
 

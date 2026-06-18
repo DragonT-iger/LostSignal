@@ -492,6 +492,33 @@ bool ULSSaveSubsystem::TransferAllInventoryToWarehouse(const int32 WarehouseMaxS
 	return bChanged;
 }
 
+bool ULSSaveSubsystem::DropExternalItemToStoredSlot(FLSSessionItem& InOutExternalItem, const ELSInventorySlotArea ToArea, const int32 ToIndex)
+{
+	// 창고는 룻박스 직접 적재 대상이 아니다(인벤토리/금고만 허용).
+	if (ToArea == ELSInventorySlotArea::Warehouse)
+	{
+		return false;
+	}
+
+	TArray<FLSSessionItem>* ToSlots = GetMutableStoredSlots(ToArea);
+	if (!ToSlots)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop external item because area is invalid. Area=%d Index=%d"),
+			static_cast<int32>(ToArea), ToIndex);
+		return false;
+	}
+
+	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
+		? GetMaxInventorySlotCount()
+		: GetMaxSafeStashSlotCount();
+	const bool bChanged = LSInventorySlotUtils::DropExternalItemToSlot(InOutExternalItem, *ToSlots, ToIndex, ToMaxSlotCount);
+	if (bChanged)
+	{
+		Save();
+	}
+	return bChanged;
+}
+
 bool ULSSaveSubsystem::GetStoredSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, FLSSessionItem& OutItem) const
 {
 	OutItem = FLSSessionItem();

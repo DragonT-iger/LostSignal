@@ -163,6 +163,13 @@ Inventory/Safe/Warehouse -> WorldDroppedItem
 WorldDroppedItem -> Inventory
 - ALSWorldDroppedItem::Interact
 - 레이드가 아니면 ULSSaveSubsystem::TryAddToInventory 사용
+
+LootBox <-> Inventory/Safe (로비 파밍, 테스트용)
+- ALSPlayerControllerBase 의 루팅 전송 경로가 레이드 비활성(=로비)이면 SaveSubsystem 을 원본으로 사용
+- ALSLootBox::TransferLootSlotToSave / TransferLootSlotToSaveSlot / TransferSaveSlotToLootSlot
+- ULSSaveSubsystem::TryAddToInventory / DropExternalItemToStoredSlot / GetStoredSlotItem / ReplaceStoredSlotItem
+- 매 전송이 즉시 Save() 로 영구 저장됨 (로비에는 탈출 트리거가 없으므로 결과 저장 단계를 거치지 않음)
+- 로비에서는 RaidInventoryComponent 를 활성화하지 않으므로 인벤토리/칩 스테이션/창고가 모두 SaveSubsystem 단일 원본을 공유한다
 ```
 
 주의할 점:
