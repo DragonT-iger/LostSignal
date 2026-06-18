@@ -52,6 +52,7 @@ void ALSFarmingGameMode::EndRaid(const ELSRaidResult Result)
 	}
 
 	bRaidEnded = true;
+	PendingRaidResult = Result;
 	BeginRaidResultSave(Result);
 }
 
@@ -215,6 +216,21 @@ void ALSFarmingGameMode::TravelToResultLevel()
 	ClearRaidResultSaveWait();
 
 	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
+
+	// 탈출 성공은 일단 ResultLevel을 건너뛰고 바로 로비로 복귀한다.
+	if (PendingRaidResult == ELSRaidResult::Extracted)
+	{
+		if (Settings && !Settings->LobbyLevel.IsNull())
+		{
+			UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->LobbyLevel);
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] LobbyLevel is not set. Check Project Settings > LS Session Settings."));
+		}
+		return;
+	}
+
 	if (Settings && !Settings->ResultLevel.IsNull())
 	{
 		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->ResultLevel);

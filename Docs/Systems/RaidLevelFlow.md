@@ -250,8 +250,11 @@ ALSFarmingGameMode::TravelToResultLevel
 -> 각 RaidInventoryComponent->EndRaidInventory
 -> 각 PlayerController->ClearSubmittedRaidEntryData
 -> SessionSubsystem->ClearRaidSessionState
--> ResultLevel로 OpenLevel
+-> 종료 결과가 Extracted면 LobbyLevel로 OpenLevel (일단 ResultLevel 건너뜀)
+-> 그 외(Dead/Quit)는 ResultLevel로 OpenLevel
 ```
+
+> 현재 탈출(Extracted) 성공은 임시로 ResultLevel을 거치지 않고 바로 `LobbyLevel`로 복귀한다. 결과 레벨(전리품 정산 등)이 준비되면 이 분기를 제거하고 다시 ResultLevel을 거치도록 되돌린다.
 
 ## 타임아웃과 실패 처리
 

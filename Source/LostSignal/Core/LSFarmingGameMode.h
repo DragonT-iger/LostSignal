@@ -39,6 +39,10 @@ private:
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Farming")
 	bool bRaidEnded = false;
 
+	// 이번 레이드를 종료시킨 결과 — 탈출(Extracted)은 일단 ResultLevel을 건너뛰고 로비로 복귀
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Farming")
+	ELSRaidResult PendingRaidResult = ELSRaidResult::Extracted;
+
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Farming")
 	bool bWaitingForRaidResultSave = false;
 
