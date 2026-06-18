@@ -30,7 +30,7 @@ constexpr int32 StaminaProgressFillProtocolLevel = 2;
 
 FString BuildChipIconObjectPath(const FName ChipItemRowName)
 {
-	const FString IconName = ChipItemRowName.ToString();
+	const FString IconName = LSInventorySlotUtils::ResolveIconAssetNameFromRowName(ChipItemRowName);
 	return FString::Printf(TEXT("/Game/LostSignal/UI/Icons/Chips/%s.%s"), *IconName, *IconName);
 }
 

@@ -7,6 +7,7 @@
 #include "Core/LSPlayerControllerBase.h"
 #include "Engine/Texture2D.h"
 #include "InputCoreTypes.h"
+#include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "UI/ChipSystem/LSChipEquipmentSlotWidget.h"
@@ -671,7 +672,7 @@ bool ULSItemSlotWidget::IsValidWarehouseDropTarget(const UDragDropOperation* InO
 
 UTexture2D* ULSItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName) const
 {
-	const FString IconObjectPath = BuildIconObjectPath(ItemRowName.ToString(), GetIconBaseFolderByRowName(ItemRowName));
+	const FString IconObjectPath = BuildIconObjectPath(LSInventorySlotUtils::ResolveIconAssetNameFromRowName(ItemRowName), GetIconBaseFolderByRowName(ItemRowName));
 	UTexture2D* IconTexture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *IconObjectPath));
 	if (!IconTexture)
 	{

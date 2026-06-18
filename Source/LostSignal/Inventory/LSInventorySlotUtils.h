@@ -20,6 +20,10 @@ namespace LSInventorySlotUtils
 	// Name 토큰 중 알려진 등급(Supply/Standard/Precision/Tuning/Prototype/Masterpiece)을 찾아 반환. 없으면 빈 문자열.
 	FString ResolveItemGradeFromRowName(FName ItemRowName);
 
+	// 칩 행 이름(Chip_{Grade}_{Func})의 기능 토큰으로 기능별 아이콘 에셋명을 반환한다.
+	// 칩이 아니거나 알 수 없는 기능이면 행 이름 문자열을 그대로 반환(기존 동작 폴백).
+	FString ResolveIconAssetNameFromRowName(FName ItemRowName);
+
 	void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, int32 SlotIndex);
 	void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount);
 	bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount, int32 MaxSlotCount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem);

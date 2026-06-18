@@ -3,6 +3,7 @@
 #include "Components/WidgetComponent.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Engine/Texture2D.h"
+#include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Minimap/LSMinimapMarkerComponent.h"
@@ -145,7 +146,7 @@ void ALSWorldDroppedItem::RefreshItemVisual()
 
 UTexture2D* ALSWorldDroppedItem::LoadIconTextureByRowName(const FName InItemRowName) const
 {
-	const FString IconObjectPath = BuildIconObjectPath(InItemRowName.ToString(), GetIconBaseFolderByRowName(InItemRowName));
+	const FString IconObjectPath = BuildIconObjectPath(LSInventorySlotUtils::ResolveIconAssetNameFromRowName(InItemRowName), GetIconBaseFolderByRowName(InItemRowName));
 	UTexture2D* IconTexture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *IconObjectPath));
 	if (!IconTexture)
 	{

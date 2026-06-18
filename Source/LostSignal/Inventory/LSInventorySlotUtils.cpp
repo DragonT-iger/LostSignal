@@ -20,6 +20,18 @@ const TArray<FString>& GetKnownGrades()
 	return KnownGrades;
 }
 
+// 칩 기능 토큰(Row Name 접미사) → 기능별 아이콘 에셋명. 등급과 무관하게 기능별 4종으로 통합한다.
+const TMap<FString, FString>& GetChipFunctionIconNames()
+{
+	static const TMap<FString, FString> ChipFunctionIconNames = {
+		{ TEXT("HP"), TEXT("Living_chip") },
+		{ TEXT("Inventory"), TEXT("Carrying_chip") },
+		{ TEXT("Battle"), TEXT("Battle_chip") },
+		{ TEXT("Navigation"), TEXT("Quest_chip") },
+	};
+	return ChipFunctionIconNames;
+}
+
 constexpr int32 SortGroupWeaponOffset = 100000;
 constexpr int32 SortGroupArmorOffset = 200000;
 constexpr int32 SortGroupItemOffset = 300000;
@@ -193,6 +205,29 @@ FString ResolveItemGradeFromRowName(const FName ItemRowName)
 
 	UE_LOG(LogLS, Warning, TEXT("[Inventory] Cannot resolve grade from row name '%s' (no known grade token)."), *ItemRowName.ToString());
 	return FString();
+}
+
+FString ResolveIconAssetNameFromRowName(const FName ItemRowName)
+{
+	const FString RowNameString = ItemRowName.ToString();
+
+	// 칩이 아니면 행 이름을 그대로 에셋명으로 사용(기존 동작 유지).
+	if (!RowNameString.StartsWith(TEXT("Chip_")))
+	{
+		return RowNameString;
+	}
+
+	// Chip_{Grade}_{Func} 의 마지막 토큰(기능)으로 기능별 아이콘을 선택한다.
+	FString FunctionToken;
+	RowNameString.Split(TEXT("_"), nullptr, &FunctionToken, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+
+	if (const FString* IconName = GetChipFunctionIconNames().Find(FunctionToken))
+	{
+		return *IconName;
+	}
+
+	UE_LOG(LogLS, Warning, TEXT("[Inventory] Cannot resolve chip icon from row name '%s' (unknown function token '%s')."), *RowNameString, *FunctionToken);
+	return RowNameString;
 }
 
 void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, const int32 SlotIndex)
