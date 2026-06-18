@@ -138,7 +138,7 @@ void ALSEnemyCharacter::InitializeMonsterArchetype()
 	const FLSMonsterArchetypeRow* Row = FindMonsterArchetypeRow();
 	if (!Row)
 	{
-		UE_LOG(LogLS, Log, TEXT("%s: Monster archetype row missing, using component defaults."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("%s: Monster archetype row missing, DataTable-driven monster values were not applied."), *GetNameSafe(this));
 		return;
 	}
 

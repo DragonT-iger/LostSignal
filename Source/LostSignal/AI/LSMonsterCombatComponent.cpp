@@ -18,11 +18,18 @@ ULSMonsterCombatComponent::ULSMonsterCombatComponent()
 
 void ULSMonsterCombatComponent::ApplyArchetype(const FLSMonsterArchetypeRow& Row)
 {
-	AlertMoveSpeedMultiplier = Row.Chase_Speed;
+	bCombatArchetypeApplied = true;
+	AlertMoveSpeedMultiplier = FMath::Max(0.0f, Row.Chase_Speed);
 }
 
 bool ULSMonsterCombatComponent::RequestAbilityByTag(FGameplayTag AbilityTag) const
 {
+	if (!bCombatArchetypeApplied)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s monster ability request blocked because no DataTable archetype was applied."), *GetNameSafe(GetOwner()));
+		return false;
+	}
+
 	if (!AbilityTag.IsValid())
 	{
 		return false;
@@ -115,6 +122,23 @@ void ULSMonsterCombatComponent::PerformMeleeHit()
 		return;
 	}
 
+	if (!bCombatArchetypeApplied)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s: PerformMeleeHit skipped because no DataTable archetype was applied."), *GetNameSafe(OwnerCharacter));
+		return;
+	}
+
+	if (MeleeHitRadius <= 0.0f)
+	{
+		UE_LOG(
+			LogLS,
+			Warning,
+			TEXT("%s: PerformMeleeHit skipped because melee hit radius is invalid. Radius=%.2f"),
+			*GetNameSafe(OwnerCharacter),
+			MeleeHitRadius);
+		return;
+	}
+
 	if (SharedCombatComponent->IsDead())
 	{
 		UE_LOG(LogLS, Log, TEXT("%s: PerformMeleeHit skipped because owner is dead."), *GetNameSafe(OwnerCharacter));
@@ -170,11 +194,11 @@ void ULSMonsterCombatComponent::PerformMeleeHit()
 		if (!SharedCombatComponent->ApplyDamageEffectToTarget(
 			HitActor,
 			DamageEffectClass,
-			DamageEffectLevel,
-			MeleeFixedDamage,
-			MeleeAttackCoefficient,
-			bMeleeCanCrit,
-			MeleeBreakPower))
+			1.0f,
+			0.0f,
+			1.0f,
+			false,
+			ELSBreakPowerTier::NormalAttack))
 		{
 			UE_LOG(
 				LogLS,
@@ -203,5 +227,5 @@ void ULSMonsterCombatComponent::PerformMeleeHit()
 
 bool ULSMonsterCombatComponent::HasValidDamageEffect() const
 {
-	return DamageEffectClass != nullptr;
+	return bCombatArchetypeApplied && DamageEffectClass != nullptr;
 }

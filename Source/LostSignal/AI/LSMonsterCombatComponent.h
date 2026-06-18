@@ -53,11 +53,14 @@ private:
 	UPROPERTY(EditAnywhere, Category="LS/Combat")
 	FGameplayTag DefaultAttackAbilityTag;
 
+	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Combat")
+	bool bCombatArchetypeApplied = false;
+
 	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
 	float LeashDistance = 2000.0f;
 
-	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
-	float AlertMoveSpeedMultiplier = 1.2f;
+	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Combat")
+	float AlertMoveSpeedMultiplier = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
@@ -67,19 +70,4 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
 	float MeleeHitRadius = 90.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="1.0"))
-	float DamageEffectLevel = 1.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
-	float MeleeFixedDamage = 10.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
-	float MeleeAttackCoefficient = 0.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
-	bool bMeleeCanCrit = false;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
-	ELSBreakPowerTier MeleeBreakPower = ELSBreakPowerTier::NormalAttack;
 };

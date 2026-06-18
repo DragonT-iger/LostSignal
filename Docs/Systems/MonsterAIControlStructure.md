@@ -101,6 +101,7 @@ Monster_HP
 
 Monster_ATK
 -> ALSEnemyCharacter가 서버에서 ULSCharacterAttributeSet Attack 초기화
+-> 몬스터 기본 근접 공격 데미지는 FixedDamage=0, AttackCoefficient=1로 적용해서 Monster_ATK를 공격력 입력으로 사용
 
 Monster_DEF
 -> ALSEnemyCharacter가 서버에서 ULSCharacterAttributeSet Defence 초기화
@@ -111,6 +112,8 @@ Monster_Guard
 Action_Group
 -> Row에는 보관하되, AbilityTag 매핑 정책이 정해지기 전까지 직접 적용하지 않는다
 ```
+
+`ULSMonsterCombatComponent`는 몬스터 기본 공격 데미지에 컴포넌트 공격력 fallback을 사용하지 않는다. `FLSMonsterArchetypeRow`가 적용되지 않으면 공격 Ability 요청 또는 실제 히트 적용을 차단하고 `UE_LOG(LogLS, Warning, ...)`를 남긴다.
 
 ## Transition 데이터 규칙
 
@@ -292,7 +295,7 @@ SetCurrentTargetFromDamage
 - StateTree Condition에 감지 계산을 넣지 않는다.
 - 타겟 탐색은 SenseComponent에서 처리한다.
 - StateTree에는 결과값만 제공한다.
-- 시야/청각/속도 수치는 DataTable 행에서 받고, Leash/시야각 같은 보조값은 별도 정책이 정해질 때까지 컴포넌트 UPROPERTY 기본값으로 관리한다.
+- 시야/청각/속도와 몬스터 공격력은 DataTable 행에서 받는다. Leash, 시야각, 공격 판정 범위처럼 아직 row 컬럼이 없는 정책값은 별도 정책이 정해질 때까지 컴포넌트 설정으로 관리한다.
 - 기억 시간은 SenseComponent가 관리하지 않는다. Investigate 상태의 Move/Wait/ClearInterest 흐름으로 관리한다.
 - 죽은 몬스터는 감지 Tick을 멈추고 관심 정보를 비운다.
 
