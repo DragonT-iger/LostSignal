@@ -102,10 +102,10 @@ void ALSRatCrop::SetStage(ELSRatCropSize NewSize)
 	if (Sprite && Stages.IsValidIndex(StageIndex) && Stages[StageIndex])
 	{
 		Sprite->SetSprite(Stages[StageIndex]);
-		const FVector2D SourceSize = Stages[StageIndex]->GetSourceSize();
-		if (SourceSize.IsNearlyZero())
+		const FVector BoxExtent = Stages[StageIndex]->GetRenderBounds().BoxExtent;
+		if (BoxExtent.IsNearlyZero())
 		{
-			UE_LOG(LogLS, Warning, TEXT("[RatSteal] 작물 %s 단계 %d 스프라이트 source size 0x0: %s"),
+			UE_LOG(LogLS, Warning, TEXT("[RatSteal] 작물 %s 단계 %d 스프라이트 렌더 바운드 0: %s"),
 				*GetName(), StageIndex, *GetNameSafe(Stages[StageIndex]));
 		}
 	}
