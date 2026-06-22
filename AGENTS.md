@@ -73,6 +73,14 @@
 | [Docs/Systems/MonsterAIControlStructure.md](Docs/Systems/MonsterAIControlStructure.md) | 몬스터 AI 제어·StateTree 전이 구조 |
 | [Docs/Systems/MinimapSystem.md](Docs/Systems/MinimapSystem.md) | 미니맵 표시 대상·지형 도형·탐색 프로토콜 연동 구조 |
 
+### 트러블슈팅 (버그 원인·수정 기록)
+
+증상이 재현되면 먼저 읽는 디버깅 기록. 같은 함정에 다시 빠지지 않기 위한 문서다.
+
+| 문서 | 담당 내용 |
+|------|-----------|
+| [Docs/Troubleshooting/UIDragDropPackagedBuild.md](Docs/Troubleshooting/UIDragDropPackagedBuild.md) | 패키지 빌드에서 UMG 드래그앤드롭 입력이 죽는 문제(DefaultDragVisual=this) 원인·진단·수정 |
+
 ### 미니게임 (RatSteal — 몰래몰래팜)
 
 원작 D2DGame을 LostSignal 내장 미니게임으로 이식하는 별도 문서군. 폴더 전체가 기획의 단일 출처이며, 진입점은 Overview다.

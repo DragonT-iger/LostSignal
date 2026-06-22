@@ -314,7 +314,17 @@ void ULSItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const 
 	DragOperation->DragItemRowName = DragItemRowName;
 	DragOperation->DragAmount = DragAmount;
 	DragOperation->DragChipStats = DragChipStats;
-	DragOperation->DefaultDragVisual = this;
+	// 드래그 비주얼은 반드시 별도 인스턴스로 만든다. 살아있는 소스 위젯(this)을 비주얼로 쓰면
+	// 드래그 종료 후 그 위젯의 Slate 드래그 감지가 영구히 죽어, 풀링 재사용 시 해당 슬롯이 드래그 불가가 된다.
+	// SetItem만 호출해 bHasItem=true로 둔다(SetDisplayOnlySlotContext는 bHasItem=false로 만들어 PreConstruct에서 아이콘이 지워진다).
+	if (APlayerController* OwningPlayer = GetOwningPlayer())
+	{
+		if (ULSItemSlotWidget* DragVisual = CreateWidget<ULSItemSlotWidget>(OwningPlayer, GetClass()))
+		{
+			DragVisual->SetItem(DragItemRowName, DragAmount, DragChipStats);
+			DragOperation->DefaultDragVisual = DragVisual;
+		}
+	}
 	DragOperation->Pivot = EDragPivot::MouseDown;
 	SetVisibility(ESlateVisibility::HitTestInvisible);
 	SetRenderOpacity(0.25f);
