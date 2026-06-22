@@ -7,6 +7,9 @@
 
 class ULSSaveGame;
 
+// 칩 장착 슬롯 또는 신호 게이지가 바뀌면 발행된다. (전투 스탯 재적용 등에 사용)
+DECLARE_MULTICAST_DELEGATE(FLSOnChipLoadoutChanged);
+
 UCLASS()
 class LOSTSIGNAL_API ULSSaveSubsystem : public UGameInstanceSubsystem
 {
@@ -14,6 +17,9 @@ class LOSTSIGNAL_API ULSSaveSubsystem : public UGameInstanceSubsystem
 
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
+	// 칩 장착/신호 게이지 변경 알림. ULSChipStatComponent 등이 구독한다.
+	FLSOnChipLoadoutChanged OnChipLoadoutChanged;
 
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void AddToInventory(const TArray<FLSSessionItem>& Items);

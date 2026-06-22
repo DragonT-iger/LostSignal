@@ -42,4 +42,13 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Data_Buff_AttackPower, "LS.Data.Buff.AttackPower")
 
 	UE_DEFINE_GAMEPLAY_TAG(Data_Stamina_Amount, "LS.Data.Stamina.Amount")
+
+	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_Attack, "LS.Data.Chip.Attack")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_Health, "LS.Data.Chip.Health")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_Defense, "LS.Data.Chip.Defense")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_Recovery, "LS.Data.Chip.Recovery")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_AttackSpeed, "LS.Data.Chip.AttackSpeed")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_MoveSpeed, "LS.Data.Chip.MoveSpeed")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_CritDamage, "LS.Data.Chip.CritDamage")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_CritRate, "LS.Data.Chip.CritRate")
 }

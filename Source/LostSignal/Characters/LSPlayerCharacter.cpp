@@ -3,6 +3,7 @@
 #include "Characters/LSPlayerCharacter.h"
 
 #include "Camera/CameraComponent.h"
+#include "Characters/LSChipStatComponent.h"
 #include "Combat/LSAimComponent.h"
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Core/LSPlayerControllerBase.h"
@@ -25,6 +26,7 @@
 #include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Inventory/LSInventoryWidget.h"
+#include "UI/LSUILayer.h"
 #include "Vision/LSMPCVisionSourceComponent.h"
 #include "Vision/LSPlayerXRayComponent.h"
 #include "Vision/LSVisionComponent.h"
@@ -60,6 +62,7 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	SkillPreviewComponent = CreateDefaultSubobject<ULSSkillPreviewComponent>(TEXT("SkillPreviewComponent"));
 	PlayerSkillComponent = CreateDefaultSubobject<ULSPlayerSkillComponent>(TEXT("PlayerSkillComponent"));
 	PlayerAttributeSet = CreateDefaultSubobject<ULSCharacterAttributeSet>(TEXT("PlayerAttributeSet"));
+	ChipStatComponent = CreateDefaultSubobject<ULSChipStatComponent>(TEXT("ChipStatComponent"));
 	StaminaChangeEffectClass = ULSGE_StaminaChange::StaticClass();
 	SurvivalOverheadWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("SurvivalOverheadWidgetComponent"));
 	SurvivalOverheadWidgetComponent->SetupAttachment(RootComponent);
@@ -80,6 +83,12 @@ void ALSPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	InitializeSurvivalOverheadWidget();
+
+	// Super::BeginPlay에서 ASC(InitAbilityActorInfo)가 준비된 뒤 칩 전투 스탯을 최초 적용한다.
+	if (ChipStatComponent)
+	{
+		ChipStatComponent->RefreshChipStats();
+	}
 }
 
 void ALSPlayerCharacter::Tick(float DeltaSeconds)
@@ -445,7 +454,7 @@ void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
 
 	if (!InventoryWidget->IsInViewport())
 	{
-		InventoryWidget->AddToViewport();
+		InventoryWidget->AddToViewport(LSUILayer::ModalPanel);
 	}
 
 	if (ULSInventoryWidget* LSInventoryWidget = Cast<ULSInventoryWidget>(InventoryWidget))
@@ -461,6 +470,11 @@ void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
 
 	InventoryWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	ActiveInventoryTarget = Target;
+
+	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(PlayerController))
+	{
+		LSPlayerController->UpdateModalBackdropVisibility();
+	}
 }
 
 void ALSPlayerCharacter::HideInventoryWidget()
@@ -474,6 +488,7 @@ void ALSPlayerCharacter::HideInventoryWidget()
 	{
 		PlayerController->HideLootDropWidget();
 		PlayerController->HideLobbyStorageWidget();
+		PlayerController->UpdateModalBackdropVisibility();
 	}
 
 	ActiveInventoryTarget.Reset();

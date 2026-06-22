@@ -160,6 +160,7 @@ void ULSSaveSubsystem::SetChipSignalGaugePercent(const float Percent)
 
 	SaveData->ChipSignalGaugePercent = ClampedPercent;
 	Save();
+	OnChipLoadoutChanged.Broadcast();
 }
 
 bool ULSSaveSubsystem::EquipChipFromStoredSlot(const ELSInventorySlotArea SourceArea, const int32 SourceIndex, const int32 EquipmentIndex)
@@ -213,6 +214,7 @@ bool ULSSaveSubsystem::EquipChipFromStoredSlot(const ELSInventorySlotArea Source
 	}
 
 	Save();
+	OnChipLoadoutChanged.Broadcast();
 	return true;
 }
 
@@ -266,6 +268,7 @@ bool ULSSaveSubsystem::DropChipEquipmentSlot(const int32 FromEquipmentIndex, con
 	if (bDropped)
 	{
 		Save();
+		OnChipLoadoutChanged.Broadcast();
 	}
 	return bDropped;
 }
@@ -316,6 +319,7 @@ bool ULSSaveSubsystem::UnequipChipToWarehouse(const int32 EquipmentIndex)
 
 	EquipmentSlot = LSInventorySlotUtils::MakeEmptyItem();
 	Save();
+	OnChipLoadoutChanged.Broadcast();
 	return true;
 }
 

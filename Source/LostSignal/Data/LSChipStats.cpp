@@ -188,6 +188,31 @@ TMap<FName, int32> AggregateChipStatTotals(const TArray<FLSSessionItem>& Items)
 	return Totals;
 }
 
+TMap<FName, int32> ComputeEffectiveChipStatTotals(const TArray<FLSSessionItem>& Items, const int32 InactiveSlotCount)
+{
+	const TMap<FName, int32> AllTotals = AggregateChipStatTotals(Items);
+
+	// 비활성 슬롯(앞에서부터 InactiveSlotCount개)만 따로 합산해 절반을 차감한다.
+	TArray<FLSSessionItem> InactiveItems;
+	InactiveItems.Reserve(FMath::Min(Items.Num(), InactiveSlotCount));
+	for (int32 SlotIndex = 0; SlotIndex < Items.Num() && SlotIndex < InactiveSlotCount; ++SlotIndex)
+	{
+		InactiveItems.Add(Items[SlotIndex]);
+	}
+	const TMap<FName, int32> InactiveTotals = AggregateChipStatTotals(InactiveItems);
+
+	TMap<FName, int32> Effective;
+	Effective.Reserve(AllTotals.Num());
+	for (const TPair<FName, int32>& Pair : AllTotals)
+	{
+		const int32* InactivePtr = InactiveTotals.Find(Pair.Key);
+		const int32 HalfLoss = InactivePtr ? FMath::RoundToInt(static_cast<float>(*InactivePtr) * 0.5f) : 0;
+		Effective.Add(Pair.Key, Pair.Value - HalfLoss);
+	}
+
+	return Effective;
+}
+
 FLSChipProtocolTotals AggregateChipProtocolTotals(const TArray<FLSSessionItem>& Items, const UObject* LogContext)
 {
 	FLSChipProtocolTotals Totals;

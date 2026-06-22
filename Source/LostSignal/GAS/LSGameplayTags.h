@@ -58,4 +58,14 @@ namespace LSGameplayTags
 
 	// SetByCaller stamina data
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Stamina_Amount)
+
+	// SetByCaller chip stat data (칩 장착 합산값을 캐릭터 어트리뷰트로 적용할 때 사용)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_Attack)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_Health)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_Defense)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_Recovery)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_AttackSpeed)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_MoveSpeed)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_CritDamage)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_CritRate)
 }

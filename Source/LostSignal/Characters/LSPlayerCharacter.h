@@ -11,6 +11,7 @@ class UCameraComponent;
 class UGameplayEffect;
 class UInputAction;
 class ULSAimComponent;
+class ULSChipStatComponent;
 class ULSMPCVisionSourceComponent;
 class ULSNoiseEmitterComponent;
 class ULSPlayerCombatComponent;
@@ -103,6 +104,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/GAS", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSCharacterAttributeSet> PlayerAttributeSet;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Chip", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<ULSChipStatComponent> ChipStatComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/UI", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UWidgetComponent> SurvivalOverheadWidgetComponent;

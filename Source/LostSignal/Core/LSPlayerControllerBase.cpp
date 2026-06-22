@@ -26,7 +26,9 @@
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Debug/LSHpDebugWidget.h"
 #include "UI/Debug/LSProtocolDebugWidget.h"
+#include "UI/LSModalBackdropWidget.h"
 #include "UI/LSPlayerHUDWidget.h"
+#include "UI/LSUILayer.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Protocol/LSProtocolUIWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
@@ -88,6 +90,7 @@ void ALSPlayerControllerBase::BeginPlay()
 	}
 
 	CreatePlayerHUDWidgetLocal();
+	CreateModalBackdropWidgetLocal();
 }
 
 void ALSPlayerControllerBase::OnPossess(APawn* InPawn)
@@ -524,13 +527,14 @@ void ALSPlayerControllerBase::ShowLootDropWidgetLocal(const FText& LootSourceNam
 
 	if (!LootDropWidgetInstance->IsInViewport())
 	{
-		LootDropWidgetInstance->AddToViewport();
+		LootDropWidgetInstance->AddToViewport(LSUILayer::ModalPanel);
 	}
 
 	LootDropWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	LootDropWidgetInstance->SetLootSourceName(LootSourceName);
 	LootDropWidgetInstance->SetSourceLootBox(SourceLootBox);
 	LootDropWidgetInstance->SetLootItems(Results);
+	UpdateModalBackdropVisibility();
 }
 
 void ALSPlayerControllerBase::HideLootDropWidgetLocal()
@@ -540,6 +544,8 @@ void ALSPlayerControllerBase::HideLootDropWidgetLocal()
 		LootDropWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 		LootDropWidgetInstance->ClearLootItems();
 	}
+
+	UpdateModalBackdropVisibility();
 }
 
 void ALSPlayerControllerBase::ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass)
@@ -573,11 +579,12 @@ void ALSPlayerControllerBase::ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbySt
 
 	if (!LobbyStorageWidgetInstance->IsInViewport())
 	{
-		LobbyStorageWidgetInstance->AddToViewport();
+		LobbyStorageWidgetInstance->AddToViewport(LSUILayer::ModalPanel);
 	}
 
 	LobbyStorageWidgetInstance->RefreshStorage();
 	LobbyStorageWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	UpdateModalBackdropVisibility();
 }
 
 void ALSPlayerControllerBase::HideLobbyStorageWidgetLocal()
@@ -586,6 +593,8 @@ void ALSPlayerControllerBase::HideLobbyStorageWidgetLocal()
 	{
 		LobbyStorageWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
+
+	UpdateModalBackdropVisibility();
 }
 
 void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass)
@@ -619,11 +628,12 @@ void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStat
 
 	if (!ChipStationWidgetInstance->IsInViewport())
 	{
-		ChipStationWidgetInstance->AddToViewport();
+		ChipStationWidgetInstance->AddToViewport(LSUILayer::ModalPanel);
 	}
 
 	ChipStationWidgetInstance->RefreshChipStation();
 	ChipStationWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	UpdateModalBackdropVisibility();
 }
 
 void ALSPlayerControllerBase::HideChipStationWidgetLocal()
@@ -632,6 +642,8 @@ void ALSPlayerControllerBase::HideChipStationWidgetLocal()
 	{
 		ChipStationWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
+
+	UpdateModalBackdropVisibility();
 }
 
 void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
@@ -672,6 +684,81 @@ void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
 	}
 
 	PlayerHUDWidgetInstance->InitializeHUDForPawn(CurrentPawn);
+}
+
+void ALSPlayerControllerBase::CreateModalBackdropWidgetLocal()
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	if (!ModalBackdropWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("ModalBackdropWidgetClass is not set on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (!ModalBackdropWidgetInstance)
+	{
+		ModalBackdropWidgetInstance = CreateWidget<ULSModalBackdropWidget>(this, ModalBackdropWidgetClass);
+		if (!ModalBackdropWidgetInstance)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Failed to create modal backdrop widget on %s."), *GetNameSafe(this));
+			return;
+		}
+	}
+
+	if (!ModalBackdropWidgetInstance->IsInViewport())
+	{
+		ModalBackdropWidgetInstance->AddToViewport(LSUILayer::ModalBackdrop);
+	}
+
+	// 패널 뒤에 상주시키되 평상시엔 숨겨 둔다. 표시는 UpdateModalBackdropVisibility가 켠다.
+	ModalBackdropWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+bool ALSPlayerControllerBase::IsAnyModalPanelOpen() const
+{
+	if (LootDropWidgetInstance && LootDropWidgetInstance->IsVisible())
+	{
+		return true;
+	}
+
+	if (LobbyStorageWidgetInstance && LobbyStorageWidgetInstance->IsVisible())
+	{
+		return true;
+	}
+
+	if (ChipStationWidgetInstance && ChipStationWidgetInstance->IsVisible())
+	{
+		return true;
+	}
+
+	// 인벤토리 위젯은 Pawn(ALSPlayerCharacter)이 소유하므로 Pawn에 상태를 묻는다.
+	if (const ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetPawn()))
+	{
+		if (PlayerCharacter->IsInventoryWidgetOpen())
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void ALSPlayerControllerBase::UpdateModalBackdropVisibility()
+{
+	if (!IsLocalPlayerController() || !ModalBackdropWidgetInstance)
+	{
+		return;
+	}
+
+	// 입력은 위에 깔린 패널이 받도록 표시 시 HitTestInvisible로 둔다.
+	const ESlateVisibility NewVisibility = IsAnyModalPanelOpen()
+		? ESlateVisibility::HitTestInvisible
+		: ESlateVisibility::Collapsed;
+	ModalBackdropWidgetInstance->SetVisibility(NewVisibility);
 }
 
 void ALSPlayerControllerBase::NotifyNoiseForHUD(const FLSNoiseEvent& NoiseEvent)
@@ -967,7 +1054,7 @@ void ALSPlayerControllerBase::ToggleProtocolDebugWidget()
 		ProtocolDebugWidgetInstance = CreateWidget<ULSProtocolDebugWidget>(this, ULSProtocolDebugWidget::StaticClass());
 		if (ProtocolDebugWidgetInstance)
 		{
-			ProtocolDebugWidgetInstance->AddToViewport(1000);
+			ProtocolDebugWidgetInstance->AddToViewport(LSUILayer::ProtocolDebug);
 		}
 		// 패널이 떠서 오버라이드가 활성화되었으므로 프로토콜 표시를 다시 그린다.
 		RefreshProtocolTestTargets();

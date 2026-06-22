@@ -42,6 +42,10 @@ namespace LSChipStats
 	LOSTSIGNAL_API int32 ResolveInactiveSignalSlotCount(float SignalGaugePercent);
 	LOSTSIGNAL_API TArray<FLSSessionItem> BuildSignalActiveEquipmentItems(const TArray<FLSSessionItem>& Items, int32 InactiveSlotCount);
 	LOSTSIGNAL_API TMap<FName, int32> AggregateChipStatTotals(const TArray<FLSSessionItem>& Items);
+
+	// 게임플레이에 실제 적용할 전투 스탯 합산. 활성 칩 100% + 비활성 칩 50% 규칙.
+	// (UI 표시 로직과 동일한 단일 출처: 전체 합 - 비활성 합의 절반 반올림)
+	LOSTSIGNAL_API TMap<FName, int32> ComputeEffectiveChipStatTotals(const TArray<FLSSessionItem>& Items, int32 InactiveSlotCount);
 	LOSTSIGNAL_API FLSChipProtocolTotals AggregateChipProtocolTotals(const TArray<FLSSessionItem>& Items, const UObject* LogContext);
 
 	// 스탯 키 → 표시용 라벨 (예: "Chip_Attack" → "공격력").

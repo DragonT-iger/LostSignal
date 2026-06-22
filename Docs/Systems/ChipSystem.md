@@ -64,18 +64,44 @@
 - **칩 스테이션 닫힘** (`ALSChipStationActor`): 칩 설정 상호작용 범위에서 로컬 플레이어가 벗어나면 `ALSPlayerControllerBase::HideChipStationWidget`으로 스테이션 UI를 닫는다.
 - **하드웨어 슬롯** (`ULSChipEquipmentSlotWidget`): 칩 스테이션 목록에서 드래그한 칩을 `EquipmentSlot_0~9` 내부 `ItemSlot`에 저장 이동으로 장착할 수 있다. 장착 슬롯끼리 드래그하면 빈 슬롯으로는 이동하고, 이미 장착된 슬롯과는 교환한다. 장착 칩을 `ChipSlotBorder` 빈 영역으로 드래그하면 장착 해제되어 창고로 이동하고, 칩 리스트 아이템 위에 드롭하면 해당 인벤토리/창고 슬롯과 교환한다. 신호 게이지가 90.0% 이하로 내려갈 때부터 1번 슬롯부터 10% 단위로 비활성 처리하며, 장착 칩의 기본 `ChipStats` 10종 합산값은 활성·비활성 슬롯을 모두 포함한다. 비활성 슬롯의 `ChipStats` 50%는 스탯 UI의 `SignalLossText`에 표시하고, 최종 스탯은 기본 표시값과 `SignalLossText` 표시값을 합산한다. 장착 칩과 신호 게이지 값은 SaveGame에 저장되어 칩 스테이션 재오픈 시 복원된다. 장착 칩의 `Item_MemoryCost` 합계는 `MemoryText`에 `현재/최대` 형식으로 표시한다. 메모리 검증은 아직 없다.
 
+### ✅ 칩 전투 스탯 → 캐릭터 GAS 연동
+
+장착 칩 합산 전투 스탯을 캐릭터 GAS 어트리뷰트에 적용한다. 적용값은 **활성 칩 100% + 비활성 칩 50%**(신호 유실 규칙)이며, UI 표시 로직과 동일한 단일 출처 `LSChipStats::ComputeEffectiveChipStatTotals`를 쓴다. 수치 변경은 무한 지속 GE `ULSGE_ChipStats`의 가산 모디파이어(SetByCaller)로만 적용한다(직접 SetAttribute 금지).
+
+- 적용 주체: `ULSChipStatComponent` (`Source/LostSignal/Characters/LSChipStatComponent.*`) — `ALSPlayerCharacter`에 부착. 서버 권한에서만 동작.
+- 적용 시점: 캐릭터 `BeginPlay`(ASC 초기화 후) 1회 + `ULSSaveSubsystem::OnChipLoadoutChanged`(장착/이동/해제/신호 게이지 변경) 시 remove & reapply.
+- 데이터 소스: `ULSSaveSubsystem`의 `GetChipEquipmentSlots()` / `GetChipSignalGaugePercent()` (GameInstance 서브시스템이라 레벨 전환에도 유지 — 프로토콜 적용 패턴과 동일).
+- 최초 1회 적용 시에만 늘어난 최대 체력만큼 `CurrentHealth`를 풀피로 맞춘다(갱신 시 현재 체력 유지).
+
+**스탯 키 → 어트리뷰트 매핑 원장**
+
+| 칩 스탯 키 | 어트리뷰트 | AttributeSet | 적용 규칙 | 상태 |
+|---|---|---|---|---|
+| Chip_Attack | Attack | Character | 평탄 가산 | ✅ 연동 |
+| Chip_Health | MaxHealth | Combat | 평탄 가산 | ✅ 연동 |
+| Chip_Defense | Defence | Character | 평탄 가산 | ✅ 연동 |
+| Chip_Recovery | Recovery | Character | 평탄 가산 | ✅ 연동(어트리뷰트만, 다운스트림 소비 미연결) |
+| Chip_Attack_Speed | AttackSpeed | Character | 퍼센트 ÷100 가산 | ✅ 연동(다운스트림 소비 확인 필요) |
+| Chip_Move_Speed | MoveSpeed | Character | 퍼센트 ÷100 가산 | ✅ 연동(다운스트림 소비 확인 필요) |
+| Chip_Critical_Damage | CritDamage | Character | 퍼센트 ÷100 가산 | ✅ 연동(데미지 계산 소비) |
+| Chip_Critical_Rate | CritChance | Character | 퍼센트 ÷100 가산 | ✅ 연동(데미지 계산 소비) |
+| Chip_Defense_Penetration | ArmorPenetration | Character | — | ⬜ 보류 |
+| Chip_Skill_Haste | CooldownReduction | Character | — | ⬜ 보류(LoL식 스킬가속 시스템 조사 후 결정) |
+
+> Attack / CritDamage / CritChance / Defence는 `LSDamageExecutionCalculation`이 데미지 계산에 소비한다. Recovery는 현재 다운스트림 소비처가 없고, MoveSpeed / AttackSpeed는 실제 이동/공격 속도로의 소비 연결을 후속으로 확인한다(어트리뷰트 값 반영까지는 완료).
+
 ### ❌ 미구현
 
 | 블록 | 항목 |
 |---|---|
-| 로직 | 등급 + `Item_Chip_Status_Count` → ChipStat 테이블에서 **실제 전투 스탯 산출**. 데이터만 있고 런타임 로직 없음 |
 | [2] | 칩 장착/이동 가능한 전용 인벤토리 UI / 칩 오버랩(정보) UI |
 | [3] | 하드웨어 UI — 메모리 초과 검증 |
-| [3] 로직 | 비활성 칩의 전투지역 실제 적용 연동 |
+| 로직 | 방어 관통(ArmorPenetration), 스킬 가속(CooldownReduction) 칩 스탯 연동 (보류) |
+| 로직 | Recovery / MoveSpeed / AttackSpeed 어트리뷰트의 실제 게임플레이 소비 연결 |
 | [4] | 소프트웨어 UI — 코어 출력 게이지바, 신호 유실 표시, 프로토콜 오버랩 UI |
 | [4] 로직 | 프로토콜 합산값 이후 레벨/단계 산식 확정, 전투지역 편의 UI 활성화 연동 |
 
-**한 줄 요약**: 데이터 레이어와 보관/툴팁/칩 스테이션 목록, 칩 장착/이동/교환, 신호 게이지 기반 장착 칩 비활성화, 장착 칩 스탯·프로토콜 합산 표시와 `DT_Protocol` 기반 단계 표시는 구현되어 있다. 메모리 검증과 실제 게임플레이 구조 변경은 아직 구현되지 않았다.
+**한 줄 요약**: 데이터 레이어와 보관/툴팁/칩 스테이션 목록, 칩 장착/이동/교환, 신호 게이지 기반 장착 칩 비활성화, 장착 칩 스탯·프로토콜 합산 표시와 `DT_Protocol` 기반 단계 표시가 구현되어 있다. 칩 전투 스탯 10종 중 8종을 캐릭터 GAS 어트리뷰트에 적용(활성 100% + 비활성 50%)하며, 방어 관통·스킬 가속 2종과 메모리 검증은 아직 미연동이다.
 
 ---
 
@@ -204,7 +230,8 @@
 
 ## 6. 관련 파일
 
-- 데이터: `Source/LostSignal/Data/LSChipRow.h`, `LSChipStatRow.h`, `LSDropSettings.h`
+- 데이터: `Source/LostSignal/Data/LSChipRow.h`, `LSChipStatRow.h`, `LSDropSettings.h`, `LSChipStats.{h,cpp}` (집계/`ComputeEffectiveChipStatTotals`)
+- GAS 연동: `Source/LostSignal/Characters/LSChipStatComponent.{h,cpp}`, `Source/LostSignal/GAS/Effects/LSGE_ChipStats.{h,cpp}`, `Source/LostSignal/GAS/LSGameplayTags.*` (`LS.Data.Chip.*`)
 - 테이블: `Content/LostSignal/Data/DataTables/DT_ChipRow.uasset`, `DT_ChipStat.uasset`
 - CSV: `Content/LostSignal/Sandbox/DT/DT_Chip.csv`, `DT_ChipStat.csv`
 - 툴팁: `Source/LostSignal/UI/Inventory/LSItemTooltipWidget.cpp` (`PopulateChipTooltip`)
