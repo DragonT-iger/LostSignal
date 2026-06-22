@@ -65,7 +65,7 @@ Source/LostSignal/Inventory/LSInventorySlotUtils.cpp
 
 `ULSInventoryWidget`은 인벤토리와 SafeStash 영역을 표시한다.
 
-또한 `WeaponSlot`, `HeadphoneSlot`, `HeadSlot`, `GlovesSlot`, `BodySlot` 장비 슬롯을 `ULSItemSlotWidget`으로 바인딩한다. 빈 상태 기본 텍스처는 각 `ULSItemSlotWidget`의 `DefaultSlotTexture`에서 지정하며, 값이 없으면 기존 기본 텍스처를 쓴다. 현재 이 5개 슬롯은 표시용이라 장착 저장/드래그 장착/장착 타입 검증 로직은 아직 연결하지 않는다.
+또한 `WeaponSlot`, `HeadphoneSlot`, `HeadSlot`, `GlovesSlot`, `BodySlot` 장비 슬롯을 `ULSItemSlotWidget`으로 바인딩한다. 슬롯 배경 텍스처는 각 `ULSItemSlotWidget`의 `DefaultSlotTexture`에서 지정하며, 값이 없으면 WBP 디자이너의 배경 브러시를 그대로 쓴다(아래 "UI 표시 흐름" 참고). 현재 이 5개 슬롯은 표시용이라 장착 저장/드래그 장착/장착 타입 검증 로직은 아직 연결하지 않는다.
 
 ```text
 RebuildInventorySlots
@@ -110,7 +110,11 @@ SetWarehouseSlotContext
 -> Warehouse
 ```
 
-아이콘은 슬롯의 `ItemRowName`을 기준으로 DataTable row를 찾고, row의 아이콘 경로를 로드한다. 아이콘 경로 문제로 로드에 실패하면 기본 텍스처를 표시하고, 빈 슬롯은 아이콘을 숨긴다.
+슬롯은 배경과 아이콘을 별도 위젯으로 겹쳐 표시한다. 슬롯 루트는 `Overlay`이고, 바닥에 `SlotBackgroundImage`(항상 표시되는 슬롯 배경 프레임), 그 위에 `ItemIconImage`(아이템 아이콘), 그 위에 `AmountText`를 둔다. 아이템 아이콘이 배경을 덮어쓰지 않으므로 아이템이 있어도 슬롯 배경이 유지된다.
+
+`SlotBackgroundImage` 브러시는 `DefaultSlotTexture`로 C++가 설정하며, `DefaultSlotTexture`가 미지정이면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다(이때 `UE_LOG(LogLS, Warning, ...)`). 호버/잠금/드래그 틴트는 배경과 아이콘 양쪽에 적용해 빈 슬롯에서도 피드백이 보인다.
+
+아이콘은 슬롯의 `ItemRowName`을 기준으로 DataTable row를 찾고, row의 아이콘 경로를 로드한다. 아이콘 경로 문제로 로드에 실패하면 기본 아이콘 텍스처를 표시하고, 빈 슬롯은 `ItemIconImage`를 `Collapsed`로 숨겨 배경만 보이게 한다.
 
 ## 드래그 앤 드롭
 

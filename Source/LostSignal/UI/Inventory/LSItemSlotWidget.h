@@ -52,6 +52,10 @@ protected:
 	virtual void NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation) override;
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
+	// 항상 표시되는 슬롯 배경 프레임. 아이템 아이콘과 분리되어 아이템이 있어도 배경이 사라지지 않는다.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UImage> SlotBackgroundImage;
+
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UImage> ItemIconImage;
 
@@ -89,12 +93,15 @@ private:
 	bool bIsLocked = false;
 	bool bIsHovered = false;
 	bool bIsDragTarget = false;
+	// 드래그 중 커서를 따라가는 비주얼 인스턴스 표시. 이 슬롯은 아이템 아이콘만 보이고 배경 프레임은 숨긴다.
+	bool bIsDragVisual = false;
 
 	// 현재 아이콘 브러시를 식별하는 키. 같은 아이템을 다시 표시할 때 동기 텍스처 로딩을 건너뛰기 위한 캐시다.
 	// 아이템 행 이름, 빈 슬롯 키, NAME_None(미적용/로드 실패) 중 하나를 가진다.
 	FName DisplayedIconKey;
 
 	void ApplyHoverVisual();
+	void ApplySlotBackground();
 	bool CanStartItemDrag() const;
 	bool IsQuickTransferPointerEvent(const FPointerEvent& InMouseEvent) const;
 	bool TryHandleQuickTransfer();
@@ -108,7 +115,6 @@ private:
 	bool IsValidLootDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidWarehouseDropTarget(const UDragDropOperation* InOperation) const;
 	UTexture2D* LoadIconTextureByRowName(FName ItemRowName) const;
-	UTexture2D* LoadSlotDefaultTexture() const;
 	UTexture2D* LoadDefaultIconTexture() const;
 	static FString BuildIconObjectPath(const FString& IconNameOrPath, const FString& BaseFolder);
 	static FString GetIconBaseFolderByRowName(FName ItemRowName);

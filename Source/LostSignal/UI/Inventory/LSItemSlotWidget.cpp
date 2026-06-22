@@ -89,23 +89,11 @@ void ULSItemSlotWidget::ClearItem()
 		return;
 	}
 
-	// 이미 빈 슬롯 텍스처가 적용돼 있으면 다시 로드하지 않는다.
-	if (DisplayedIconKey != EmptySlotIconKey)
-	{
-		if (UTexture2D* DefaultIconTexture = LoadSlotDefaultTexture())
-		{
-			ItemIconImage->SetBrushFromTexture(DefaultIconTexture);
-			DisplayedIconKey = EmptySlotIconKey;
-		}
-		else
-		{
-			UE_LOG(LogLS, Warning, TEXT("ClearItem could not load default icon on %s."), *GetNameSafe(this));
-			DisplayedIconKey = NAME_None;
-		}
-	}
+	// 배경은 SlotBackgroundImage가 항상 표시하므로 빈 슬롯에서는 아이콘만 숨긴다.
+	DisplayedIconKey = EmptySlotIconKey;
 
 	ApplyHoverVisual();
-	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
+	ItemIconImage->SetVisibility(ESlateVisibility::Collapsed);
 	AmountText->SetText(FText::GetEmpty());
 	AmountText->SetVisibility(ESlateVisibility::Collapsed);
 	bHasItem = false;
@@ -138,6 +126,8 @@ void ULSItemSlotWidget::SetDisplayOnlySlotContext()
 void ULSItemSlotWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
+
+	ApplySlotBackground();
 
 	if (!bHasItem)
 	{
@@ -321,6 +311,8 @@ void ULSItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const 
 	{
 		if (ULSItemSlotWidget* DragVisual = CreateWidget<ULSItemSlotWidget>(OwningPlayer, GetClass()))
 		{
+			// 드래그 비주얼은 아이템 아이콘만 커서를 따라가도록 배경 프레임을 숨긴다.
+			DragVisual->bIsDragVisual = true;
 			DragVisual->SetItem(DragItemRowName, DragAmount, DragChipStats);
 			DragOperation->DefaultDragVisual = DragVisual;
 		}
@@ -461,24 +453,59 @@ void ULSItemSlotWidget::ResetTransientSlotState()
 
 void ULSItemSlotWidget::ApplyHoverVisual()
 {
-	if (!ItemIconImage)
-	{
-		return;
-	}
-
+	FLinearColor Tint = NormalIconTint;
 	if (bIsLocked)
 	{
-		ItemIconImage->SetColorAndOpacity(LockedIconTint);
-		return;
+		Tint = LockedIconTint;
 	}
-
-	if (bIsDragTarget)
+	else if (bIsDragTarget)
 	{
-		ItemIconImage->SetColorAndOpacity(DragTargetIconTint);
+		Tint = DragTargetIconTint;
+	}
+	else
+	{
+		Tint = bIsHovered ? HoveredIconTint : NormalIconTint;
+	}
+
+	// 빈 슬롯(아이콘 Collapsed)에서도 호버/잠금/드래그 피드백이 보이도록 배경에도 같은 틴트를 적용한다.
+	if (SlotBackgroundImage)
+	{
+		SlotBackgroundImage->SetColorAndOpacity(Tint);
+	}
+
+	if (ItemIconImage)
+	{
+		ItemIconImage->SetColorAndOpacity(Tint);
+	}
+}
+
+void ULSItemSlotWidget::ApplySlotBackground()
+{
+	if (!SlotBackgroundImage)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SlotBackgroundImage is not bound on %s."), *GetNameSafe(this));
 		return;
 	}
 
-	ItemIconImage->SetColorAndOpacity(bIsHovered ? HoveredIconTint : NormalIconTint);
+	// 드래그 비주얼은 아이템 아이콘만 표시하므로 배경 프레임을 숨긴다.
+	if (bIsDragVisual)
+	{
+		SlotBackgroundImage->SetVisibility(ESlateVisibility::Collapsed);
+		return;
+	}
+
+	// DefaultSlotTexture가 지정된 경우에만 배경 브러시를 덮어쓴다.
+	// 미지정이면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다.
+	if (DefaultSlotTexture)
+	{
+		SlotBackgroundImage->SetBrushFromTexture(DefaultSlotTexture);
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("DefaultSlotTexture is not set on %s; using WBP designer brush for slot background."), *GetNameSafe(this));
+	}
+
+	SlotBackgroundImage->SetVisibility(ESlateVisibility::Visible);
 }
 
 bool ULSItemSlotWidget::CanStartItemDrag() const
@@ -719,16 +746,6 @@ UTexture2D* ULSItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName)
 	}
 
 	return IconTexture;
-}
-
-UTexture2D* ULSItemSlotWidget::LoadSlotDefaultTexture() const
-{
-	if (DefaultSlotTexture)
-	{
-		return DefaultSlotTexture;
-	}
-
-	return LoadDefaultIconTexture();
 }
 
 UTexture2D* ULSItemSlotWidget::LoadDefaultIconTexture() const
