@@ -52,6 +52,11 @@ struct LOSTSIGNAL_API FLSVisionPolygonData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	TArray<FVector2D> Points;
 
+	// Points와 1:1로 대응. 해당 점이 오클루더(벽)에 맞은 점이면 1.0, 아무것도 못 맞고 최대거리/반경에
+	// 도달한 "열린" 점(또는 apex)이면 0.0. 셰이더가 바깥 시야 경계 엣지에만 페더를 적용할 때 사용한다.
+	UPROPERTY(Transient)
+	TArray<float> PointFlags;
+
 	// Stores the exact ray hit points used while solving visibility so debug drawing can show
 	// actual raycasts without reconstructing them from the polygon outline.
 	UPROPERTY(Transient)

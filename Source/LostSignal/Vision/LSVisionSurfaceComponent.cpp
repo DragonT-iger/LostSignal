@@ -90,6 +90,16 @@ void ULSVisionSurfaceComponent::InitializeVisionMaterials()
 			if (SourceMaterial == nullptr && bUseExistingMaterials)
 			{
 				SourceMaterial = MeshComponent->GetMaterial(MaterialIndex);
+
+				// 재호출 시 이미 이 컴포넌트가 교체한 비전 MID를 다시 감싸면 MID-of-MID가 되어 누수/이중 래핑이 생긴다.
+				// 그 경우 부모(원본) 머티리얼을 소스로 사용한다.
+				if (UMaterialInstanceDynamic* ExistingMID = Cast<UMaterialInstanceDynamic>(SourceMaterial))
+				{
+					if (ExistingMID->GetOuter() == this && ExistingMID->Parent != nullptr)
+					{
+						SourceMaterial = ExistingMID->Parent;
+					}
+				}
 			}
 
 			if (SourceMaterial == nullptr)

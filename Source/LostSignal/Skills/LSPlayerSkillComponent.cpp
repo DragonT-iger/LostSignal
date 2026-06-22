@@ -135,6 +135,11 @@ bool ULSPlayerSkillComponent::ConfirmActiveSkillPreview(ELSPlayerSkillSlot Slot)
 {
 	if (!ActiveSkillData || ActiveSlot != Slot)
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s failed to confirm skill preview. ActiveSkill=%s ActiveSlot=%d RequestedSlot=%d"),
+			*GetNameSafe(GetOwner()),
+			*GetNameSafe(ActiveSkillData),
+			static_cast<int32>(ActiveSlot),
+			static_cast<int32>(Slot));
 		return false;
 	}
 
@@ -151,11 +156,13 @@ bool ULSPlayerSkillComponent::ConfirmAnyActiveSkillPreview(const FVector& Target
 {
 	if (!ActiveSkillData)
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s failed to confirm any skill preview because ActiveSkillData is missing."),
+			*GetNameSafe(GetOwner()));
 		return false;
 	}
 
 	const ELSPlayerSkillSlot SlotToActivate = ActiveSlot;
-	ULSSkillDataAsset* SkillData = GetSkillData(SlotToActivate);
+	ULSSkillDataAsset* SkillData = ActiveSkillData;
 	const FVector ClampedTargetLocation = ClampTargetLocationToCastRange(SkillData, TargetLocation);
 
 	const bool bConfirmed = ConfirmActiveSkillPreview(SlotToActivate);

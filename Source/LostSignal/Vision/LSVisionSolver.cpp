@@ -168,8 +168,10 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 	PolygonData.VisionRadius = SolverInfo.VisionRadius;
 	PolygonData.Extent = SolverInfo.MaxRayDistance;
 	PolygonData.Points.Reserve(FinalAngles.Num() + 1);
+	PolygonData.PointFlags.Reserve(FinalAngles.Num() + 1);
 	PolygonData.DebugRayHitPoints.Reserve(FinalAngles.Num());
 	PolygonData.Points.Add(SolverInfo.RayOriginPos);
+	PolygonData.PointFlags.Add(0.0f); // apex(RayOrigin)는 열린 점으로 취급.
 
 	for (const float AngleDeg : FinalAngles)
 	{
@@ -198,6 +200,9 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 			}
 		}
 
+		// max-distance 합성으로 bHit를 덮어쓰기 전에 "실제 오클루더에 맞았는지"를 캡처한다.
+		const bool bWasOccluderHit = ClosestHit.bHit;
+
 		if (!ClosestHit.bHit)
 		{
 			ClosestHit.HitPoint = SolverInfo.RayOriginPos + (RayDir * SolverInfo.MaxRayDistance);
@@ -206,6 +211,7 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 		}
 
 		PolygonData.Points.Add(ClosestHit.HitPoint);
+		PolygonData.PointFlags.Add(bWasOccluderHit ? 1.0f : 0.0f);
 		PolygonData.DebugRayHitPoints.Add(ClosestHit.HitPoint);
 	}
 

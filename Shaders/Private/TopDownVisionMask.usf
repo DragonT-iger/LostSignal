@@ -9,10 +9,18 @@ float FeatherWidth;
 float2 WorldMin;
 float2 WorldMax;
 float2 OutputTextureSize;
-float4 VisibleColor;
 float4 HiddenColor;
 uint PolygonPointCount;
 StructuredBuffer<float2> PolygonPoints;
+// 각 폴리곤 점이 오클루더(벽)에 맞은 점이면 1.0, 아무것도 못 맞고 최대거리/반경에 도달한 "열린" 점(또는 apex)이면 0.0.
+StructuredBuffer<float> PolygonPointFlags;
+
+// 크리스프 경계의 텍셀 계단을 깨기 위한 경계 디더 노이즈.
+Texture2D NoiseTexture;
+SamplerState NoiseSampler;
+float NoiseScale; // 월드 타일링(1/유닛). 클수록 무늬가 잘아져 알갱이처럼 보인다.
+float NoiseWidth; // 경계를 흔드는 폭(월드 유닛). feather와 독립 — FeatherWidth=0(크리스프)이어도 디더가 동작한다.
+float OccluderFeatherScale; // 오브젝트(벽) 경계 페더 = FeatherWidth × 이 값. 0=크리스프(정확), 1=열린 경계와 동일. 살짝이면 0.25 정도.
 
 float PointSegmentDistance(float2 Point, float2 A, float2 B)
 {
@@ -42,8 +50,14 @@ void MainCS(uint3 DispatchThreadId : SV_DispatchThreadID)
     const float DistanceToVision = length(WorldPos);
     const float CircleAlpha = smoothstep(max(VisionRadius - FeatherWidth, 0.0f), VisionRadius, DistanceToVision);
 
+    // 경계 디더용 노이즈 오프셋(월드 유닛, ±NoiseWidth/2). 충돌 안 한 "열린" 경계 거리에만 더해 그 경계만 디더한다.
+    // 판정/오클루더 거리는 흔들리지 않은 WorldPos를 그대로 써서 오브젝트 경계는 또렷하게 유지. 월드 좌표 샘플이라 안 기어다님.
+    const float EdgeNoise = NoiseTexture.SampleLevel(NoiseSampler, WorldPos * NoiseScale, 0).r;
+    const float NoiseOffset = (EdgeNoise - 0.5f) * NoiseWidth;
+
     bool bInside = false;
-    float MinEdgeDistance = 1000000.0f;
+    float MinEdgeDistanceOpen = 1000000.0f;     // "열린"·콘 끝 경계까지 최소거리
+    float MinEdgeDistanceOccluder = 1000000.0f; // 오브젝트(벽 정면) 경계까지 최소거리
 
     if (PolygonPointCount < 3)
     {
@@ -55,23 +69,45 @@ void MainCS(uint3 DispatchThreadId : SV_DispatchThreadID)
     {
         float2 Pi = PolygonPoints[i];
         float2 Pj = PolygonPoints[j];
-        MinEdgeDistance = min(MinEdgeDistance, PointSegmentDistance(WorldPos, Pj, Pi));
 
-        float Denom = Pj.y - Pi.y;
-        bool bIntersect =
-            ((Pi.y > WorldPos.y) != (Pj.y > WorldPos.y)) &&
-            (WorldPos.x < (Pj.x - Pi.x) * (WorldPos.y - Pi.y) / Denom + Pi.x);
-
-        if (bIntersect)
+        // FOV 콘의 양쪽 끝(시야각 한계) 엣지는 apex(Points[0])와 연결된다. 이 두 엣지는 충돌 여부와 무관하게 노이즈를 준다.
+        // 그 외에는 양 끝점이 모두 비-오클루더면 "열린 경계"(노이즈), 한쪽이라도 오클루더면 "오브젝트 경계"(또렷).
+        bool bApexEdge = (i == 0) || (j == 0);
+        bool bEdgeOpen = bApexEdge || ((PolygonPointFlags[i] < 0.5f) && (PolygonPointFlags[j] < 0.5f));
+        float EdgeDistance = PointSegmentDistance(WorldPos, Pj, Pi);
+        if (bEdgeOpen)
         {
-            bInside = !bInside;
+            MinEdgeDistanceOpen = min(MinEdgeDistanceOpen, EdgeDistance);
+        }
+        else
+        {
+            MinEdgeDistanceOccluder = min(MinEdgeDistanceOccluder, EdgeDistance);
+        }
+
+        // 수평 엣지(Denom == 0)에서 0 나눗셈으로 inf/NaN이 나오지 않도록 가드. (C++ 판정과 동일)
+        float Denom = Pj.y - Pi.y;
+        if (abs(Denom) > 1e-6f)
+        {
+            bool bIntersect =
+                ((Pi.y > WorldPos.y) != (Pj.y > WorldPos.y)) &&
+                (WorldPos.x < (Pj.x - Pi.x) * (WorldPos.y - Pi.y) / Denom + Pi.x);
+
+            if (bIntersect)
+            {
+                bInside = !bInside;
+            }
         }
     }
 
     float PolygonAlpha = 1.0f;
     if (bInside)
     {
-        PolygonAlpha = 1.0f - smoothstep(0.0f, max(FeatherWidth, 0.0001f), MinEdgeDistance);
+        // 열린·콘 끝 경계: FeatherWidth 페더 + 노이즈.
+        float FeatherOpen = 1.0f - smoothstep(0.0f, max(FeatherWidth, 0.0001f), MinEdgeDistanceOpen + NoiseOffset);
+        // 오브젝트(벽) 경계: 페더는 OccluderFeatherScale로 살짝만(작을수록 벽과 정확). 노이즈는 동일하게 적용해 계단을 깬다.
+        float OccluderWidth = FeatherWidth * OccluderFeatherScale;
+        float FeatherOccluder = 1.0f - smoothstep(0.0f, max(OccluderWidth, 0.0001f), MinEdgeDistanceOccluder + NoiseOffset);
+        PolygonAlpha = max(FeatherOpen, FeatherOccluder);
     }
 
     const float FinalAlpha = min(CircleAlpha, PolygonAlpha);

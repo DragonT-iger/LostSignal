@@ -56,6 +56,13 @@ public:
 		return RuntimeMaskRenderTarget;
 	}
 
+	// 오클루더 세그먼트(시야 차단 형상)가 추가/제거/이동될 때마다 증가한다.
+	// 플레이어가 가만히 있어도 이 값이 바뀌면 시야를 다시 계산해야 한다.
+	int32 GetSegmentTopologyVersion() const
+	{
+		return SegmentTopologyVersion;
+	}
+
 private:
 	UTextureRenderTarget2D* ResolveVisibilityMaskRenderTarget();
 	UTextureRenderTarget2D* CreateRenderTargetFromTemplate(const UTextureRenderTarget2D* TemplateRenderTarget);
@@ -87,6 +94,8 @@ private:
 	TMap<TWeakObjectPtr<ULSVisionOccluderComponent>, FLSVisionOccluderGridState> OccluderGridStates;
 
 	int32 NextSegmentId = 0;
+
+	int32 SegmentTopologyVersion = 0;
 
 	float GridCellSize = 800.0f;
 };

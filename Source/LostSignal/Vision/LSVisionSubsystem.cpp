@@ -1,5 +1,6 @@
 #include "Vision/LSVisionSubsystem.h"
 
+#include "Engine/Texture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "LostSignal.h"
@@ -49,6 +50,16 @@ void ULSVisionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 			MaskRenderer->SetActorHiddenInGame(true);
 			MaskRenderer->SetCanBeDamaged(false);
 			MaskRenderer->VisibilityMaskRenderTarget = RuntimeMaskRenderTarget;
+
+			// MaskRenderer는 런타임 스폰(BP/레벨 인스턴스 없음)이라, 설정값을 여기서 복사해 적용한다.
+			if (VisionSettings != nullptr)
+			{
+				MaskRenderer->FeatherWidth = VisionSettings->FeatherWidth;
+				MaskRenderer->EdgeNoiseTexture = VisionSettings->EdgeNoiseTexture.LoadSynchronous();
+				MaskRenderer->EdgeNoiseScale = VisionSettings->EdgeNoiseScale;
+				MaskRenderer->EdgeNoiseWidth = VisionSettings->EdgeNoiseWidth;
+				MaskRenderer->OccluderFeatherScale = VisionSettings->OccluderFeatherScale;
+			}
 		}
 	}
 
@@ -294,6 +305,9 @@ UTextureRenderTarget2D* ULSVisionSubsystem::CreateFallbackRenderTarget(const int
 	RenderTarget->ClearColor = FLinearColor::Black;
 	RenderTarget->bAutoGenerateMips = false;
 	RenderTarget->bCanCreateUAV = true;
+	// Extent 밖 지오메트리의 UV가 [0,1]을 벗어나도 중심(보임) 영역을 다시 샘플하지 않도록 Clamp.
+	RenderTarget->AddressX = TextureAddress::TA_Clamp;
+	RenderTarget->AddressY = TextureAddress::TA_Clamp;
 	RenderTarget->InitAutoFormat(Size, Size);
 	RenderTarget->UpdateResourceImmediate(true);
 	return RenderTarget;
@@ -372,6 +386,8 @@ void ULSVisionSubsystem::RegisterOccluderInGrid(ULSVisionOccluderComponent* Occl
 		GridState.OccupiedCells.Add(CellKey);
 	}
 	OccluderGridStates.Add(Occluder, MoveTemp(GridState));
+
+	++SegmentTopologyVersion;
 }
 
 void ULSVisionSubsystem::UnregisterOccluderFromGrid(ULSVisionOccluderComponent* Occluder)
@@ -386,6 +402,8 @@ void ULSVisionSubsystem::UnregisterOccluderFromGrid(ULSVisionOccluderComponent* 
 	{
 		return;
 	}
+
+	++SegmentTopologyVersion;
 
 	for (const FLSVisionGridCellKey& CellKey : GridState.OccupiedCells)
 	{

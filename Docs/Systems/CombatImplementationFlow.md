@@ -120,6 +120,8 @@ ALSPlayerCharacter::OnAttack
 -> 아니면 ULSPlayerCombatComponent::RequestBasicAttack
 ```
 
+스킬 프리뷰 중 좌클릭은 스킬 확정 입력으로 소비한다. 확정이 실패하더라도 같은 입력으로 기본 공격을 실행하지 않는다.
+
 스킬 입력:
 
 ```text

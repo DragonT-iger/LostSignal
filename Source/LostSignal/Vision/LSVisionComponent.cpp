@@ -5,6 +5,7 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "LostSignal.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Vision/LSVisionMaskRenderer.h"
 #include "Vision/LSVisionSolver.h"
@@ -132,7 +133,23 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	ULSVisionSubsystem* VisionSubsystem = World->GetSubsystem<ULSVisionSubsystem>();
 	if (VisionSubsystem == nullptr || VisionSubsystem->GetMaskRenderer() == nullptr)
 	{
+		// 이 레벨에서 시야/마스크가 전혀 동작하지 않는 원인 진단용. 매 프레임 스팸을 피해 1회만 남긴다.
+		if (!bWarnedMissingMaskRenderer)
+		{
+			UE_LOG(LogLS, Warning, TEXT("LSVisionComponent '%s': 시야 갱신 스킵 — %s. 이 레벨에서 마스크/시야가 동작하지 않습니다."),
+				*GetNameSafe(GetOwner()),
+				VisionSubsystem == nullptr ? TEXT("VisionSubsystem 없음") : TEXT("MaskRenderer 미바인딩(미스폰)"));
+			bWarnedMissingMaskRenderer = true;
+		}
+
 		return;
+	}
+
+	// 미바인딩 상태에서 복구되면(예: WP 스트리밍 완료) 한 번 알리고 경고 플래그를 리셋한다.
+	if (bWarnedMissingMaskRenderer)
+	{
+		UE_LOG(LogLS, Log, TEXT("LSVisionComponent '%s': MaskRenderer 복구됨, 시야 갱신을 재개합니다."), *GetNameSafe(GetOwner()));
+		bWarnedMissingMaskRenderer = false;
 	}
 
 	const FVector ActorLocation = GetOwner()->GetActorLocation();
@@ -141,6 +158,31 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	const FVector ActorForward = GetOwner()->GetActorForwardVector();
 	const FVector2D ActorForward2D = FVector2D(ActorForward.X, ActorForward.Y).GetSafeNormal();
 	const FVector2D RayOrigin2D = ActorLocation2D - (ActorForward2D * (VisionRadius - 50));
+
+	// 플레이어 포즈·오클루더 토폴로지·활성화 플래그가 모두 직전과 같으면 폴리곤/마스크가 그대로이므로 재계산을 건너뛴다.
+	// 단, 타겟(몬스터 등)은 플레이어가 멈춰 있어도 움직이므로 가시성 갱신은 계속 수행한다.
+	const int32 CurrentTopologyVersion = VisionSubsystem->GetSegmentTopologyVersion();
+	if (bHasSolvedOnce
+		&& bLastEnableVision == bEnableVision
+		&& LastSolveTopologyVersion == CurrentTopologyVersion
+		&& ActorLocation2D.Equals(LastSolveOrigin, 0.5f)
+		&& ActorForward2D.Equals(LastSolveForward, 0.001f))
+	{
+		// 비영구(1프레임) 디버그 선은 매 프레임 다시 그려야 하므로, 재계산을 건너뛰어도 캐시된 폴리곤으로 다시 그린다.
+		if (bDrawDebugRays)
+		{
+			DrawDebugVisionRays();
+		}
+
+		UpdateVisionTargets(ActorLocation2D);
+		return;
+	}
+
+	bHasSolvedOnce = true;
+	bLastEnableVision = bEnableVision;
+	LastSolveTopologyVersion = CurrentTopologyVersion;
+	LastSolveOrigin = ActorLocation2D;
+	LastSolveForward = ActorForward2D;
 
 	FLSVisionSolverInfo SolverInfo;
 	SolverInfo.OriginPos = ActorLocation2D;
@@ -201,12 +243,16 @@ void ULSVisionComponent::DrawDebugVisionRays() const
 		return;
 	}
 
-	const FVector RayOrigin(CurrentPolygon.RayOrigin.X, CurrentPolygon.RayOrigin.Y, DebugRayZOffset);
+	// 비전 계산은 XY만 쓰므로, 디버그 선은 플레이어 Z를 기준으로 그린다.
+	// (절대 Z를 쓰면 바닥이 0이 아닌 레벨에서 선이 지면 아래에 그려져 보이지 않는다.)
+	const float DrawZ = (GetOwner() != nullptr ? GetOwner()->GetActorLocation().Z : 0.0f) + DebugRayZOffset;
+
+	const FVector RayOrigin(CurrentPolygon.RayOrigin.X, CurrentPolygon.RayOrigin.Y, DrawZ);
 	const bool bPersistentLines = DebugRayDuration > 0.0f;
 
 	for (const FVector2D& Point2D : CurrentPolygon.DebugRayHitPoints)
 	{
-		const FVector RayEnd(Point2D.X, Point2D.Y, DebugRayZOffset);
+		const FVector RayEnd(Point2D.X, Point2D.Y, DrawZ);
 
 		DrawDebugLine(
 			World,

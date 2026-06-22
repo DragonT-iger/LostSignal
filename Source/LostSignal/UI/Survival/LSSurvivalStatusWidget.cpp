@@ -34,7 +34,7 @@ FString BuildChipIconObjectPath(const FName ChipItemRowName)
 	return FString::Printf(TEXT("/Game/LostSignal/UI/Icons/Chips/%s.%s"), *IconName, *IconName);
 }
 
-int32 CalculateDisappearingSignalSlotIndex(const float SignalPercent)
+int32 CalculateSurvivalDisappearingSignalSlotIndex(const float SignalPercent)
 {
 	const float ClampedPercent = FMath::Clamp(SignalPercent, 0.0f, 1.0f);
 	if (ClampedPercent <= 0.0f)
@@ -45,7 +45,7 @@ int32 CalculateDisappearingSignalSlotIndex(const float SignalPercent)
 	return FMath::Clamp(FMath::FloorToInt((1.0f - ClampedPercent) * 10.0f + KINDA_SMALL_NUMBER), 0, 9);
 }
 
-float CalculateSignalSlotDisappearProgress(const float SignalPercent, const int32 SlotIndex)
+float CalculateSurvivalSignalSlotDisappearProgress(const float SignalPercent, const int32 SlotIndex)
 {
 	if (SlotIndex == INDEX_NONE)
 	{
@@ -399,7 +399,7 @@ void ULSSurvivalStatusWidget::RefreshSignalChipFromSave()
 	}
 
 	const float SignalPercent = SaveSubsystem->GetChipSignalGaugePercent();
-	const int32 DisappearingSlotIndex = CalculateDisappearingSignalSlotIndex(SignalPercent);
+	const int32 DisappearingSlotIndex = CalculateSurvivalDisappearingSignalSlotIndex(SignalPercent);
 	const TArray<FLSSessionItem>& EquipmentItems = SaveSubsystem->GetChipEquipmentSlots();
 	const FLSSessionItem* DisappearingItem = EquipmentItems.IsValidIndex(DisappearingSlotIndex)
 		? &EquipmentItems[DisappearingSlotIndex]
@@ -410,7 +410,7 @@ void ULSSurvivalStatusWidget::RefreshSignalChipFromSave()
 		return;
 	}
 
-	SetPreviewSignalChip(DisappearingItem->ItemRowName, CalculateSignalSlotDisappearProgress(SignalPercent, DisappearingSlotIndex));
+	SetPreviewSignalChip(DisappearingItem->ItemRowName, CalculateSurvivalSignalSlotDisappearProgress(SignalPercent, DisappearingSlotIndex));
 }
 
 void ULSSurvivalStatusWidget::SetRingCooldownProgress(float Progress)

@@ -214,8 +214,14 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 void ALSPlayerCharacter::OnAttack()
 {
-	if (ConfirmActiveSkillPreview())
+	if (PlayerSkillComponent && PlayerSkillComponent->IsPreviewingSkill())
 	{
+		if (!ConfirmActiveSkillPreview())
+		{
+			UE_LOG(LogLS, Warning, TEXT("%s failed to confirm skill preview. Basic attack input was consumed."),
+				*GetNameSafe(this));
+		}
+
 		return;
 	}
 
@@ -552,14 +558,32 @@ void ALSPlayerCharacter::UpdateActiveSkillPreview()
 
 bool ALSPlayerCharacter::ConfirmActiveSkillPreview()
 {
-	if (!IsLocallyControlled() || !PlayerSkillComponent || !PlayerSkillComponent->IsPreviewingSkill())
+	if (!IsLocallyControlled())
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot confirm skill preview because it is not locally controlled."),
+			*GetNameSafe(this));
+		return false;
+	}
+
+	if (!PlayerSkillComponent)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot confirm skill preview because PlayerSkillComponent is missing."),
+			*GetNameSafe(this));
+		return false;
+	}
+
+	if (!PlayerSkillComponent->IsPreviewingSkill())
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot confirm skill preview because no skill preview is active."),
+			*GetNameSafe(this));
 		return false;
 	}
 
 	FVector MouseWorldPoint = FVector::ZeroVector;
 	if (!ResolveMouseWorldPoint(MouseWorldPoint))
 	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot confirm skill preview because mouse world point could not be resolved."),
+			*GetNameSafe(this));
 		return false;
 	}
 

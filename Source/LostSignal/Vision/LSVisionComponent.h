@@ -85,4 +85,14 @@ private:
 	FTimerHandle VisionUpdateTimerHandle;
 	TObjectPtr<UMaterialInstanceDynamic> PostProcessMID;
 	bool bLocalVisionInitialized = false;
+
+	// MaskRenderer/Subsystem 미바인딩 경고를 매 프레임 스팸하지 않도록 1회만 찍기 위한 상태.
+	bool bWarnedMissingMaskRenderer = false;
+
+	// 직전 solve 상태 캐시. 플레이어 포즈·오클루더 토폴로지·활성화 플래그가 모두 그대로면 재계산을 건너뛴다.
+	bool bHasSolvedOnce = false;
+	bool bLastEnableVision = true;
+	int32 LastSolveTopologyVersion = -1;
+	FVector2D LastSolveOrigin = FVector2D::ZeroVector;
+	FVector2D LastSolveForward = FVector2D::ZeroVector;
 };
