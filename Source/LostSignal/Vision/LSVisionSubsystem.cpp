@@ -55,6 +55,7 @@ void ULSVisionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 			if (VisionSettings != nullptr)
 			{
 				MaskRenderer->FeatherWidth = VisionSettings->FeatherWidth;
+				MaskRenderer->HiddenColor = VisionSettings->HiddenColor;
 				MaskRenderer->EdgeNoiseTexture = VisionSettings->EdgeNoiseTexture.LoadSynchronous();
 				MaskRenderer->EdgeNoiseScale = VisionSettings->EdgeNoiseScale;
 				MaskRenderer->EdgeNoiseWidth = VisionSettings->EdgeNoiseWidth;

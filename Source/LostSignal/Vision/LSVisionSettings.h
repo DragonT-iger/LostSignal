@@ -36,6 +36,10 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Edge", meta = (ClampMin = "0.0"))
 	float FeatherWidth = 70.0f;
 
+	// 시야 밖 영역에 기록되는 색(머티리얼이 어둡게 처리할 때 사용하는 틴트).
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision")
+	FLinearColor HiddenColor = FLinearColor(0.5f, 0.5f, 0.5f, 1.0f);
+
 	// 크리스프 경계의 텍셀 계단을 깨는 디더 노이즈 텍스쳐(Wrap 권장). 미지정 시 경계 노이즈 없음.
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|EdgeNoise")
 	TSoftObjectPtr<UTexture2D> EdgeNoiseTexture;
