@@ -1,5 +1,6 @@
 #include "UI/Protocol/LSProtocolWidget.h"
 
+#include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/RichTextBlock.h"
 #include "Components/TextBlock.h"
@@ -245,6 +246,21 @@ void ULSProtocolWidget::UpdateTooltipPosition()
 		return;
 	}
 
-	// 마우스 픽셀 위치 + 오프셋(커서 오른쪽). bRemoveDPIScale=true로 픽셀→레이아웃 단위 변환.
-	ActiveTooltipWidget->SetPositionInViewport(FVector2D(MouseX, MouseY) + TooltipCursorOffset, true);
+	// 툴팁 크기를 확정한다. 갓 생성된 위젯은 desired size가 0일 수 있어 레이아웃을 강제로 한 번 돌린다.
+	ActiveTooltipWidget->ForceLayoutPrepass();
+
+	// 모든 계산은 픽셀 공간에서 한다. GetMousePosition·GetViewportSize는 픽셀, desired size는 레이아웃 단위라 DPI를 곱해 픽셀로 맞춘다.
+	const float ViewportScale = UWidgetLayoutLibrary::GetViewportScale(this);
+	const FVector2D ViewportSize = UWidgetLayoutLibrary::GetViewportSize(this);
+	const FVector2D TooltipPixelSize = ActiveTooltipWidget->GetDesiredSize() * ViewportScale;
+
+	// 마우스 + 오프셋(커서 오른쪽)으로 두되, 오른쪽/아래로 넘치면 화면 안으로 끌어들인다.
+	FVector2D PositionPx = FVector2D(MouseX, MouseY) + TooltipCursorOffset;
+	const float MaxX = FMath::Max(0.0f, ViewportSize.X - TooltipPixelSize.X);
+	const float MaxY = FMath::Max(0.0f, ViewportSize.Y - TooltipPixelSize.Y);
+	PositionPx.X = FMath::Clamp(PositionPx.X, 0.0f, MaxX);
+	PositionPx.Y = FMath::Clamp(PositionPx.Y, 0.0f, MaxY);
+
+	// bRemoveDPIScale=true로 픽셀→레이아웃 단위 변환.
+	ActiveTooltipWidget->SetPositionInViewport(PositionPx, true);
 }

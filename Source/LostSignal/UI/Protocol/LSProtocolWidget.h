@@ -56,7 +56,7 @@ protected:
 
 	// 호버 툴팁이 마우스 커서 기준으로 떨어지는 오프셋(픽셀). X 양수면 커서 오른쪽에 표시된다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
-	FVector2D TooltipCursorOffset = FVector2D(28.0f, 8.0f);
+	FVector2D TooltipCursorOffset = FVector2D(48.0f, 8.0f);
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTextBlock> LevelText;
