@@ -72,6 +72,9 @@ public:
 protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
+	// 파생 클래스가 칩 적용 전에 베이스 어트리뷰트를 초기화할 수 있는 훅. 기본 동작 없음.
+	virtual void InitializeBaseAttributes() {}
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<USpringArmComponent> CameraBoom;
 

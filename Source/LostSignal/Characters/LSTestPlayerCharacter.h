@@ -15,13 +15,13 @@ class LOSTSIGNAL_API ALSTestPlayerCharacter : public ALSPlayerCharacter
 public:
 	ALSTestPlayerCharacter();
 
-	virtual void BeginPlay() override;
-
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 
 protected:
+	virtual void InitializeBaseAttributes() override;
+
 	UPROPERTY(EditDefaultsOnly, Category="LS/Stats|DataTable")
 	TObjectPtr<UDataTable> CharacterStatTable;
 

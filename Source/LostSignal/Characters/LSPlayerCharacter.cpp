@@ -84,6 +84,9 @@ void ALSPlayerCharacter::BeginPlay()
 	Super::BeginPlay();
 	InitializeSurvivalOverheadWidget();
 
+	// 칩은 베이스 스탯 위에 얹는 GE이므로, 칩 적용 전에 파생 클래스의 베이스 어트리뷰트를 먼저 초기화한다.
+	InitializeBaseAttributes();
+
 	// Super::BeginPlay에서 ASC(InitAbilityActorInfo)가 준비된 뒤 칩 전투 스탯을 최초 적용한다.
 	if (ChipStatComponent)
 	{

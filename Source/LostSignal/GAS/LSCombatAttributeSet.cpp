@@ -1,7 +1,6 @@
 #include "GAS/LSCombatAttributeSet.h"
 
 #include "GameplayEffectExtension.h"
-#include "LostSignal.h"
 #include "Net/UnrealNetwork.h"
 
 void ULSCombatAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -54,16 +53,7 @@ void ULSCombatAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCa
 
 void ULSCombatAttributeSet::ClampCurrentHealth()
 {
-	// [DEBUG] 체력 100 초기화 원인 진단용. 클램프로 현재 체력이 줄어드는 순간을 잡는다. 진단 후 제거할 것.
-	const float BeforeClamp = GetCurrentHealth();
-	const float ClampedValue = FMath::Clamp(BeforeClamp, 0.0f, GetMaxHealth());
-	if (!FMath::IsNearlyEqual(BeforeClamp, ClampedValue))
-	{
-		UE_LOG(LogLS, Warning,
-			TEXT("[ChipStat][DEBUG] ClampCurrentHealth: %.0f -> %.0f (MaxHealth=%.0f)"),
-			BeforeClamp, ClampedValue, GetMaxHealth());
-	}
-	SetCurrentHealth(ClampedValue);
+	SetCurrentHealth(FMath::Clamp(GetCurrentHealth(), 0.0f, GetMaxHealth()));
 }
 
 void ULSCombatAttributeSet::OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth) const

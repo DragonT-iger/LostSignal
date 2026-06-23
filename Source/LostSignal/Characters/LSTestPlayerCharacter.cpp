@@ -10,9 +10,9 @@ ALSTestPlayerCharacter::ALSTestPlayerCharacter()
 {
 }
 
-void ALSTestPlayerCharacter::BeginPlay()
+void ALSTestPlayerCharacter::InitializeBaseAttributes()
 {
-	Super::BeginPlay();
+	// 칩 적용 전에 베이스 스탯을 초기화한다(ALSPlayerCharacter::BeginPlay가 RefreshChipStats 직전에 호출).
 	LoadStatsFromDataTable();
 	ApplyStatsToAttributeSet();
 }

@@ -104,10 +104,6 @@ void ULSChipStatComponent::RefreshChipStats()
 	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Chip_CritDamage, PercentValue(TEXT("Chip_Critical_Damage")));
 	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Chip_CritRate, PercentValue(TEXT("Chip_Critical_Rate")));
 
-	// [DEBUG] 칩 스탯 적용 전 체력 상태 스냅샷.
-	const float MaxHealthBefore = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute());
-	const float CurrentHealthBefore = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
-
 	if (ChipStatEffectHandle.IsValid())
 	{
 		ASC->RemoveActiveGameplayEffect(ChipStatEffectHandle);
@@ -115,30 +111,13 @@ void ULSChipStatComponent::RefreshChipStats()
 	}
 	ChipStatEffectHandle = ASC->ApplyGameplayEffectSpecToSelf(Spec);
 
-	// [DEBUG] 칩 GE 재적용 직후(풀피 보정 전) 체력 상태.
-	const float MaxHealthAfterGE = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute());
-	const float CurrentHealthAfterGE = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
-
 	// 최초 1회 적용 시에만 늘어난 최대 체력에 맞춰 풀피로 시작한다. (갱신 시엔 현재 체력 유지)
-	const bool bDidFullHeal = !bHasAppliedOnce;
 	if (!bHasAppliedOnce)
 	{
 		bHasAppliedOnce = true;
 		const float NewMaxHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute());
 		ASC->SetNumericAttributeBase(ULSCombatAttributeSet::GetCurrentHealthAttribute(), NewMaxHealth);
 	}
-
-	// [DEBUG] 칩 스탯 재적용 흐름 추적용. 체력 100 초기화 원인 진단 후 제거할 것.
-	UE_LOG(LogLS, Warning,
-		TEXT("[ChipStat][DEBUG] Owner=%s Signal=%.2f InactiveSlots=%d ChipHealth=%.0f | MaxHealth %.0f->%.0f CurrentHealth %.0f->%.0f | FirstApply(FullHeal)=%d -> CurrentHealthFinal=%.0f"),
-		*GetNameSafe(OwnerActor),
-		SignalPercent,
-		InactiveSlotCount,
-		FlatValue(TEXT("Chip_Health")),
-		MaxHealthBefore, MaxHealthAfterGE,
-		CurrentHealthBefore, CurrentHealthAfterGE,
-		bDidFullHeal ? 1 : 0,
-		ASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute()));
 }
 
 UAbilitySystemComponent* ULSChipStatComponent::GetOwnerAbilitySystemComponent() const
