@@ -265,7 +265,8 @@ void ULSItemSlotWidget::NativeOnDragEnter(const FGeometry& InGeometry, const FDr
 {
 	Super::NativeOnDragEnter(InGeometry, InDragDropEvent, InOperation);
 
-	bIsDragTarget = IsValidInventoryDropTarget(InOperation) || IsValidLootDropTarget(InOperation) || IsValidWarehouseDropTarget(InOperation);
+	bIsDragTarget = IsValidInventoryDropTarget(InOperation) || IsValidLootDropTarget(InOperation) || IsValidWarehouseDropTarget(InOperation)
+		|| IsValidChipEquipmentDropTarget(InOperation) || IsValidChipStationDropTarget(InOperation);
 	ApplyHoverVisual();
 }
 
@@ -449,6 +450,7 @@ void ULSItemSlotWidget::ResetTransientSlotState()
 	bIsDragTarget = false;
 	SetVisibility(ESlateVisibility::Visible);
 	SetRenderOpacity(1.0f);
+	SetRenderScale(FVector2D::UnitVector);
 }
 
 void ULSItemSlotWidget::ApplyHoverVisual()
@@ -477,6 +479,10 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 	{
 		ItemIconImage->SetColorAndOpacity(Tint);
 	}
+
+	// 틴트에 더해 호버/드래그 타겟 시 슬롯을 살짝 키워 강조한다(잠금·드래그 비주얼 제외).
+	const bool bShouldEmphasize = !bIsLocked && !bIsDragVisual && (bIsHovered || bIsDragTarget);
+	SetRenderScale(bShouldEmphasize ? HoveredRenderScale : FVector2D::UnitVector);
 }
 
 void ULSItemSlotWidget::ApplySlotBackground()
@@ -734,6 +740,40 @@ bool ULSItemSlotWidget::IsValidWarehouseDropTarget(const UDragDropOperation* InO
 	}
 
 	return false;
+}
+
+bool ULSItemSlotWidget::IsValidChipEquipmentDropTarget(const UDragDropOperation* InOperation) const
+{
+	// 칩 장착 슬롯이 드롭 대상일 때의 유효 조건. HandleChipDrop의 수락 조건과 일치한다.
+	const ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
+	if (!DragOperation || bIsLocked || !ChipEquipmentSlotWidget.IsValid())
+	{
+		return false;
+	}
+
+	if (!DragOperation->SourceChipStationWidget || DragOperation->DragItemRowName.IsNone() || DragOperation->DragAmount <= 0)
+	{
+		return false;
+	}
+
+	if (ChipStationWidget.IsValid() && DragOperation->SourceChipStationWidget != ChipStationWidget.Get())
+	{
+		return false;
+	}
+
+	return DragOperation->DragItemRowName.ToString().StartsWith(TEXT("Chip_"));
+}
+
+bool ULSItemSlotWidget::IsValidChipStationDropTarget(const UDragDropOperation* InOperation) const
+{
+	// 칩 목록 슬롯은 장착 슬롯에서 드래그해 온 경우(장착 해제 스왑)에만 유효 대상이다. NativeOnDrop의 칩 스테이션 분기와 일치한다.
+	const ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
+	if (!DragOperation || bIsLocked || ChipEquipmentSlotWidget.IsValid() || !ChipStationWidget.IsValid())
+	{
+		return false;
+	}
+
+	return DragOperation->SourceChipEquipmentSlotWidget != nullptr;
 }
 
 UTexture2D* ULSItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName) const

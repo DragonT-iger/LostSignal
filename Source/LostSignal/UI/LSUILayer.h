@@ -19,6 +19,9 @@ namespace LSUILayer
 	// 모달 패널 본체. 블러 위, 디버그 오버레이 아래.
 	constexpr int32 ModalPanel = 200;
 
-	// 시연용 프로토콜 디버그 패널. 항상 최상단.
+	// 시연용 프로토콜 디버그 패널.
 	constexpr int32 ProtocolDebug = 1000;
+
+	// 커서를 따라다니는 호버 툴팁. 모든 패널/디버그 위에 떠야 하므로 최상단.
+	constexpr int32 Tooltip = 2000;
 }

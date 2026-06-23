@@ -118,6 +118,8 @@ private:
 	bool IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidLootDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidWarehouseDropTarget(const UDragDropOperation* InOperation) const;
+	bool IsValidChipEquipmentDropTarget(const UDragDropOperation* InOperation) const;
+	bool IsValidChipStationDropTarget(const UDragDropOperation* InOperation) const;
 	UTexture2D* LoadIconTextureByRowName(FName ItemRowName) const;
 	UTexture2D* LoadDefaultIconTexture() const;
 	static FString BuildIconObjectPath(const FString& IconNameOrPath, const FString& BaseFolder);

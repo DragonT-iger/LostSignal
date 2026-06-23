@@ -4,14 +4,48 @@
 #include "Components/RichTextBlock.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
+#include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
+#include "UI/LSUILayer.h"
 #include "UI/Protocol/LSProtocolTooltipWidget.h"
 
 void ULSProtocolWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	RefreshProtocolTooltip();
+	EnsureHoverHitTestable();
+}
+
+void ULSProtocolWidget::NativeDestruct()
+{
+	HideProtocolTooltip();
+
+	Super::NativeDestruct();
+}
+
+void ULSProtocolWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
+
+	// 툴팁만 뜨고 상호작용 피드백이 없어, 호버 시 한 줄 전체에 틴트를 입혀 강조한다.
+	SetColorAndOpacity(HoveredTint);
+	ShowProtocolTooltip();
+}
+
+void ULSProtocolWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseLeave(InMouseEvent);
+
+	SetColorAndOpacity(FLinearColor::White);
+	HideProtocolTooltip();
+}
+
+FReply ULSProtocolWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	// 툴팁이 커서를 따라가도록 위치를 갱신한다.
+	UpdateTooltipPosition();
+
+	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
 }
 
 void ULSProtocolWidget::SetProtocol(int32 Level, int32 SynergyStage)
@@ -32,7 +66,6 @@ void ULSProtocolWidget::SetProtocolLevels(const int32 CurrentLevel, const int32 
 
 	CurrentProtocolLevel = CurrentLevel;
 	PreviousProtocolLevel = PreviousLevel;
-	RefreshProtocolTooltip();
 }
 
 void ULSProtocolWidget::SetProtocolStageCount(const int32 InSynergyStageCount)
@@ -59,7 +92,6 @@ void ULSProtocolWidget::SetProtocolStageLevels(const TArray<int32>& InSynergySta
 void ULSProtocolWidget::SetProtocolType(const ELSProtocolType InProtocolType)
 {
 	ProtocolType = InProtocolType;
-	RefreshProtocolTooltip();
 }
 
 FString ULSProtocolWidget::BuildSynergyMarkup(int32 ActiveStage) const
@@ -155,17 +187,9 @@ ULSProtocolTooltipWidget* ULSProtocolWidget::CreateProtocolTooltipWidget()
 	return ProtocolTooltipWidget;
 }
 
-void ULSProtocolWidget::RefreshProtocolTooltip()
+void ULSProtocolWidget::EnsureHoverHitTestable()
 {
-	ULSProtocolTooltipWidget* ProtocolTooltipWidget = CreateProtocolTooltipWidget();
-	if (!ProtocolTooltipWidget)
-	{
-		SetToolTip(nullptr);
-		return;
-	}
-
-	SetToolTip(ProtocolTooltipWidget);
-
+	// 호버(틴트/툴팁)가 동작하려면 루트가 히트테스트 가능해야 한다.
 	UWidget* RootWidget = WidgetTree ? WidgetTree->RootWidget : nullptr;
 	if (!RootWidget)
 	{
@@ -178,9 +202,49 @@ void ULSProtocolWidget::RefreshProtocolTooltip()
 	{
 		RootWidget->SetVisibility(ESlateVisibility::Visible);
 	}
+}
 
-	if (ULSProtocolTooltipWidget* RootTooltipWidget = CreateProtocolTooltipWidget())
+void ULSProtocolWidget::ShowProtocolTooltip()
+{
+	// 잔여 툴팁 정리 후 새로 띄운다(현재 레벨 기준으로 매 호버마다 생성).
+	HideProtocolTooltip();
+
+	ActiveTooltipWidget = CreateProtocolTooltipWidget();
+	if (!ActiveTooltipWidget)
 	{
-		RootWidget->SetToolTip(RootTooltipWidget);
+		return;
 	}
+
+	// 마우스 입력을 가로채지 않게 하고, 모달 패널 위(툴팁 레이어)에 올린다.
+	ActiveTooltipWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+	ActiveTooltipWidget->AddToViewport(LSUILayer::Tooltip);
+	UpdateTooltipPosition();
+}
+
+void ULSProtocolWidget::HideProtocolTooltip()
+{
+	if (ActiveTooltipWidget)
+	{
+		ActiveTooltipWidget->RemoveFromParent();
+		ActiveTooltipWidget = nullptr;
+	}
+}
+
+void ULSProtocolWidget::UpdateTooltipPosition()
+{
+	if (!ActiveTooltipWidget)
+	{
+		return;
+	}
+
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	float MouseX = 0.0f;
+	float MouseY = 0.0f;
+	if (!OwningPlayer || !OwningPlayer->GetMousePosition(MouseX, MouseY))
+	{
+		return;
+	}
+
+	// 마우스 픽셀 위치 + 오프셋(커서 오른쪽). bRemoveDPIScale=true로 픽셀→레이아웃 단위 변환.
+	ActiveTooltipWidget->SetPositionInViewport(FVector2D(MouseX, MouseY) + TooltipCursorOffset, true);
 }

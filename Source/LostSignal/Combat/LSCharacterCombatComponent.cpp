@@ -335,6 +335,17 @@ void ULSCharacterCombatComponent::BindStateTagDelegates()
 
 void ULSCharacterCombatComponent::HandleCurrentHealthChanged(const FOnAttributeChangeData& ChangeData)
 {
+	// [DEBUG] 체력 100 초기화 진단용. 실제 CurrentHealth 어트리뷰트가 바뀌는 순간을 잡는다. 진단 후 제거할 것.
+	if (const UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+	{
+		UE_LOG(LogLS, Warning,
+			TEXT("[ChipStat][DEBUG] HandleCurrentHealthChanged Owner=%s CurrentHealth %.0f->%.0f (MaxHealth=%.0f)"),
+			*GetNameSafe(GetOwner()),
+			ChangeData.OldValue,
+			ChangeData.NewValue,
+			ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute()));
+	}
+
 	RefreshDeathState();
 }
 

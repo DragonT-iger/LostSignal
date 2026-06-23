@@ -327,6 +327,14 @@ void ULSSurvivalStatusWidget::RefreshDisplay()
 	const float MaxHealth = bUsePreviewSurvivalStatus ? PreviewMaxHealth : (CombatAttributeSet ? CombatAttributeSet->GetMaxHealth() : 0.0f);
 	const float CurrentStamina = bUsePreviewSurvivalStatus ? PreviewCurrentStamina : (CharacterAttributeSet ? CharacterAttributeSet->GetCurrentStamina() : 0.0f);
 	const float MaxStamina = bUsePreviewSurvivalStatus ? PreviewMaxStamina : (CharacterAttributeSet ? CharacterAttributeSet->GetMaxStamina() : 0.0f);
+
+	// [DEBUG] 체력 100 초기화 진단용. 위젯이 실제로 읽는 체력 값을 찍는다. 진단 후 제거할 것.
+	UE_LOG(LogLS, Warning,
+		TEXT("[ChipStat][DEBUG] SurvivalWidget RefreshDisplay reads CurrentHealth=%.0f MaxHealth=%.0f (Preview=%d, CombatSet=%s)"),
+		CurrentHealth, MaxHealth,
+		bUsePreviewSurvivalStatus ? 1 : 0,
+		*GetNameSafe(CombatAttributeSet));
+
 	int32 CurrentSurvivalProtocolLevel = 0;
 	int32 PreviousSurvivalProtocolLevel = 0;
 	ResolveSurvivalProtocolLevels(CurrentSurvivalProtocolLevel, PreviousSurvivalProtocolLevel);

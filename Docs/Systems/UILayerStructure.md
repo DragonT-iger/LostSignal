@@ -20,13 +20,14 @@
 레이어 값의 단일 출처는 `Source/LostSignal/UI/LSUILayer.h`다. 문서엔 수치를 복붙하지 않으며, 순서 관계만 적는다.
 
 ```text
-HUD  <  BackgroundBlur  <  ModalPanel  <  ProtocolDebug
+HUD  <  BackgroundBlur  <  ModalPanel  <  ProtocolDebug  <  Tooltip
 ```
 
 - `HUD`: 상시 게임플레이 HUD. 블러보다 아래라 패널이 열리면 HUD도 함께 블러된다.
 - `BackgroundBlur`: 공유 풀스크린 블러. 모든 모달 패널이 공유한다.
 - `ModalPanel`: 인벤토리/창고/칩스테이션/루트드랍 본체. 전부 같은 레이어라 블러 위에 선명하게 그려진다.
-- `ProtocolDebug`: 시연용 디버그 패널. 항상 최상단.
+- `ProtocolDebug`: 시연용 디버그 패널.
+- `Tooltip`: 커서를 따라다니는 호버 툴팁(프로토콜 등). 모든 패널/디버그 위에 떠야 하므로 최상단. 입력을 가로채지 않도록 `HitTestInvisible`로 띄운다.
 
 새 최상위 위젯을 `AddToViewport` 할 때는 리터럴 Z 대신 `LSUILayer`의 값을 쓴다.
 
