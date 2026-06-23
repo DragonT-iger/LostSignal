@@ -111,13 +111,9 @@ void ULSChipStatComponent::RefreshChipStats()
 	}
 	ChipStatEffectHandle = ASC->ApplyGameplayEffectSpecToSelf(Spec);
 
-	// 최초 1회 적용 시에만 늘어난 최대 체력에 맞춰 풀피로 시작한다. (갱신 시엔 현재 체력 유지)
-	if (!bHasAppliedOnce)
-	{
-		bHasAppliedOnce = true;
-		const float NewMaxHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute());
-		ASC->SetNumericAttributeBase(ULSCombatAttributeSet::GetCurrentHealthAttribute(), NewMaxHealth);
-	}
+	// 칩은 로비에서만 변경되므로, 칩 적용/갱신 때마다 현재 체력을 (칩 보정된) 최대 체력으로 맞춘다.
+	const float NewMaxHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute());
+	ASC->SetNumericAttributeBase(ULSCombatAttributeSet::GetCurrentHealthAttribute(), NewMaxHealth);
 }
 
 UAbilitySystemComponent* ULSChipStatComponent::GetOwnerAbilitySystemComponent() const

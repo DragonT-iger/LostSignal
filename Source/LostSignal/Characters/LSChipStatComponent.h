@@ -42,7 +42,4 @@ private:
 
 	// SaveSubsystem 변경 구독 해제용 핸들.
 	FDelegateHandle ChipLoadoutChangedHandle;
-
-	// 최초 1회 적용 시에만 늘어난 최대 체력만큼 풀피로 맞춘다.
-	bool bHasAppliedOnce = false;
 };
