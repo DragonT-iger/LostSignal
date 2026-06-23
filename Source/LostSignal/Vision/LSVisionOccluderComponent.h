@@ -10,6 +10,8 @@ class UBoxComponent;
 class UStaticMeshComponent;
 class UPrimitiveComponent;
 class USceneComponent;
+struct FKBoxElem;
+struct FKConvexElem;
 
 UENUM(BlueprintType)
 enum class ELSVisionOccluderSourceMode : uint8
@@ -86,9 +88,13 @@ private:
 	void UpdateObservedComponentBinding();
 	void HandleObservedComponentTransformUpdated(USceneComponent* UpdatedComponent, EUpdateTransformFlags UpdateTransformFlags, ETeleportType Teleport);
 	void BuildSegmentsFromBox(const UBoxComponent* BoxComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
-	void BuildSegmentsFromCollisionGeometry(const UPrimitiveComponent* PrimitiveComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
-	void BuildSegmentsFromMeshBounds(const UPrimitiveComponent* PrimitiveComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
-	void BuildSegmentsFromPrimitiveBounds(const UPrimitiveComponent* PrimitiveComponent, TArray<FLSVisionSegment2D>& OutSegments) const;
+	void BuildSegmentsFromCollisionGeometry(const UPrimitiveComponent* PrimitiveComponent, float SliceZ, TArray<FLSVisionSegment2D>& OutSegments) const;
+	void BuildSegmentsFromMeshBounds(const UPrimitiveComponent* PrimitiveComponent, float SliceZ, TArray<FLSVisionSegment2D>& OutSegments) const;
+	void BuildSegmentsFromPrimitiveBounds(const UPrimitiveComponent* PrimitiveComponent, float SliceZ, TArray<FLSVisionSegment2D>& OutSegments) const;
+	// 콜리전 형상을 수평면(Z=SliceZ)으로 잘라 단면 윤곽점을 모은 뒤 세그먼트로 만든다(눈높이가 아닌 바닥 평면 기준).
+	void SliceBoxByPlane(const FTransform& ComponentTransform, const FKBoxElem& BoxElement, float SliceZ, TArray<FLSVisionSegment2D>& OutSegments) const;
+	void SliceConvexByPlane(const FTransform& ComponentTransform, const FKConvexElem& ConvexElement, float SliceZ, TArray<FLSVisionSegment2D>& OutSegments) const;
+	float ResolveSliceZ() const;
 	void AddRectangleSegments(const FVector2D& Min, const FVector2D& Max, TArray<FLSVisionSegment2D>& OutSegments) const;
 	void AddTransformedRectangleSegments(
 		const FVector& LocalCenter,

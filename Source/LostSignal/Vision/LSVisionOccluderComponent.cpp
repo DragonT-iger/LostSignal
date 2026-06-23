@@ -9,6 +9,7 @@
 #include "GameFramework/Actor.h"
 #include "LostSignal.h"
 #include "PhysicsEngine/BodySetup.h"
+#include "Vision/LSVisionSettings.h"
 #include "Vision/LSVisionSubsystem.h"
 
 ULSVisionOccluderComponent::ULSVisionOccluderComponent()
@@ -69,12 +70,14 @@ void ULSVisionOccluderComponent::RebuildSegments()
 {
 	TArray<FLSVisionSegment2D> RebuiltSegments;
 
+	const float SliceZ = ResolveSliceZ();
+
 	switch (SourceMode)
 	{
 	case ELSVisionOccluderSourceMode::CollisionGeometry:
 		if (UPrimitiveComponent* PrimitiveComponent = ResolveMeshPrimitiveComponent())
 		{
-			BuildSegmentsFromCollisionGeometry(PrimitiveComponent, RebuiltSegments);
+			BuildSegmentsFromCollisionGeometry(PrimitiveComponent, SliceZ, RebuiltSegments);
 		}
 		break;
 
@@ -88,14 +91,14 @@ void ULSVisionOccluderComponent::RebuildSegments()
 	case ELSVisionOccluderSourceMode::MeshBounds:
 		if (UPrimitiveComponent* PrimitiveComponent = ResolvePrimitiveComponent())
 		{
-			BuildSegmentsFromMeshBounds(PrimitiveComponent, RebuiltSegments);
+			BuildSegmentsFromMeshBounds(PrimitiveComponent, SliceZ, RebuiltSegments);
 		}
 		break;
 
 	case ELSVisionOccluderSourceMode::PrimitiveBounds:
 		if (UPrimitiveComponent* PrimitiveComponent = ResolvePrimitiveComponent())
 		{
-			BuildSegmentsFromPrimitiveBounds(PrimitiveComponent, RebuiltSegments);
+			BuildSegmentsFromPrimitiveBounds(PrimitiveComponent, SliceZ, RebuiltSegments);
 		}
 		break;
 
@@ -111,7 +114,8 @@ void ULSVisionOccluderComponent::RebuildSegments()
 
 	if (Segments.Num() == 0 && GetOwner() != nullptr)
 	{
-		UE_LOG(LogLS, Warning, TEXT("LSVisionOccluderComponent on '%s' could not build any occluder segments."), *GetNameSafe(GetOwner()));
+		// 시야 평면(SliceZ)에 형상이 없으면(떠 있는/빈 바닥 물체) 세그먼트가 0인 게 정상이라 경고 대신 Verbose로 남긴다.
+		UE_LOG(LogLS, Verbose, TEXT("LSVisionOccluderComponent on '%s' produced no occluder segments (collision may not cross the vision slice height)."), *GetNameSafe(GetOwner()));
 	}
 
 	if (GetOwner() != nullptr && GetOwner()->HasActorBegunPlay())
@@ -206,9 +210,11 @@ void ULSVisionOccluderComponent::BuildSegmentsFromBox(const UBoxComponent* BoxCo
 	OutSegments.Add(Segment30);
 }
 
-// Builds 2D segments from simple collision geometry so holes/openings can be described by multiple primitives.
+// Builds 2D segments from the cross-section of simple collision at the vision slice height (Z=SliceZ),
+// so floating/empty-bottom or tilted objects only block sight where geometry actually exists at floor level.
 void ULSVisionOccluderComponent::BuildSegmentsFromCollisionGeometry(
 	const UPrimitiveComponent* PrimitiveComponent,
+	const float SliceZ,
 	TArray<FLSVisionSegment2D>& OutSegments) const
 {
 	if (PrimitiveComponent == nullptr)
@@ -221,66 +227,198 @@ void ULSVisionOccluderComponent::BuildSegmentsFromCollisionGeometry(
 	const UBodySetup* BodySetup = StaticMesh != nullptr ? StaticMesh->GetBodySetup() : nullptr;
 	if (BodySetup == nullptr)
 	{
-		BuildSegmentsFromMeshBounds(PrimitiveComponent, OutSegments);
+		BuildSegmentsFromMeshBounds(PrimitiveComponent, SliceZ, OutSegments);
 		return;
 	}
 
 	const FTransform ComponentTransform = PrimitiveComponent->GetComponentTransform();
 	const FKAggregateGeom& AggregateGeometry = BodySetup->AggGeom;
 
+	const int32 ShapeCount = AggregateGeometry.BoxElems.Num() + AggregateGeometry.ConvexElems.Num();
+
 	for (const FKBoxElem& BoxElement : AggregateGeometry.BoxElems)
 	{
-		const FVector HalfExtent(BoxElement.X * 0.5f, BoxElement.Y * 0.5f, BoxElement.Z * 0.5f);
-		const FTransform BoxLocalTransform = BoxElement.GetTransform();
-
-		const FVector World0 = ComponentTransform.TransformPosition(BoxLocalTransform.TransformPosition(FVector(HalfExtent.X, HalfExtent.Y, 0.0f)));
-		const FVector World1 = ComponentTransform.TransformPosition(BoxLocalTransform.TransformPosition(FVector(HalfExtent.X, -HalfExtent.Y, 0.0f)));
-		const FVector World2 = ComponentTransform.TransformPosition(BoxLocalTransform.TransformPosition(FVector(-HalfExtent.X, -HalfExtent.Y, 0.0f)));
-		const FVector World3 = ComponentTransform.TransformPosition(BoxLocalTransform.TransformPosition(FVector(-HalfExtent.X, HalfExtent.Y, 0.0f)));
-
-		TArray<FVector2D> BoxLoop;
-		BoxLoop.Reserve(4);
-		BoxLoop.Add(FVector2D(World0.X, World0.Y));
-		BoxLoop.Add(FVector2D(World1.X, World1.Y));
-		BoxLoop.Add(FVector2D(World2.X, World2.Y));
-		BoxLoop.Add(FVector2D(World3.X, World3.Y));
-		AddClosedPointLoopSegments(BoxLoop, OutSegments);
+		SliceBoxByPlane(ComponentTransform, BoxElement, SliceZ, OutSegments);
 	}
 
 	for (const FKConvexElem& ConvexElement : AggregateGeometry.ConvexElems)
 	{
-		if (ConvexElement.VertexData.Num() < 3)
-		{
-			continue;
-		}
-
-		TArray<FVector2D> ProjectedPoints;
-		ProjectedPoints.Reserve(ConvexElement.VertexData.Num());
-
-		const FTransform ConvexLocalTransform = ConvexElement.GetTransform();
-		for (const FVector& LocalVertex : ConvexElement.VertexData)
-		{
-			const FVector WorldVertex = ComponentTransform.TransformPosition(ConvexLocalTransform.TransformPosition(LocalVertex));
-			ProjectedPoints.Add(FVector2D(WorldVertex.X, WorldVertex.Y));
-		}
-
-		TArray<FVector2D> HullPoints;
-		BuildConvexHull2D(ProjectedPoints, HullPoints);
-		AddClosedPointLoopSegments(HullPoints, OutSegments);
+		SliceConvexByPlane(ComponentTransform, ConvexElement, SliceZ, OutSegments);
 	}
 
-	if (OutSegments.Num() == 0)
+	// 박스/콘벡스가 아예 없으면(스피어/캡슐 등) 바운드로 폴백. 형상은 있는데 SliceZ를 안 지나 비어있는 건 정상이므로 폴백 안 함.
+	if (ShapeCount == 0)
 	{
-		BuildSegmentsFromMeshBounds(PrimitiveComponent, OutSegments);
+		BuildSegmentsFromMeshBounds(PrimitiveComponent, SliceZ, OutSegments);
+	}
+}
+
+// Clips an oriented box's 12 edges against the horizontal plane Z=SliceZ and turns the cross-section into segments.
+void ULSVisionOccluderComponent::SliceBoxByPlane(
+	const FTransform& ComponentTransform,
+	const FKBoxElem& BoxElement,
+	const float SliceZ,
+	TArray<FLSVisionSegment2D>& OutSegments) const
+{
+	const FVector HalfExtent(BoxElement.X * 0.5f, BoxElement.Y * 0.5f, BoxElement.Z * 0.5f);
+	const FTransform BoxLocalTransform = BoxElement.GetTransform();
+
+	// 코너 순서: (sx,sy,sz) 0:(-,-,-) 1:(-,-,+) 2:(-,+,-) 3:(-,+,+) 4:(+,-,-) 5:(+,-,+) 6:(+,+,-) 7:(+,+,+)
+	FVector Corners[8];
+	int32 CornerIndex = 0;
+	for (int32 SignX = -1; SignX <= 1; SignX += 2)
+	{
+		for (int32 SignY = -1; SignY <= 1; SignY += 2)
+		{
+			for (int32 SignZ = -1; SignZ <= 1; SignZ += 2)
+			{
+				const FVector LocalCorner(SignX * HalfExtent.X, SignY * HalfExtent.Y, SignZ * HalfExtent.Z);
+				Corners[CornerIndex++] = ComponentTransform.TransformPosition(BoxLocalTransform.TransformPosition(LocalCorner));
+			}
+		}
+	}
+
+	static const int32 BoxEdges[12][2] =
+	{
+		{0, 1}, {2, 3}, {4, 5}, {6, 7}, // sz 방향
+		{0, 2}, {1, 3}, {4, 6}, {5, 7}, // sy 방향
+		{0, 4}, {1, 5}, {2, 6}, {3, 7}  // sx 방향
+	};
+
+	TArray<FVector2D> SlicePoints;
+	for (const int32(&Edge)[2] : BoxEdges)
+	{
+		const FVector& A = Corners[Edge[0]];
+		const FVector& B = Corners[Edge[1]];
+		const float DistA = A.Z - SliceZ;
+		const float DistB = B.Z - SliceZ;
+
+		if ((DistA <= 0.0f && DistB >= 0.0f) || (DistA >= 0.0f && DistB <= 0.0f))
+		{
+			if (FMath::IsNearlyEqual(A.Z, B.Z))
+			{
+				continue;
+			}
+
+			const float T = FMath::Clamp((SliceZ - A.Z) / (B.Z - A.Z), 0.0f, 1.0f);
+			const FVector P = FMath::Lerp(A, B, T);
+			SlicePoints.Add(FVector2D(P.X, P.Y));
+		}
+	}
+
+	if (SlicePoints.Num() >= 3)
+	{
+		TArray<FVector2D> HullPoints;
+		BuildConvexHull2D(SlicePoints, HullPoints);
+		AddClosedPointLoopSegments(HullPoints, OutSegments);
+	}
+}
+
+// Clips a convex hull's edges against the horizontal plane Z=SliceZ and turns the cross-section into segments.
+void ULSVisionOccluderComponent::SliceConvexByPlane(
+	const FTransform& ComponentTransform,
+	const FKConvexElem& ConvexElement,
+	const float SliceZ,
+	TArray<FLSVisionSegment2D>& OutSegments) const
+{
+	const TArray<FVector>& VertexData = ConvexElement.VertexData;
+	if (VertexData.Num() < 4)
+	{
+		return;
+	}
+
+	const FTransform ConvexLocalTransform = ConvexElement.GetTransform();
+	TArray<FVector> WorldVertices;
+	WorldVertices.Reserve(VertexData.Num());
+	for (const FVector& LocalVertex : VertexData)
+	{
+		WorldVertices.Add(ComponentTransform.TransformPosition(ConvexLocalTransform.TransformPosition(LocalVertex)));
+	}
+
+	TArray<FVector2D> SlicePoints;
+
+	const TArray<int32>& IndexData = ConvexElement.IndexData;
+	if (IndexData.Num() >= 3)
+	{
+		TSet<uint32> VisitedEdges;
+		const auto SliceEdge = [&](const int32 IndexA, const int32 IndexB)
+		{
+			if (IndexA == IndexB || !WorldVertices.IsValidIndex(IndexA) || !WorldVertices.IsValidIndex(IndexB))
+			{
+				return;
+			}
+
+			const uint32 EdgeKey = IndexA < IndexB
+				? (static_cast<uint32>(IndexA) << 16) | static_cast<uint32>(IndexB)
+				: (static_cast<uint32>(IndexB) << 16) | static_cast<uint32>(IndexA);
+			bool bAlreadyVisited = false;
+			VisitedEdges.Add(EdgeKey, &bAlreadyVisited);
+			if (bAlreadyVisited)
+			{
+				return;
+			}
+
+			const FVector& A = WorldVertices[IndexA];
+			const FVector& B = WorldVertices[IndexB];
+			const float DistA = A.Z - SliceZ;
+			const float DistB = B.Z - SliceZ;
+			if (((DistA <= 0.0f && DistB >= 0.0f) || (DistA >= 0.0f && DistB <= 0.0f)) && !FMath::IsNearlyEqual(A.Z, B.Z))
+			{
+				const float T = FMath::Clamp((SliceZ - A.Z) / (B.Z - A.Z), 0.0f, 1.0f);
+				const FVector P = FMath::Lerp(A, B, T);
+				SlicePoints.Add(FVector2D(P.X, P.Y));
+			}
+		};
+
+		for (int32 TriangleStart = 0; TriangleStart + 2 < IndexData.Num(); TriangleStart += 3)
+		{
+			SliceEdge(IndexData[TriangleStart], IndexData[TriangleStart + 1]);
+			SliceEdge(IndexData[TriangleStart + 1], IndexData[TriangleStart + 2]);
+			SliceEdge(IndexData[TriangleStart + 2], IndexData[TriangleStart]);
+		}
+	}
+	else
+	{
+		// 인덱스(엣지) 데이터가 없으면 정밀 절단이 불가능하므로, 기존처럼 전체 정점을 투영해 폴백한다.
+		for (const FVector& WorldVertex : WorldVertices)
+		{
+			SlicePoints.Add(FVector2D(WorldVertex.X, WorldVertex.Y));
+		}
+	}
+
+	if (SlicePoints.Num() >= 3)
+	{
+		TArray<FVector2D> HullPoints;
+		BuildConvexHull2D(SlicePoints, HullPoints);
+		AddClosedPointLoopSegments(HullPoints, OutSegments);
+	}
+}
+
+// Returns true when the vision slice plane (Z=SliceZ) lies within the primitive's world bounds Z range.
+namespace
+{
+	bool DoesSlicePlaneOverlapBounds(const UPrimitiveComponent* PrimitiveComponent, const float SliceZ)
+	{
+		const FBoxSphereBounds WorldBounds = PrimitiveComponent->Bounds;
+		const float MinZ = WorldBounds.Origin.Z - WorldBounds.BoxExtent.Z;
+		const float MaxZ = WorldBounds.Origin.Z + WorldBounds.BoxExtent.Z;
+		return SliceZ >= MinZ && SliceZ <= MaxZ;
 	}
 }
 
 // Builds 2D segments from the owning mesh's local bounds so rotation/pivot are preserved better than a world AABB.
 void ULSVisionOccluderComponent::BuildSegmentsFromMeshBounds(
 	const UPrimitiveComponent* PrimitiveComponent,
+	const float SliceZ,
 	TArray<FLSVisionSegment2D>& OutSegments) const
 {
 	if (PrimitiveComponent == nullptr)
+	{
+		return;
+	}
+
+	// 바운드 AABB는 어느 높이로 잘라도 같은 사각형이므로, SliceZ가 바운드 Z범위 밖이면(떠 있는 물체) 막지 않는다.
+	if (!DoesSlicePlaneOverlapBounds(PrimitiveComponent, SliceZ))
 	{
 		return;
 	}
@@ -301,15 +439,22 @@ void ULSVisionOccluderComponent::BuildSegmentsFromMeshBounds(
 		return;
 	}
 
-	BuildSegmentsFromPrimitiveBounds(PrimitiveComponent, OutSegments);
+	BuildSegmentsFromPrimitiveBounds(PrimitiveComponent, SliceZ, OutSegments);
 }
 
 // Approximates an arbitrary primitive as a 2D bounds rectangle for easy environment authoring.
 void ULSVisionOccluderComponent::BuildSegmentsFromPrimitiveBounds(
 	const UPrimitiveComponent* PrimitiveComponent,
+	const float SliceZ,
 	TArray<FLSVisionSegment2D>& OutSegments) const
 {
 	if (PrimitiveComponent == nullptr)
+	{
+		return;
+	}
+
+	// 바운드 AABB는 어느 높이로 잘라도 같은 사각형이므로, SliceZ가 바운드 Z범위 밖이면(떠 있는 물체) 막지 않는다.
+	if (!DoesSlicePlaneOverlapBounds(PrimitiveComponent, SliceZ))
 	{
 		return;
 	}
@@ -591,4 +736,24 @@ USceneComponent* ULSVisionOccluderComponent::ResolveObservedSceneComponent() con
 	default:
 		return nullptr;
 	}
+}
+
+// 콜리전을 자를 시야 평면 높이(월드 Z).
+// 플레이어 발 높이 기준 모드면 서브시스템이 런타임에 갱신한 값을, 아니면 설정의 절대 Z를 쓴다.
+float ULSVisionOccluderComponent::ResolveSliceZ() const
+{
+	const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>();
+
+	if (VisionSettings != nullptr && VisionSettings->bSliceHeightFromPlayer)
+	{
+		if (const UWorld* World = GetWorld())
+		{
+			if (const ULSVisionSubsystem* VisionSubsystem = World->GetSubsystem<ULSVisionSubsystem>())
+			{
+				return VisionSubsystem->GetRuntimeSliceZ();
+			}
+		}
+	}
+
+	return VisionSettings != nullptr ? VisionSettings->OccluderSliceHeight : 0.0f;
 }

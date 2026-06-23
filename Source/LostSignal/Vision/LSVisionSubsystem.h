@@ -63,6 +63,15 @@ public:
 		return SegmentTopologyVersion;
 	}
 
+	// 오클루더 콜리전을 자르는 시야 평면 월드 Z. 플레이어 발 높이 기준 모드에서 런타임에 갱신된다.
+	float GetRuntimeSliceZ() const
+	{
+		return RuntimeSliceZ;
+	}
+
+	// 시야 평면 Z를 갱신하고, 의미 있게 바뀌었으면 등록된 모든 오클루더의 단면을 다시 계산한다.
+	void SetRuntimeSliceZ(float NewSliceZ);
+
 private:
 	UTextureRenderTarget2D* ResolveVisibilityMaskRenderTarget();
 	UTextureRenderTarget2D* CreateRenderTargetFromTemplate(const UTextureRenderTarget2D* TemplateRenderTarget);
@@ -96,6 +105,8 @@ private:
 	int32 NextSegmentId = 0;
 
 	int32 SegmentTopologyVersion = 0;
+
+	float RuntimeSliceZ = 0.0f;
 
 	float GridCellSize = 800.0f;
 };

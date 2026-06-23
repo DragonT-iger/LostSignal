@@ -3,10 +3,13 @@
 #include "Camera/CameraComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "LostSignal.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Vision/LSVisionSettings.h"
 #include "Vision/LSVisionMaskRenderer.h"
 #include "Vision/LSVisionSolver.h"
 #include "Vision/LSVisionSubsystem.h"
@@ -154,6 +157,21 @@ void ULSVisionComponent::UpdateVisionPolygon()
 
 	const FVector ActorLocation = GetOwner()->GetActorLocation();
 	const FVector2D ActorLocation2D(ActorLocation.X, ActorLocation.Y);
+
+	// 플레이어 발 높이 기준 모드면 오클루더 슬라이스 평면을 발 높이 + 오프셋으로 갱신(변할 때만 재슬라이스).
+	if (const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>(); VisionSettings != nullptr && VisionSettings->bSliceHeightFromPlayer)
+	{
+		float FootZ = ActorLocation.Z;
+		if (const ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner()))
+		{
+			if (const UCapsuleComponent* Capsule = OwnerCharacter->GetCapsuleComponent())
+			{
+				FootZ -= Capsule->GetScaledCapsuleHalfHeight();
+			}
+		}
+
+		VisionSubsystem->SetRuntimeSliceZ(FootZ + VisionSettings->OccluderSliceHeight);
+	}
 
 	const FVector ActorForward = GetOwner()->GetActorForwardVector();
 	const FVector2D ActorForward2D = FVector2D(ActorForward.X, ActorForward.Y).GetSafeNormal();

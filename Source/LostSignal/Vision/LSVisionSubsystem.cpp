@@ -74,6 +74,27 @@ void ULSVisionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	GridCellSize = VisionSettings != nullptr
 		? FMath::Max(VisionSettings->SpatialGridCellSize, 100.0f)
 		: 800.0f;
+	RuntimeSliceZ = VisionSettings != nullptr ? VisionSettings->OccluderSliceHeight : 0.0f;
+}
+
+// 시야 평면 Z가 의미 있게 바뀌면 등록된 모든 오클루더의 단면을 다시 계산한다.
+// 평면 게임에선 시작 시 한 번만 호출되는 수준이라 비용은 무시 가능.
+void ULSVisionSubsystem::SetRuntimeSliceZ(const float NewSliceZ)
+{
+	if (FMath::IsNearlyEqual(RuntimeSliceZ, NewSliceZ, 1.0f))
+	{
+		return;
+	}
+
+	RuntimeSliceZ = NewSliceZ;
+
+	for (ULSVisionOccluderComponent* Occluder : RegisteredOccluders)
+	{
+		if (Occluder != nullptr)
+		{
+			Occluder->RebuildSegments();
+		}
+	}
 }
 
 // Releases the shared vision runtime objects when the world is torn down.

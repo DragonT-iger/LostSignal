@@ -32,6 +32,15 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Optimization", meta = (ClampMin = "100.0"))
 	float SpatialGridCellSize = 800.0f;
 
+	// true면 시야 평면 Z를 로컬 플레이어 발 높이 기준으로 잡는다(발 높이 + OccluderSliceHeight). false면 OccluderSliceHeight를 절대 월드 Z로 사용.
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Occluder")
+	bool bSliceHeightFromPlayer = true;
+
+	// 오클루더 콜리전을 자를 시야 평면 높이. bSliceHeightFromPlayer=true면 "플레이어 발 위로의 오프셋", false면 "절대 월드 Z".
+	// 바닥 면과 정확히 일치하면 단면이 degenerate 되므로 살짝 위로 둔다(예: 8). 평면 게임이라 거의 변하지 않아 재슬라이스 비용은 무시 수준.
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Occluder")
+	float OccluderSliceHeight = 8.0f;
+
 	// 시야 경계(근접 원/바깥 경계/오브젝트 경계)의 페이드 폭(월드 유닛). 클수록 경계가 부드럽게 퍼진다.
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Edge", meta = (ClampMin = "0.0"))
 	float FeatherWidth = 70.0f;
