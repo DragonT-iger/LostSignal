@@ -73,7 +73,7 @@
 | [Docs/Systems/ChipSystem.md](Docs/Systems/ChipSystem.md) | 칩 데이터·장착·신호 게이지·프로토콜·칩 전투 스탯 GAS 연동 |
 | [Docs/Systems/MonsterAIControlStructure.md](Docs/Systems/MonsterAIControlStructure.md) | 몬스터 AI 제어·StateTree 전이 구조 |
 | [Docs/Systems/MinimapSystem.md](Docs/Systems/MinimapSystem.md) | 미니맵 표시 대상·지형 도형·탐색 프로토콜 연동 구조 |
-| [Docs/Systems/UILayerStructure.md](Docs/Systems/UILayerStructure.md) | UI 레이어 Z-order·공유 모달 블러 백드롭 표시 규칙 |
+| [Docs/Systems/UILayerStructure.md](Docs/Systems/UILayerStructure.md) | UI 레이어 Z-order·공유 풀스크린 블러 표시 규칙 |
 
 ### 트러블슈팅 (버그 원인·수정 기록)
 

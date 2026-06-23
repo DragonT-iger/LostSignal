@@ -74,6 +74,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	FLinearColor LockedIconTint = FLinearColor(0.35f, 0.35f, 0.35f, 0.65f);
 
+	// 호버/드래그 타겟일 때 슬롯을 키워 강조하는 배율. (1.0, 1.0)이면 크기 변화 없음.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
+	FVector2D HoveredRenderScale = FVector2D(1.1f, 1.1f);
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTexture2D> DefaultSlotTexture;
 

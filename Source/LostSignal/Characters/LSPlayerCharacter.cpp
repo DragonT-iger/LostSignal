@@ -473,7 +473,7 @@ void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
 
 	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(PlayerController))
 	{
-		LSPlayerController->UpdateModalBackdropVisibility();
+		LSPlayerController->UpdateBackgroundBlurVisibility();
 	}
 }
 
@@ -488,7 +488,7 @@ void ALSPlayerCharacter::HideInventoryWidget()
 	{
 		PlayerController->HideLootDropWidget();
 		PlayerController->HideLobbyStorageWidget();
-		PlayerController->UpdateModalBackdropVisibility();
+		PlayerController->UpdateBackgroundBlurVisibility();
 	}
 
 	ActiveInventoryTarget.Reset();

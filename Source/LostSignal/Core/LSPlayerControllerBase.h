@@ -16,7 +16,7 @@ class ALSWorldDroppedItem;
 class UInputMappingContext;
 class ULSLobbyStorageWidget;
 class ULSChipStationWidget;
-class ULSModalBackdropWidget;
+class ULSBackgroundBlurWidget;
 class ULSRaidInventoryComponent;
 class ULSSaveSubsystem;
 class ULSHpDebugWidget;
@@ -62,9 +62,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/UI")
 	bool IsChipStationWidgetOpen() const;
 
-	// 모달 패널(인벤토리/창고/칩스테이션/루트드랍) 표시 상태에 맞춰 공유 블러 백드롭을 켜고 끈다.
+	// 모달 패널(인벤토리/창고/칩스테이션/루트드랍) 표시 상태에 맞춰 공유 블러를 켜고 끈다.
 	// 어느 패널이든 show/hide 직후 호출하면 되며, 매번 현재 상태를 재계산하므로 중복 호출에 안전하다.
-	void UpdateModalBackdropVisibility();
+	void UpdateBackgroundBlurVisibility();
 
 	int32 GetOpenLobbyStorageMaxSlotCount() const;
 	void RefreshOpenLobbyStorageWidget();
@@ -153,7 +153,7 @@ protected:
 	TSubclassOf<ULSPlayerHUDWidget> PlayerHUDWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
-	TSubclassOf<ULSModalBackdropWidget> ModalBackdropWidgetClass;
+	TSubclassOf<ULSBackgroundBlurWidget> BackgroundBlurWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Noise", meta=(ClampMin="0.0"))
 	float SoundIndicatorDetectionRadiusMeters = 10.0f;
@@ -168,7 +168,7 @@ protected:
 	TObjectPtr<ULSPlayerHUDWidget> PlayerHUDWidgetInstance;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSModalBackdropWidget> ModalBackdropWidgetInstance;
+	TObjectPtr<ULSBackgroundBlurWidget> BackgroundBlurWidgetInstance;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSLobbyStorageWidget> LobbyStorageWidgetInstance;
@@ -291,7 +291,7 @@ private:
 	void ShowChipStationWidgetLocal(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass);
 	void HideChipStationWidgetLocal();
 	void CreatePlayerHUDWidgetLocal();
-	void CreateModalBackdropWidgetLocal();
+	void CreateBackgroundBlurWidgetLocal();
 	bool IsAnyModalPanelOpen() const;
 	void InitializeRaidInventoryFromSessionSubsystem();
 	void SubmitLocalRaidEntryData();

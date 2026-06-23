@@ -26,7 +26,7 @@
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Debug/LSHpDebugWidget.h"
 #include "UI/Debug/LSProtocolDebugWidget.h"
-#include "UI/LSModalBackdropWidget.h"
+#include "UI/LSBackgroundBlurWidget.h"
 #include "UI/LSPlayerHUDWidget.h"
 #include "UI/LSUILayer.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
@@ -90,7 +90,7 @@ void ALSPlayerControllerBase::BeginPlay()
 	}
 
 	CreatePlayerHUDWidgetLocal();
-	CreateModalBackdropWidgetLocal();
+	CreateBackgroundBlurWidgetLocal();
 }
 
 void ALSPlayerControllerBase::OnPossess(APawn* InPawn)
@@ -534,7 +534,7 @@ void ALSPlayerControllerBase::ShowLootDropWidgetLocal(const FText& LootSourceNam
 	LootDropWidgetInstance->SetLootSourceName(LootSourceName);
 	LootDropWidgetInstance->SetSourceLootBox(SourceLootBox);
 	LootDropWidgetInstance->SetLootItems(Results);
-	UpdateModalBackdropVisibility();
+	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::HideLootDropWidgetLocal()
@@ -545,7 +545,7 @@ void ALSPlayerControllerBase::HideLootDropWidgetLocal()
 		LootDropWidgetInstance->ClearLootItems();
 	}
 
-	UpdateModalBackdropVisibility();
+	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass)
@@ -584,7 +584,7 @@ void ALSPlayerControllerBase::ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbySt
 
 	LobbyStorageWidgetInstance->RefreshStorage();
 	LobbyStorageWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-	UpdateModalBackdropVisibility();
+	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::HideLobbyStorageWidgetLocal()
@@ -594,7 +594,7 @@ void ALSPlayerControllerBase::HideLobbyStorageWidgetLocal()
 		LobbyStorageWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
-	UpdateModalBackdropVisibility();
+	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass)
@@ -633,7 +633,7 @@ void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStat
 
 	ChipStationWidgetInstance->RefreshChipStation();
 	ChipStationWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-	UpdateModalBackdropVisibility();
+	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::HideChipStationWidgetLocal()
@@ -643,7 +643,7 @@ void ALSPlayerControllerBase::HideChipStationWidgetLocal()
 		ChipStationWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
-	UpdateModalBackdropVisibility();
+	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
@@ -686,36 +686,36 @@ void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
 	PlayerHUDWidgetInstance->InitializeHUDForPawn(CurrentPawn);
 }
 
-void ALSPlayerControllerBase::CreateModalBackdropWidgetLocal()
+void ALSPlayerControllerBase::CreateBackgroundBlurWidgetLocal()
 {
 	if (!IsLocalPlayerController())
 	{
 		return;
 	}
 
-	if (!ModalBackdropWidgetClass)
+	if (!BackgroundBlurWidgetClass)
 	{
-		UE_LOG(LogLS, Warning, TEXT("ModalBackdropWidgetClass is not set on %s."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("BackgroundBlurWidgetClass is not set on %s."), *GetNameSafe(this));
 		return;
 	}
 
-	if (!ModalBackdropWidgetInstance)
+	if (!BackgroundBlurWidgetInstance)
 	{
-		ModalBackdropWidgetInstance = CreateWidget<ULSModalBackdropWidget>(this, ModalBackdropWidgetClass);
-		if (!ModalBackdropWidgetInstance)
+		BackgroundBlurWidgetInstance = CreateWidget<ULSBackgroundBlurWidget>(this, BackgroundBlurWidgetClass);
+		if (!BackgroundBlurWidgetInstance)
 		{
 			UE_LOG(LogLS, Warning, TEXT("Failed to create modal backdrop widget on %s."), *GetNameSafe(this));
 			return;
 		}
 	}
 
-	if (!ModalBackdropWidgetInstance->IsInViewport())
+	if (!BackgroundBlurWidgetInstance->IsInViewport())
 	{
-		ModalBackdropWidgetInstance->AddToViewport(LSUILayer::ModalBackdrop);
+		BackgroundBlurWidgetInstance->AddToViewport(LSUILayer::BackgroundBlur);
 	}
 
-	// 패널 뒤에 상주시키되 평상시엔 숨겨 둔다. 표시는 UpdateModalBackdropVisibility가 켠다.
-	ModalBackdropWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
+	// 패널 뒤에 상주시키되 평상시엔 숨겨 둔다. 표시는 UpdateBackgroundBlurVisibility가 켠다.
+	BackgroundBlurWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 }
 
 bool ALSPlayerControllerBase::IsAnyModalPanelOpen() const
@@ -747,9 +747,9 @@ bool ALSPlayerControllerBase::IsAnyModalPanelOpen() const
 	return false;
 }
 
-void ALSPlayerControllerBase::UpdateModalBackdropVisibility()
+void ALSPlayerControllerBase::UpdateBackgroundBlurVisibility()
 {
-	if (!IsLocalPlayerController() || !ModalBackdropWidgetInstance)
+	if (!IsLocalPlayerController() || !BackgroundBlurWidgetInstance)
 	{
 		return;
 	}
@@ -758,7 +758,7 @@ void ALSPlayerControllerBase::UpdateModalBackdropVisibility()
 	const ESlateVisibility NewVisibility = IsAnyModalPanelOpen()
 		? ESlateVisibility::HitTestInvisible
 		: ESlateVisibility::Collapsed;
-	ModalBackdropWidgetInstance->SetVisibility(NewVisibility);
+	BackgroundBlurWidgetInstance->SetVisibility(NewVisibility);
 }
 
 void ALSPlayerControllerBase::NotifyNoiseForHUD(const FLSNoiseEvent& NoiseEvent)
