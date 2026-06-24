@@ -239,7 +239,16 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 {
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
 	{
-		TryHandleQuickTransfer();
+		const bool bTransferred = TryHandleQuickTransfer();
+		// 칩 리스트→장착칸 빠른이동: 1개 장착 후 버튼을 누르고 있으면 컨테이너가 딜레이 뒤 우수수 장착을 이어받는다.
+		// (정렬 리빌드로 커서 자리에 칩이 계속 들어와 MouseMove 기반으로는 1개 장착이 어려웠다.)
+		if (bTransferred && IsChipStationListSlot())
+		{
+			if (ULSChipStationWidget* OwningChipStation = ChipStationWidget.Get())
+			{
+				OwningChipStation->StartQuickEquipAutoRepeat();
+			}
+		}
 		return FReply::Handled();
 	}
 
@@ -253,7 +262,8 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 
 FReply ULSItemSlotWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (IsQuickTransferPointerEvent(InMouseEvent))
+	// 칩 리스트→장착칸은 이동 기반 반복을 쓰지 않는다(컨테이너 타이머가 딜레이→우수수 자동반복 담당).
+	if (IsQuickTransferPointerEvent(InMouseEvent) && !IsChipStationListSlot())
 	{
 		TryHandleQuickTransfer();
 	}
@@ -542,6 +552,12 @@ bool ULSItemSlotWidget::CanStartItemDrag() const
 bool ULSItemSlotWidget::IsQuickTransferPointerEvent(const FPointerEvent& InMouseEvent) const
 {
 	return InMouseEvent.IsShiftDown() && InMouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton);
+}
+
+bool ULSItemSlotWidget::IsChipStationListSlot() const
+{
+	// 칩 스테이션 컨텍스트이면서 장착칸(ChipEquipmentSlot) 컨텍스트가 아니면 인벤토리+창고 합친 칩 리스트 슬롯이다.
+	return ChipStationWidget.IsValid() && !ChipEquipmentSlotWidget.IsValid();
 }
 
 bool ULSItemSlotWidget::TryHandleQuickTransfer()

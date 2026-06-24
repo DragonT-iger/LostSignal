@@ -12,6 +12,7 @@
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSDropSettings.h"
 #include "Engine/DataTable.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
@@ -272,6 +273,8 @@ void ULSChipStationWidget::NativeDestruct()
 	{
 		SignalSlider->OnValueChanged.RemoveDynamic(this, &ULSChipStationWidget::HandleSignalSliderValueChanged);
 	}
+
+	StopQuickEquipAutoRepeat();
 
 	Super::NativeDestruct();
 }
@@ -661,6 +664,75 @@ bool ULSChipStationWidget::QuickUnequipEquippedChipToWarehouse(const int32 Equip
 	}
 
 	return bUnequipped;
+}
+
+void ULSChipStationWidget::StartQuickEquipAutoRepeat()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// 첫 1개는 호출 측(슬롯 버튼 다운)에서 이미 장착했다. 여기서는 InitialDelay 뒤부터 Interval 간격으로
+	// 우수수 장착을 이어받는다. 버튼을 InitialDelay 안에 떼면 한 번도 반복되지 않아 1개만 장착된다.
+	FTimerManager& TimerManager = World->GetTimerManager();
+	TimerManager.ClearTimer(QuickEquipAutoRepeatTimerHandle);
+	TimerManager.SetTimer(QuickEquipAutoRepeatTimerHandle, this, &ULSChipStationWidget::TickQuickEquipAutoRepeat,
+		FMath::Max(QuickEquipAutoRepeatInterval, 0.01f), true, FMath::Max(QuickEquipAutoRepeatInitialDelay, 0.0f));
+}
+
+void ULSChipStationWidget::StopQuickEquipAutoRepeat()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(QuickEquipAutoRepeatTimerHandle);
+	}
+}
+
+void ULSChipStationWidget::TickQuickEquipAutoRepeat()
+{
+	// 입력이 풀렸거나 더 장착할 칩/빈 칸이 없으면 자동반복을 멈춘다.
+	if (!IsQuickEquipAutoRepeatInputHeld() || !QuickEquipFirstAvailableChip())
+	{
+		StopQuickEquipAutoRepeat();
+	}
+}
+
+bool ULSChipStationWidget::QuickEquipFirstAvailableChip()
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		return false;
+	}
+
+	// 리스트 표시와 동일한 정렬을 적용해 "커서 자리에 들어오는 다음 칩"(정렬 상단)을 장착한다.
+	UDataTable* ChipTable = LoadChipTable(this);
+	TArray<FLSChipStationViewItem> ViewItems;
+	AddChipViewItems(SaveSubsystem->GetInventory(), ELSInventorySlotArea::Inventory, ChipTable, this, ViewItems);
+	AddChipViewItems(SaveSubsystem->GetWarehouseItems(), ELSInventorySlotArea::Warehouse, ChipTable, this, ViewItems);
+	if (ViewItems.Num() == 0)
+	{
+		return false;
+	}
+
+	SortChipViewItems(ViewItems);
+	const FLSChipStationViewItem& TopItem = ViewItems[0];
+	return QuickEquipChipToFirstEmptyHardwareSlot(TopItem.SourceArea, TopItem.SourceSlotIndex);
+}
+
+bool ULSChipStationWidget::IsQuickEquipAutoRepeatInputHeld() const
+{
+	if (!FSlateApplication::IsInitialized())
+	{
+		return false;
+	}
+
+	const FSlateApplication& SlateApp = FSlateApplication::Get();
+	return SlateApp.GetModifierKeys().IsShiftDown()
+		&& SlateApp.GetPressedMouseButtons().Contains(EKeys::LeftMouseButton);
 }
 
 void ULSChipStationWidget::InitializeEquipmentSlots()
