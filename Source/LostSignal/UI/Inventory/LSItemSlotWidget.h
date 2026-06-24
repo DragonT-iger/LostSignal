@@ -41,6 +41,10 @@ public:
 	// 슬롯 위젯을 재사용할 때 이전 상호작용의 잔여 시각 상태를 초기화한다.
 	void ResetTransientSlotState();
 
+	// 리빌드 직후 커서가 여전히 이 슬롯 위에 있으면 호버 강조를 복원한다.
+	// 풀링 재사용으로 위젯 인스턴스가 그대로라 Slate가 MouseEnter를 다시 쏘지 않기 때문이다.
+	void RefreshHoverStateFromCursor();
+
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
@@ -74,6 +78,33 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	FLinearColor LockedIconTint = FLinearColor(0.35f, 0.35f, 0.35f, 0.65f);
 
+	// 아이템 등급별 슬롯 배경색. 등급은 Row Name 토큰에서 파싱한다(LSInventorySlotUtils::ResolveItemGradeFromRowName).
+	// 등급이 없거나 알 수 없는 아이템은 DefaultGradeColor, 아이템이 없는 빈 슬롯은 EmptySlotBackgroundColor를 쓴다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
+	FLinearColor DefaultGradeColor = FLinearColor(0.55f, 0.55f, 0.58f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
+	FLinearColor EmptySlotBackgroundColor = FLinearColor(0.22f, 0.22f, 0.25f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
+	FLinearColor SupplyGradeColor = FLinearColor(0.62f, 0.62f, 0.62f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
+	FLinearColor StandardGradeColor = FLinearColor(0.45f, 0.85f, 0.45f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
+	FLinearColor PrecisionGradeColor = FLinearColor(0.35f, 0.6f, 1.0f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
+	FLinearColor TuningGradeColor = FLinearColor(0.7f, 0.4f, 0.95f, 1.0f);
+
+	// 프로토타입은 빨강 계열로, 마스터피스는 금색으로 둬서 서로 확실히 구분한다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
+	FLinearColor PrototypeGradeColor = FLinearColor(0.95f, 0.22f, 0.18f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
+	FLinearColor MasterpieceGradeColor = FLinearColor(1.0f, 0.82f, 0.25f, 1.0f);
+
 	// 호버/드래그 타겟일 때 슬롯을 키워 강조하는 배율. (1.0, 1.0)이면 크기 변화 없음.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	FVector2D HoveredRenderScale = FVector2D(1.1f, 1.1f);
@@ -99,6 +130,8 @@ private:
 	bool bIsDragTarget = false;
 	// 드래그 중 커서를 따라가는 비주얼 인스턴스 표시. 이 슬롯은 아이템 아이콘만 보이고 배경 프레임은 숨긴다.
 	bool bIsDragVisual = false;
+	// 현재 표시 중인 아이템 등급에 해당하는 배경색. 빈 슬롯·등급 없는 아이템은 DefaultGradeColor.
+	FLinearColor CurrentGradeBackgroundColor = FLinearColor::White;
 
 	// 현재 아이콘 브러시를 식별하는 키. 같은 아이템을 다시 표시할 때 동기 텍스처 로딩을 건너뛰기 위한 캐시다.
 	// 아이템 행 이름, 빈 슬롯 키, NAME_None(미적용/로드 실패) 중 하나를 가진다.
@@ -106,6 +139,8 @@ private:
 
 	void ApplyHoverVisual();
 	void ApplySlotBackground();
+	// 아이템 Row Name의 등급 토큰을 슬롯 배경색으로 매핑한다. 등급이 없으면 DefaultGradeColor를 반환.
+	FLinearColor ResolveGradeBackgroundColor(FName ItemRowName) const;
 	bool CanStartItemDrag() const;
 	bool IsQuickTransferPointerEvent(const FPointerEvent& InMouseEvent) const;
 	// 칩 스테이션의 칩 리스트(인벤토리+창고 합친 창) 슬롯인지. 이 슬롯의 빠른이동은

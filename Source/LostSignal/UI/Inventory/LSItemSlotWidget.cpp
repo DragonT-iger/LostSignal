@@ -64,6 +64,8 @@ void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, con
 		DisplayedIconKey = bUsedItemIcon ? ItemRowName : NAME_None;
 	}
 
+	CurrentGradeBackgroundColor = ResolveGradeBackgroundColor(ItemRowName);
+
 	ApplyHoverVisual();
 	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
 	AmountText->SetText(FText::AsNumber(Amount));
@@ -91,6 +93,8 @@ void ULSItemSlotWidget::ClearItem()
 
 	// 배경은 SlotBackgroundImage가 항상 표시하므로 빈 슬롯에서는 아이콘만 숨긴다.
 	DisplayedIconKey = EmptySlotIconKey;
+	// 빈 슬롯은 등급색을 쓰지 않고 전용 빈 슬롯 배경색으로 되돌린다.
+	CurrentGradeBackgroundColor = EmptySlotBackgroundColor;
 
 	ApplyHoverVisual();
 	ItemIconImage->SetVisibility(ESlateVisibility::Collapsed);
@@ -463,6 +467,21 @@ void ULSItemSlotWidget::ResetTransientSlotState()
 	SetRenderScale(FVector2D::UnitVector);
 }
 
+void ULSItemSlotWidget::RefreshHoverStateFromCursor()
+{
+	// 리빌드 과정에서 ResetTransientSlotState가 bIsHovered를 끄지만, 커서가 그대로 이 슬롯 위에 있으면
+	// 풀링 재사용된 위젯 인스턴스가 바뀌지 않아 Slate가 새 MouseEnter를 보내지 않는다.
+	// 실제 Slate 호버 상태를 직접 조회해 호버 강조를 복원한다.
+	const bool bActuallyHovered = IsHovered();
+	if (bIsHovered == bActuallyHovered)
+	{
+		return;
+	}
+
+	bIsHovered = bActuallyHovered;
+	ApplyHoverVisual();
+}
+
 void ULSItemSlotWidget::ApplyHoverVisual()
 {
 	FLinearColor Tint = NormalIconTint;
@@ -479,10 +498,12 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 		Tint = bIsHovered ? HoveredIconTint : NormalIconTint;
 	}
 
-	// 빈 슬롯(아이콘 Collapsed)에서도 호버/잠금/드래그 피드백이 보이도록 배경에도 같은 틴트를 적용한다.
+	// 배경은 특수 상태(잠금/드래그타겟/호버)에서는 피드백 틴트를, 평상시에는 아이템 등급색을 쓴다.
+	// (빈 슬롯·등급 없는 아이템은 CurrentGradeBackgroundColor가 흰색이라 기존과 동일하게 보인다.)
 	if (SlotBackgroundImage)
 	{
-		SlotBackgroundImage->SetColorAndOpacity(Tint);
+		const bool bSpecialState = bIsLocked || bIsDragTarget || bIsHovered;
+		SlotBackgroundImage->SetColorAndOpacity(bSpecialState ? Tint : CurrentGradeBackgroundColor);
 	}
 
 	if (ItemIconImage)
@@ -522,6 +543,20 @@ void ULSItemSlotWidget::ApplySlotBackground()
 	}
 
 	SlotBackgroundImage->SetVisibility(ESlateVisibility::Visible);
+}
+
+FLinearColor ULSItemSlotWidget::ResolveGradeBackgroundColor(const FName ItemRowName) const
+{
+	// 등급 토큰은 툴팁(GetGradeText)과 동일한 단일 출처에서 파싱한다.
+	const FString Grade = LSInventorySlotUtils::ResolveItemGradeFromRowName(ItemRowName);
+	if (Grade == TEXT("Supply"))       return SupplyGradeColor;
+	if (Grade == TEXT("Standard"))     return StandardGradeColor;
+	if (Grade == TEXT("Precision"))    return PrecisionGradeColor;
+	if (Grade == TEXT("Tuning"))       return TuningGradeColor;
+	if (Grade == TEXT("Prototype"))    return PrototypeGradeColor;
+	if (Grade == TEXT("Masterpiece"))  return MasterpieceGradeColor;
+
+	return DefaultGradeColor;
 }
 
 bool ULSItemSlotWidget::CanStartItemDrag() const

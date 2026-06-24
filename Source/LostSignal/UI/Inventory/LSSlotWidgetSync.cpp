@@ -85,6 +85,8 @@ void SyncSlotWidgets(
 
 		SlotWidget->ResetTransientSlotState();
 		ConfigureSlot(SlotIndex, *SlotWidget);
+		// 빠른이동 등으로 리빌드된 직후, 커서가 여전히 올라가 있는 슬롯은 호버 강조를 복원한다.
+		SlotWidget->RefreshHoverStateFromCursor();
 	}
 }
 }
