@@ -80,11 +80,12 @@ protected:
 
 	// 아이템 등급별 슬롯 배경색. 등급은 Row Name 토큰에서 파싱한다(LSInventorySlotUtils::ResolveItemGradeFromRowName).
 	// 등급이 없거나 알 수 없는 아이템은 DefaultGradeColor, 아이템이 없는 빈 슬롯은 EmptySlotBackgroundColor를 쓴다.
+	// FColor(sRGB) → FLinearColor 변환 생성자를 써서 에디터 색 선택기와 동일한 색으로 표시한다. (#124B6B 짙은 청록 블루)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
-	FLinearColor DefaultGradeColor = FLinearColor(0.55f, 0.55f, 0.58f, 1.0f);
+	FLinearColor DefaultGradeColor = FLinearColor(FColor(0x12, 0x4B, 0x6B));
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
-	FLinearColor EmptySlotBackgroundColor = FLinearColor(0.22f, 0.22f, 0.25f, 1.0f);
+	FLinearColor EmptySlotBackgroundColor = FLinearColor(FColor(0x12, 0x4B, 0x6B));
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
 	FLinearColor SupplyGradeColor = FLinearColor(0.62f, 0.62f, 0.62f, 1.0f);

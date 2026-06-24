@@ -114,7 +114,7 @@ SetWarehouseSlotContext
 
 `SlotBackgroundImage` 브러시는 `DefaultSlotTexture`로 C++가 설정하며, `DefaultSlotTexture`가 미지정이면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다(이때 `UE_LOG(LogLS, Warning, ...)`). 호버/잠금/드래그 틴트는 배경과 아이콘 양쪽에 적용해 빈 슬롯에서도 피드백이 보인다.
 
-평상시(특수 상태가 아닐 때) 배경 틴트는 아이템 등급색으로 칠한다. 등급은 Row Name 토큰에서 파싱하며(`LSInventorySlotUtils::ResolveItemGradeFromRowName`, 툴팁 등급 표기와 동일 출처), 6등급(`Supply/Standard/Precision/Tuning/Prototype/Masterpiece`)별 색은 `ULSItemSlotWidget`의 `*GradeColor` `UPROPERTY` 기본값으로 두고 디자이너가 조정한다. 등급이 없는 아이템은 `DefaultGradeColor`, 아이템이 없는 빈 슬롯은 `EmptySlotBackgroundColor`를 쓴다(빈 슬롯이 더 어두워 시각적으로 구분된다). 호버/잠금/드래그 등 특수 상태에서는 기존 피드백 틴트가 우선한다.
+평상시(특수 상태가 아닐 때) 배경 틴트는 아이템 등급색으로 칠한다. 등급은 Row Name 토큰에서 파싱하며(`LSInventorySlotUtils::ResolveItemGradeFromRowName`, 툴팁 등급 표기와 동일 출처), 6등급(`Supply/Standard/Precision/Tuning/Prototype/Masterpiece`)별 색은 `ULSItemSlotWidget`의 `*GradeColor` `UPROPERTY` 기본값으로 두고 디자이너가 조정한다. 등급이 없는 아이템은 `DefaultGradeColor`, 아이템이 없는 빈 슬롯은 `EmptySlotBackgroundColor`를 쓴다(둘 다 UI 시그니처 블루 `#124B6B` 기본값). 호버/잠금/드래그 등 특수 상태에서는 기존 피드백 틴트가 우선한다.
 
 아이콘은 슬롯의 `ItemRowName`을 기준으로 DataTable row를 찾고, row의 아이콘 경로를 로드한다. 아이콘 경로 문제로 로드에 실패하면 기본 아이콘 텍스처를 표시하고, 빈 슬롯은 `ItemIconImage`를 `Collapsed`로 숨겨 배경만 보이게 한다.
 
