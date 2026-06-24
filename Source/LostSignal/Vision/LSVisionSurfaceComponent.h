@@ -44,6 +44,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FName Forward2DParamName = TEXT("PlayerForward2D");
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
+	FName SurfacePushParamName = TEXT("MaskSurfacePush");
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> VisionMaterialInstances;
 

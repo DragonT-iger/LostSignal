@@ -158,19 +158,20 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	const FVector ActorLocation = GetOwner()->GetActorLocation();
 	const FVector2D ActorLocation2D(ActorLocation.X, ActorLocation.Y);
 
+	// 플레이어 발 높이(바닥 기준 Z). 오클루더 슬라이스 평면과 마스크 투영의 "높이 0" 기준으로 공용한다.
+	float PlayerFootZ = ActorLocation.Z;
+	if (const ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner()))
+	{
+		if (const UCapsuleComponent* Capsule = OwnerCharacter->GetCapsuleComponent())
+		{
+			PlayerFootZ -= Capsule->GetScaledCapsuleHalfHeight();
+		}
+	}
+
 	// 플레이어 발 높이 기준 모드면 오클루더 슬라이스 평면을 발 높이 + 오프셋으로 갱신(변할 때만 재슬라이스).
 	if (const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>(); VisionSettings != nullptr && VisionSettings->bSliceHeightFromPlayer)
 	{
-		float FootZ = ActorLocation.Z;
-		if (const ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner()))
-		{
-			if (const UCapsuleComponent* Capsule = OwnerCharacter->GetCapsuleComponent())
-			{
-				FootZ -= Capsule->GetScaledCapsuleHalfHeight();
-			}
-		}
-
-		VisionSubsystem->SetRuntimeSliceZ(FootZ + VisionSettings->OccluderSliceHeight);
+		VisionSubsystem->SetRuntimeSliceZ(PlayerFootZ + VisionSettings->OccluderSliceHeight);
 	}
 
 	const FVector ActorForward = GetOwner()->GetActorForwardVector();
@@ -225,9 +226,17 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	if (PostProcessMID != nullptr)
 	{
 		PostProcessMID->SetScalarParameterValue(EnableParamName, bEnableVision ? 1.0f : 0.0f);
-		PostProcessMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, 0.0f, 0.0f));
+		// Z 슬롯에 플레이어 발 높이를 실어 보낸다. UV는 XY만 쓰므로 Z는 머티리얼의 "바닥 기준 높이(GroundZ)" 입력으로 재활용된다.
+		PostProcessMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, PlayerFootZ, 0.0f));
 		//MaskExtent -> RenderTarget을 World좌표범위로 치환한 값. ex)extent = 2500 -> uv 0 ~ 1 = world -2500 ~ 2500 크기, 원점은 플레이어 기준
 		PostProcessMID->SetScalarParameterValue(MaskExtentParamName, CurrentPolygon.Extent);
+
+		// 솟아오른/기울어진 면에서 시야 경계가 표면을 일자로 자르는 것을 완화하는 노멀 푸시.
+		// 머티리얼: offset.xy = WorldNormal.XY × (WorldPos.Z − MaskOriginWS.Z) × 이 값. (높이에 비례)
+		if (const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>())
+		{
+			PostProcessMID->SetScalarParameterValue(SurfacePushParamName, VisionSettings->SurfaceNormalPush);
+		}
 
 		if (UTextureRenderTarget2D* VisibilityMaskRT = VisionSubsystem->GetVisibilityMaskRenderTarget())
 		{
@@ -243,7 +252,7 @@ void ULSVisionComponent::UpdateVisionPolygon()
 		{
 			SurfaceComponent->ApplyVisionParameters(
 				VisionSubsystem->GetVisibilityMaskRenderTarget(),
-				FVector(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, 0.0f),
+				FVector(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, PlayerFootZ),
 				CurrentPolygon.Extent,
 				SolverInfo.OriginForward);
 		}

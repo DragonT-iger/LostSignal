@@ -5,6 +5,7 @@
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Vision/LSVisionSettings.h"
 #include "Vision/LSVisionSubsystem.h"
 
 ULSVisionSurfaceComponent::ULSVisionSurfaceComponent()
@@ -126,6 +127,10 @@ void ULSVisionSurfaceComponent::ApplyVisionParameters(
 	const float MaskExtent,
 	const FVector2D& PlayerForward2D)
 {
+	// 솟아오른/기울어진 면에서 시야 경계가 표면을 일자로 자르는 것을 완화하는 노멀 푸시(머티리얼이 PixelNormalWS.XY에 곱해 사용).
+	const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>();
+	const float SurfaceNormalPush = VisionSettings != nullptr ? VisionSettings->SurfaceNormalPush : 0.0f;
+
 	for (UMaterialInstanceDynamic* VisionMID : VisionMaterialInstances)
 	{
 		if (VisionMID == nullptr)
@@ -141,5 +146,6 @@ void ULSVisionSurfaceComponent::ApplyVisionParameters(
 		VisionMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(MaskOriginWS.X, MaskOriginWS.Y, MaskOriginWS.Z, 0.0f));
 		VisionMID->SetScalarParameterValue(MaskExtentParamName, MaskExtent);
 		VisionMID->SetVectorParameterValue(Forward2DParamName, FLinearColor(PlayerForward2D.X, PlayerForward2D.Y, 0.0f, 0.0f));
+		VisionMID->SetScalarParameterValue(SurfacePushParamName, SurfaceNormalPush);
 	}
 }

@@ -105,7 +105,11 @@ void MainCS(uint3 DispatchThreadId : SV_DispatchThreadID)
         // 열린·콘 끝 경계: FeatherWidth 페더 + 노이즈.
         float FeatherOpen = 1.0f - smoothstep(0.0f, max(FeatherWidth, 0.0001f), MinEdgeDistanceOpen + NoiseOffset);
         // 오브젝트(벽) 경계: 페더는 OccluderFeatherScale로 살짝만(작을수록 벽과 정확). 노이즈는 동일하게 적용해 계단을 깬다.
-        float OccluderWidth = FeatherWidth * OccluderFeatherScale;
+        // 저해상도 RT에서 크리스프 경계가 텍셀 계단으로 보이는 것을 막기 위해 전이 폭을 최소 1텍셀(월드 단위)로 보장한다.
+        // 바이리니어가 매끈한 램프로 풀 수 있는 하한 — 해상도가 허용하는 한 또렷함은 유지되고, RT 크기가 바뀌면 자동으로 따라간다.
+        float2 TexelWorldSize = (WorldMax - WorldMin) / max(OutputTextureSize, float2(1.0f, 1.0f));
+        float TexelWorld = max(TexelWorldSize.x, TexelWorldSize.y);
+        float OccluderWidth = max(FeatherWidth * OccluderFeatherScale, TexelWorld);
         float FeatherOccluder = 1.0f - smoothstep(0.0f, max(OccluderWidth, 0.0001f), MinEdgeDistanceOccluder + NoiseOffset);
         PolygonAlpha = max(FeatherOpen, FeatherOccluder);
     }

@@ -81,6 +81,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FName EnableParamName = TEXT("VisionEnable");
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
+	FName SurfacePushParamName = TEXT("MaskSurfacePush");
+
 private:
 	FTimerHandle VisionUpdateTimerHandle;
 	TObjectPtr<UMaterialInstanceDynamic> PostProcessMID;

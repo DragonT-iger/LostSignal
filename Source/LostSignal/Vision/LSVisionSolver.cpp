@@ -25,6 +25,41 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 	const float StartAngleDeg = ForwardAngleDeg - SolverInfo.HalfFovDegrees;
 	const float EndAngleDeg = ForwardAngleDeg + SolverInfo.HalfFovDegrees;
 
+	// A. FOV 콘 밖 세그먼트 선컬링.
+	// 그리드는 반경 전체(MaxRayDistance) 원판을 긁어오지만 폴리곤은 HalfFov 콘만 쓴다.
+	// 콘과 각도 구간이 겹치지 않는 세그먼트는 어떤 콘 레이도 막을 수 없으므로 미리 제거해 레이 루프 N을 줄인다.
+	// 양 끝점의 forward 기준 부호각 [min,max]가 콘 반각을 벗어나면 컬링. 뒤쪽 래핑(±180)은 안전하게 살려두고
+	// 기존 IsPointBehindViewer가 히트를 걸러내므로 결과는 불변, 효율만 얻는다.
+	TArray<const FLSVisionSegment2D*> CulledSegments;
+	CulledSegments.Reserve(SolverInfo.Segments.Num());
+	{
+		const float CullHalfFovDeg = SolverInfo.HalfFovDegrees + SolverInfo.AngleEpsilon;
+		for (const FLSVisionSegment2D* Segment : SolverInfo.Segments)
+		{
+			if (Segment == nullptr)
+			{
+				continue;
+			}
+
+			const float StartDeltaDeg = FMath::FindDeltaAngleDegrees(
+				ForwardAngleDeg,
+				FMath::RadiansToDegrees(FMath::Atan2(Segment->Start.Y - SolverInfo.RayOriginPos.Y, Segment->Start.X - SolverInfo.RayOriginPos.X)));
+			const float EndDeltaDeg = FMath::FindDeltaAngleDegrees(
+				ForwardAngleDeg,
+				FMath::RadiansToDegrees(FMath::Atan2(Segment->End.Y - SolverInfo.RayOriginPos.Y, Segment->End.X - SolverInfo.RayOriginPos.X)));
+
+			const float MinDeltaDeg = FMath::Min(StartDeltaDeg, EndDeltaDeg);
+			const float MaxDeltaDeg = FMath::Max(StartDeltaDeg, EndDeltaDeg);
+
+			if (MaxDeltaDeg < -CullHalfFovDeg || MinDeltaDeg > CullHalfFovDeg)
+			{
+				continue;
+			}
+
+			CulledSegments.Add(Segment);
+		}
+	}
+
 	const auto IsAngleInsideFov = [&](const float AngleDeg)
 	{
 		const float DeltaDeg = FMath::FindDeltaAngleDegrees(ForwardAngleDeg, AngleDeg);
@@ -47,34 +82,34 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 	AnglesDeg.Add(EndAngleDeg);
 
 	TArray<FVector2D> UniqueVertices;
-	UniqueVertices.Reserve(SolverInfo.Segments.Num() * 2);
+	UniqueVertices.Reserve(CulledSegments.Num() * 2);
 
-	const auto AddUniqueVertex = [&UniqueVertices, &SolverInfo](const FVector2D& Vertex)
+	// B. dedup을 양자화 키 TSet으로. 정점마다 배열 전체를 선형 탐색하던 O(V²)를 O(V)로 낮춘다.
+	// KINDA_SMALL_NUMBER(1e-4) 격자에 스냅한 정수 키로 중복 판정 — 동일 위치 정점이 한 번만 들어간다.
+	TSet<FIntPoint> SeenVertexKeys;
+	SeenVertexKeys.Reserve(CulledSegments.Num() * 2);
+
+	const auto AddUniqueVertex = [&UniqueVertices, &SeenVertexKeys, &SolverInfo](const FVector2D& Vertex)
 	{
 		if (IsPointBehindViewer(SolverInfo.OriginPos, SolverInfo.OriginForward, Vertex))
 		{
 			return;
 		}
 
-		const bool bAlreadyAdded = UniqueVertices.ContainsByPredicate(
-			[&Vertex](const FVector2D& ExistingVertex)
-			{
-				return ExistingVertex.Equals(Vertex, KINDA_SMALL_NUMBER);
-			});
+		const FIntPoint VertexKey(
+			FMath::RoundToInt(Vertex.X / KINDA_SMALL_NUMBER),
+			FMath::RoundToInt(Vertex.Y / KINDA_SMALL_NUMBER));
 
+		bool bAlreadyAdded = false;
+		SeenVertexKeys.Add(VertexKey, &bAlreadyAdded);
 		if (!bAlreadyAdded)
 		{
 			UniqueVertices.Add(Vertex);
 		}
 	};
 
-	for (const FLSVisionSegment2D* Segment : SolverInfo.Segments)
+	for (const FLSVisionSegment2D* Segment : CulledSegments)
 	{
-		if (Segment == nullptr)
-		{
-			continue;
-		}
-
 		AddUniqueVertex(Segment->Start);
 		AddUniqueVertex(Segment->End);
 	}
@@ -181,13 +216,8 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 		FLSVisionRayHit ClosestHit;
 		ClosestHit.Distance = SolverInfo.MaxRayDistance;
 
-		for (const FLSVisionSegment2D* Segment : SolverInfo.Segments)
+		for (const FLSVisionSegment2D* Segment : CulledSegments)
 		{
-			if (Segment == nullptr)
-			{
-				continue;
-			}
-
 			const FLSVisionRayHit Hit = CastRay(SolverInfo.RayOriginPos, RayDir, Segment->Start, Segment->End, SolverInfo.MaxRayDistance);
 			if (!Hit.bHit || IsPointBehindViewer(SolverInfo.OriginPos, SolverInfo.OriginForward, Hit.HitPoint))
 			{

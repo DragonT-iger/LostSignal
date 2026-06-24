@@ -64,4 +64,11 @@ public:
 	// 오브젝트(벽) 경계 페더 = FeatherWidth × 이 값. 0=크리스프(정확), 1=열린 경계와 동일. 살짝이면 0.25 정도.
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Edge", meta = (ClampMin = "0.0"))
 	float OccluderFeatherScale = 0.25f;
+
+	// 마스크 샘플 좌표를 픽셀 월드 노멀 방향으로 미는 강도(픽셀 높이에 비례). 솟아오른/기울어진 면에서 시야 경계가
+	// 표면을 일자로 자르는 것을 완화해 경계가 높이를 타고 오르게 한다. 바닥(노멀 ≈+Z, 높이 ≈0)은 사실상 불변.
+	// 머티리얼: offset.xy = WorldNormal.XY × (WorldPos.Z − GroundZ) × 이 값. GroundZ는 MaskOriginWS.Z(플레이어 발 높이).
+	// 높이에 곱해지는 비율이라 단위는 대략 0.1~0.5 범위. 0=보정 없음(기존 동작).
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Projection", meta = (ClampMin = "0.0"))
+	float SurfaceNormalPush = 0.0f;
 };
