@@ -495,3 +495,13 @@ AI 코드를 수정한 뒤 다음을 확인한다.
 - 몬스터별 차이가 C++ 분기가 아니라 데이터/에셋 참조로 분리되어 있는가
 - 기존 Dead / Knockback / Stunned 흐름을 깨지 않는가
 ```
+
+## 기획 대비 현재 범위
+
+몬스터 시스템 기획서에는 있으나 현재 코드에 아직 없는 항목을 기록한다. 코드가 사실이므로, 같은 분석을 반복하지 않도록 미구현/보류 상태만 남긴다. 구현 설계는 각 항목을 실제로 작업할 때 별도로 합의한다.
+
+- **위험도(Threat) 시스템:** 기획에서 삭제됨. 코드 잔재(`ULSMonsterSenseComponent` `ThreatMultiplier` / `SetThreatMultiplier`)는 제거 완료. 현재 시야 반경은 평상시 `BaseSightRadius`, ReturnHome(경계) 시 `bForceMaxSightRadius`로 `MaxSightRadius` 고정.
+- **스폰/배치 시스템:** 일반·고정형 보스·배회형 보스·탈출 시 스폰 모두 미구현. 메인 레이드용 스폰 매니저 없음(레벨 수동 배치 + DataTable 초기화만). 별도 작업으로 보류.
+- **어그로 우선순위 엔진:** 기획의 P0(해제)·P1(특수 상호작용)·P2(시야·거리)·P3(관측 불가) 우선순위 덮어쓰기와 예외 규칙은 미구현. 현재는 `FindBestVisibleTarget`(시야 내 최근접) + `SetCurrentTargetFromDamage`(피격자 타겟팅) 수준.
+- **저항 어트리뷰트 / 회전 속도:** 방어 관통 저항·치명타 확률 저항과 그 계산식, 회전 속도는 `FLSMonsterArchetypeRow`/AttributeSet에 없음.
+- **강인도(Monster_Guard):** Row에는 존재하나 적용 정책 미정(위 "몬스터 DataTable 규칙" 참고).

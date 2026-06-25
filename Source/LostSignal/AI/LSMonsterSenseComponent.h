@@ -61,9 +61,6 @@ public:
 	float GetCurrentSightRadius() const;
 
 	UFUNCTION(BlueprintCallable, Category="AI|Sense")
-	void SetThreatMultiplier(float InThreatMultiplier);
-
-	UFUNCTION(BlueprintCallable, Category="AI|Sense")
 	void SetForceMaxSightRadius(bool bInForceMaxSightRadius);
 
 	UFUNCTION(BlueprintCallable, Category="LS/AI|Sense")
@@ -123,9 +120,6 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	bool bHasInterestLocation = false;
-
-	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
-	float ThreatMultiplier = 1.0f;
 
 	UPROPERTY(VisibleAnywhere, Category="LS/AI|Sense")
 	bool bForceMaxSightRadius = false;

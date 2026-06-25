@@ -167,12 +167,7 @@ float ULSMonsterSenseComponent::GetCurrentSightRadius() const
 		return MaxSightRadius;
 	}
 
-	return FMath::Clamp(BaseSightRadius * ThreatMultiplier, BaseSightRadius, MaxSightRadius);
-}
-
-void ULSMonsterSenseComponent::SetThreatMultiplier(float InThreatMultiplier)
-{
-	ThreatMultiplier = FMath::Max(1.0f, InThreatMultiplier);
+	return BaseSightRadius;
 }
 
 void ULSMonsterSenseComponent::SetForceMaxSightRadius(bool bInForceMaxSightRadius)
