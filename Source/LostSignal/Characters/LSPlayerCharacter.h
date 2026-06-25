@@ -11,6 +11,7 @@ class UCameraComponent;
 class UGameplayEffect;
 class UInputAction;
 class ULSAimComponent;
+class ULSCharacterLightingComponent;
 class ULSChipStatComponent;
 class ULSMPCVisionSourceComponent;
 class ULSNoiseEmitterComponent;
@@ -89,6 +90,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSPlayerXRayComponent> PlayerXRayComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<ULSCharacterLightingComponent> CharacterLightingComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Noise", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSNoiseEmitterComponent> NoiseEmitterComponent;
