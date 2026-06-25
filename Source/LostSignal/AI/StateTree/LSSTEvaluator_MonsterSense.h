@@ -52,11 +52,20 @@ struct FLSSTEvaluator_MonsterSenseInstanceData
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	float AlertMoveSpeedMultiplier = 1.0f;
 
+	/** 현재 타겟을 이번 틱 실제로 보고 있는지(FOV+LOS). Attack/즉시 추격 판정용. */
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bHasVisualTarget = false;
 
+	/** 타겟 보유 여부(시야 상실 후 기억 시간 포함). Chase 유지 판정용. */
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	bool bHasTarget = false;
+
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bHasInterestLocation = false;
+
+	/** 현재 거리에 발동 가능한(사거리 적합 + 쿨다운 준비) 액션이 있는지. Attack 진입 판정용. */
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	bool bHasUsableAction = false;
 
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bIsBeyondLeashDistance = false;

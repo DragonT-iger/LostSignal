@@ -43,7 +43,9 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 	{
 		InstanceData.CurrentTarget = nullptr;
 		InstanceData.bHasVisualTarget = false;
+		InstanceData.bHasTarget = false;
 		InstanceData.bHasInterestLocation = false;
+		InstanceData.bHasUsableAction = false;
 		InstanceData.DistanceToTarget = 0.0f;
 		InstanceData.DistanceFromHome = 0.0f;
 		InstanceData.bIsBeyondLeashDistance = false;
@@ -61,6 +63,7 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 	InstanceData.AlertDuration = InstanceData.SenseComponent->GetAlertDuration();
 	InstanceData.AlertMoveSpeedMultiplier = InstanceData.SenseComponent->GetAlertMoveSpeedMultiplier();
 	InstanceData.bHasVisualTarget = InstanceData.SenseComponent->HasVisualTarget();
+	InstanceData.bHasTarget = InstanceData.SenseComponent->HasTarget();
 	InstanceData.bHasInterestLocation = InstanceData.SenseComponent->HasInterestLocation();
 	InstanceData.bIsBeyondLeashDistance = InstanceData.SenseComponent->IsBeyondLeashDistance();
 	InstanceData.bIsAttacking = false;
@@ -89,4 +92,9 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 	{
 		InstanceData.DistanceToTarget = 0.0f;
 	}
+
+	// 현재 타겟 거리에 발동 가능한 액션이 있는지(거리 적합 + 쿨다운 준비). 타겟이 없으면 false.
+	InstanceData.bHasUsableAction = (InstanceData.CurrentTarget && InstanceData.CombatComponent)
+		? InstanceData.CombatComponent->HasUsableActionInRange(InstanceData.DistanceToTarget)
+		: false;
 }

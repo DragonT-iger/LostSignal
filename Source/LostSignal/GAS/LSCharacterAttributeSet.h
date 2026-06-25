@@ -38,6 +38,11 @@ public:
 	FGameplayAttributeData CritChance = 0.0f;
 	LS_ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CritChance)
 
+	// 피격 시 공격자의 치명타 확률을 감소시키는 저항(몬스터 Monster_Crit_Resist 입력).
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
+	FGameplayAttributeData CritChanceResistance = 0.0f;
+	LS_ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CritChanceResistance)
+
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData CritDamage = 1.5f;
 	LS_ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, CritDamage)
@@ -45,6 +50,11 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData ArmorPenetration = 0.0f;
 	LS_ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, ArmorPenetration)
+
+	// 피격 시 공격자의 방어 관통을 감소시키는 저항(몬스터 Monster_ArmorPen_Resist 입력).
+	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
+	FGameplayAttributeData ArmorPenetrationResistance = 0.0f;
+	LS_ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, ArmorPenetrationResistance)
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData Defence = 0.0f;

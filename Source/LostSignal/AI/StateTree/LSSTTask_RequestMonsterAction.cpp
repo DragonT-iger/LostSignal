@@ -1,16 +1,17 @@
-#include "AI/StateTree/LSSTTask_RequestAbilityByTag.h"
+#include "AI/StateTree/LSSTTask_RequestMonsterAction.h"
 
 #include "AI/LSMonsterCombatComponent.h"
 #include "Characters/LSEnemyCharacter.h"
+#include "GAS/LSGameplayTags.h"
 #include "StateTreeExecutionContext.h"
 
-FLSSTTask_RequestAbilityByTag::FLSSTTask_RequestAbilityByTag()
+FLSSTTask_RequestMonsterAction::FLSSTTask_RequestMonsterAction()
 {
 	bShouldCallTick = true;
 	bShouldCopyBoundPropertiesOnTick = true;
 }
 
-EStateTreeRunStatus FLSSTTask_RequestAbilityByTag::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
+EStateTreeRunStatus FLSSTTask_RequestMonsterAction::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
@@ -24,19 +25,13 @@ EStateTreeRunStatus FLSSTTask_RequestAbilityByTag::EnterState(FStateTreeExecutio
 		return EStateTreeRunStatus::Failed;
 	}
 
-	FGameplayTag AbilityTag = InstanceData.AbilityTag;
-	if (!AbilityTag.IsValid() && InstanceData.bFallbackToDefaultAttackTag)
-	{
-		AbilityTag = InstanceData.CombatComponent->GetDefaultAttackAbilityTag();
-	}
-
-	InstanceData.ActiveAbilityTag = AbilityTag;
-	return InstanceData.CombatComponent->RequestAbilityByTag(AbilityTag)
+	// 어떤 액션을 할지는 CombatComponent가 거리/쿨다운으로 선택한다.
+	return InstanceData.CombatComponent->RequestAction(InstanceData.TargetActor)
 		? EStateTreeRunStatus::Running
 		: EStateTreeRunStatus::Failed;
 }
 
-EStateTreeRunStatus FLSSTTask_RequestAbilityByTag::Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const
+EStateTreeRunStatus FLSSTTask_RequestMonsterAction::Tick(FStateTreeExecutionContext& Context, const float DeltaTime) const
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 	if (!InstanceData.CombatComponent)
@@ -44,12 +39,12 @@ EStateTreeRunStatus FLSSTTask_RequestAbilityByTag::Tick(FStateTreeExecutionConte
 		return EStateTreeRunStatus::Failed;
 	}
 
-	if (InstanceData.CombatComponent->IsAbilityActiveByTag(InstanceData.ActiveAbilityTag))
+	if (InstanceData.CombatComponent->IsAbilityActiveByTag(LSGameplayTags::Ability_MonsterAction))
 	{
 		return EStateTreeRunStatus::Running;
 	}
 
-	if (InstanceData.bCancelAbilityWhenTargetLeavesRange && InstanceData.EnemyCharacter && InstanceData.TargetActor && InstanceData.CancelIfTargetFartherThan > 0.0f)
+	if (InstanceData.bCancelActionWhenTargetLeavesRange && InstanceData.EnemyCharacter && InstanceData.TargetActor && InstanceData.CancelIfTargetFartherThan > 0.0f)
 	{
 		const float DistanceToTarget = FVector::Dist2D(
 			InstanceData.EnemyCharacter->GetActorLocation(),
@@ -57,7 +52,7 @@ EStateTreeRunStatus FLSSTTask_RequestAbilityByTag::Tick(FStateTreeExecutionConte
 
 		if (DistanceToTarget > InstanceData.CancelIfTargetFartherThan)
 		{
-			InstanceData.CombatComponent->CancelAbilityByTag(InstanceData.ActiveAbilityTag);
+			InstanceData.CombatComponent->CancelAbilityByTag(LSGameplayTags::Ability_MonsterAction);
 			return EStateTreeRunStatus::Succeeded;
 		}
 	}

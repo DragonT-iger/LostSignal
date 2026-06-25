@@ -10,7 +10,7 @@ namespace LSGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Dash, "LS.Ability.Dash")
 	UE_DEFINE_GAMEPLAY_TAG(Ability_PlayerBasicAttack, "LS.Ability.Player.BasicAttack")
-	UE_DEFINE_GAMEPLAY_TAG(Ability_MonsterMelee, "LS.Ability.Monster.Melee")
+	UE_DEFINE_GAMEPLAY_TAG(Ability_MonsterAction, "LS.Ability.Monster.Action")
 
 	UE_DEFINE_GAMEPLAY_TAG(Cooldown_Dash, "LS.Cooldown.Dash")
 	UE_DEFINE_GAMEPLAY_TAG(Cooldown_Skill_Overclock, "LS.Cooldown.Skill.Overclock")

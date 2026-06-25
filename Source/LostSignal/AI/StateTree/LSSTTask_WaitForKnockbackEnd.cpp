@@ -3,6 +3,7 @@
 #include "AI/LSMonsterCombatComponent.h"
 #include "AIController.h"
 #include "Characters/LSEnemyCharacter.h"
+#include "GAS/LSGameplayTags.h"
 #include "StateTreeExecutionContext.h"
 
 FLSSTTask_WaitForKnockbackEnd::FLSSTTask_WaitForKnockbackEnd()
@@ -35,7 +36,7 @@ EStateTreeRunStatus FLSSTTask_WaitForKnockbackEnd::EnterState(FStateTreeExecutio
 		FGameplayTag AbilityTag = InstanceData.AttackAbilityTag;
 		if (!AbilityTag.IsValid() && InstanceData.bFallbackToDefaultAttackTag)
 		{
-			AbilityTag = InstanceData.CombatComponent->GetDefaultAttackAbilityTag();
+			AbilityTag = LSGameplayTags::Ability_MonsterAction;
 		}
 
 		InstanceData.CombatComponent->CancelAbilityByTag(AbilityTag);

@@ -10,13 +10,14 @@
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSMonsterArchetypeRow.h"
 #include "Engine/DataTable.h"
-#include "GAS/Abilities/LSGA_MonsterMelee.h"
+#include "GAS/Abilities/LSGA_MonsterAction.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Gameplay/LSNoiseEmitterComponent.h"
 #include "LostSignal.h"
 #include "Minimap/LSMinimapMarkerComponent.h"
+#include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "UI/Debug/LSHpDebugWidget.h"
 #include "UI/Combat/LSEnemyHealthBarComponent.h"
 
@@ -30,7 +31,7 @@ ALSEnemyCharacter::ALSEnemyCharacter()
 {
 	AIControllerClass = ALSAIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
-	DefaultAttackAbilityClass = ULSGA_MonsterMelee::StaticClass();
+	MonsterActionAbilityClass = ULSGA_MonsterAction::StaticClass();
 
 	// Player uses its own facing logic, but AI should rotate from controller focus while chasing targets.
 	// bUseControllerDesiredRotation is the CharacterMovement-side switch that turns SetFocus() yaw into body rotation.
@@ -47,19 +48,7 @@ ALSEnemyCharacter::ALSEnemyCharacter()
 	MinimapMarkerComponent->SetMarkerType(ELSMinimapMarkerType::Enemy);
 	MinimapMarkerComponent->SetMarkerColor(FLinearColor(1.0f, 0.12f, 0.1f, 1.0f));
 	MonsterAttributeSet = CreateDefaultSubobject<ULSCharacterAttributeSet>(TEXT("MonsterAttributeSet"));
-}
-
-UAnimMontage* ALSEnemyCharacter::GetAbilityMontage(FGameplayTag AbilityTag) const
-{
-	for (const FLSMonsterAbilityMontageEntry& Entry : AbilityMontages)
-	{
-		if (Entry.AbilityTag == AbilityTag)
-		{
-			return Entry.Montage;
-		}
-	}
-
-	return nullptr;
+	SkillPreviewComponent = CreateDefaultSubobject<ULSSkillPreviewComponent>(TEXT("SkillPreviewComponent"));
 }
 
 void ALSEnemyCharacter::MulticastPlayAbilityMontage_Implementation(UAnimMontage* Montage)
@@ -103,10 +92,10 @@ void ALSEnemyCharacter::BeginPlay()
 
 	if (HasAuthority())
 	{
-		if (DefaultAttackAbilityClass)
+		if (MonsterActionAbilityClass)
 		{
 			// StateTree can only request abilities that already exist on the monster ASC.
-			GrantAbility(DefaultAttackAbilityClass);
+			GrantAbility(MonsterActionAbilityClass);
 		}
 
 		if (ALSAIController* LSAIController = Cast<ALSAIController>(GetController()))
@@ -175,6 +164,8 @@ void ALSEnemyCharacter::ApplyMonsterAttributes(const FLSMonsterArchetypeRow& Row
 
 	MonsterAttributeSet->InitAttack(FMath::Max(0.0f, Row.Monster_ATK));
 	MonsterAttributeSet->InitDefence(FMath::Max(0.0f, Row.Monster_DEF));
+	MonsterAttributeSet->InitArmorPenetrationResistance(FMath::Max(0.0f, Row.Monster_ArmorPen_Resist));
+	MonsterAttributeSet->InitCritChanceResistance(FMath::Max(0.0f, Row.Monster_Crit_Resist));
 }
 
 void ALSEnemyCharacter::TryCreateDebugHpWidget()

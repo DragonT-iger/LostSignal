@@ -1,16 +1,18 @@
-#include "GAS/Abilities/LSGA_MonsterMelee.h"
+#include "GAS/Abilities/LSGA_MonsterAction.h"
 
+#include "AI/LSMonsterCombatComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Data/LSMonsterActionRow.h"
 #include "GAS/LSGameplayTags.h"
 #include "LostSignal.h"
 
-ULSGA_MonsterMelee::ULSGA_MonsterMelee()
+ULSGA_MonsterAction::ULSGA_MonsterAction()
 {
 	FGameplayTagContainer AssetTags;
-	AssetTags.AddTag(LSGameplayTags::Ability_MonsterMelee);
+	AssetTags.AddTag(LSGameplayTags::Ability_MonsterAction);
 	SetAssetTags(AssetTags);
 
 	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);
@@ -22,7 +24,7 @@ ULSGA_MonsterMelee::ULSGA_MonsterMelee()
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
-void ULSGA_MonsterMelee::ActivateAbility(
+void ULSGA_MonsterAction::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilityActivationInfo ActivationInfo,
@@ -33,26 +35,25 @@ void ULSGA_MonsterMelee::ActivateAbility(
 	bEndingAbility = false;
 
 	ALSEnemyCharacter* EnemyCharacter = Cast<ALSEnemyCharacter>(GetAvatarActorFromActorInfo());
-	if (!EnemyCharacter)
+	ULSMonsterCombatComponent* CombatComponent = EnemyCharacter ? EnemyCharacter->GetMonsterCombatComponent() : nullptr;
+	if (!EnemyCharacter || !CombatComponent)
 	{
-		UE_LOG(LogLS, Warning, TEXT("MonsterMelee ActivateAbility failed: avatar is not ALSEnemyCharacter."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	// The ability decides "what action" to run, but the monster character owns "which montage" to play.
-	const FGameplayTag MeleeAbilityTag = LSGameplayTags::Ability_MonsterMelee;
-	ActiveAttackMontage = EnemyCharacter->GetAbilityMontage(MeleeAbilityTag);
-	if (!ActiveAttackMontage)
+	// 어떤 액션을 할지는 CombatComponent가 정하고(RequestAction), 몽타주는 그 액션 row의 Action_Ani에서 읽는다.
+	const FLSMonsterActionRow* ActionRow = CombatComponent->GetActiveActionRow();
+	ActiveActionMontage = ActionRow ? Cast<UAnimMontage>(ActionRow->Action_Ani.TryLoad()) : nullptr;
+	if (!ActiveActionMontage)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s has no montage mapped for %s."), *GetNameSafe(EnemyCharacter), *MeleeAbilityTag.ToString());
+		UE_LOG(LogLS, Warning, TEXT("%s monster action has no montage resolved from Action_Ani."), *GetNameSafe(EnemyCharacter));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s MonsterMelee CommitAbility failed."), *GetNameSafe(EnemyCharacter));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -60,27 +61,24 @@ void ULSGA_MonsterMelee::ActivateAbility(
 	UAnimInstance* AnimInstance = EnemyCharacter->GetMesh() ? EnemyCharacter->GetMesh()->GetAnimInstance() : nullptr;
 	if (!AnimInstance)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s MonsterMelee has no AnimInstance."), *GetNameSafe(EnemyCharacter));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	EnemyCharacter->MulticastPlayAbilityMontage(ActiveAttackMontage);
-	if (!AnimInstance->Montage_IsPlaying(ActiveAttackMontage))
+	EnemyCharacter->MulticastPlayAbilityMontage(ActiveActionMontage);
+	if (!AnimInstance->Montage_IsPlaying(ActiveActionMontage))
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s MonsterMelee failed to play montage %s."), *GetNameSafe(EnemyCharacter), *GetNameSafe(ActiveAttackMontage));
+		UE_LOG(LogLS, Warning, TEXT("%s failed to play monster action montage %s."), *GetNameSafe(EnemyCharacter), *GetNameSafe(ActiveActionMontage));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
 	FOnMontageEnded MontageEndedDelegate;
-	MontageEndedDelegate.BindUObject(this, &ULSGA_MonsterMelee::HandleAttackMontageEnded);
-	AnimInstance->Montage_SetEndDelegate(MontageEndedDelegate, ActiveAttackMontage);
-
-	UE_LOG(LogLS, Log, TEXT("%s activated monster melee ability."), *GetNameSafe(EnemyCharacter));
+	MontageEndedDelegate.BindUObject(this, &ULSGA_MonsterAction::HandleActionMontageEnded);
+	AnimInstance->Montage_SetEndDelegate(MontageEndedDelegate, ActiveActionMontage);
 }
 
-void ULSGA_MonsterMelee::EndAbility(
+void ULSGA_MonsterAction::EndAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilityActivationInfo ActivationInfo,
@@ -89,47 +87,34 @@ void ULSGA_MonsterMelee::EndAbility(
 {
 	bEndingAbility = true;
 
-	UE_LOG(
-		LogLS,
-		Log,
-		TEXT("%s EndAbility called. Cancelled=%d ReplicateEnd=%d Montage=%s"),
-		*GetNameSafe(GetAvatarActorFromActorInfo()),
-		bWasCancelled,
-		bReplicateEndAbility,
-		*GetNameSafe(ActiveAttackMontage)
-	);
-
 	if (ALSEnemyCharacter* EnemyCharacter = Cast<ALSEnemyCharacter>(GetAvatarActorFromActorInfo()))
 	{
+		// 캔슬/종료 시 텔레그래프가 남지 않도록 정리(노티파이 End가 누락된 경우 대비).
+		if (ULSMonsterCombatComponent* CombatComponent = EnemyCharacter->GetMonsterCombatComponent())
+		{
+			CombatComponent->EndActionTelegraph();
+		}
+
 		if (UAnimInstance* AnimInstance = EnemyCharacter->GetMesh() ? EnemyCharacter->GetMesh()->GetAnimInstance() : nullptr)
 		{
-			if (ActiveAttackMontage && AnimInstance->Montage_IsPlaying(ActiveAttackMontage))
+			if (ActiveActionMontage && AnimInstance->Montage_IsPlaying(ActiveActionMontage))
 			{
-				EnemyCharacter->MulticastStopAbilityMontage(ActiveAttackMontage, 0.1f);
+				EnemyCharacter->MulticastStopAbilityMontage(ActiveActionMontage, 0.1f);
 			}
 		}
 	}
 
-	ActiveAttackMontage = nullptr;
+	ActiveActionMontage = nullptr;
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
-void ULSGA_MonsterMelee::HandleAttackMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+void ULSGA_MonsterAction::HandleActionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
 	if (bEndingAbility)
 	{
 		return;
 	}
-
-	UE_LOG(
-		LogLS,
-		Log,
-		TEXT("%s melee montage ended. Interrupted=%d Montage=%s"),
-		*GetNameSafe(GetAvatarActorFromActorInfo()),
-		bInterrupted,
-		*GetNameSafe(Montage)
-	);
 
 	if (IsActive())
 	{

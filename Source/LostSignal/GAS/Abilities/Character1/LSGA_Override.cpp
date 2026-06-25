@@ -2,6 +2,7 @@
 
 #include "AbilitySystemComponent.h"
 #include "Combat/LSCharacterCombatComponent.h"
+#include "Combat/LSHitboxLibrary.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "Engine/EngineTypes.h"
 #include "GAS/Effects/LSGE_PlayerBasicDamage.h"
@@ -82,42 +83,32 @@ namespace
 			return false;
 		}
 
-		FVector ToTarget = TargetActor->GetActorLocation() - SourceActor->GetActorLocation();
-		ToTarget.Z = 0.0f;
-		const float Distance = ToTarget.Size2D();
-		if (Distance <= KINDA_SMALL_NUMBER)
-		{
-			return true;
-		}
-
+		// Circle/Cone/Box 판정은 공용 유틸을 사용한다(몬스터 액션과 동일 경로).
+		ELSHitboxShape HitboxShape = ELSHitboxShape::Circle;
 		switch (Shape)
 		{
 		case ELSCharacterSkillRangeShape::Cone:
-			{
-				if (Distance > Radius)
-				{
-					return false;
-				}
-
-				const float Dot = FVector::DotProduct(AimDirection, ToTarget.GetSafeNormal2D());
-				const float HalfAngle = FMath::Clamp(ConeAngleDegrees * 0.5f, 0.0f, 180.0f);
-				return Dot >= FMath::Cos(FMath::DegreesToRadians(HalfAngle));
-			}
-
+			HitboxShape = ELSHitboxShape::Cone;
+			break;
 		case ELSCharacterSkillRangeShape::Box:
-			{
-				const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, AimDirection).GetSafeNormal();
-				const float ForwardDistance = FVector::DotProduct(ToTarget, AimDirection);
-				const float RightDistance = FVector::DotProduct(ToTarget, RightDirection);
-				return ForwardDistance >= 0.0f &&
-					ForwardDistance <= Length &&
-					FMath::Abs(RightDistance) <= Width * 0.5f;
-			}
-
+			HitboxShape = ELSHitboxShape::Box;
+			break;
 		case ELSCharacterSkillRangeShape::Circle:
+		case ELSCharacterSkillRangeShape::None:
 		default:
-			return Distance <= Radius;
+			HitboxShape = ELSHitboxShape::Circle;
+			break;
 		}
+
+		return ULSHitboxLibrary::IsTargetInsideHitbox(
+			SourceActor->GetActorLocation(),
+			AimDirection,
+			TargetActor->GetActorLocation(),
+			HitboxShape,
+			Radius,
+			Length,
+			Width,
+			ConeAngleDegrees);
 	}
 
 	bool ShouldApplyOverrideSelfEffect(const FLSCharacterSkillRow& Row, bool bHasRow)

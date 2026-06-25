@@ -70,19 +70,26 @@ GameplayAbility / GameplayEffect
 `FLSMonsterArchetypeRow`는 기획 CSV의 영문 헤더와 1:1로 맞춘다. 첫 번째 `Name` 컬럼은 DataTable row key로 사용하고, UPROPERTY로 중복 선언하지 않는다.
 
 ```text
-Monster_Name_KR
-Monster_Resource_Path
-Monster_Combat_Type
-Monster_HP
-Monster_ATK
-Monster_DEF
-Monster_Guard
-Sight_Radius
-Hearing_Radius
-Patrol_Speed
-Chase_Speed
-Action_Group
+Monster_Name_KR        (FText)
+Monster_Resource_Path  (FSoftObjectPath)
+Monster_Rank           (enum ELSMonsterRank: Normal/Boss)
+Monster_Combat_Type    (enum ELSMonsterCombatType: Melee/Ranged)
+Monster_HP             (float)
+Monster_ATK            (float)
+Monster_DEF            (float)
+Monster_Guard          (int32)
+Monster_ArmorPen_Resist(float)
+Monster_Crit_Resist    (float)
+Sight_Radius           (float)
+Hearing_Radius         (float)
+Patrol_Speed           (float)
+Chase_Speed            (float)
+Action_Group           (TArray<FName>: DT_MonsterAction row 참조)
 ```
+
+`Monster_AmorPen`(공격용 방어 관통)은 기획 스키마 시트에는 있으나 실제 데이터 시트 헤더/CSV에는 없어 Row에 추가하지 않았다(기획 스키마-데이터 불일치, 기획자 확인 대상).
+
+별도 테이블 `DT_MonsterAction`은 `FLSMonsterActionRow`(`Source/LostSignal/Data/LSMonsterActionRow.h`)를 RowStruct로 쓴다. CSV(`Content/LostSignal/Sandbox/DT/DT_MonsterAction.csv`) 영문 헤더와 1:1. 첫 컬럼 `Name`은 row key. enum `ELSActionTarget`(Self/Area), `ELSHitboxShape`(Circle/Cone/Box)를 포함한다.
 
 현재 코드 연결 기준 (AttributeSet 역할: `ULSCombatAttributeSet`=체력 전담, `ULSCharacterAttributeSet`=공격/방어 등 능력치 전담):
 
@@ -106,11 +113,22 @@ Monster_ATK
 Monster_DEF
 -> ALSEnemyCharacter가 서버에서 ULSCharacterAttributeSet Defence 초기화
 
+Monster_ArmorPen_Resist
+-> 서버에서 ULSCharacterAttributeSet ArmorPenetrationResistance 초기화
+-> 어트리뷰트 보유까지만. 실제 데미지 계산식(캐릭터 관통 - 저항, 0 클램프) 반영은 데미지 파이프라인 후속
+
+Monster_Crit_Resist
+-> 서버에서 ULSCharacterAttributeSet CritChanceResistance 초기화
+-> 어트리뷰트 보유까지만. 실제 치명타 계산 반영은 후속
+
+Monster_Rank
+-> Row에는 보관하되(ELSMonsterRank: Normal/Boss), 등급별 분기(스폰/보스 처리) 정책이 정해지기 전까지 직접 적용하지 않는다
+
 Monster_Guard
--> Row에는 보관하되, Tenacity/Guard 적용 정책이 정해지기 전까지 직접 적용하지 않는다
+-> Row에는 보관하되(int32), Tenacity/Guard 적용 정책이 정해지기 전까지 직접 적용하지 않는다
 
 Action_Group
--> Row에는 보관하되, AbilityTag 매핑 정책이 정해지기 전까지 직접 적용하지 않는다
+-> Row에는 보관하되(TArray<FName>, DT_MonsterAction row 참조), 어빌리티 소비 정책이 정해지기 전까지 직접 적용하지 않는다
 ```
 
 `ULSMonsterCombatComponent`는 몬스터 기본 공격 데미지에 컴포넌트 공격력 fallback을 사용하지 않는다. `FLSMonsterArchetypeRow`가 적용되지 않으면 공격 Ability 요청 또는 실제 히트 적용을 차단하고 `UE_LOG(LogLS, Warning, ...)`를 남긴다.
@@ -124,7 +142,8 @@ SenseComponent
 -> CurrentTarget
 -> InterestLocation
 -> HomeLocation
--> bHasVisualTarget
+-> bHasVisualTarget   (현재 타겟을 이번 틱 실제로 봄: FOV+LOS)
+-> bHasTarget         (타겟 보유: 시야 상실 후 기억 시간 포함)
 -> bHasInterestLocation
 
 GAS Tag
@@ -142,13 +161,16 @@ Evaluator InstanceData
 -> DistanceFromHome
 -> AlertDuration
 -> AlertMoveSpeedMultiplier
--> bHasVisualTarget
+-> bHasVisualTarget   (현재 가시)
+-> bHasTarget         (기억 포함 보유)
 -> bHasInterestLocation
--> bIsBeyondLeashDistance
+-> bIsBeyondLeashDistance   (앵커=최초 인식 위치 기준, P0)
 -> bIsAttacking
 -> bIsDead
 -> bIsKnockback
 ```
+
+`bHasVisualTarget`(현재 가시)과 `bHasTarget`(기억 포함 보유)은 의미가 다르다. Chase 유지는 `bHasTarget`, 즉시 추격/Attack 판정은 `bHasVisualTarget`을 쓴다. `bIsBeyondLeashDistance`는 Home이 아니라 최초 인식 위치(앵커) 기준이다.
 
 새 전이 조건에 필요한 값이 있으면 Condition에서 직접 찾지 말고 Evaluator에 먼저 추가한다.
 
@@ -229,18 +251,23 @@ ReturnHome / Patrol 복귀
 
 ## 공격 제어 규칙
 
-StateTree는 공격을 직접 구현하지 않고 AbilityTag로 요청한다.
+몬스터 공격은 평타 없이 **DT_MonsterAction(FLSMonsterActionRow) 데이터 주도**로만 동작한다. StateTree는 어떤 액션을 할지 직접 고르지 않고 "공격하라"만 요청하며, 거리/쿨다운에 따른 액션 선택은 `ULSMonsterCombatComponent`가 한다. 발동·타격·범위표시 타이밍은 montage AnimNotify가 구동한다.
 
 ```text
 StateTree Attack 상태
--> LS Request Ability By Tag
--> ULSMonsterCombatComponent::RequestAbilityByTag
--> ASC TryActivateAbilitiesByTag
--> GameplayAbility 실행
--> 몽타주 재생
--> AnimNotify
--> ULSMonsterCombatComponent::PerformMeleeHit
--> GameplayEffect로 데미지 적용
+-> LS Request Monster Action (FLSSTTask_RequestMonsterAction)
+-> ULSMonsterCombatComponent::RequestAction(Target)
+   -> SelectActionForDistance: Action_Group 순서로 거리 적합 + 쿨다운 준비 액션 선택
+   -> 활성 액션 컨텍스트 세팅 + 액션별 쿨다운 시작(컴포넌트 TMap 타이머)
+   -> RequestAbilityByTag(Ability_MonsterAction)
+-> ULSGA_MonsterAction: 활성 액션 row의 Action_Ani 몽타주 재생
+-> (윈드업) AnimNotifyState ULSANS_MonsterActionTelegraph
+   -> ULSMonsterCombatComponent::BeginActionTelegraph / EndActionTelegraph
+   -> ULSSkillPreviewComponent(스킬 인디케이터 재사용)로 Hitbox 모양/크기 표시
+-> (타격 프레임) AnimNotify ULSAN_MonsterActionHit
+   -> ULSMonsterCombatComponent::PerformActionHit
+   -> SphereOverlap + ULSHitboxLibrary::IsTargetInsideHitbox(Circle/Cone/Box)
+   -> ULSCharacterCombatComponent::ApplyDamageEffectToTarget (Coeff=Action_Multiplier, BreakPower=Action_Impact)
 ```
 
 공격 상태 이탈 규칙:
@@ -255,29 +282,37 @@ Attack -> Dead / Knockback
 기존 강제 상태 전이 유지
 ```
 
-`LS Request Ability By Tag`는 Ability가 활성화된 뒤에는 거리 이탈로 Ability를 취소하지 않는다. 공격 거리 이탈은 Ability 종료 후 StateTree 전이 조건으로 다시 판단한다.
+`LS Request Monster Action`은 액션 어빌리티가 활성화된 뒤에는 기본적으로 거리 이탈로 취소하지 않는다(공격 모션 캔슬 금지). 공격 거리 이탈은 어빌리티 종료 후 StateTree 전이 조건으로 다시 판단한다.
+
+텔레그래프 표시 여부는 `ULSMonsterCombatComponent::ShouldShowActionTelegraph()`가 게이팅한다(현재는 항상 true, 추후 전투 프로토콜 레벨 게이팅 확장점).
 
 공격 로직을 추가할 때 지킬 규칙:
 
-- StateTree는 어떤 공격을 할지 `FGameplayTag`로 요청한다.
-- 실제 공격 실행은 `GameplayAbility`에 둔다.
-- 실제 타격 타이밍은 몽타주 Notify가 호출한다.
-- 데미지는 `ULSCharacterCombatComponent::ApplyDamageEffectToTarget` 같은 GAS 경로를 사용한다.
+- 어떤 액션을 할지는 StateTree가 아니라 CombatComponent가 거리/쿨다운으로 고른다(StateTree는 "공격" 요청만).
+- 실제 공격 실행은 `ULSGA_MonsterAction`(단일 데이터 주도 어빌리티)에 둔다.
+- 타격·텔레그래프 타이밍은 montage Notify(`ULSAN_MonsterActionHit`)/NotifyState(`ULSANS_MonsterActionTelegraph`)가 호출한다.
+- 데미지는 `ULSCharacterCombatComponent::ApplyDamageEffectToTarget` GAS 경로를 사용한다.
+- 히트박스(Circle/Cone/Box) 판정은 공용 `ULSHitboxLibrary`를 쓴다(플레이어 스킬과 공유).
 - Attribute를 직접 수정하지 않는다.
-- 몬스터별 공격 차이는 C++ if문이 아니라 AbilityTag, AbilityClass, Montage Map, DataTable 값으로 분리한다.
+- 몬스터별 공격 차이는 C++ if문이 아니라 `DT_MonsterAction` 행(계수·사거리·쿨다운·히트박스·Action_Ani)으로 분리한다.
 
 ## 감지 제어 규칙
 
 감지 판단은 `ULSMonsterSenseComponent`에 모은다.
 
 ```text
-Tick
+Tick (UpdateSensing = 우선순위 중재 1패스)
 -> 서버 권한 확인
 -> 죽음 상태면 관심 정보 초기화 및 Tick 중지
--> FindBestVisibleTarget
--> CanSeeActor
--> 타겟이 보이면 CurrentTarget / InterestLocation 갱신
--> 타겟이 안 보이면 CurrentTarget만 초기화
+-> P0(해제): IsBeyondLeashDistance(앵커=최초 인식 위치 기준)는 데이터로만 노출.
+   실제 해제는 StateTree가 ReturnHome 진입 시 ClearInterest로 처리(C++ 자체 해제 안 함)
+-> P2(시야): FindBestVisibleTarget(최근접) + CanSeeActor
+   - 신규 획득(없다가 생김)이면 SetTarget이 앵커 캡처
+   - P2 최근접 전환은 앵커 유지
+   - 공격 중(LS.Combat.Attacking)에는 타겟 식별자 전환을 보류(모션 캔슬 금지)
+-> 현재 타겟이 보이면 InterestLocation 갱신, 기억 타이머 리셋
+-> P3(관측 불가): 시야 상실 시 기억 시간(LostSightMemorySeconds, 기본 5s)동안 타겟 유지
+   (InterestLocation 동결), 초과 시 ReleaseTarget. 공격 중에는 타이머 정지
 -> InterestLocation은 StateTree가 LS Clear Interest를 호출할 때까지 유지
 
 RegisterNoiseEvent
@@ -296,7 +331,7 @@ SetCurrentTargetFromDamage
 - 타겟 탐색은 SenseComponent에서 처리한다.
 - StateTree에는 결과값만 제공한다.
 - 시야/청각/속도와 몬스터 공격력은 DataTable 행에서 받는다. Leash, 시야각, 공격 판정 범위처럼 아직 row 컬럼이 없는 정책값은 별도 정책이 정해질 때까지 컴포넌트 설정으로 관리한다.
-- 기억 시간은 SenseComponent가 관리하지 않는다. Investigate 상태의 Move/Wait/ClearInterest 흐름으로 관리한다.
+- 타겟 기억 시간(P3, 시야 상실 후 유지)은 SenseComponent가 `LostSightMemorySeconds` 타이머로 관리한다. Investigate의 마지막 위치 조사(InterestLocation Move/Wait/ClearInterest)와는 별개 개념이다.
 - 죽은 몬스터는 감지 Tick을 멈추고 관심 정보를 비운다.
 
 ## 소음 이벤트 발생 구조
@@ -380,24 +415,35 @@ ULSMonsterSenseComponent::bLogNoiseDebug
 권장 전이:
 
 ```text
-Combat -> ReturnHome
+Combat(Chase) 유지
 조건:
-!bHasVisualTarget && bIsBeyondLeashDistance
+bHasTarget   (현재 가시 또는 기억 시간 내)
+
+Combat -> ReturnHome (P0 해제)
+조건:
+bIsBeyondLeashDistance   (앵커=최초 인식 위치에서 leash 초과)
 사용 Condition:
-LS Has Visual Target(bInvert=true) && LS Is Beyond Leash Distance
+LS Is Beyond Leash Distance
+참고: ReturnHome 진입 시 LS Set Return Home Mode -> ClearInterest가 타겟/앵커를 해제한다(C++ 자체 해제 아님).
+
+Combat -> InvestigateInterest
+조건:
+!bHasTarget && bHasInterestLocation   (기억 시간 경과로 타겟 드롭, 마지막 위치 확인)
 
 ReturnHome -> Combat
 조건:
-bHasVisualTarget && !bIsBeyondLeashDistance
+bHasVisualTarget   (복귀 중 Leash 안에서 다시 봄)
 
 ReturnHome -> InvestigateInterest
 조건:
-!bHasVisualTarget && !bIsBeyondLeashDistance && bHasInterestLocation
+!bHasVisualTarget && bHasInterestLocation
 
 ReturnHome -> Patrol
 조건:
 HomeLocation 또는 순찰 복귀 지점 도착
 ```
+
+> Attack 진입은 `bHasVisualTarget && IsTargetInRange`(현재 가시)로 판단한다. Chase 유지/InterestLocation 추격은 `bHasTarget`을 쓰므로, 기억 시간 동안 타겟이 안 보여도 마지막 목격 위치(`GetInterestLocation`)로 계속 추격한다.
 
 권장 Task:
 
@@ -502,6 +548,12 @@ AI 코드를 수정한 뒤 다음을 확인한다.
 
 - **위험도(Threat) 시스템:** 기획에서 삭제됨. 코드 잔재(`ULSMonsterSenseComponent` `ThreatMultiplier` / `SetThreatMultiplier`)는 제거 완료. 현재 시야 반경은 평상시 `BaseSightRadius`, ReturnHome(경계) 시 `bForceMaxSightRadius`로 `MaxSightRadius` 고정.
 - **스폰/배치 시스템:** 일반·고정형 보스·배회형 보스·탈출 시 스폰 모두 미구현. 메인 레이드용 스폰 매니저 없음(레벨 수동 배치 + DataTable 초기화만). 별도 작업으로 보류.
-- **어그로 우선순위 엔진:** 기획의 P0(해제)·P1(특수 상호작용)·P2(시야·거리)·P3(관측 불가) 우선순위 덮어쓰기와 예외 규칙은 미구현. 현재는 `FindBestVisibleTarget`(시야 내 최근접) + `SetCurrentTargetFromDamage`(피격자 타겟팅) 수준.
-- **저항 어트리뷰트 / 회전 속도:** 방어 관통 저항·치명타 확률 저항과 그 계산식, 회전 속도는 `FLSMonsterArchetypeRow`/AttributeSet에 없음.
-- **강인도(Monster_Guard):** Row에는 존재하나 적용 정책 미정(위 "몬스터 DataTable 규칙" 참고).
+- **어그로 우선순위 엔진:** 1차로 SenseComponent 내부 완결분 구현됨 — P2(시야 최근접), P3(`LostSightMemorySeconds` 기억 후 해제), 공격 중 타겟 전환 보류, P0 이탈 판정 데이터(앵커=최초 인식 위치 기준 `IsBeyondLeashDistance`). **미구현(후속):** P0 무적(`LS.State.Invulnerable` 등) 및 복귀 200% 전용 속도, P1 특수 상호작용 발신원 배선(루팅/소모품/탈출 → 어그로 트리거)과 그 LOS/2명 동률 처리. 현재 P1 자리는 `SetCurrentTargetFromDamage`(피격자 타겟팅)가 임시로 메움.
+  - **StateTree 에셋 배선(후속, 에디터 작업):** `Content/LostSignal/AI/StateTree/ST_EnemyTest`에서 (1) Chase 유지 전이를 `bHasVisualTarget`이 아니라 `bHasTarget`에 바인딩(기억 시간 P3 추격), (2) Attack 진입을 `LS Has Usable Action`(→`bHasUsableAction`) + `LS Has Visual Target`(→`bHasVisualTarget`, 현재 가시)로, (3) 공격 노드를 삭제된 `LS Request Ability By Tag` → 신규 **`LS Request Monster Action`**으로 교체해야 한다. C++은 값/태스크/Condition만 노출한다. (참고: "현재 가시" 변수명은 `bHasVisualTarget`이며 별도 `bIsTargetVisible` 변수는 없다.)
+- **저항 어트리뷰트:** Row 컬럼(`Monster_ArmorPen_Resist`/`Monster_Crit_Resist`)과 어트리뷰트(`ArmorPenetrationResistance`/`CritChanceResistance`) **추가 완료**. 단 저항을 실제 데미지/치명타 계산식(관통 - 저항, 0 클램프)에 반영하는 것은 데미지 파이프라인 후속.
+- **회전 속도(Turn_Rate):** 최신 DT_MonsterStat CSV에서 컬럼이 빠져 Row 필드·RotationRate 적용 모두 제거됨. 회전 속도는 생성자 기본값(540)으로 동작. 데이터 주도가 필요하면 CSV에 Turn_Rate 컬럼을 다시 넣고 재적용해야 한다.
+- **몬스터 공격(데이터 주도):** 평타(`ULSGA_MonsterMelee`/`PerformMeleeHit`) **제거 완료**. 모든 공격이 `DT_MonsterAction`(FLSMonsterActionRow) 기반으로 `ULSGA_MonsterAction` + montage Notify(`ULSAN_MonsterActionHit`)/NotifyState(`ULSANS_MonsterActionTelegraph`)로 실행된다. 거리/쿨다운 선택은 `ULSMonsterCombatComponent::SelectActionForDistance`(쿨다운은 컴포넌트 TMap 월드타이머). 범위 표시는 `ULSSkillPreviewComponent` 재사용. 히트박스 판정은 공용 `ULSHitboxLibrary`(플레이어 Override와 공유).
+  - **미구현(후속):** Dash 이동(도약 물기 `Dash_Distance`)은 몽타주 루트모션/후속, `Erosion_Value`(침식)·`Action_Guard`(액션 중 포이즈) 적용, `bCanCrit`(현재 false 고정).
+  - **에디터/BP 셋업:** `ULSMonsterCombatComponent`에 `MonsterActionTable`(DT_MonsterAction)·텔레그래프 머티리얼(Circle/Box), `ULSSkillPreviewComponent`에 `DefaultPreviewMesh`를 BP에서 할당해야 텔레그래프가 보인다.
+- **강인도(Monster_Guard):** Row에는 존재하나(int32) 적용 정책 미정(위 "몬스터 DataTable 규칙" 참고).
+- **구체 몬스터 클래스:** `ALSEnemyHyena`(ALSEnemyCharacter 상속, 생성자에서 `MonsterRowName="10001"`만 설정) 추가 완료. 그 외 몬스터는 같은 패턴의 얇은 서브클래스 + BP로 확장.

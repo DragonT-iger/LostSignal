@@ -1,11 +1,10 @@
-#include "Animation/LSAN_MonsterMeleeHit.h"
+#include "Animation/LSAN_MonsterActionHit.h"
 
 #include "AI/LSMonsterCombatComponent.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "LostSignal.h"
 
-void ULSAN_MonsterMeleeHit::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
+void ULSAN_MonsterActionHit::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
 {
 	ALSEnemyCharacter* EnemyCharacter = MeshComp ? Cast<ALSEnemyCharacter>(MeshComp->GetOwner()) : nullptr;
 	if (!EnemyCharacter)
@@ -15,11 +14,11 @@ void ULSAN_MonsterMeleeHit::Notify(USkeletalMeshComponent* MeshComp, UAnimSequen
 
 	if (ULSMonsterCombatComponent* CombatComponent = EnemyCharacter->GetMonsterCombatComponent())
 	{
-		CombatComponent->PerformMeleeHit();
+		CombatComponent->PerformActionHit();
 	}
 }
 
-FString ULSAN_MonsterMeleeHit::GetNotifyName_Implementation() const
+FString ULSAN_MonsterActionHit::GetNotifyName_Implementation() const
 {
-	return TEXT("LS Monster Melee Hit");
+	return TEXT("LS Monster Action Hit");
 }

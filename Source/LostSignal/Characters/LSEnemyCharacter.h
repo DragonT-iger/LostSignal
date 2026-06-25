@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "Characters/LSCharacterBase.h"
-#include "GameplayTagContainer.h"
 #include "LSEnemyCharacter.generated.h"
 
 class UDataTable;
@@ -17,27 +16,10 @@ class ULSMonsterCombatComponent;
 class ULSMonsterSenseComponent;
 class ULSNoiseEmitterComponent;
 class ULSEnemyHealthBarComponent;
+class ULSSkillPreviewComponent;
 struct FLSMonsterArchetypeRow;
 
-/**
- * Per-ability montage entry owned by the monster actor, not by the GameplayAbility.
- * This keeps authored animation choices on the character/BP side, just like the player character setup.
- */
-USTRUCT(BlueprintType)
-struct FLSMonsterAbilityMontageEntry
-{
-	GENERATED_BODY()
-
-	/** Ability tag used by StateTree/GAS when this attack is requested. */
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
-	FGameplayTag AbilityTag;
-
-	/** Montage the monster should play when the matching ability activates. */
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
-	TObjectPtr<UAnimMontage> Montage = nullptr;
-};
-
-/** Base enemy pawn that wires monster AI components, animation data, and grants the first melee ability slice. */
+/** Base enemy pawn that wires monster AI components, animation data, and grants the data-driven monster action ability. */
 UCLASS(Abstract)
 class LOSTSIGNAL_API ALSEnemyCharacter : public ALSCharacterBase
 {
@@ -66,10 +48,6 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/GAS")
 	ULSCharacterAttributeSet* GetMonsterAttributeSet() const { return MonsterAttributeSet; }
 
-	/** Returns the montage authored for the requested ability tag, if any. */
-	UFUNCTION(BlueprintPure, Category="LS/Combat")
-	UAnimMontage* GetAbilityMontage(FGameplayTag AbilityTag) const;
-
 	/** Returns the death montage authored for this enemy. */
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	UAnimMontage* GetDeathMontage() const { return DeathMontage; }
@@ -83,13 +61,9 @@ public:
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	/** Ability granted on BeginPlay so StateTree can request a basic attack by gameplay tag. */
+	/** Data-driven monster attack ability granted on BeginPlay; activated via ULSMonsterCombatComponent::RequestAction. */
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
-	TSubclassOf<UGameplayAbility> DefaultAttackAbilityClass;
-
-	/** Character-owned montage map read by monster abilities at runtime. */
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
-	TArray<FLSMonsterAbilityMontageEntry> AbilityMontages;
+	TSubclassOf<UGameplayAbility> MonsterActionAbilityClass;
 
 	/** Death animation authored per enemy BP and played by the Dead state before AI logic stops. */
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
@@ -112,6 +86,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Noise")
 	TObjectPtr<ULSNoiseEmitterComponent> NoiseEmitterComponent;
+
+	// 공격 범위 텔레그래프(스킬 인디케이터 재사용). ULSMonsterCombatComponent가 구동한다.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Combat")
+	TObjectPtr<ULSSkillPreviewComponent> SkillPreviewComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/UI|Combat")
 	TObjectPtr<ULSEnemyHealthBarComponent> HealthBarComponent;

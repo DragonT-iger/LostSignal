@@ -129,12 +129,18 @@ void ULSMonsterSenseComponent::SetCurrentTargetFromDamage(AActor* DamageInstigat
 		return;
 	}
 
-	CurrentTarget = DamageInstigator;
+	// 피격은 즉시 어그로(가시 여부 무관). 신규 획득이면 앵커를 캡처하고 기억 타이머를 리셋한다.
+	SetTarget(DamageInstigator, !CurrentTarget.IsValid());
 	InterestLocation = DamageInstigatorLocation;
 	bHasInterestLocation = true;
 }
 
 bool ULSMonsterSenseComponent::HasVisualTarget() const
+{
+	return bTargetVisibleThisTick;
+}
+
+bool ULSMonsterSenseComponent::HasTarget() const
 {
 	return CurrentTarget.IsValid();
 }
@@ -157,7 +163,14 @@ float ULSMonsterSenseComponent::GetDistanceFromHome() const
 
 bool ULSMonsterSenseComponent::IsBeyondLeashDistance() const
 {
-	return LeashDistance > 0.0f && GetDistanceFromHome() > LeashDistance;
+	// P0: 이탈 판정은 최초 인식 위치(앵커) 기준. 복귀 목적지인 Home과 분리한다.
+	if (!bHasAggroAnchor || LeashDistance <= 0.0f)
+	{
+		return false;
+	}
+
+	const AActor* OwnerActor = GetOwner();
+	return OwnerActor && FVector::Dist2D(OwnerActor->GetActorLocation(), AggroAnchorLocation) > LeashDistance;
 }
 
 float ULSMonsterSenseComponent::GetCurrentSightRadius() const
@@ -182,12 +195,12 @@ void ULSMonsterSenseComponent::SetReturnHomeMode(bool bInReturnHomeMode)
 
 void ULSMonsterSenseComponent::ClearVisualTarget()
 {
-	CurrentTarget.Reset();
+	ReleaseTarget();
 }
 
 void ULSMonsterSenseComponent::ClearInterest()
 {
-	CurrentTarget.Reset();
+	ReleaseTarget();
 	InterestLocation = FVector::ZeroVector;
 	bHasInterestLocation = false;
 }
@@ -240,24 +253,71 @@ bool ULSMonsterSenseComponent::CanSeeActor(const AActor* Actor) const
 
 void ULSMonsterSenseComponent::UpdateSensing(float DeltaTime)
 {
+	// P0(해제)는 여기서 직접 처리하지 않는다. IsBeyondLeashDistance()(앵커 기준)를
+	// 데이터로만 노출하고, 실제 타겟 해제는 StateTree가 ReturnHome으로 전이하며
+	// ClearInterest를 호출할 때 일어난다. (데이터=SenseComponent, 전이=StateTree)
+
+	// P2: 시야(전방 부채꼴 + LOS) 내 가장 가까운 대상.
 	AActor* VisibleTarget = FindBestVisibleTarget();
-	if (VisibleTarget)
+	if (VisibleTarget && ShouldSuppressReturnHomeInterest(VisibleTarget->GetActorLocation()))
 	{
-		const FVector VisibleTargetLocation = VisibleTarget->GetActorLocation();
-		if (ShouldSuppressReturnHomeInterest(VisibleTargetLocation))
-		{
-			CurrentTarget.Reset();
-			return;
-		}
+		VisibleTarget = nullptr;
+	}
 
-		CurrentTarget = VisibleTarget;
-		InterestLocation = VisibleTargetLocation;
+	// 공격 중에는 타겟 식별자 전환을 보류한다(모션 캔슬 금지, 기획 예외 규칙).
+	const bool bAttacking = IsOwnerAttacking();
+	const bool bHoldDuringAttack = bAttacking && CurrentTarget.IsValid() && CurrentTarget.Get() != VisibleTarget;
+	if (VisibleTarget && !bHoldDuringAttack && CurrentTarget.Get() != VisibleTarget)
+	{
+		// 타겟이 없다가 생긴 경우에만 앵커를 캡처한다(P2 최근접 전환은 앵커 유지).
+		SetTarget(VisibleTarget, !CurrentTarget.IsValid());
+	}
+
+	// 보유 타겟이 이번 틱 실제로 보이는지 판정한다.
+	AActor* HeldTarget = CurrentTarget.Get();
+	bTargetVisibleThisTick = HeldTarget && CanSeeActor(HeldTarget);
+
+	if (bTargetVisibleThisTick)
+	{
+		InterestLocation = HeldTarget->GetActorLocation();
 		bHasInterestLocation = true;
-
+		TimeSinceTargetLastSeen = 0.0f;
 		return;
 	}
 
+	// P3: 시야 상실. 기억 시간 동안 타겟 유지(InterestLocation 동결), 초과 시 해제.
+	// 공격 중에는 타이머를 멈춰 해제를 미룬다.
+	if (CurrentTarget.IsValid() && !bAttacking)
+	{
+		TimeSinceTargetLastSeen += DeltaTime;
+		if (TimeSinceTargetLastSeen >= LostSightMemorySeconds)
+		{
+			ReleaseTarget();
+		}
+	}
+}
+
+void ULSMonsterSenseComponent::SetTarget(AActor* NewTarget, bool bCaptureAnchor)
+{
+	CurrentTarget = NewTarget;
+	TimeSinceTargetLastSeen = 0.0f;
+
+	if (bCaptureAnchor)
+	{
+		if (const AActor* OwnerActor = GetOwner())
+		{
+			AggroAnchorLocation = OwnerActor->GetActorLocation();
+			bHasAggroAnchor = true;
+		}
+	}
+}
+
+void ULSMonsterSenseComponent::ReleaseTarget()
+{
 	CurrentTarget.Reset();
+	bHasAggroAnchor = false;
+	TimeSinceTargetLastSeen = 0.0f;
+	bTargetVisibleThisTick = false;
 }
 
 AActor* ULSMonsterSenseComponent::FindBestVisibleTarget() const
@@ -316,6 +376,13 @@ bool ULSMonsterSenseComponent::IsOwnerDead() const
 	const ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner());
 	const UAbilitySystemComponent* ASC = OwnerCharacter ? OwnerCharacter->GetAbilitySystemComponent() : nullptr;
 	return ASC && ASC->HasMatchingGameplayTag(LSGameplayTags::State_Dead);
+}
+
+bool ULSMonsterSenseComponent::IsOwnerAttacking() const
+{
+	const ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner());
+	const UAbilitySystemComponent* ASC = OwnerCharacter ? OwnerCharacter->GetAbilitySystemComponent() : nullptr;
+	return ASC && ASC->HasMatchingGameplayTag(LSGameplayTags::Combat_Attacking);
 }
 
 void ULSMonsterSenseComponent::DrawSenseDebug() const

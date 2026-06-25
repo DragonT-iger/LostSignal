@@ -177,7 +177,7 @@ Protocol_Required_Level = 5
 
 칩스테이션은 기본적으로 장착 칩의 전투 프로토콜 합산값(현재=신호 활성 칩, 이전=전체 칩)을 `SetPreviewBattleProtocol`을 통해 `ULSSkillBarWidget::SetPreviewBattleProtocolLevels`에 전달한다. 프로토콜 디버그 패널이 떠 있고 오버라이드가 설정됐을 때만 그 디버그 값을 따른다. 신호율 슬라이더는 활성 칩 집합을 바꿔 현재 레벨에 반영된다. 이 프리뷰 값은 칩스테이션 내부 표시 전용이며 실제 플레이 HUD의 전투 프로토콜 레벨을 변경하지 않는다. 디버그 패널을 토글하거나 값을 바꾸면 `ALSPlayerControllerBase::RefreshProtocolTestTargets`가 열린 칩스테이션을 다시 그려 로비에서도 즉시 반영된다.
 
-스킬 범위 표시는 새 `UUserWidget`을 만들지 않고 기존 `ULSSkillPreviewComponent`와 `FLSSkillAreaPreviewSpec` 흐름을 사용한다. 적 공격 범위 표시는 공격 판정 데이터와 연결되어야 하므로 4단계 구현 시 월드 메시/데칼/머티리얼 방식 중 하나로 별도 결정한다.
+스킬 범위 표시는 새 `UUserWidget`을 만들지 않고 기존 `ULSSkillPreviewComponent`와 `FLSSkillAreaPreviewSpec` 흐름을 사용한다. 적(몬스터) 공격 범위 표시(텔레그래프)도 같은 `ULSSkillPreviewComponent`/`FLSSkillAreaPreviewSpec`를 재사용한다 — 몬스터에 부착된 프리뷰 컴포넌트를 `ULSMonsterCombatComponent`가 액션 row(`DT_MonsterAction`)의 히트박스로 구동한다([MonsterAIControlStructure.md](MonsterAIControlStructure.md) 공격 제어 규칙 참고). 현재는 항상 표시하되, `ULSMonsterCombatComponent::ShouldShowActionTelegraph()`가 전투 프로토콜 레벨 게이팅을 끼울 확장점이다(여기서 프로토콜 해금에 따라 표시 여부를 결정하도록 확장 예정).
 
 ## 현재 제한
 

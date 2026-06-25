@@ -18,7 +18,7 @@ namespace LSGameplayTags
 	// Ability tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Dash)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_PlayerBasicAttack)
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_MonsterMelee)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_MonsterAction)
 
 	// Cooldown tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Cooldown_Dash)
