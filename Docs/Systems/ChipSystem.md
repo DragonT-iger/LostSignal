@@ -27,6 +27,7 @@
 
 - **메모리(Memory)**: 칩마다 메모리 비용(`Item_MemoryCost`)이 있고, 장착 UI에는 `현재 사용량 / 최대치` 한도가 있다. 합이 한도를 넘으면 장착 불가.
 - **신호 게이지(Signal Gauge)**: 0~100% 스크롤바. 게이지가 90.0% 이하로 내려갈 때부터 10% 단위로 **칩 번호 순서대로** 비활성화된다. 기본 장착 칩 스탯 합산은 활성·비활성 슬롯을 모두 포함하며, 프로토콜 합산은 비활성 슬롯을 제외한다. 비활성 칩 스탯 값의 50%는 `SignalLossText`에 별도로 표시한다. 최종 전투 스탯은 기본 스탯 표시값과 `SignalLossText` 표시값을 더한 값이다.
+  - **레이드 중 시간 감소**: 레이드(파밍 레벨) 진입 시 게이지를 100%로 채우고 **60초마다 10%씩 자동 감소**시키며 0%에서 멈춘다(= 1분에 칩 1칸씩 신호 유실). 레이드 종료(로비 복귀) 시 다시 100%로 복원한다. 감소 주체는 레이드 동안만 존재하는 서버 권한 게임모드 `ALSFarmingGameMode`이며, `ULSSaveSubsystem::SetChipSignalGaugePercent`만 주기적으로 호출해 기존 GAS 재적용(`OnChipLoadoutChanged` → `ULSChipStatComponent::RefreshChipStats`)과 HUD 갱신 경로를 그대로 탄다. (싱글/Listen 서버 기준 — 데디 MO 동기화는 기존 칩 적용 패턴과 함께 후속.)
 - **프로토콜(Protocol)**: 칩이 보유한 4종 시너지 수치. 장착 칩들의 합산값을 그대로 프로토콜 레벨로 보고, `DT_Protocol`의 해금 row를 기준으로 단계와 표시 항목을 계산한다.
   - 생존(Survival): 체력·스태미나 UI 등 긴장감을 낮추는 편의 UI
   - 적재(Carrying): 인벤토리 개수·보호슬롯·퀵슬롯 등 용량 UI
@@ -52,13 +53,13 @@
 | 설정 참조 | `ChipTable`, `ChipStatTable` 소프트 참조 | `Source/LostSignal/Data/LSDropSettings.h` |
 | 보관함 | 칩 탭 필터(`ELSStorageFilter::Chip`) + `WBP_ChipStorage` | `Source/LostSignal/UI/Storage/LSLobbyStorageWidget.*` |
 | 아이콘 | 칩 아이콘 경로(`/Game/LostSignal/UI/Icons/Chips/`) | `Source/LostSignal/UI/Inventory/LSItemSlotWidget.cpp:465` |
-| 툴팁(부분) | 칩 툴팁: 이름/등급/설명/가격/메모리/확정 전투 스탯 | `Source/LostSignal/UI/Inventory/LSItemTooltipWidget.cpp:197` |
+| 툴팁 | 칩 툴팁: 이름/등급/설명/가격/메모리/프로토콜 수치/확정 전투 스탯 | `Source/LostSignal/UI/Inventory/LSItemTooltipWidget.cpp:197` |
 | 칩 스테이션 목록(부분) | `ChipSlotWrapBox`에 저장 인벤토리/창고의 `Chip_` 아이템을 가격 높은순으로 `ULSItemSlotWidget` 표시 | `Source/LostSignal/UI/ChipSystem/LSChipStationWidget.*` |
 | 하드웨어 슬롯(부분) | `EquipmentSlot_0~9` 내부 `ItemSlot`에 칩 목록 드래그 장착. 장착 슬롯끼리 이동/교환 가능. 장착 칩을 `ChipSlotBorder` 빈 영역에 드롭하면 창고 이동, 칩 리스트 아이템 위에 드롭하면 해당 저장 슬롯과 교환. 장착 칩의 스탯/프로토콜 합산값과 메모리 사용량(`현재/최대`)을 UI에 표시. 메모리 검증은 미연동 | `Source/LostSignal/UI/ChipSystem/LSChipEquipmentSlotWidget.*` |
 
 ### ⚠️ 부분 구현
 
-- **칩 툴팁** (`PopulateChipTooltip`): 메모리 할당량과 저장된 `ChipStats`의 **확정 전투 스탯 값**은 표시하지만, **프로토콜 수치**는 표시하지 않는다.
+- **칩 툴팁** (`PopulateChipTooltip`): 메모리 할당량, 칩 행의 **프로토콜 수치 4종**(`Chip_Protocol_*` 중 0이 아닌 것만 `"생존 프로토콜 +1"` 형식으로 전투 스탯보다 먼저 표시), 저장된 `ChipStats`의 **확정 전투 스탯 값**을 표시한다. 프로토콜 이름 텍스트의 단일 출처는 `LSProtocol::GetProtocolDisplayName`(`Source/LostSignal/Data/LSProtocolTypes.*`)이다.
 - **칩 스테이션 목록** (`ULSChipStationWidget::RefreshChipSlots`): 저장 인벤토리/창고의 `Chip_` 아이템을 가격 높은순으로 아이콘/수량/툴팁 슬롯에 표시한다. `SignalSlider`와 `SignalProgressBar`는 0~1 값으로 동기화하며, 슬라이더 값은 `ULSSaveGame::ChipSignalGaugePercent`에 저장한다.
 - **칩 스테이션 프리뷰** (`ULSChipStationWidget`): `WBP_ChipStation`에 `ULSMinimapWidget` 기반 자식 위젯을 `Minimap` 이름으로 배치하면 실제 월드 데이터 대신 더미 지형/마커 프리뷰를 표시한다. `ULSSurvivalStatusWidget` 기반 자식 위젯을 `SurvivalStatus` 이름으로 배치하면 같은 신호 게이지 테스트 레벨과 더미 체력/스태미나로 생존 UI 프리뷰를 표시한다. 칩 스테이션 프리뷰의 프로토콜 4종 레벨은 기본적으로 장착 칩 프로토콜 합산값(현재=신호 활성 칩, 이전=전체 칩)을 표시한다. 단 프로토콜 디버그 패널이 화면에 떠 있고(`ALSPlayerControllerBase::IsProtocolDebugWidgetVisible`) 해당 프로토콜에 오버라이드 값이 설정돼 있을 때(`HasProtocolTestLevel`)만 그 디버그 값을 따른다. 패널을 닫으면 잔존 오버라이드는 무시하고 칩 합산값으로 복귀한다. 신호 게이지 슬라이더는 활성 칩 집합을 바꿔 현재 레벨에 반영된다. 미니맵 표시 규칙의 단일 출처는 [MinimapSystem.md](MinimapSystem.md)다.
 - **칩 스테이션 닫힘** (`ALSChipStationActor`): 칩 설정 상호작용 범위에서 로컬 플레이어가 벗어나면 `ALSPlayerControllerBase::HideChipStationWidget`으로 스테이션 UI를 닫는다.

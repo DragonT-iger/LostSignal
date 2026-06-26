@@ -45,6 +45,10 @@ public:
 	void UpdateRaidConsumedItems(const TArray<FLSSessionItem>& ConsumedItems);
 	void ClearRaidSave();
 
+	// 현재 레이드(파밍) 세션이 진행 중인지. 레이드에서만 신호 게이지가 시간에 따라 감소한다.
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	bool IsRaidSaveActive() const;
+
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	const TArray<FLSSessionItem>& GetInventory() const;
 

@@ -7,6 +7,7 @@
 #include "LSFarmingGameMode.generated.h"
 
 class ALSPlayerControllerBase;
+class ULSSaveSubsystem;
 
 UCLASS()
 class LOSTSIGNAL_API ALSFarmingGameMode : public ALSGameModeBase
@@ -14,6 +15,8 @@ class LOSTSIGNAL_API ALSFarmingGameMode : public ALSGameModeBase
 	GENERATED_BODY()
 
 public:
+	virtual void StartPlay() override;
+
 	// 플레이어 사망 시 — 캐릭터 사망 처리에서 호출
 	UFUNCTION(BlueprintCallable, Category="LS/Farming")
 	void OnPlayerDied();
@@ -35,6 +38,14 @@ private:
 	void HandleRaidResultSaveTimeout();
 	void TravelToResultLevel();
 	void ClearRaidResultSaveWait();
+
+	// 레이드 진입 후 신호 게이지를 시간에 따라 자동 감소시킨다(1분에 10%씩, 0%에서 정지).
+	void StartSignalGaugeDrain();
+	void TickSignalGaugeDrain();
+	void StopSignalGaugeDrain();
+	ULSSaveSubsystem* GetSaveSubsystem() const;
+
+	FTimerHandle SignalGaugeDrainTimerHandle;
 
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Farming")
 	bool bRaidEnded = false;

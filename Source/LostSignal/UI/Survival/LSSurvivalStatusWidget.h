@@ -73,6 +73,11 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Survival")
 	bool bStartPreviewRingCooldownOnConstruct = true;
 
+	// 레이드 HUD에서 신호 칩 카운트다운 링이 한 바퀴(1.0→0.0) 도는 시간(초).
+	// 반드시 ALSFarmingGameMode의 SignalGaugeDrainIntervalSeconds(60초)와 일치해야 한다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Survival", meta=(ClampMin="0.0"))
+	float SignalDrainInterval = 60.0f;
+
 private:
 	TWeakObjectPtr<ALSCharacterBase> ObservedCharacter;
 	TWeakObjectPtr<UAbilitySystemComponent> ObservedASC;
@@ -90,6 +95,7 @@ private:
 	void RefreshSignalChipFromSave();
 	void SetRingCooldownProgress(float Progress);
 	void SetChipImageTexture(UTexture2D* Texture);
+	void SetSignalChipIcon(FName ChipItemRowName);
 	void ClearPreviewSignalChip();
 	void ResolveSurvivalProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const;
 	bool IsSurvivalFeatureVisible(FName EnableName) const;
@@ -106,6 +112,10 @@ private:
 
 	UPROPERTY(Transient)
 	FName PreviewSignalChipRowName;
+
+	// 레이드 HUD에서 현재 카운트다운 중인 "다음에 사라질" 슬롯 인덱스. 구간 변화 감지용.
+	UPROPERTY(Transient)
+	int32 ActiveSignalSlotIndex = INDEX_NONE;
 
 	UPROPERTY(Transient)
 	bool bUsePreviewSurvivalStatus = false;

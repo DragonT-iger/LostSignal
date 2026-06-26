@@ -140,6 +140,7 @@ void ULSSurvivalStatusWidget::NativeDestruct()
 void ULSSurvivalStatusWidget::InitializeSurvivalStatusForPawn(APawn* InPawn)
 {
 	bUsePreviewSurvivalStatus = false;
+	ActiveSignalSlotIndex = INDEX_NONE;
 	ALSCharacterBase* NewCharacter = Cast<ALSCharacterBase>(InPawn);
 	if (ObservedCharacter.Get() == NewCharacter)
 	{
@@ -226,6 +227,14 @@ void ULSSurvivalStatusWidget::SetPreviewSignalChip(const FName ChipItemRowName, 
 		return;
 	}
 
+	SetSignalChipIcon(ChipItemRowName);
+
+	PreviewRingCooldownRemaining = 0.0f;
+	SetRingCooldownProgress(DisappearProgress);
+}
+
+void ULSSurvivalStatusWidget::SetSignalChipIcon(const FName ChipItemRowName)
+{
 	if (PreviewSignalChipRowName != ChipItemRowName)
 	{
 		UTexture2D* IconTexture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *BuildChipIconObjectPath(ChipItemRowName)));
@@ -241,9 +250,6 @@ void ULSSurvivalStatusWidget::SetPreviewSignalChip(const FName ChipItemRowName, 
 	{
 		ChipImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
-
-	PreviewRingCooldownRemaining = 0.0f;
-	SetRingCooldownProgress(DisappearProgress);
 }
 
 void ULSSurvivalStatusWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -407,10 +413,28 @@ void ULSSurvivalStatusWidget::RefreshSignalChipFromSave()
 	if (!DisappearingItem || !LSInventorySlotUtils::IsFilled(*DisappearingItem))
 	{
 		ClearPreviewSignalChip();
+		ActiveSignalSlotIndex = INDEX_NONE;
 		return;
 	}
 
-	SetPreviewSignalChip(DisappearingItem->ItemRowName, CalculateSurvivalSignalSlotDisappearProgress(SignalPercent, DisappearingSlotIndex));
+	// 신호 게이지는 레이드에서만 시간에 따라 감소한다. 로비 등 비레이드에서는 게이지가
+	// 고정이므로 링을 시간 카운트다운하지 않고 현재 구간 위치만 정적으로 표시한다.
+	if (!SaveSubsystem->IsRaidSaveActive())
+	{
+		SetPreviewSignalChip(DisappearingItem->ItemRowName, CalculateSurvivalSignalSlotDisappearProgress(SignalPercent, DisappearingSlotIndex));
+		ActiveSignalSlotIndex = INDEX_NONE;
+		return;
+	}
+
+	// 레이드: 게이지는 1분마다 10% 단계로만 떨어져 구간 내 위치로는 링이 멈춘다.
+	// "다음에 사라질 칩(구간)"이 바뀌는 순간 시간 카운트다운(드레인 주기)을 새로 시작하고,
+	// 같은 구간 동안에는 RefreshPreviewRingCooldown이 매 틱 링을 1.0→0.0으로 깎는다.
+	if (DisappearingSlotIndex != ActiveSignalSlotIndex)
+	{
+		SetSignalChipIcon(DisappearingItem->ItemRowName);
+		StartPreviewRingCooldown(SignalDrainInterval);
+		ActiveSignalSlotIndex = DisappearingSlotIndex;
+	}
 }
 
 void ULSSurvivalStatusWidget::SetRingCooldownProgress(float Progress)

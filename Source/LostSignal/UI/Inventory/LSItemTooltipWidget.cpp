@@ -116,6 +116,16 @@ void ULSItemTooltipWidget::AddStatIfNonZero(const FText& StatName, const float V
 	AddStat(StatName, FormatNumber(Value));
 }
 
+void ULSItemTooltipWidget::AddProtocolStatIfNonZero(const ELSProtocolType ProtocolType, const int32 Value)
+{
+	if (Value == 0)
+	{
+		return;
+	}
+
+	AddStat(LSProtocol::GetProtocolDisplayName(ProtocolType), FormatSignedNumber(Value));
+}
+
 void ULSItemTooltipWidget::AddExtraInfo(const FText& ExtraInfoName, const FText& ExtraInfoValue)
 {
 	if (!ExtraInfoBox)
@@ -215,6 +225,12 @@ void ULSItemTooltipWidget::PopulateChipTooltip(const FName ItemRowName, const TA
 
 	SetCommonTexts(LOCTEXT("ChipTooltipType", "칩 설명창"), Row->Item_Text, LSInventorySlotUtils::ResolveItemGradeFromRowName(ItemRowName), Row->Item_Description, Row->Item_Cost);
 	AddExtraInfo(LOCTEXT("ChipMemoryCostExtraInfo", "메모리 할당량"), FText::AsNumber(Row->Item_MemoryCost));
+
+	// 프로토콜 수치를 전투 스탯보다 먼저 표시한다. (0이 아닌 것만)
+	AddProtocolStatIfNonZero(ELSProtocolType::Survival, Row->Chip_Protocol_Survival);
+	AddProtocolStatIfNonZero(ELSProtocolType::Carrying, Row->Chip_Protocol_Carrying);
+	AddProtocolStatIfNonZero(ELSProtocolType::Battle, Row->Chip_Protocol_Battle);
+	AddProtocolStatIfNonZero(ELSProtocolType::Navigation, Row->Chip_Protocol_Navigation);
 
 	// 인스턴스 스냅샷에 저장된 추가 전투 스탯을 표시한다.
 	for (const FLSChipResolvedStat& Stat : ChipStats)
@@ -352,6 +368,12 @@ FText ULSItemTooltipWidget::FormatNumber(const float Value)
 	Options.MinimumFractionalDigits = 0;
 	Options.MaximumFractionalDigits = 2;
 	return FText::AsNumber(Value, &Options);
+}
+
+FText ULSItemTooltipWidget::FormatSignedNumber(const int32 Value)
+{
+	const FText SignText = Value < 0 ? FText::FromString(TEXT("-")) : FText::FromString(TEXT("+"));
+	return FText::Format(LOCTEXT("SignedNumberFormat", "{0}{1}"), SignText, FText::AsNumber(FMath::Abs(Value)));
 }
 
 int32 ULSItemTooltipWidget::CountItems(const TArray<FLSSessionItem>& Items, const FName ItemRowName)

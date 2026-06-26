@@ -16,19 +16,8 @@ namespace
 {
 FText GetProtocolName(const ELSProtocolType ProtocolType)
 {
-	switch (ProtocolType)
-	{
-	case ELSProtocolType::Survival:
-		return LOCTEXT("SurvivalProtocolName", "생존 프로토콜");
-	case ELSProtocolType::Carrying:
-		return LOCTEXT("CarryingProtocolName", "적재 프로토콜");
-	case ELSProtocolType::Battle:
-		return LOCTEXT("BattleProtocolName", "전투 프로토콜");
-	case ELSProtocolType::Navigation:
-		return LOCTEXT("NavigationProtocolName", "탐색 프로토콜");
-	default:
-		return LOCTEXT("UnknownProtocolName", "프로토콜");
-	}
+	// 이름 텍스트는 LSProtocol::GetProtocolDisplayName이 단일 출처다.
+	return LSProtocol::GetProtocolDisplayName(ProtocolType);
 }
 
 FText GetProtocolDescription(const ELSProtocolType ProtocolType)

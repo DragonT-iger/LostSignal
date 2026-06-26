@@ -3,12 +3,28 @@
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
+#include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSettings.h"
 #include "Session/LSSessionSubsystem.h"
 
 namespace
 {
 constexpr float RaidResultSaveTimeoutSeconds = 10.0f;
+constexpr float SignalGaugeDrainIntervalSeconds = 60.0f;
+constexpr float SignalGaugeDrainStepPercent = 0.1f;
+}
+
+void ALSFarmingGameMode::StartPlay()
+{
+	Super::StartPlay();
+
+	// 레이드 진입 시 신호 게이지를 가득 채운 뒤 시간 감소를 시작한다.
+	if (ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem())
+	{
+		SaveSubsystem->SetChipSignalGaugePercent(1.0f);
+	}
+
+	StartSignalGaugeDrain();
 }
 
 void ALSFarmingGameMode::OnPlayerDied()
@@ -192,6 +208,13 @@ void ALSFarmingGameMode::HandleRaidResultSaveTimeout()
 
 void ALSFarmingGameMode::TravelToResultLevel()
 {
+	// 레이드 종료 — 신호 게이지 감소를 멈추고 로비 복귀를 위해 가득 채운다.
+	StopSignalGaugeDrain();
+	if (ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem())
+	{
+		SaveSubsystem->SetChipSignalGaugePercent(1.0f);
+	}
+
 	UWorld* World = GetWorld();
 	if (World)
 	{
@@ -250,4 +273,47 @@ void ALSFarmingGameMode::ClearRaidResultSaveWait()
 	{
 		World->GetTimerManager().ClearTimer(RaidResultSaveTimeoutTimerHandle);
 	}
+}
+
+void ALSFarmingGameMode::StartSignalGaugeDrain()
+{
+	GetWorldTimerManager().SetTimer(
+		SignalGaugeDrainTimerHandle,
+		this,
+		&ALSFarmingGameMode::TickSignalGaugeDrain,
+		SignalGaugeDrainIntervalSeconds,
+		true);
+}
+
+void ALSFarmingGameMode::TickSignalGaugeDrain()
+{
+	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] Cannot drain signal gauge because SaveSubsystem is missing."));
+		StopSignalGaugeDrain();
+		return;
+	}
+
+	const float NextPercent = FMath::Max(SaveSubsystem->GetChipSignalGaugePercent() - SignalGaugeDrainStepPercent, 0.0f);
+	SaveSubsystem->SetChipSignalGaugePercent(NextPercent);
+
+	if (NextPercent <= 0.0f)
+	{
+		StopSignalGaugeDrain();
+	}
+}
+
+void ALSFarmingGameMode::StopSignalGaugeDrain()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(SignalGaugeDrainTimerHandle);
+	}
+}
+
+ULSSaveSubsystem* ALSFarmingGameMode::GetSaveSubsystem() const
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	return GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
 }

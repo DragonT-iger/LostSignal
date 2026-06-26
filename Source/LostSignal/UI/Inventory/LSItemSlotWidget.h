@@ -99,12 +99,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
 	FLinearColor TuningGradeColor = FLinearColor(0.7f, 0.4f, 0.95f, 1.0f);
 
-	// 프로토타입은 빨강 계열로, 마스터피스는 금색으로 둬서 서로 확실히 구분한다.
+	// 프로토타입은 노랑 계열로, 마스터피스는 빨강으로 둬서 서로 확실히 구분한다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
-	FLinearColor PrototypeGradeColor = FLinearColor(0.95f, 0.22f, 0.18f, 1.0f);
+	FLinearColor PrototypeGradeColor = FLinearColor(1.0f, 0.82f, 0.25f, 1.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
-	FLinearColor MasterpieceGradeColor = FLinearColor(1.0f, 0.82f, 0.25f, 1.0f);
+	FLinearColor MasterpieceGradeColor = FLinearColor(0.95f, 0.22f, 0.18f, 1.0f);
 
 	// 호버/드래그 타겟일 때 슬롯을 키워 강조하는 배율. (1.0, 1.0)이면 크기 변화 없음.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")

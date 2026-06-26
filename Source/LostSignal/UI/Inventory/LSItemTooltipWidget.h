@@ -2,6 +2,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
+#include "Data/LSProtocolTypes.h"
 #include "Session/LSSessionSubsystem.h"
 #include "LSItemTooltipWidget.generated.h"
 
@@ -52,6 +53,8 @@ private:
 	void ClearExtraInfos();
 	void AddStat(const FText& StatName, const FText& StatValue);
 	void AddStatIfNonZero(const FText& StatName, float Value);
+	// 프로토콜 수치를 "생존 프로토콜 +1" 형식으로 StatsBox에 추가한다. 0이면 표시하지 않는다.
+	void AddProtocolStatIfNonZero(ELSProtocolType ProtocolType, int32 Value);
 	void AddExtraInfo(const FText& ExtraInfoName, const FText& ExtraInfoValue);
 	void SetCommonTexts(const FText& TooltipType, const FText& ItemName, const FString& ItemGrade, const FText& Description, int32 ItemCost);
 	void PopulateChipTooltip(FName ItemRowName, const TArray<FLSChipResolvedStat>& ChipStats);
@@ -63,5 +66,7 @@ private:
 	static FText GetEquipmentDisplayText(const FString& EquipmentName);
 	static FText NormalizeDescriptionText(const FText& Description);
 	static FText FormatNumber(float Value);
+	// 부호를 항상 붙인 정수 표시(예: +1, -2).
+	static FText FormatSignedNumber(int32 Value);
 	static int32 CountItems(const TArray<FLSSessionItem>& Items, FName ItemRowName);
 };

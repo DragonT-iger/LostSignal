@@ -610,6 +610,11 @@ void ULSSaveSubsystem::UpdateRaidConsumedItems(const TArray<FLSSessionItem>& Con
 	Save();
 }
 
+bool ULSSaveSubsystem::IsRaidSaveActive() const
+{
+	return SaveData && SaveData->bRaidSaveActive;
+}
+
 void ULSSaveSubsystem::ClearRaidSave()
 {
 	if (!SaveData)
