@@ -41,4 +41,7 @@ private:
 	TObjectPtr<UAnimMontage> ActiveActionMontage;
 
 	bool bEndingAbility = false;
+
+	// 공격 중에는 플레이어를 향한 body 회전을 멈춰 공격 방향을 고정한다(종료 시 복원).
+	bool bSavedUseControllerDesiredRotation = true;
 };

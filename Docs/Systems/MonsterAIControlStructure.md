@@ -287,6 +287,8 @@ Attack -> Dead / Knockback
 
 `LS Request Monster Action`은 액션 어빌리티가 활성화된 뒤에는 기본적으로 거리 이탈로 취소하지 않는다(공격 모션 캔슬 금지). 공격 거리 이탈은 어빌리티 종료 후 StateTree 전이 조건으로 다시 판단한다.
 
+공격 중 facing 고정: `ULSGA_MonsterAction`이 활성인 동안 `bUseControllerDesiredRotation`을 false로 꺼 **공격 시작 시점의 방향으로 body 회전을 고정**한다(어빌리티 종료 시 복원). 따라서 공격 도중에는 플레이어를 따라 돌지 않고, 공격과 공격 사이에만 다시 타겟을 향한다.
+
 텔레그래프 표시 여부는 `ULSMonsterCombatComponent::ShouldShowActionTelegraph()`가 게이팅한다(현재는 항상 true, 추후 전투 프로토콜 레벨 게이팅 확장점).
 
 공격 로직을 추가할 때 지킬 규칙:
@@ -558,6 +560,7 @@ AI 코드를 수정한 뒤 다음을 확인한다.
 - **몬스터 공격(데이터 주도):** 평타(`ULSGA_MonsterMelee`/`PerformMeleeHit`) **제거 완료**. 모든 공격이 `DT_MonsterAction`(FLSMonsterActionRow) 기반으로 `ULSGA_MonsterAction` + montage Notify(`ULSAN_MonsterActionHit`)/NotifyState(`ULSANS_MonsterActionTelegraph`)로 실행된다. 거리/쿨다운 선택은 `ULSMonsterCombatComponent::SelectActionForDistance`(쿨다운은 컴포넌트 TMap 월드타이머). 범위 표시는 `ULSSkillPreviewComponent` 재사용. 히트박스 판정은 공용 `ULSHitboxLibrary`(플레이어 Override와 공유).
   - **Dash 이동(도약 물기):** **구현 완료**. `ULSAN_MonsterActionDash`(도약 프레임 노티파이) → `ULSMonsterCombatComponent::PerformActionDash`가 `Dash_Distance`/`Duration`으로 타겟 방향 평면 전진(`FRootMotionSource_ConstantForce`, Priority 6, 타겟까지 거리로 클램프해 오버슈트 방지). 수직 점프 비주얼은 애니메이션이 담당. 어빌리티 종료/캔슬 시 `EndActionDash`로 루트모션 제거. 몽타주 도약 프레임에 노티파이 배치 필요.
     - **착지 정렬:** 도약 액션은 텔레그래프(`BeginActionTelegraph`)·데미지 판정(`PerformActionHit`)을 모두 **착지 예정 지점**에 맞춘다(공유 헬퍼 `ComputeActionOriginAndDirection`). 타격 프레임이 착지보다 일러도 데미지·범위표시가 착지 위치에 들어간다. 텔레그래프는 윈드업 시작 시점의 예측 착지로 1회 배치(윈드업 중 타겟 추종은 미적용).
+    - **박스 프리뷰 전방 보정:** Box 히트박스는 원점(뒷변)에서 전방으로 뻗는데 프리뷰 메시는 중심 정렬이라, `BeginActionTelegraph`가 Box일 때 프리뷰를 전방 `Hitbox_X*0.5`만큼 밀어 실제 판정과 맞춘다(플레이어 `LocationOffset.X=Range_X*0.5`와 동일 규칙). Circle/Cone은 원점 중심이라 보정 없음. `ULSSkillPreviewComponent::UpdateAreaPreview`는 `LocationOffset`을 적용하지 않으므로 호출부(여기)에서 더한다.
   - **미구현(후속):** 실제 공중 포물선(JumpForce)·도약 중 호밍, `Erosion_Value`(침식)·`Action_Guard`(액션 중 포이즈) 적용, `bCanCrit`(현재 false 고정).
   - **에디터/BP 셋업:** `ULSMonsterCombatComponent`에 `MonsterActionTable`(DT_MonsterAction)·텔레그래프 머티리얼(Circle/Box), `ULSSkillPreviewComponent`에 `DefaultPreviewMesh`를 BP에서 할당해야 텔레그래프가 보인다.
 - **강인도(Monster_Guard):** Row에는 존재하나(int32) 적용 정책 미정(위 "몬스터 DataTable 규칙" 참고).

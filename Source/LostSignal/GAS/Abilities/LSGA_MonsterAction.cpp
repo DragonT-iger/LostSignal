@@ -5,6 +5,7 @@
 #include "Animation/AnimMontage.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Data/LSMonsterActionRow.h"
 #include "GAS/LSGameplayTags.h"
 #include "LostSignal.h"
@@ -68,6 +69,13 @@ void ULSGA_MonsterAction::ActivateAbility(
 		return;
 	}
 
+	// 공격 중에는 플레이어를 향한 body 회전을 멈춰 공격 방향을 시작 시점으로 고정한다(종료 시 복원).
+	if (UCharacterMovementComponent* MovementComponent = EnemyCharacter->GetCharacterMovement())
+	{
+		bSavedUseControllerDesiredRotation = MovementComponent->bUseControllerDesiredRotation;
+		MovementComponent->bUseControllerDesiredRotation = false;
+	}
+
 	UAnimInstance* AnimInstance = EnemyCharacter->GetMesh() ? EnemyCharacter->GetMesh()->GetAnimInstance() : nullptr;
 	if (!AnimInstance)
 	{
@@ -112,6 +120,12 @@ void ULSGA_MonsterAction::EndAbility(
 			{
 				EnemyCharacter->MulticastStopAbilityMontage(ActiveActionMontage, 0.1f);
 			}
+		}
+
+		// 공격 종료 — body 회전 복원(공격 사이엔 다시 플레이어를 향한다).
+		if (UCharacterMovementComponent* MovementComponent = EnemyCharacter->GetCharacterMovement())
+		{
+			MovementComponent->bUseControllerDesiredRotation = bSavedUseControllerDesiredRotation;
 		}
 	}
 

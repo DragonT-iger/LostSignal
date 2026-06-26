@@ -374,6 +374,7 @@ void ULSMonsterCombatComponent::BeginActionTelegraph()
 		Spec.BoxLength = X;
 		Spec.BoxWidth = Y;
 		Spec.Material = TelegraphBoxMaterial;
+		Spec.OutlineThickness = 0.2f;
 		break;
 	case ELSHitboxShape::Cone:
 		Spec.Shape = ELSSkillAreaShape::Circle;
@@ -396,6 +397,14 @@ void ULSMonsterCombatComponent::BeginActionTelegraph()
 		FVector PreviewOrigin;
 		FVector PreviewDirection;
 		ComputeActionOriginAndDirection(*Row, PreviewOrigin, PreviewDirection);
+
+		// 박스 히트박스는 원점(뒷변)에서 전방으로 뻗지만 프리뷰 메시는 중심 정렬이라,
+		// 전방 절반만큼 밀어 실제 판정과 표시를 맞춘다(플레이어 LocationOffset.X=Range_X*0.5와 동일).
+		if (Row->Hitbox_Shape == ELSHitboxShape::Box && !PreviewDirection.IsNearlyZero())
+		{
+			PreviewOrigin += PreviewDirection * (X * 0.5f);
+		}
+
 		const FRotator PreviewRotation = PreviewDirection.IsNearlyZero()
 			? OwnerActor->GetActorRotation()
 			: PreviewDirection.Rotation();
