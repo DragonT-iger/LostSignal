@@ -57,12 +57,6 @@ public:
 	// Shift+좌클릭 빠른 조작: 장착된 칩을 창고로 해제한다.
 	bool QuickUnequipEquippedChipToWarehouse(int32 EquipmentSlotIndex);
 
-	// Shift+좌클릭으로 칩 1개를 장착한 직후 호출한다. 버튼을 계속 누르고 있으면 InitialDelay 뒤부터
-	// Interval 간격으로 칩을 우수수 자동 장착한다(리스트 정렬 상단부터). 칩 스테이션 리스트는 정렬 리빌드로
-	// 커서 위치에 칩이 계속 들어와 MouseMove 기반 반복으로는 1개만 장착하기 어려워, 시간 기반 반복으로 분리했다.
-	void StartQuickEquipAutoRepeat();
-	void StopQuickEquipAutoRepeat();
-
 protected:
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
@@ -74,6 +68,12 @@ protected:
 	void RefreshEquippedChipSummary();
 	void SetEquippedChipMemoryText(int32 CurrentMemory);
 	void QueueRefreshChipStation();
+	// 빠른 장착 전용 경량 갱신(칩 리스트 정렬/리빌드 제외, 장착칸·요약·용량만 다음 틱에 1회로 합쳐 처리).
+	void QueueRefreshEquippedChipState();
+	// 장착 칩을 창고로 해제하고, 칩 리스트는 재정렬 없이 돌아온 칩을 빈 칸(없으면 맨 뒤)에 꽂는다. 드래그/Shift 해제 공용.
+	bool UnequipChipFromSlotToWarehouse(int32 EquipmentSlotIndex);
+	// 칩 한 개를 칩 리스트의 첫 빈 슬롯(hole)에 넣거나, 없으면 맨 뒤에 새 슬롯으로 추가한다(정렬/리빌드 없음).
+	void InsertChipListSlot(const FLSSessionItem& Chip, ELSInventorySlotArea SourceArea, int32 SourceSlotIndex);
 	void HandleCarryingSlotCapacityChanged();
 	void InitializeEquipmentSlots();
 	void SetPreviewMinimapNavigationLevels(int32 CurrentNavigationProtocol, int32 PreviousNavigationProtocol);
@@ -162,15 +162,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip", meta=(ClampMin="0"))
 	int32 MaxChipMemory = 100;
 
-	// 칩 리스트→장착칸 빠른이동 자동반복: 첫 1개 장착 후 이 시간(초)이 지나야 다음 칩이 들어간다.
-	// 이 안에 버튼을 떼면 1개만 장착된다.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip", meta=(ClampMin="0"))
-	float QuickEquipAutoRepeatInitialDelay = 0.28f;
-
-	// 자동반복 시작 후 칩이 우수수 장착되는 간격(초).
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip", meta=(ClampMin="0.01"))
-	float QuickEquipAutoRepeatInterval = 0.05f;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip")
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
 
@@ -205,13 +196,6 @@ protected:
 	TObjectPtr<ULSChipEquipmentSlotWidget> EquipmentSlot_9;
 
 private:
-	// 자동반복 1틱: Shift+좌클릭이 유지되는 동안 정렬 상단 칩을 장착하고, 입력이 풀리거나
-	// 더 장착할 수 없으면 멈춘다.
-	void TickQuickEquipAutoRepeat();
-	// 인벤토리+창고를 합쳐 리스트와 동일하게 정렬한 뒤, 상단 칩을 첫 빈 장착칸에 장착한다.
-	bool QuickEquipFirstAvailableChip();
-	// 자동반복 유지 조건: Shift + 마우스 좌버튼이 모두 눌린 상태인지 전역 입력으로 확인한다.
-	bool IsQuickEquipAutoRepeatInputHeld() const;
-
-	FTimerHandle QuickEquipAutoRepeatTimerHandle;
+	// QueueRefreshEquippedChipState가 같은 틱에 여러 번 예약되지 않도록 막는 코얼레스 가드.
+	bool bPendingEquippedStateRefresh = false;
 };

@@ -243,16 +243,7 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 {
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
 	{
-		const bool bTransferred = TryHandleQuickTransfer();
-		// 칩 리스트→장착칸 빠른이동: 1개 장착 후 버튼을 누르고 있으면 컨테이너가 딜레이 뒤 우수수 장착을 이어받는다.
-		// (정렬 리빌드로 커서 자리에 칩이 계속 들어와 MouseMove 기반으로는 1개 장착이 어려웠다.)
-		if (bTransferred && IsChipStationListSlot())
-		{
-			if (ULSChipStationWidget* OwningChipStation = ChipStationWidget.Get())
-			{
-				OwningChipStation->StartQuickEquipAutoRepeat();
-			}
-		}
+		TryHandleQuickTransfer();
 		return FReply::Handled();
 	}
 
@@ -266,8 +257,9 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 
 FReply ULSItemSlotWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	// 칩 리스트→장착칸은 이동 기반 반복을 쓰지 않는다(컨테이너 타이머가 딜레이→우수수 자동반복 담당).
-	if (IsQuickTransferPointerEvent(InMouseEvent) && !IsChipStationListSlot())
+	// Shift+좌클릭을 누른 채 커서를 슬롯 위로 쓸면 지나가는 칸을 차례로 빠른이동한다.
+	// (장착된 칸은 ClearItem으로 비워져 bHasItem=false가 되므로 재호출돼도 무해)
+	if (IsQuickTransferPointerEvent(InMouseEvent))
 	{
 		TryHandleQuickTransfer();
 	}
@@ -589,12 +581,6 @@ bool ULSItemSlotWidget::IsQuickTransferPointerEvent(const FPointerEvent& InMouse
 	return InMouseEvent.IsShiftDown() && InMouseEvent.IsMouseButtonDown(EKeys::LeftMouseButton);
 }
 
-bool ULSItemSlotWidget::IsChipStationListSlot() const
-{
-	// 칩 스테이션 컨텍스트이면서 장착칸(ChipEquipmentSlot) 컨텍스트가 아니면 인벤토리+창고 합친 칩 리스트 슬롯이다.
-	return ChipStationWidget.IsValid() && !ChipEquipmentSlotWidget.IsValid();
-}
-
 bool ULSItemSlotWidget::TryHandleQuickTransfer()
 {
 	// 칩 장착 슬롯: Shift+좌클릭 -> 창고로 해제. (장착 슬롯은 SlotIndex가 INDEX_NONE이라 아래 가드보다 먼저 처리한다.)
@@ -702,7 +688,14 @@ bool ULSItemSlotWidget::TryHandleChipEquipmentQuickTransfer()
 bool ULSItemSlotWidget::TryHandleChipStationQuickTransfer()
 {
 	ULSChipStationWidget* OwningChipStation = ChipStationWidget.Get();
-	return OwningChipStation && OwningChipStation->QuickEquipChipToFirstEmptyHardwareSlot(SlotArea, SlotIndex);
+	if (!OwningChipStation || !OwningChipStation->QuickEquipChipToFirstEmptyHardwareSlot(SlotArea, SlotIndex))
+	{
+		return false;
+	}
+
+	// 칩 리스트는 재정렬/리빌드하지 않고 이 소스 슬롯 한 칸만 비운다(정렬은 스테이션을 다시 열 때만).
+	ClearItem();
+	return true;
 }
 
 void ULSItemSlotWidget::RefreshStoredSlotVisual()

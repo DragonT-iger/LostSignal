@@ -45,6 +45,9 @@ public:
 	// 풀링 재사용으로 위젯 인스턴스가 그대로라 Slate가 MouseEnter를 다시 쏘지 않기 때문이다.
 	void RefreshHoverStateFromCursor();
 
+	// 이 슬롯에 아이템이 들어 있는지. 빈 슬롯(hole) 재사용 여부 판단 등에 쓴다.
+	bool HasItem() const { return bHasItem; }
+
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
@@ -144,9 +147,6 @@ private:
 	FLinearColor ResolveGradeBackgroundColor(FName ItemRowName) const;
 	bool CanStartItemDrag() const;
 	bool IsQuickTransferPointerEvent(const FPointerEvent& InMouseEvent) const;
-	// 칩 스테이션의 칩 리스트(인벤토리+창고 합친 창) 슬롯인지. 이 슬롯의 빠른이동은
-	// 이동 기반이 아니라 컨테이너 타이머(딜레이→우수수)로 자동반복한다.
-	bool IsChipStationListSlot() const;
 	bool TryHandleQuickTransfer();
 	bool TryHandleLootQuickTransfer();
 	bool TryHandleInventoryQuickTransfer();

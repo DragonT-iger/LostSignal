@@ -12,7 +12,6 @@
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSDropSettings.h"
 #include "Engine/DataTable.h"
-#include "Framework/Application/SlateApplication.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
@@ -215,6 +214,35 @@ void SortChipViewItems(TArray<FLSChipStationViewItem>& ViewItems)
 			: Left.SourceSlotIndex < Right.SourceSlotIndex;
 	});
 }
+
+// 슬롯 배열에서 현재 채워진 인덱스 집합을 만든다.
+TSet<int32> BuildFilledSlotIndexSet(const TArray<FLSSessionItem>& Slots)
+{
+	TSet<int32> Filled;
+	for (int32 SlotIndex = 0; SlotIndex < Slots.Num(); ++SlotIndex)
+	{
+		if (LSInventorySlotUtils::IsFilled(Slots[SlotIndex]))
+		{
+			Filled.Add(SlotIndex);
+		}
+	}
+
+	return Filled;
+}
+
+// AlreadyFilled에 없던, 새로 채워진 첫 슬롯 인덱스를 반환한다. 없으면 INDEX_NONE.
+int32 FindFirstNewlyFilledIndex(const TArray<FLSSessionItem>& Slots, const TSet<int32>& AlreadyFilled)
+{
+	for (int32 SlotIndex = 0; SlotIndex < Slots.Num(); ++SlotIndex)
+	{
+		if (LSInventorySlotUtils::IsFilled(Slots[SlotIndex]) && !AlreadyFilled.Contains(SlotIndex))
+		{
+			return SlotIndex;
+		}
+	}
+
+	return INDEX_NONE;
+}
 }
 
 void ULSChipStationWidget::NativeConstruct()
@@ -263,7 +291,6 @@ void ULSChipStationWidget::NativeConstruct()
 		UE_LOG(LogLS, Warning, TEXT("SignalSlider is not bound on %s."), *GetNameSafe(this));
 	}
 
-	UE_LOG(LogLS, Warning, TEXT("[ChipStation] NativeConstruct -> RefreshChipStation (this=%s)"), *GetNameSafe(this));
 	RefreshChipStation();
 }
 
@@ -273,8 +300,6 @@ void ULSChipStationWidget::NativeDestruct()
 	{
 		SignalSlider->OnValueChanged.RemoveDynamic(this, &ULSChipStationWidget::HandleSignalSliderValueChanged);
 	}
-
-	StopQuickEquipAutoRepeat();
 
 	Super::NativeDestruct();
 }
@@ -292,8 +317,6 @@ bool ULSChipStationWidget::NativeOnDrop(const FGeometry& InGeometry, const FDrag
 
 void ULSChipStationWidget::RefreshChipStation_Implementation()
 {
-	UE_LOG(LogLS, Warning, TEXT("[ChipStation] RefreshChipStation_Implementation 진입"));
-
 	RefreshChipSlots();
 	RefreshEquipmentSlots();
 	RefreshEquippedChipSummary();
@@ -464,6 +487,34 @@ void ULSChipStationWidget::QueueRefreshChipStation()
 	}));
 }
 
+void ULSChipStationWidget::QueueRefreshEquippedChipState()
+{
+	// 빠른 장착 전용 경량 갱신. 칩 리스트(RefreshChipSlots=정렬+리빌드)는 건드리지 않고
+	// 용량 보정 + 장착칸 + 요약만 다음 틱에 한 번으로 합쳐 갱신한다(쓸기 중 매 장착마다 풀 리빌드 방지).
+	if (bPendingEquippedStateRefresh)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		HandleCarryingSlotCapacityChanged();
+		RefreshEquipmentSlots();
+		RefreshEquippedChipSummary();
+		return;
+	}
+
+	bPendingEquippedStateRefresh = true;
+	World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		bPendingEquippedStateRefresh = false;
+		HandleCarryingSlotCapacityChanged();
+		RefreshEquipmentSlots();
+		RefreshEquippedChipSummary();
+	}));
+}
+
 void ULSChipStationWidget::HandleCarryingSlotCapacityChanged()
 {
 	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
@@ -555,22 +606,7 @@ bool ULSChipStationWidget::UnequipChipToWarehouse(const ULSInventoryDragDropOper
 		return false;
 	}
 
-	UGameInstance* GameInstance = GetGameInstance();
-	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-	if (!SaveSubsystem)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot unequip chip because SaveSubsystem is missing on %s."), *GetNameSafe(this));
-		return false;
-	}
-
-	const bool bUnequipped = SaveSubsystem->UnequipChipToWarehouse(DragOperation.SourceEquipmentSlotIndex);
-	if (bUnequipped)
-	{
-		HandleCarryingSlotCapacityChanged();
-		QueueRefreshChipStation();
-	}
-
-	return bUnequipped;
+	return UnequipChipFromSlotToWarehouse(DragOperation.SourceEquipmentSlotIndex);
 }
 
 bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDragDropOperation& DragOperation, const ELSInventorySlotArea TargetArea, const int32 TargetSlotIndex)
@@ -639,8 +675,9 @@ bool ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot(const ELSInven
 	const bool bEquipped = SaveSubsystem->EquipChipFromStoredSlot(SourceArea, SourceSlotIndex, TargetEquipmentSlotIndex);
 	if (bEquipped)
 	{
-		HandleCarryingSlotCapacityChanged();
-		QueueRefreshChipStation();
+		// 칩 리스트는 호출 측(소스 슬롯 위젯)이 ClearItem으로 그 칸만 비운다. 여기선 리스트를 재정렬/리빌드하지 않고
+		// 장착칸·요약·용량만 경량 갱신한다(정렬은 스테이션을 다시 열 때만).
+		QueueRefreshEquippedChipState();
 	}
 
 	return bEquipped;
@@ -648,91 +685,90 @@ bool ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot(const ELSInven
 
 bool ULSChipStationWidget::QuickUnequipEquippedChipToWarehouse(const int32 EquipmentSlotIndex)
 {
+	return UnequipChipFromSlotToWarehouse(EquipmentSlotIndex);
+}
+
+bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentSlotIndex)
+{
 	UGameInstance* GameInstance = GetGameInstance();
 	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
 	if (!SaveSubsystem)
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot quick-unequip chip because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("Cannot unequip chip because SaveSubsystem is missing on %s."), *GetNameSafe(this));
 		return false;
 	}
 
-	const bool bUnequipped = SaveSubsystem->UnequipChipToWarehouse(EquipmentSlotIndex);
-	if (bUnequipped)
+	// 해제 전 채워진 창고 인덱스를 기록해, 해제 후 새로 채워진 칸(=돌아온 칩의 위치)을 찾는다.
+	const TSet<int32> FilledBeforeUnequip = BuildFilledSlotIndexSet(SaveSubsystem->GetWarehouseItems());
+	if (!SaveSubsystem->UnequipChipToWarehouse(EquipmentSlotIndex))
 	{
+		return false;
+	}
+
+	// 칩 리스트는 재정렬/리빌드하지 않고, 돌아온 칩을 빈 칸(빠른 장착으로 생긴 hole) 또는 맨 뒤에 꽂는다.
+	const TArray<FLSSessionItem>& WarehouseAfter = SaveSubsystem->GetWarehouseItems();
+	const int32 ReturnedWarehouseIndex = FindFirstNewlyFilledIndex(WarehouseAfter, FilledBeforeUnequip);
+	if (ReturnedWarehouseIndex != INDEX_NONE)
+	{
+		InsertChipListSlot(WarehouseAfter[ReturnedWarehouseIndex], ELSInventorySlotArea::Warehouse, ReturnedWarehouseIndex);
+		QueueRefreshEquippedChipState();
+	}
+	else
+	{
+		// 기존 스택에 합쳐진 예외 케이스: 위치를 특정할 수 없으므로 안전하게 풀 새로고침(정렬 포함)한다.
 		HandleCarryingSlotCapacityChanged();
 		QueueRefreshChipStation();
 	}
 
-	return bUnequipped;
+	return true;
 }
 
-void ULSChipStationWidget::StartQuickEquipAutoRepeat()
+void ULSChipStationWidget::InsertChipListSlot(const FLSSessionItem& Chip, const ELSInventorySlotArea SourceArea, const int32 SourceSlotIndex)
 {
-	UWorld* World = GetWorld();
-	if (!World)
+	if (!ChipSlotWrapBox)
 	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot insert chip list slot because ChipSlotWrapBox is not bound on %s."), *GetNameSafe(this));
 		return;
 	}
 
-	// 첫 1개는 호출 측(슬롯 버튼 다운)에서 이미 장착했다. 여기서는 InitialDelay 뒤부터 Interval 간격으로
-	// 우수수 장착을 이어받는다. 버튼을 InitialDelay 안에 떼면 한 번도 반복되지 않아 1개만 장착된다.
-	FTimerManager& TimerManager = World->GetTimerManager();
-	TimerManager.ClearTimer(QuickEquipAutoRepeatTimerHandle);
-	TimerManager.SetTimer(QuickEquipAutoRepeatTimerHandle, this, &ULSChipStationWidget::TickQuickEquipAutoRepeat,
-		FMath::Max(QuickEquipAutoRepeatInterval, 0.01f), true, FMath::Max(QuickEquipAutoRepeatInitialDelay, 0.0f));
-}
-
-void ULSChipStationWidget::StopQuickEquipAutoRepeat()
-{
-	if (UWorld* World = GetWorld())
+	// 1) 빠른 장착으로 비워진 슬롯(hole)을 앞에서부터 재사용한다.
+	ULSItemSlotWidget* TargetSlot = nullptr;
+	for (int32 ChildIndex = 0; ChildIndex < ChipSlotWrapBox->GetChildrenCount(); ++ChildIndex)
 	{
-		World->GetTimerManager().ClearTimer(QuickEquipAutoRepeatTimerHandle);
-	}
-}
-
-void ULSChipStationWidget::TickQuickEquipAutoRepeat()
-{
-	// 입력이 풀렸거나 더 장착할 칩/빈 칸이 없으면 자동반복을 멈춘다.
-	if (!IsQuickEquipAutoRepeatInputHeld() || !QuickEquipFirstAvailableChip())
-	{
-		StopQuickEquipAutoRepeat();
-	}
-}
-
-bool ULSChipStationWidget::QuickEquipFirstAvailableChip()
-{
-	UGameInstance* GameInstance = GetGameInstance();
-	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-	if (!SaveSubsystem)
-	{
-		return false;
+		ULSItemSlotWidget* SlotWidget = Cast<ULSItemSlotWidget>(ChipSlotWrapBox->GetChildAt(ChildIndex));
+		if (SlotWidget && !SlotWidget->HasItem())
+		{
+			TargetSlot = SlotWidget;
+			break;
+		}
 	}
 
-	// 리스트 표시와 동일한 정렬을 적용해 "커서 자리에 들어오는 다음 칩"(정렬 상단)을 장착한다.
-	UDataTable* ChipTable = LoadChipTable(this);
-	TArray<FLSChipStationViewItem> ViewItems;
-	AddChipViewItems(SaveSubsystem->GetInventory(), ELSInventorySlotArea::Inventory, ChipTable, this, ViewItems);
-	AddChipViewItems(SaveSubsystem->GetWarehouseItems(), ELSInventorySlotArea::Warehouse, ChipTable, this, ViewItems);
-	if (ViewItems.Num() == 0)
+	// 2) 빈 칸이 없으면 맨 뒤에 새 슬롯을 만든다.
+	if (!TargetSlot)
 	{
-		return false;
+		if (!ItemSlotWidgetClass)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Cannot append chip list slot because ItemSlotWidgetClass is not set on %s."), *GetNameSafe(this));
+			return;
+		}
+
+		APlayerController* OwningPlayer = GetOwningPlayer();
+		TargetSlot = OwningPlayer
+			? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
+			: CreateWidget<ULSItemSlotWidget>(GetWorld(), ItemSlotWidgetClass);
+		if (!TargetSlot)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Failed to create chip list slot on %s."), *GetNameSafe(this));
+			return;
+		}
+
+		ChipSlotWrapBox->AddChildToWrapBox(TargetSlot);
 	}
 
-	SortChipViewItems(ViewItems);
-	const FLSChipStationViewItem& TopItem = ViewItems[0];
-	return QuickEquipChipToFirstEmptyHardwareSlot(TopItem.SourceArea, TopItem.SourceSlotIndex);
-}
-
-bool ULSChipStationWidget::IsQuickEquipAutoRepeatInputHeld() const
-{
-	if (!FSlateApplication::IsInitialized())
-	{
-		return false;
-	}
-
-	const FSlateApplication& SlateApp = FSlateApplication::Get();
-	return SlateApp.GetModifierKeys().IsShiftDown()
-		&& SlateApp.GetPressedMouseButtons().Contains(EKeys::LeftMouseButton);
+	TargetSlot->ResetTransientSlotState();
+	TargetSlot->SetItem(Chip.ItemRowName, Chip.Amount, Chip.ChipStats);
+	TargetSlot->SetChipStationSlotContext(this, SourceArea, SourceSlotIndex, Chip.ItemRowName, Chip.Amount, Chip.ChipStats);
+	TargetSlot->RefreshHoverStateFromCursor();
 }
 
 void ULSChipStationWidget::InitializeEquipmentSlots()
@@ -893,8 +929,6 @@ void ULSChipStationWidget::SetChipStat(FName StatKey, int32 StatValue, int32 Sig
 		return;
 	}
 
-	UE_LOG(LogLS, Warning, TEXT("[ChipStation] SetChipStat '%s' -> %s (Stat=%d, Signal=%d)"),
-	       *StatKey.ToString(), *GetNameSafe(StatWidget), StatValue, SignalLoss);
 	StatWidget->SetStat(LSChipStats::GetChipStatLabel(StatKey), StatValue, SignalLoss);
 }
 
