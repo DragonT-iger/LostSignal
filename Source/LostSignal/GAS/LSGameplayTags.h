@@ -30,6 +30,7 @@ namespace LSGameplayTags
 
 	// Combat phase tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_Attacking)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_SkillCasting)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_AttackActive)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_ComboWindow)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combat_NextAttack_ComboIndexOverride)

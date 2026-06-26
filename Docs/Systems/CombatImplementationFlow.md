@@ -122,6 +122,8 @@ ALSPlayerCharacter::OnAttack
 
 스킬 프리뷰 중 좌클릭은 스킬 확정 입력으로 소비한다. 확정이 실패하더라도 같은 입력으로 기본 공격을 실행하지 않는다.
 
+기본 공격 콤보 진행 중에 스킬을 확정하면 기본 공격이 즉시 캔슬되고 스킬이 발동한다. (스킬 시전 중 다른 스킬은 차단) 차단/캔슬 태그 계약은 [SkillSystemStructure.md](SkillSystemStructure.md)의 `기본 공격 캔슬과 스킬 차단 태그`가 단일 출처다.
+
 스킬 입력:
 
 ```text

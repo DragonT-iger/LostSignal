@@ -205,6 +205,17 @@ PassiveSkill_ID
 
 프리뷰가 없는 즉발 스킬도 같은 DataAsset과 Ability 경로를 사용한다. 차이는 PreviewSpec을 보여주느냐의 문제다.
 
+## 기본 공격 캔슬과 스킬 차단 태그
+
+액티브 스킬 Ability는 발동 차단/캔슬을 다음 태그 계약으로 처리한다. (이 문서가 단일 출처)
+
+- 기본 공격(`LSGA_PlayerBasicAttack`)은 진행 중 `LS.Combat.Attacking`을 부여하고, AssetTag로 `LS.Ability.Player.BasicAttack`을 가진다.
+- 스킬 Ability는 발동 시 `LS.Combat.Attacking`(공통 "진행 중" 의미)과 `LS.Combat.SkillCasting`(스킬 시전 표식)을 함께 부여한다.
+- 스킬의 `ActivationBlockedTags`는 `LS.Combat.SkillCasting`을 막는다. → 스킬 시전 중에는 다른 스킬을 발동할 수 없다.
+- 스킬의 `CancelAbilitiesWithTag`는 `LS.Ability.Player.BasicAttack`을 캔슬한다. → 기본 공격 모션 중 스킬을 확정하면 기본 공격이 즉시 취소되고(어느 콤보 단계에서든) 스킬이 발동한다. 취소된 기본 공격은 자신의 `EndAbility(bWasCancelled)` 경로에서 몽타주를 멈추고 전투 상태를 정리한다.
+
+`LS.Combat.Attacking`은 몬스터 감지/소음, 전투 컴포넌트 등 다른 시스템이 "공격/스킬 진행 중" 의미로 참조하므로 차단/캔슬 판정에는 쓰지 않는다. 차단은 `LS.Combat.SkillCasting`, 캔슬은 `LS.Ability.Player.BasicAttack`으로 분리한다.
+
 ## 패시브 스킬
 
 패시브는 `ULSPlayerSkillComponent::PassiveSkills`에 `ULSPassiveSkillDataAsset` 파생 DataAsset을 등록한다.
@@ -588,7 +599,7 @@ Ability BP 또는 C++ 기본값:
 
 ```text
 - 필요한 몽타주/GE 클래스가 할당됐는지
-- Activation Blocked Tags에 Dead/Stunned 등 차단 태그가 포함됐는지
+- Activation Blocked Tags에 Dead/Stunned 등 차단 태그가 포함됐는지 (스킬끼리 차단은 SkillCasting, 기본공격 캔슬은 CancelAbilitiesWithTag — `기본 공격 캔슬과 스킬 차단 태그` 참고)
 - Instancing Policy가 내부 상태 보유 방식과 맞는지
 ```
 

@@ -20,6 +20,7 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Cooldown_Skill_Execution, "LS.Cooldown.Skill.Execution")
 
 	UE_DEFINE_GAMEPLAY_TAG(Combat_Attacking, "LS.Combat.Attacking")
+	UE_DEFINE_GAMEPLAY_TAG(Combat_SkillCasting, "LS.Combat.SkillCasting")
 	UE_DEFINE_GAMEPLAY_TAG(Combat_AttackActive, "LS.Combat.AttackActive")
 	UE_DEFINE_GAMEPLAY_TAG(Combat_ComboWindow, "LS.Combat.ComboWindow")
 	UE_DEFINE_GAMEPLAY_TAG(Combat_NextAttack_ComboIndexOverride, "LS.Combat.NextAttack.ComboIndexOverride")
