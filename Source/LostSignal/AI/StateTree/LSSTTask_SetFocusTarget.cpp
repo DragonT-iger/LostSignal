@@ -15,7 +15,14 @@ FLSSTTask_SetFocusTarget::FLSSTTask_SetFocusTarget()
 
 EStateTreeRunStatus FLSSTTask_SetFocusTarget::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
-	const FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
+
+	// 에셋 AIController 바인딩 누락 대비 컨텍스트 소유자에서 해석.
+	if (!InstanceData.AIController)
+	{
+		InstanceData.AIController = Cast<AAIController>(Context.GetOwner());
+	}
+
 	if (!InstanceData.AIController)
 	{
 		return EStateTreeRunStatus::Failed;

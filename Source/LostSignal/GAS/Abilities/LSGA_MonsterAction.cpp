@@ -38,6 +38,8 @@ void ULSGA_MonsterAction::ActivateAbility(
 	ULSMonsterCombatComponent* CombatComponent = EnemyCharacter ? EnemyCharacter->GetMonsterCombatComponent() : nullptr;
 	if (!EnemyCharacter || !CombatComponent)
 	{
+		UE_LOG(LogLS, Warning, TEXT("MonsterAction ActivateAbility aborted: EnemyCharacter=%s CombatComponent=%s"),
+			*GetNameSafe(EnemyCharacter), *GetNameSafe(CombatComponent));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -45,6 +47,14 @@ void ULSGA_MonsterAction::ActivateAbility(
 	// 어떤 액션을 할지는 CombatComponent가 정하고(RequestAction), 몽타주는 그 액션 row의 Action_Ani에서 읽는다.
 	const FLSMonsterActionRow* ActionRow = CombatComponent->GetActiveActionRow();
 	ActiveActionMontage = ActionRow ? Cast<UAnimMontage>(ActionRow->Action_Ani.TryLoad()) : nullptr;
+
+	// 진단: 활성 row가 잡혔는지, Action_Ani 경로에서 몽타주가 실제로 로드됐는지 확인.
+	UE_LOG(LogLS, Log, TEXT("MonsterAction %s: row=%s, Action_Ani=%s -> montage=%s"),
+		*GetNameSafe(EnemyCharacter),
+		ActionRow ? *ActionRow->Action_Name.ToString() : TEXT("<no active row>"),
+		ActionRow ? *ActionRow->Action_Ani.ToString() : TEXT("<no active row>"),
+		*GetNameSafe(ActiveActionMontage));
+
 	if (!ActiveActionMontage)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s monster action has no montage resolved from Action_Ani."), *GetNameSafe(EnemyCharacter));
@@ -89,10 +99,11 @@ void ULSGA_MonsterAction::EndAbility(
 
 	if (ALSEnemyCharacter* EnemyCharacter = Cast<ALSEnemyCharacter>(GetAvatarActorFromActorInfo()))
 	{
-		// 캔슬/종료 시 텔레그래프가 남지 않도록 정리(노티파이 End가 누락된 경우 대비).
+		// 캔슬/종료 시 텔레그래프·도약 이동이 남지 않도록 정리(노티파이 End가 누락된 경우 대비).
 		if (ULSMonsterCombatComponent* CombatComponent = EnemyCharacter->GetMonsterCombatComponent())
 		{
 			CombatComponent->EndActionTelegraph();
+			CombatComponent->EndActionDash();
 		}
 
 		if (UAnimInstance* AnimInstance = EnemyCharacter->GetMesh() ? EnemyCharacter->GetMesh()->GetAnimInstance() : nullptr)

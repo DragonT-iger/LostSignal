@@ -24,6 +24,13 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
+	// 에셋에서 AIController 바인딩이 누락돼도 동작하도록 컨텍스트 소유자에서 직접 해석한다.
+	// (LSSTTask_StopAILogic과 동일한 패턴)
+	if (!InstanceData.AIController)
+	{
+		InstanceData.AIController = Cast<AAIController>(Context.GetOwner());
+	}
+
 	if (!InstanceData.EnemyCharacter && InstanceData.AIController)
 	{
 		InstanceData.EnemyCharacter = Cast<ALSEnemyCharacter>(InstanceData.AIController->GetPawn());
@@ -94,7 +101,19 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 	}
 
 	// 현재 타겟 거리에 발동 가능한 액션이 있는지(거리 적합 + 쿨다운 준비). 타겟이 없으면 false.
+	const bool bPrevHasUsableAction = InstanceData.bHasUsableAction;
 	InstanceData.bHasUsableAction = (InstanceData.CurrentTarget && InstanceData.CombatComponent)
 		? InstanceData.CombatComponent->HasUsableActionInRange(InstanceData.DistanceToTarget)
 		: false;
+
+	// 진단: 값이 바뀔 때만 로그(매 틱 도배 방지). Attack 진입 전이가 읽는 값.
+	if (InstanceData.bHasUsableAction != bPrevHasUsableAction)
+	{
+		UE_LOG(LogLS, Log, TEXT("bHasUsableAction %d->%d (target=%s, dist=%.0f, visual=%d)"),
+			bPrevHasUsableAction ? 1 : 0,
+			InstanceData.bHasUsableAction ? 1 : 0,
+			*GetNameSafe(InstanceData.CurrentTarget),
+			InstanceData.DistanceToTarget,
+			InstanceData.bHasVisualTarget ? 1 : 0);
+	}
 }

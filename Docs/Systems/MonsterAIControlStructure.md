@@ -257,13 +257,16 @@ ReturnHome / Patrol 복귀
 StateTree Attack 상태
 -> LS Request Monster Action (FLSSTTask_RequestMonsterAction)
 -> ULSMonsterCombatComponent::RequestAction(Target)
-   -> SelectActionForDistance: Action_Group 순서로 거리 적합 + 쿨다운 준비 액션 선택
+   -> SelectActionForDistance: 거리 적합 + 쿨다운 준비 후보 중 쿨다운이 가장 긴(=강한) 액션 우선(동률 시 Action_Group 순서)
    -> 활성 액션 컨텍스트 세팅 + 액션별 쿨다운 시작(컴포넌트 TMap 타이머)
    -> RequestAbilityByTag(Ability_MonsterAction)
 -> ULSGA_MonsterAction: 활성 액션 row의 Action_Ani 몽타주 재생
 -> (윈드업) AnimNotifyState ULSANS_MonsterActionTelegraph
    -> ULSMonsterCombatComponent::BeginActionTelegraph / EndActionTelegraph
    -> ULSSkillPreviewComponent(스킬 인디케이터 재사용)로 Hitbox 모양/크기 표시
+-> (도약 프레임, 선택) AnimNotify ULSAN_MonsterActionDash
+   -> ULSMonsterCombatComponent::PerformActionDash
+   -> Dash_Distance/Duration으로 타겟 방향 평면 전진(FRootMotionSource_ConstantForce, 타겟까지 거리로 클램프)
 -> (타격 프레임) AnimNotify ULSAN_MonsterActionHit
    -> ULSMonsterCombatComponent::PerformActionHit
    -> SphereOverlap + ULSHitboxLibrary::IsTargetInsideHitbox(Circle/Cone/Box)
@@ -553,7 +556,9 @@ AI 코드를 수정한 뒤 다음을 확인한다.
 - **저항 어트리뷰트:** Row 컬럼(`Monster_ArmorPen_Resist`/`Monster_Crit_Resist`)과 어트리뷰트(`ArmorPenetrationResistance`/`CritChanceResistance`) **추가 완료**. 단 저항을 실제 데미지/치명타 계산식(관통 - 저항, 0 클램프)에 반영하는 것은 데미지 파이프라인 후속.
 - **회전 속도(Turn_Rate):** 최신 DT_MonsterStat CSV에서 컬럼이 빠져 Row 필드·RotationRate 적용 모두 제거됨. 회전 속도는 생성자 기본값(540)으로 동작. 데이터 주도가 필요하면 CSV에 Turn_Rate 컬럼을 다시 넣고 재적용해야 한다.
 - **몬스터 공격(데이터 주도):** 평타(`ULSGA_MonsterMelee`/`PerformMeleeHit`) **제거 완료**. 모든 공격이 `DT_MonsterAction`(FLSMonsterActionRow) 기반으로 `ULSGA_MonsterAction` + montage Notify(`ULSAN_MonsterActionHit`)/NotifyState(`ULSANS_MonsterActionTelegraph`)로 실행된다. 거리/쿨다운 선택은 `ULSMonsterCombatComponent::SelectActionForDistance`(쿨다운은 컴포넌트 TMap 월드타이머). 범위 표시는 `ULSSkillPreviewComponent` 재사용. 히트박스 판정은 공용 `ULSHitboxLibrary`(플레이어 Override와 공유).
-  - **미구현(후속):** Dash 이동(도약 물기 `Dash_Distance`)은 몽타주 루트모션/후속, `Erosion_Value`(침식)·`Action_Guard`(액션 중 포이즈) 적용, `bCanCrit`(현재 false 고정).
+  - **Dash 이동(도약 물기):** **구현 완료**. `ULSAN_MonsterActionDash`(도약 프레임 노티파이) → `ULSMonsterCombatComponent::PerformActionDash`가 `Dash_Distance`/`Duration`으로 타겟 방향 평면 전진(`FRootMotionSource_ConstantForce`, Priority 6, 타겟까지 거리로 클램프해 오버슈트 방지). 수직 점프 비주얼은 애니메이션이 담당. 어빌리티 종료/캔슬 시 `EndActionDash`로 루트모션 제거. 몽타주 도약 프레임에 노티파이 배치 필요.
+    - **착지 정렬:** 도약 액션은 텔레그래프(`BeginActionTelegraph`)·데미지 판정(`PerformActionHit`)을 모두 **착지 예정 지점**에 맞춘다(공유 헬퍼 `ComputeActionOriginAndDirection`). 타격 프레임이 착지보다 일러도 데미지·범위표시가 착지 위치에 들어간다. 텔레그래프는 윈드업 시작 시점의 예측 착지로 1회 배치(윈드업 중 타겟 추종은 미적용).
+  - **미구현(후속):** 실제 공중 포물선(JumpForce)·도약 중 호밍, `Erosion_Value`(침식)·`Action_Guard`(액션 중 포이즈) 적용, `bCanCrit`(현재 false 고정).
   - **에디터/BP 셋업:** `ULSMonsterCombatComponent`에 `MonsterActionTable`(DT_MonsterAction)·텔레그래프 머티리얼(Circle/Box), `ULSSkillPreviewComponent`에 `DefaultPreviewMesh`를 BP에서 할당해야 텔레그래프가 보인다.
 - **강인도(Monster_Guard):** Row에는 존재하나(int32) 적용 정책 미정(위 "몬스터 DataTable 규칙" 참고).
 - **구체 몬스터 클래스:** `ALSEnemyHyena`(ALSEnemyCharacter 상속, 생성자에서 `MonsterRowName="10001"`만 설정) 추가 완료. 그 외 몬스터는 같은 패턴의 얇은 서브클래스 + BP로 확장.

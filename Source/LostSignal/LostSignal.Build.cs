@@ -15,6 +15,7 @@ public class LostSignal : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"AIModule",
+			"AnimGraphRuntime",
 			"NavigationSystem",
 			"StateTreeModule",
 			"GameplayStateTreeModule",

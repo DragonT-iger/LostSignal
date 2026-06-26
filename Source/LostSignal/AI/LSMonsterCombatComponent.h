@@ -57,6 +57,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void PerformActionHit();
 
+	/** 도약 프레임 AnimNotify가 호출. 활성 액션 row의 Dash_Distance/Duration으로 타겟 방향 전진 이동. */
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void PerformActionDash();
+
+	/** 도약 루트모션 소스 제거. 어빌리티 종료/캔슬 시 호출돼 이동이 남지 않게 한다. */
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void EndActionDash();
+
 	/** 윈드업 AnimNotifyState가 호출. 활성 액션 row 범위로 텔레그래프 표시. */
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void BeginActionTelegraph();
@@ -75,6 +83,8 @@ public:
 
 private:
 	const FLSMonsterActionRow* FindActionRow(FName RowName) const;
+	// 액션의 판정/표시 원점·방향. 도약 액션이면 착지 예정 지점(타겟까지 거리로 클램프)을 원점으로 한다.
+	void ComputeActionOriginAndDirection(const FLSMonsterActionRow& Row, FVector& OutOrigin, FVector& OutDirection) const;
 	FName SelectActionForDistance(float Distance) const;
 	bool IsActionOnCooldown(FName RowName) const;
 	void StartActionCooldown(FName RowName, float Cooldown);
@@ -116,4 +126,12 @@ private:
 
 	// 액션별 쿨다운 만료 월드시각(초). 어트리뷰트가 아닌 AI 선택용 타이머.
 	TMap<FName, double> ActionCooldownEndTimes;
+
+	// 진행 중인 도약 루트모션 소스 ID. 0 = 없음(ERootMotionSourceID::Invalid).
+	uint16 ActionDashRootMotionSourceID = 0;
+
+	// 도약 착지 예정 지점/방향. PerformActionHit이 타격 프레임 타이밍과 무관하게 착지 위치에 데미지를 적용하도록 사용.
+	bool bActionDashLandingValid = false;
+	FVector ActionDashLandingLocation = FVector::ZeroVector;
+	FVector ActionDashDirection = FVector::ZeroVector;
 };

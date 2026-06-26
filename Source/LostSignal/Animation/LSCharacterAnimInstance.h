@@ -1,17 +1,16 @@
 #pragma once
 
-#include "Animation/AnimInstance.h"
+#include "Animation/LSAnimInstanceBase.h"
 #include "LSCharacterAnimInstance.generated.h"
 
-class UAbilitySystemComponent;
 class UAnimMontage;
 
 /**
- * AnimBP parent class for LostSignal characters.
- * Exposes GAS/state-driven animation flags so AnimGraph can decide slot blending without BP event-graph logic.
+ * 상하체 슬롯 블렌딩을 사용하는 캐릭터용 AnimBP 부모 클래스.
+ * 공용 ASC 캐싱/죽음 판정은 ULSAnimInstanceBase가 담당하고, 여기서는 슬롯 블렌딩 플래그만 갱신한다.
  */
 UCLASS()
-class LOSTSIGNAL_API ULSCharacterAnimInstance : public UAnimInstance
+class LOSTSIGNAL_API ULSCharacterAnimInstance : public ULSAnimInstanceBase
 {
 	GENERATED_BODY()
 
@@ -26,9 +25,6 @@ public:
 	FName FullBodySlotName = TEXT("FullBody");
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Animation")
-	bool bIsDead = false;
-
-	UPROPERTY(BlueprintReadOnly, Category="LS/Animation")
 	bool bIsFullBodyMontagePlaying = false;
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Animation")
@@ -40,9 +36,4 @@ public:
 protected:
 	UFUNCTION(BlueprintPure, Category="LS/Animation")
 	bool IsMontageUsingSlot(const UAnimMontage* Montage, FName SlotName) const;
-
-private:
-	void CacheAbilitySystemComponent();
-
-	TWeakObjectPtr<UAbilitySystemComponent> CachedAbilitySystemComponent;
 };

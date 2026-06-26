@@ -21,6 +21,12 @@ EStateTreeRunStatus FLSSTTask_SetReturnHomeMode::EnterState(FStateTreeExecutionC
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
+	// 에셋 AIController 바인딩 누락 대비 컨텍스트 소유자에서 해석.
+	if (!InstanceData.AIController)
+	{
+		InstanceData.AIController = Cast<AAIController>(Context.GetOwner());
+	}
+
 	if (!InstanceData.EnemyCharacter && InstanceData.AIController)
 	{
 		InstanceData.EnemyCharacter = Cast<ALSEnemyCharacter>(InstanceData.AIController->GetPawn());
