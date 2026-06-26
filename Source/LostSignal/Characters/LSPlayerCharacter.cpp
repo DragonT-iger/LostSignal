@@ -224,6 +224,8 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	if (Item6Action) { EnhancedInput->BindAction(Item6Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem6); }
 	if (InteractAction) { EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnInteract); }
 	if (LootTransferAction) { EnhancedInput->BindAction(LootTransferAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnLootTransfer); }
+	if (ToggleInventoryAction) { EnhancedInput->BindAction(ToggleInventoryAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnToggleInventory); }
+	if (MenuAction) { EnhancedInput->BindAction(MenuAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnMenu); }
 }
 
 void ALSPlayerCharacter::OnAttack()
@@ -412,6 +414,54 @@ void ALSPlayerCharacter::OnLootTransfer()
 	}
 }
 
+void ALSPlayerCharacter::OnToggleInventory()
+{
+	if (!IsLocallyControlled()) return;
+
+	// 칩스테이션 등 모달이 열려 있으면 그걸 닫고, 닫을 게 없을 때만 단독 인벤토리를 연다.
+	if (TryCloseOpenModalPanel())
+	{
+		return;
+	}
+
+	ShowInventoryWidgetStandalone();
+}
+
+void ALSPlayerCharacter::OnMenu()
+{
+	if (!IsLocallyControlled()) return;
+
+	// ESC(메뉴/백): 열린 모달이 있으면 먼저 닫는다.
+	if (TryCloseOpenModalPanel())
+	{
+		return;
+	}
+
+	// 닫을 UI가 없으면 설정 메뉴를 연다. (설정 UI 구현 시 이 자리에 연결)
+}
+
+bool ALSPlayerCharacter::TryCloseOpenModalPanel()
+{
+	// 칩스테이션은 인벤토리 위젯과 별개인 컨트롤러 소유 모달이라 먼저 확인한다.
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetController()))
+	{
+		if (PlayerController->IsChipStationWidgetOpen())
+		{
+			PlayerController->HideChipStationWidget();
+			return true;
+		}
+	}
+
+	// 인벤토리(컨테이너로 열렸든 단독이든) — 함께 떠 있던 룻드랍/로비 창고도 같이 닫힌다.
+	if (IsInventoryWidgetOpen())
+	{
+		HideInventoryWidget();
+		return true;
+	}
+
+	return false;
+}
+
 void ALSPlayerCharacter::RebuildInventoryWidgetSlots()
 {
 	if (ULSInventoryWidget* LSInventoryWidget = Cast<ULSInventoryWidget>(InventoryWidget))
@@ -421,30 +471,24 @@ void ALSPlayerCharacter::RebuildInventoryWidgetSlots()
 	}
 }
 
-void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
+bool ALSPlayerCharacter::ShowInventoryWidgetInternal(bool bShowStoreAllButton)
 {
 	if (!IsLocallyControlled())
 	{
-		return;
-	}
-
-	if (!Target)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot show inventory widget because target is missing on %s."), *GetNameSafe(this));
-		return;
+		return false;
 	}
 
 	if (!InventoryWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("InventoryWidgetClass is not set on %s."), *GetNameSafe(this));
-		return;
+		return false;
 	}
 
 	APlayerController* PlayerController = Cast<APlayerController>(GetController());
 	if (!PlayerController)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot show inventory widget because player controller is missing on %s."), *GetNameSafe(this));
-		return;
+		return false;
 	}
 
 	if (!InventoryWidget)
@@ -453,20 +497,20 @@ void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
 		if (!InventoryWidget)
 		{
 			UE_LOG(LogLS, Warning, TEXT("Failed to create inventory widget on %s."), *GetNameSafe(this));
-			return;
+			return false;
 		}
 	}
 
 	if (!InventoryWidget->IsInViewport())
 	{
-		InventoryWidget->AddToViewport(LSUILayer::ModalPanel);
+		InventoryWidget->AddToViewport(LSUILayer::ModalPanelInventory);
 	}
 
 	if (ULSInventoryWidget* LSInventoryWidget = Cast<ULSInventoryWidget>(InventoryWidget))
 	{
 		LSInventoryWidget->RebuildInventorySlots();
 		LSInventoryWidget->RebuildConfirmedStorageSlots();
-		LSInventoryWidget->SetStoreAllButtonVisible(Target->IsA<ALSLobbyStorageActor>());
+		LSInventoryWidget->SetStoreAllButtonVisible(bShowStoreAllButton);
 	}
 	else
 	{
@@ -474,12 +518,47 @@ void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
 	}
 
 	InventoryWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-	ActiveInventoryTarget = Target;
 
 	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(PlayerController))
 	{
 		LSPlayerController->UpdateBackgroundBlurVisibility();
 	}
+
+	return true;
+}
+
+void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
+{
+	if (!Target)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot show inventory widget because target is missing on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (!ShowInventoryWidgetInternal(Target->IsA<ALSLobbyStorageActor>()))
+	{
+		return;
+	}
+
+	ActiveInventoryTarget = Target;
+	bIsStandaloneInventoryOpen = false;
+}
+
+void ALSPlayerCharacter::ShowInventoryWidgetStandalone()
+{
+	if (!IsLocallyControlled() || IsInventoryWidgetOpen())
+	{
+		return;
+	}
+
+	// 단독 인벤토리는 컨테이너가 없으므로 전부 보관 버튼을 숨긴다.
+	if (!ShowInventoryWidgetInternal(false))
+	{
+		return;
+	}
+
+	ActiveInventoryTarget.Reset();
+	bIsStandaloneInventoryOpen = true;
 }
 
 void ALSPlayerCharacter::HideInventoryWidget()
@@ -497,11 +576,18 @@ void ALSPlayerCharacter::HideInventoryWidget()
 	}
 
 	ActiveInventoryTarget.Reset();
+	bIsStandaloneInventoryOpen = false;
 }
 
 void ALSPlayerCharacter::UpdateInventoryWidgetDistance()
 {
 	if (!IsInventoryWidgetOpen())
+	{
+		return;
+	}
+
+	// 단독(Tab) 인벤토리는 연동된 컨테이너가 없으므로 거리 기반 자동 닫기 대상이 아니다.
+	if (bIsStandaloneInventoryOpen)
 	{
 		return;
 	}

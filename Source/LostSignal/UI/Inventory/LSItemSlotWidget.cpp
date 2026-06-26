@@ -243,8 +243,12 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 {
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
 	{
-		TryHandleQuickTransfer();
-		return FReply::Handled();
+		// 옮길 대상(룻박스/창고/장착)이 있을 때만 빠른이동으로 클릭을 소비한다.
+		// 대상이 없으면(인벤토리만 열림) 아래 드래그 감지로 넘어가, 달리기(Shift)로 Shift가 눌려 있어도 월드 드랍 드래그가 가능하다.
+		if (TryHandleQuickTransfer())
+		{
+			return FReply::Handled();
+		}
 	}
 
 	if (!CanStartItemDrag())

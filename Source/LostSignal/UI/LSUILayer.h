@@ -16,8 +16,12 @@ namespace LSUILayer
 	// 인벤토리/창고/칩스테이션/루트드랍 같은 모달 패널 뒤에 깔리는 공유 풀스크린 블러.
 	constexpr int32 BackgroundBlur = 100;
 
-	// 모달 패널 본체. 블러 위, 디버그 오버레이 아래.
+	// 모달 패널 본체(창고/칩스테이션/루트드랍 컨테이너). 블러 위, 인벤토리 아래.
 	constexpr int32 ModalPanel = 200;
+
+	// 인벤토리 본체. 컨테이너 패널과 함께 떠도 항상 위에 그려져, 컨테이너 WBP의 배경이
+	// 인벤토리를 덮지 않게 한다. (같은 Z면 뷰포트 삽입 순서에 휘둘려 덮이는 경우가 생김)
+	constexpr int32 ModalPanelInventory = 300;
 
 	// 시연용 프로토콜 디버그 패널.
 	constexpr int32 ProtocolDebug = 1000;

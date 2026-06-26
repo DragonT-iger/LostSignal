@@ -61,6 +61,17 @@ Source/LostSignal/Inventory/LSInventorySlotUtils.cpp
 
 새 슬롯 조작이 필요하면 각 시스템에 복사하지 말고 이 유틸을 먼저 확장한다.
 
+## 인벤토리 열기/닫기
+
+인벤토리는 두 경로로 열린다(둘 다 `ALSPlayerCharacter` 소유).
+
+- **컨테이너 연동:** 룻박스/로비 창고를 상호작용(`OnInteract`)하면 그 타깃 기준으로 열린다. 타깃과 멀어지면 Tick의 거리 검사(`UpdateInventoryWidgetDistance`)로 자동으로 닫힌다.
+- **단독 토글:** Tab(`ToggleInventoryAction`)으로 컨테이너 없이 인벤토리만 연다. 단독으로 열린 인벤토리는 연동 컨테이너가 없으므로 거리 기반 자동 닫기 대상이 아니다(`bIsStandaloneInventoryOpen`). 전부 보관 버튼도 숨긴다.
+
+닫기는 Tab(다시 누름)과 ESC(`MenuAction`)가 공유하는 `TryCloseOpenModalPanel`이 우선순위대로 처리한다. 칩스테이션([ChipSystem.md](ChipSystem.md) 소유)이 떠 있으면 인벤토리를 열지 않고 칩스테이션부터 닫고, 아니면 인벤토리를 닫는다(이때 함께 떠 있던 룻드랍/로비 창고도 같이 닫힌다). 닫을 모달이 없을 때만 Tab은 단독 인벤토리를 열고, ESC는 설정 메뉴를 연다(설정 UI 연결은 추후).
+
+키 매핑은 Enhanced Input 에셋(`IA_Inventory`=Tab, `IA_Menu`=ESC)을 `IMC_Default`에서 연결하고, Pawn BP에서 두 `UInputAction` 슬롯에 할당한다. 공유 블러 토글은 [UILayerStructure.md](UILayerStructure.md)가 소유한다 — 위 show/hide가 컨트롤러 `UpdateBackgroundBlurVisibility()`를 호출해 자동 반영된다.
+
 ## UI 표시 흐름
 
 `ULSInventoryWidget`은 인벤토리와 SafeStash 영역을 표시한다.
@@ -165,6 +176,8 @@ Warehouse 슬롯 Shift+좌클릭
 ```
 
 중요한 의도는 "인벤토리만 켜져 있는 상태에서는 Shift-click이 동작하지 않는다"이다. 빠른 이동은 대상 컨테이너가 명확할 때만 처리한다.
+
+단, 빠른이동이 대상 부재 등으로 실패하면(`TryHandleQuickTransfer`가 false) 클릭을 소비하지 않고 일반 드래그 감지로 넘어간다. 달리기 키가 `LeftShift`라 뛰는 동안 Shift가 눌려 있어도, 인벤토리만 열린 상태에서 아이템을 슬롯 밖으로 드래그해 월드에 버릴 수 있다(월드 드랍은 드래그 취소 시 발생).
 
 칩스테이션 안에서는 대상이 칩 장착(하드웨어)이라 컨테이너 조건 없이 동작한다.
 

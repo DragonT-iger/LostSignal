@@ -181,6 +181,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TObjectPtr<UInputAction> RunAction;
 
+	// Tab: 인벤토리 단독 열기/닫기 토글
+	UPROPERTY(EditAnywhere, Category="LS/Input")
+	TObjectPtr<UInputAction> ToggleInventoryAction;
+
+	// ESC(메뉴/백): 열린 UI가 있으면 닫고, 닫을 게 없으면 설정 메뉴를 연다
+	UPROPERTY(EditAnywhere, Category="LS/Input")
+	TObjectPtr<UInputAction> MenuAction;
+
 	// 상호작용 감지 최대 거리 (cm)
 	UPROPERTY(EditAnywhere, Category="LS/Interact", meta=(ClampMin="50.0"))
 	float MaxInteractRange = 250.0f;
@@ -253,6 +261,8 @@ protected:
 private:
 	bool bIsRunning = false;
 	bool bHasSentFacingRotation = false;
+	// 컨테이너 없이 Tab으로 연 단독 인벤토리인지. 단독이면 거리 기반 자동 닫기를 건너뛴다.
+	bool bIsStandaloneInventoryOpen = false;
 	TWeakObjectPtr<AActor> ActiveInventoryTarget;
 
 	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
@@ -289,7 +299,13 @@ private:
 	void OnItem6();
 	void OnInteract();
 	void OnLootTransfer();
+	void OnToggleInventory();
+	void OnMenu();
+	// 열려 있는 모달 패널(칩스테이션/인벤토리)을 우선순위대로 하나 닫는다. 닫았으면 true.
+	bool TryCloseOpenModalPanel();
+	bool ShowInventoryWidgetInternal(bool bShowStoreAllButton);
 	void ShowInventoryWidgetForTarget(AActor* Target);
+	void ShowInventoryWidgetStandalone();
 	void HideInventoryWidget();
 	void UpdateInventoryWidgetDistance();
 
