@@ -299,6 +299,21 @@ ASC와 AttributeSet 관계:
 
 즉 Ability가 Attribute 값을 참조하면 해당 캐릭터 인스턴스에 등록된 AttributeSet 값을 읽는다. 서버에서 적용된 Attribute 변경은 복제를 통해 클라이언트 UI와 표시 상태에 반영된다.
 
+## 피격 연출 흐름 (GameplayCue)
+
+타격 사운드는 주체로 나뉜다. **공격음(휘두름)은 때리는 쪽**이 `LSAN_PlaySound`(공격 몽타주 Notify)로 내고, **피격음은 맞는 쪽**이 GameplayCue로 낸다. 피격음을 GameplayCue로 두면 데미지 GE 한 곳에 Cue를 다는 것만으로 몬스터/플레이어/스킬 등 모든 공격원이 자동 커버되고, 멀티에서도 복제 재생된다.
+
+```text
+데미지 GE(Instant)가 대상 ASC에 적용
+-> GE에 달린 GameplayCue.Combat.Hit "Executed" 발동
+-> GameplayCueManager가 태그로 GameplayCueNotify 매칭 (ULSGCN_Hit 파생 BP)
+-> ULSGCN_Hit::OnExecute에서 피격자 위치에 피격음 재생
+```
+
+- 데미지 적용 = Cue 발동 시점이라, 무적/슈퍼아머로 GE가 막히면(`bDamageBlocked`) 피격음도 자연히 안 난다.
+- Cue 태그는 `GameplayCue.Combat.Hit` 단일로 시작한다. 재질/부위별로 쪼갤 때는 `GameplayCue.Combat.Hit.<재질>` 하위 태그를 추가하고, 그때만 발동을 "GE-박기"에서 "코드가 대상 재질을 읽어 `ExecuteGameplayCue`"로 옮긴다. 단일 태그는 부모 폴백으로 계속 동작한다.
+- 사운드 에셋은 `ULSGCN_Hit` 파생 BP에서 매핑한다(경로 하드코딩 금지). Notify BP는 `/Game/LostSignal` 하위에 두며 스캔 경로는 `DefaultGame.ini`의 `GameplayCueNotifyPaths`로 지정한다.
+
 ## 쿨타임 흐름
 
 쿨타임은 GameplayTag와 GameplayEffect로 관리한다. 스킬 입력 시 쿨타임 중이면 프리뷰 진입도 막는다.

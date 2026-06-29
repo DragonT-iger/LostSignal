@@ -65,9 +65,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void EndActionDash();
 
-	/** 윈드업 AnimNotifyState가 호출. 활성 액션 row 범위로 텔레그래프 표시. */
+	/** 윈드업 AnimNotifyState Begin이 호출. 활성 액션 row 범위로 텔레그래프 표시. Duration은 fill 차오름 기준 시간. */
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
-	void BeginActionTelegraph();
+	void BeginActionTelegraph(float Duration = 0.0f);
+
+	/** 윈드업 AnimNotifyState Tick이 호출. 경과 시간 비율로 텔레그래프 fill을 0→1로 채운다. */
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void UpdateActionTelegraphFill(float DeltaSeconds);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void EndActionTelegraph();
@@ -134,4 +138,8 @@ private:
 	bool bActionDashLandingValid = false;
 	FVector ActionDashLandingLocation = FVector::ZeroVector;
 	FVector ActionDashDirection = FVector::ZeroVector;
+
+	// 텔레그래프 fill 차오름: 윈드업 NotifyState 윈도우 길이와 경과 시간.
+	float TelegraphDuration = 0.0f;
+	float TelegraphElapsed = 0.0f;
 };

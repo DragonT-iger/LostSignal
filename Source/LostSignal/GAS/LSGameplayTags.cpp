@@ -30,6 +30,8 @@ namespace LSGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Event_Combat_BasicAttackHit, "LS.Event.Combat.BasicAttackHit")
 
+	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Combat_Hit, "GameplayCue.Combat.Hit")
+
 	UE_DEFINE_GAMEPLAY_TAG(Noise_Idle, "LS.Noise.Idle")
 	UE_DEFINE_GAMEPLAY_TAG(Noise_Walk, "LS.Noise.Walk")
 	UE_DEFINE_GAMEPLAY_TAG(Noise_Run, "LS.Noise.Run")

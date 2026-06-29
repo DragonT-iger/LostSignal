@@ -95,6 +95,21 @@ void ULSSkillPreviewComponent::UpdateAreaPreview(const FVector& WorldLocation, c
 	ApplyMaterialParameters(WorldRotation.Yaw);
 }
 
+void ULSSkillPreviewComponent::SetAreaFillAmount(float NewFillAmount)
+{
+	ActivePreviewSpec.FillAmount = NewFillAmount;
+	if (!ActivePreviewMaterial)
+	{
+		return;
+	}
+
+	// 모양별 fill 파라미터만 갱신(ApplyMaterialParameters와 동일 매핑). 다른 파라미터·트랜스폼은 보존.
+	const FName FillParameterName = ActivePreviewSpec.Shape == ELSSkillAreaShape::Circle
+		? FName(TEXT("Outer Radius"))
+		: FName(TEXT("Fill Amount"));
+	ActivePreviewMaterial->SetScalarParameterValue(FillParameterName, NewFillAmount);
+}
+
 void ULSSkillPreviewComponent::EndAreaPreview()
 {
 	if (ActivePreviewMesh)

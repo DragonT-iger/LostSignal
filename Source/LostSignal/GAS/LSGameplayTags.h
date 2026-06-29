@@ -42,6 +42,9 @@ namespace LSGameplayTags
 	// Gameplay event tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Event_Combat_BasicAttackHit)
 
+	// Gameplay cue tags (피격 등 연출용. 반드시 "GameplayCue." 루트로 시작)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Combat_Hit)
+
 	// Gameplay noise tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Noise_Idle)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Noise_Walk)

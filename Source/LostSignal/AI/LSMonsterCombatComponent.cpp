@@ -347,12 +347,16 @@ void ULSMonsterCombatComponent::EndActionDash()
 	bActionDashLandingValid = false;
 }
 
-void ULSMonsterCombatComponent::BeginActionTelegraph()
+void ULSMonsterCombatComponent::BeginActionTelegraph(float Duration)
 {
 	if (!ShouldShowActionTelegraph())
 	{
 		return;
 	}
+
+	// fill 차오름 기준 시간(윈드업 NotifyState 윈도우). 매 Tick 경과 비율로 0→1.
+	TelegraphDuration = Duration;
+	TelegraphElapsed = 0.0f;
 
 	const AActor* OwnerActor = GetOwner();
 	const FLSMonsterActionRow* Row = GetActiveActionRow();
@@ -409,11 +413,30 @@ void ULSMonsterCombatComponent::BeginActionTelegraph()
 			? OwnerActor->GetActorRotation()
 			: PreviewDirection.Rotation();
 		Preview->UpdateAreaPreview(PreviewOrigin, PreviewRotation);
+		Preview->SetAreaFillAmount(0.0f); // 채움 시작점.
 	}
+}
+
+void ULSMonsterCombatComponent::UpdateActionTelegraphFill(float DeltaSeconds)
+{
+	ULSSkillPreviewComponent* Preview = GetPreviewComponent();
+	if (!Preview || !Preview->IsAreaPreviewActive())
+	{
+		return;
+	}
+
+	TelegraphElapsed += DeltaSeconds;
+	const float Alpha = TelegraphDuration > 0.0f
+		? FMath::Clamp(TelegraphElapsed / TelegraphDuration, 0.0f, 1.0f)
+		: 1.0f;
+	Preview->SetAreaFillAmount(Alpha);
 }
 
 void ULSMonsterCombatComponent::EndActionTelegraph()
 {
+	TelegraphDuration = 0.0f;
+	TelegraphElapsed = 0.0f;
+
 	if (ULSSkillPreviewComponent* Preview = GetPreviewComponent())
 	{
 		Preview->EndAreaPreview();

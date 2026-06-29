@@ -262,8 +262,9 @@ StateTree Attack 상태
    -> RequestAbilityByTag(Ability_MonsterAction)
 -> ULSGA_MonsterAction: 활성 액션 row의 Action_Ani 몽타주 재생
 -> (윈드업) AnimNotifyState ULSANS_MonsterActionTelegraph
-   -> ULSMonsterCombatComponent::BeginActionTelegraph / EndActionTelegraph
+   -> Begin: BeginActionTelegraph(TotalDuration) / Tick: UpdateActionTelegraphFill / End: EndActionTelegraph
    -> ULSSkillPreviewComponent(스킬 인디케이터 재사용)로 Hitbox 모양/크기 표시
+   -> fill은 NotifyState 윈도우(TotalDuration) 동안 0→1로 차오름(가득 참=타격 시점). ULSSkillPreviewComponent::SetAreaFillAmount
 -> (도약 프레임, 선택) AnimNotify ULSAN_MonsterActionDash
    -> ULSMonsterCombatComponent::PerformActionDash
    -> Dash_Distance/Duration으로 타겟 방향 평면 전진(FRootMotionSource_ConstantForce, 타겟까지 거리로 클램프)

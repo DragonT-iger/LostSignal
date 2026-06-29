@@ -26,6 +26,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Skill|Preview")
 	void EndAreaPreview();
 
+	/** 위치/회전·기타 파라미터는 그대로 두고 fill 진행도만 갱신(텔레그래프 차징 등). */
+	UFUNCTION(BlueprintCallable, Category="LS/Skill|Preview")
+	void SetAreaFillAmount(float NewFillAmount);
+
 	UFUNCTION(BlueprintPure, Category="LS/Skill|Preview")
 	bool IsAreaPreviewActive() const { return ActivePreviewMesh != nullptr; }
 

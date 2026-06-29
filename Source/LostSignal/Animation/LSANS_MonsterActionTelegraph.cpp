@@ -17,7 +17,16 @@ void ULSANS_MonsterActionTelegraph::NotifyBegin(USkeletalMeshComponent* MeshComp
 {
 	if (ULSMonsterCombatComponent* CombatComponent = ResolveMonsterCombat(MeshComp))
 	{
-		CombatComponent->BeginActionTelegraph();
+		// TotalDuration(윈드업 윈도우)이 fill 차오름 기준 시간.
+		CombatComponent->BeginActionTelegraph(TotalDuration);
+	}
+}
+
+void ULSANS_MonsterActionTelegraph::NotifyTick(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float FrameDeltaTime, const FAnimNotifyEventReference& EventReference)
+{
+	if (ULSMonsterCombatComponent* CombatComponent = ResolveMonsterCombat(MeshComp))
+	{
+		CombatComponent->UpdateActionTelegraphFill(FrameDeltaTime);
 	}
 }
 
