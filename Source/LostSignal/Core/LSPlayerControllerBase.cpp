@@ -653,6 +653,14 @@ void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
 		return;
 	}
 
+	// HUD(미니맵/체력 등)는 폰이 있어야 의미가 있다. 폰이 없으면(예: 로비) 만들지 않는다.
+	// 폰을 점유하면 OnPossess/AcknowledgePossession에서 다시 호출돼 그때 생성된다.
+	APawn* CurrentPawn = GetPawn();
+	if (!CurrentPawn)
+	{
+		return;
+	}
+
 	if (!PlayerHUDWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("PlayerHUDWidgetClass is not set on %s."), *GetNameSafe(this));
@@ -675,14 +683,6 @@ void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
 	}
 
 	PlayerHUDWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-
-	APawn* CurrentPawn = GetPawn();
-	if (!CurrentPawn)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s created player HUD but pawn is not ready yet."), *GetNameSafe(this));
-		return;
-	}
-
 	PlayerHUDWidgetInstance->InitializeHUDForPawn(CurrentPawn);
 }
 

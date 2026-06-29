@@ -1,14 +1,91 @@
 #include "Core/LSLobbyGameMode.h"
 
+#include "Blueprint/UserWidget.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "GameFramework/PlayerController.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Session/LSSessionSettings.h"
 #include "Session/LSSessionSubsystem.h"
+#include "UI/LSBackgroundBlurWidget.h"
+#include "UI/LSUILayer.h"
+#include "UI/Lobby/LSLobbyMenuWidget.h"
 
 namespace
 {
 constexpr float RaidEntryDataTimeoutSeconds = 10.0f;
+}
+
+ALSLobbyGameMode::ALSLobbyGameMode()
+{
+	// 로비는 조작할 폰이 없다. 기본 폰 스폰을 막는다.
+	DefaultPawnClass = nullptr;
+}
+
+void ALSLobbyGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+	CreateLobbyBackgroundWidget();
+	CreateLobbyMenuWidget();
+}
+
+void ALSLobbyGameMode::CreateLobbyBackgroundWidget()
+{
+	APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	if (!PlayerController)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot create lobby background because PlayerController is missing."));
+		return;
+	}
+
+	if (!BackgroundBlurWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] BackgroundBlurWidgetClass is not set on %s. Check BP_LobbyGameMode."), *GetNameSafe(this));
+		return;
+	}
+
+	BackgroundBlurWidgetInstance = CreateWidget<ULSBackgroundBlurWidget>(PlayerController, BackgroundBlurWidgetClass);
+	if (!BackgroundBlurWidgetInstance)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Failed to create lobby background widget on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	// 메뉴 뒤에 상시 깔리는 배경. 입력은 메뉴가 받도록 HitTestInvisible로 둔다.
+	BackgroundBlurWidgetInstance->AddToViewport(LSUILayer::LobbyBackground);
+	BackgroundBlurWidgetInstance->SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void ALSLobbyGameMode::CreateLobbyMenuWidget()
+{
+	APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	if (!PlayerController)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot create lobby menu because PlayerController is missing."));
+		return;
+	}
+
+	if (!LobbyMenuWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] LobbyMenuWidgetClass is not set on %s. Check BP_LobbyGameMode."), *GetNameSafe(this));
+		return;
+	}
+
+	LobbyMenuWidgetInstance = CreateWidget<ULSLobbyMenuWidget>(PlayerController, LobbyMenuWidgetClass);
+	if (!LobbyMenuWidgetInstance)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Failed to create lobby menu widget on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	LobbyMenuWidgetInstance->AddToViewport(LSUILayer::LobbyMenu);
+
+	PlayerController->bShowMouseCursor = true;
+	FInputModeUIOnly InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	// 로비 메뉴에 포커스를 줘서 TAB 등 키 입력이 위젯으로 전달되게 한다.
+	InputMode.SetWidgetToFocus(LobbyMenuWidgetInstance->TakeWidget());
+	PlayerController->SetInputMode(InputMode);
 }
 
 void ALSLobbyGameMode::StartRaid()

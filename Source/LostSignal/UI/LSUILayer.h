@@ -13,6 +13,12 @@ namespace LSUILayer
 	// 패널이 열리면 HUD도 함께 블러된다. (HUD를 또렷이 유지하려면 BackgroundBlur보다 큰 값으로 올린다.)
 	constexpr int32 HUD = 0;
 
+	// ---- 로비 레벨 전용 ----
+	// 로비 메뉴 뒤에 상시 깔리는 배경 블러. 메뉴(LobbyMenu)보다 아래라 메뉴가 또렷이 위에 그려진다.
+	constexpr int32 LobbyBackground = 0;
+	// 로비 메뉴 본체(WBP_Lobby). 배경 블러보다 위.
+	constexpr int32 LobbyMenu = 10;
+
 	// 인벤토리/창고/칩스테이션/루트드랍 같은 모달 패널 뒤에 깔리는 공유 풀스크린 블러.
 	constexpr int32 BackgroundBlur = 100;
 
