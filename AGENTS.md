@@ -44,6 +44,7 @@
 - **에셋 참조:** `ConstructorHelpers`로 WBP/에셋 경로 하드코딩 지양. `UPROPERTY(EditDefaultsOnly)`/`TSubclassOf`로 열고 BP에서 매핑
 - **초기화:** 초기화 로직은 C++ 생성자에서 처리. BP(블루프린트)에서는 메시·이펙트·사운드 등 에셋 경로 매핑만 수행
 - **GAS:** 체력/스태미나/스킬/상태이상은 GAS로 처리. 구조·태그·컴포넌트 매핑은 [SkillSystemStructure.md](Docs/Systems/SkillSystemStructure.md) 참고. 수치 변경은 반드시 GameplayEffect로.
+- **익명 네임스페이스 헬퍼 이름 충돌 금지(유니티 빌드):** `.cpp`의 익명 네임스페이스(`namespace { ... }`)나 `static` 파일 로컬 함수는 **파일마다 고유한 이름**을 쓴다. 두 파일이 같은 시그니처의 같은 이름(예: `ResolveGameDataSubsystem`)을 쓰면, 평소엔 통과하다가 새 `.cpp` 추가로 유니티 묶음이 재배치되는 순간 "중복 정의" 컴파일 에러가 난다. 새 파일 추가 후 빌드가 깨지면 이 충돌부터 의심하고, 헬퍼 이름에 도메인 접두사(예: `ResolveCombatAccelerationGameData`)를 붙여 고유화한다.
 
 ---
 

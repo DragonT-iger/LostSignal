@@ -45,6 +45,14 @@ public:
 	void UpdateRaidConsumedItems(const TArray<FLSSessionItem>& ConsumedItems);
 	void ClearRaidSave();
 
+	// 타이틀 Continue 활성 여부 판단용. 저장된 세이브 파일이 존재하는지.
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	bool HasExistingSave() const;
+
+	// 타이틀 New 게임. 모든 진행 데이터를 초기화하고 즉시 저장한다.
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	void StartNewGame();
+
 	// 현재 레이드(파밍) 세션이 진행 중인지. 레이드에서만 신호 게이지가 시간에 따라 감소한다.
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	bool IsRaidSaveActive() const;

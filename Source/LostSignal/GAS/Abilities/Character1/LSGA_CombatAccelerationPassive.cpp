@@ -56,7 +56,7 @@ namespace
 		AccumulateCombatAccelerationModifier(StatusRow.Target_Stat_2, StatusRow.Math_Type_2, StatusRow.Mod_Value_2, OutAttackSpeedBonus, OutAttackPowerBonus);
 	}
 
-	const ULSGameDataSubsystem* ResolveGameDataSubsystem(const AActor* SourceActor)
+	const ULSGameDataSubsystem* ResolveCombatAccelerationGameData(const AActor* SourceActor)
 	{
 		const UWorld* World = SourceActor ? SourceActor->GetWorld() : nullptr;
 		const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
@@ -98,7 +98,7 @@ void ULSGA_CombatAccelerationPassive::ActivateAbility(
 		return;
 	}
 
-	const ULSGameDataSubsystem* GameDataSubsystem = ResolveGameDataSubsystem(SourceActor);
+	const ULSGameDataSubsystem* GameDataSubsystem = ResolveCombatAccelerationGameData(SourceActor);
 	const FLSCharacterPassiveSkillRow* PassiveRow = GameDataSubsystem
 		? GameDataSubsystem->FindPassiveSkillRowByID(SkillData->GetPassiveSkillID(), TEXT("CombatAcceleration.PassiveRow"))
 		: nullptr;

@@ -655,6 +655,21 @@ FString ULSSaveSubsystem::GetResolvedDebugFileName() const
 	return FString::Printf(TEXT("%s_Debug.json"), *ResolvedSlotName);
 }
 
+bool ULSSaveSubsystem::HasExistingSave() const
+{
+	const FString ResolvedSlotName = GetResolvedSlotName();
+	return UGameplayStatics::DoesSaveGameExist(ResolvedSlotName, 0)
+		|| UGameplayStatics::DoesSaveGameExist(SlotName, 0);
+}
+
+void ULSSaveSubsystem::StartNewGame()
+{
+	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
+	EnsureChipEquipmentSlots();
+	Save();
+	UE_LOG(LogLS, Log, TEXT("[Save] New game started - progress reset for slot %s"), *GetResolvedSlotName());
+}
+
 void ULSSaveSubsystem::Load()
 {
 	const FString ResolvedSlotName = GetResolvedSlotName();
