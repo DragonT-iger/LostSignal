@@ -109,6 +109,11 @@ CooldownEffectClass
 
 DisplayName / Description / Icon
 - UI 표시 정보
+
+CastSound
+- 스킬 발동 순간 재생할 시전음(USoundBase). 스킬별로 다르게 둔다.
+- 발동 시 ULSPlayerSkillComponent가 GameplayCueParameters에 실어 GameplayCue.Skill.Cast로 발동 → 전 클라 복제 재생.
+- 미할당이면 무음. 프레임에 맞춰야 하는 휘두름/타격음은 여기가 아니라 몽타주의 LSAN_PlaySound로 둔다.
 ```
 
 ## ULSSkillDataAsset

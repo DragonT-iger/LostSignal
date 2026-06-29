@@ -7,6 +7,7 @@
 
 class UGameplayAbility;
 class UGameplayEffect;
+class USoundBase;
 
 /** Common DataAsset base shared by active and passive skill assets. */
 UCLASS(Abstract, BlueprintType)
@@ -46,4 +47,8 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|UI")
 	TObjectPtr<UTexture2D> Icon;
+
+	// 스킬 발동 순간 재생할 시전음. 발동 시 GameplayCueParameters로 실려 전 클라에서 재생된다(미할당이면 무음).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Audio")
+	TObjectPtr<USoundBase> CastSound;
 };

@@ -610,8 +610,35 @@ bool ULSPlayerSkillComponent::TryActivateGameplayAbility(ULSSkillDataAsset* Skil
 		PendingAbilityContext = FLSSkillActivationContext();
 		PendingAbilityClass = nullptr;
 	}
+	else
+	{
+		// 발동 성공 시 시전음 Cue 발동. 서버 권한 경로라 멀티캐스트로 전 클라가 재생한다.
+		PlaySkillCastCue(SkillData);
+	}
 
 	return bActivated;
+}
+
+void ULSPlayerSkillComponent::PlaySkillCastCue(const ULSSkillDataAsset* SkillData) const
+{
+	if (!SkillData || !SkillData->CastSound)
+	{
+		return;
+	}
+
+	AActor* OwnerActor = GetOwner();
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerActor);
+	if (!OwnerActor || !ASC)
+	{
+		return;
+	}
+
+	FGameplayCueParameters CueParams;
+	CueParams.SourceObject = SkillData->CastSound.Get();
+	CueParams.Location = OwnerActor->GetActorLocation();
+	CueParams.Instigator = OwnerActor;
+
+	ASC->ExecuteGameplayCue(LSGameplayTags::GameplayCue_Skill_Cast, CueParams);
 }
 
 bool ULSPlayerSkillComponent::TrySendPassiveGameplayEvent(ULSPassiveSkillDataAsset* SkillData, int32 ComboIndex, int32 ComboAttackID) const

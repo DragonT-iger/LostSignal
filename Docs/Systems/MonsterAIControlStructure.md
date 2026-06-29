@@ -198,9 +198,12 @@ Sense / GAS / Combat
 코드 작업 시 기본 상태 모델은 아래 구조를 기준으로 본다.
 
 ```text
-Idle
-- 기본 대기
-- 관심 위치나 시야 타겟이 생기면 이동 상태로 전이
+Idle / Patrol
+- 타겟이 없을 때 LS Patrol(FLSSTTask_Patrol)로 HomeLocation 주변 배회
+- 직선 5m 이동 → 정지 대기(둘러보기) → 다른 방향 직선 이동 반복(거리/대기시간 변수)
+- PatrolRadius 이내로만 이동(경계 초과 시 Home 방향으로 편향), 네비 레이캐스트로 충돌체 직전 ObstacleStopMargin만큼 앞에서 정지
+- 이동 속도는 기본 MaxWalkSpeed × PatrolSpeedMultiplier(상태 이탈 시 복원)
+- 관심 위치나 시야 타겟이 생기면 이동 상태로 전이(순찰 태스크는 이탈을 막지 않음)
 
 Investigate
 - InterestLocation으로 이동

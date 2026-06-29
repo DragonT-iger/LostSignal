@@ -314,6 +314,17 @@ ASC와 AttributeSet 관계:
 - Cue 태그는 `GameplayCue.Combat.Hit` 단일로 시작한다. 재질/부위별로 쪼갤 때는 `GameplayCue.Combat.Hit.<재질>` 하위 태그를 추가하고, 그때만 발동을 "GE-박기"에서 "코드가 대상 재질을 읽어 `ExecuteGameplayCue`"로 옮긴다. 단일 태그는 부모 폴백으로 계속 동작한다.
 - 사운드 에셋은 `ULSGCN_Hit` 파생 BP에서 매핑한다(경로 하드코딩 금지). Notify BP는 `/Game/LostSignal` 하위에 두며 스캔 경로는 `DefaultGame.ini`의 `GameplayCueNotifyPaths`로 지정한다.
 
+스킬 시전음도 GameplayCue로 처리하되, 사운드 출처가 다르다. 피격음은 공유라 GCN BP에 사운드를 매핑하지만, 시전음은 스킬별이라 **사운드 에셋을 스킬 DataAsset(`CastSound`)에 두고 GameplayCueParameters로 전달**한다. DataAsset 필드는 [SkillSystemStructure.md](SkillSystemStructure.md)의 `ULSSkillDataAssetBase`가 단일 출처다.
+
+```text
+스킬 발동(서버 권한, ULSPlayerSkillComponent::TryActivateGameplayAbility 성공)
+-> CastSound를 GameplayCueParameters.SourceObject에 담아 ASC->ExecuteGameplayCue(GameplayCue.Skill.Cast, Params)
+-> 서버 ExecuteGameplayCue가 NetMulticast로 전 클라(소유자 포함) 실행
+-> ULSGCN_SkillCast::OnExecute가 받은 SourceObject(USoundBase)를 캐스터 위치에서 재생
+```
+
+- `ULSGCN_SkillCast`는 사운드를 직접 들지 않고 파라미터로 받은 것만 재생하므로, 스킬마다 GCN/태그가 늘지 않는다. BP는 `GameplayCue.Skill.Cast` 태그 바인딩용 1개면 된다.
+
 ## 쿨타임 흐름
 
 쿨타임은 GameplayTag와 GameplayEffect로 관리한다. 스킬 입력 시 쿨타임 중이면 프리뷰 진입도 막는다.
