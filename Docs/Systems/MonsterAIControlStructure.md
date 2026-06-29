@@ -100,8 +100,15 @@ Sight_Radius
 Hearing_Radius
 -> ULSMonsterSenseComponent::HearingRadius
 
+Patrol_Speed
+-> ULSMonsterSenseComponent::PatrolMoveSpeedMultiplier
+-> FLSSTTask_Patrol enters Patrol with MaxWalkSpeed *= PatrolMoveSpeedMultiplier
+
 Chase_Speed
--> StateTree에 노출되는 AlertMoveSpeedMultiplier 계열 값
+-> ULSMonsterSenseComponent::AlertMoveSpeedMultiplier (Evaluator가 StateTree로 노출)
+-> Chase: FLSSTTask_ApplyMoveSpeedMultiplier가 MaxWalkSpeed = base × AlertMoveSpeedMultiplier (기본 MoveTo와 병렬)
+-> ReturnHome: FLSSTTask_SetReturnHomeMode가 동일하게 MaxWalkSpeed = base × AlertMoveSpeedMultiplier
+-> base = ALSEnemyCharacter::DefaultMaxWalkSpeed (BeginPlay 캡처, 모든 이동 Task의 단일 기준)
 
 Monster_HP
 -> ALSEnemyCharacter가 서버에서 ULSCombatAttributeSet MaxHealth / CurrentHealth 초기화
@@ -198,6 +205,13 @@ Sense / GAS / Combat
 코드 작업 시 기본 상태 모델은 아래 구조를 기준으로 본다.
 
 ```text
+Dormant
+- 타겟/관심 위치/공격/복귀가 없고 플레이어가 SleepDistance 밖이면 진입
+- ULSMonsterSenseComponent가 WakeDistance / SleepDistance / DormantSenseTickInterval을 에디터 변수로 관리
+- StateTree Dormant 상태는 LS Dormant Wait(FLSSTTask_DormantWait)로 이동/포커스를 정리한 뒤 전이까지 유지
+- Dormant 중에는 거리 체크만 유지하고 시야/FOV/LOS 감지와 Patrol MoveTo 비용을 쓰지 않음
+- 가장 가까운 플레이어가 WakeDistance 안으로 들어오면 Patrol로 복귀
+
 Idle / Patrol
 - 타겟이 없을 때 LS Patrol(FLSSTTask_Patrol)로 HomeLocation 주변 배회
 - 직선 5m 이동 → 정지 대기(둘러보기) → 다른 방향 직선 이동 반복(거리/대기시간 변수)
@@ -211,7 +225,8 @@ Investigate
 - 시야 타겟을 다시 얻으면 Chase로 전이
 
 Chase
-- 현재 시야 타겟 추적
+- 현재 시야 타겟 추적(기본 MoveTo Task 사용)
+- 이동 속도를 AlertMoveSpeedMultiplier(=Chase_Speed) 기준으로 적용: LS Apply Move Speed Multiplier Task를 MoveTo와 병렬로 배치(상태 이탈 시 복원)
 - 공격 거리 안이면 Attack으로 전이
 - 시야가 끊기면 마지막 InterestLocation으로 Investigate 전이
 - Leash를 벗어나면 ReturnHome 전이
@@ -468,6 +483,21 @@ ReturnHome
 ```
 
 `LS Set Return Home Mode`는 State Enter에서 포커스와 기존 추적 잔상을 끊고, State Exit에서 시야 반경 강제와 이동 속도를 복구한다. State Exit에서는 `InterestLocation`을 지우지 않는다. 대신 ReturnHome 중에는 Home 기준 Leash 밖의 시야 타겟, 소음, 피격 위치를 `InterestLocation`으로 다시 만들지 않는다. Leash 안의 새 감지만 Combat 또는 InvestigateInterest 전이에 사용한다.
+
+## 로코모션 애니메이션(Walk/Run) 규칙
+
+이동 Gait(Idle/Walk/Run)는 StateTree Task가 AnimInstance에 직접 지정하지 않는다. `ULSMonsterLocomotionAnimInstance`가 매 프레임 `MaxWalkSpeed`를 읽어 파생한다(pull). 이동 속도는 이미 Task가 단일 출처로 소유하므로(Patrol/ReturnHome가 `MaxWalkSpeed`를 변경), gait를 별도 상태로 중복 관리하지 않는다.
+
+```text
+Idle  : 실제 속력(velocity) <= MovingSpeedThreshold
+Walk  : MaxWalkSpeed <= 임계   (Patrol = base × PatrolMoveSpeedMultiplier, < base)
+Run   : MaxWalkSpeed >  임계   (Chase / ReturnHome = base × AlertMoveSpeedMultiplier)
+```
+
+- walk/run 임계는 Patrol 속도와 base 속도의 중간이다(`(PatrolMoveSpeedMultiplier + 1.0) / 2 × base`). Patrol만 base 미만(walk)으로 내려가고, Chase·ReturnHome은 AlertMoveSpeedMultiplier(≥1 가정)로 base 이상이 되어 run이 된다. 아키타입 멀티플라이어가 없으면 `WalkRunThresholdAlpha × base`로 폴백한다.
+- 기준(base) 속도는 `ALSEnemyCharacter`가 BeginPlay에서 `DefaultMaxWalkSpeed`로 1회 캡처해 보관하는 **단일 출처**다. 모든 이동 Task(Patrol/Chase/ReturnHome)는 라이브 `MaxWalkSpeed`를 캡처하지 않고 이 base를 읽어 `base × 배수`로 설정하며, 상태 이탈 시 base로 복원한다. AnimInstance도 같은 값을 읽는다. 이렇게 하면 전이 Enter/Exit 순서나 멀티플라이어 누적(줄어든 속도에 또 곱하기)에 의존하지 않는다.
+- 이동 속도 상태(Patrol/Chase/ReturnHome)는 상호 배타라는 전제로 base 복원을 쓴다. 동시에 두 속도 Task가 활성화되는 구조를 만들지 않는다.
+- 새 이동 상태(예: Investigate)를 추가해도 속도만 적절히 주면 gait가 자동으로 따라온다. Task에 gait 지정 코드를 넣지 않는다.
 
 ## 상태 태그 규칙
 

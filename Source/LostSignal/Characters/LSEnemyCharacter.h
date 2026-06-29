@@ -34,6 +34,9 @@ public:
 
 	virtual void BeginPlay() override;
 
+	/** 멀티플라이어가 적용되지 않은 기준(base) MaxWalkSpeed. BeginPlay에서 1회 저장. 이동 Task/AnimInstance가 base × 배수의 단일 출처로 사용. */
+	float GetDefaultMaxWalkSpeed() const { return DefaultMaxWalkSpeed; }
+
 	UFUNCTION(BlueprintPure, Category="LS/AI")
 	ULSMonsterSenseComponent* GetMonsterSenseComponent() const { return MonsterSenseComponent; }
 
@@ -124,4 +127,8 @@ private:
 	void DestroyDebugHpWidget();
 
 	bool bWarnedMissingDebugHpWidgetClass = false;
+
+	// 멀티 미적용 기준 MaxWalkSpeed(생성자/BP 기본값). BeginPlay에서 캡처해 고정.
+	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/AI")
+	float DefaultMaxWalkSpeed = 0.0f;
 };

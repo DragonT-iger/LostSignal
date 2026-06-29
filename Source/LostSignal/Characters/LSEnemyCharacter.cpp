@@ -87,6 +87,12 @@ void ALSEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 이동 Task가 속도를 바꾸기 전(StateTree 시작 전) base 속도를 캡처해 단일 출처로 보관.
+	if (const UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		DefaultMaxWalkSpeed = MovementComponent->MaxWalkSpeed;
+	}
+
 	InitializeMonsterArchetype();
 	TryCreateDebugHpWidget();
 

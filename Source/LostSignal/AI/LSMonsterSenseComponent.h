@@ -62,8 +62,19 @@ public:
 	UFUNCTION(BlueprintPure, Category="AI|Sense")
 	float GetAlertMoveSpeedMultiplier() const { return AlertMoveSpeedMultiplier; }
 
+	UFUNCTION(BlueprintPure, Category="LS/AI|Sense")
+	float GetPatrolMoveSpeedMultiplier() const { return PatrolMoveSpeedMultiplier; }
+
+	bool HasArchetypeMoveSpeedMultipliers() const { return bHasArchetypeMoveSpeedMultipliers; }
+
 	UFUNCTION(BlueprintPure, Category="AI|Sense")
 	float GetCurrentSightRadius() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/AI|Sense")
+	bool IsDormantByDistance() const { return bIsDormantByDistance; }
+
+	UFUNCTION(BlueprintPure, Category="LS/AI|Sense")
+	float GetNearestPlayerDistance() const { return NearestPlayerDistance; }
 
 	UFUNCTION(BlueprintCallable, Category="AI|Sense")
 	void SetForceMaxSightRadius(bool bInForceMaxSightRadius);
@@ -80,12 +91,16 @@ public:
 	bool CanSeeActor(const AActor* Actor) const;
 
 private:
+	void UpdateDistanceDormancy();
 	void UpdateSensing(float DeltaTime);
+	float ComputeNearestPlayerDistance() const;
 	AActor* FindBestVisibleTarget() const;
 	/** Commits a new target; captures the aggro anchor only on the first acquisition. */
 	void SetTarget(AActor* NewTarget, bool bCaptureAnchor);
 	/** Fully drops the current target, anchor and memory timer (keeps InterestLocation). */
 	void ReleaseTarget();
+	bool ShouldForceActiveSense() const;
+	void ApplySenseTickInterval();
 	bool IsLocationBeyondLeashDistance(const FVector& Location) const;
 	bool ShouldSuppressReturnHomeInterest(const FVector& InterestCandidateLocation) const;
 	bool IsOwnerDead() const;
@@ -110,6 +125,12 @@ private:
 	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float AlertMoveSpeedMultiplier = 1.2f;
 
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
+	float PatrolMoveSpeedMultiplier = 0.7f;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI|Sense")
+	bool bHasArchetypeMoveSpeedMultipliers = false;
+
 	// 최초 인식 위치(앵커)에서 이 거리를 벗어나면 타겟 해제(P0). 기획 30m 기준.
 	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float LeashDistance = 3000.0f;
@@ -117,6 +138,21 @@ private:
 	// 시야에서 타겟을 놓친 뒤 타겟을 유지하는 시간(P3). 경과 시 타겟 해제.
 	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float LostSightMemorySeconds = 5.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI|Dormant")
+	bool bEnableDistanceDormancy = true;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI|Dormant", meta=(ClampMin="0.0"))
+	float WakeDistance = 3000.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI|Dormant", meta=(ClampMin="0.0"))
+	float SleepDistance = 3500.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI|Dormant", meta=(ClampMin="0.0"))
+	float ActiveSenseTickInterval = 0.1f;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI|Dormant", meta=(ClampMin="0.0"))
+	float DormantSenseTickInterval = 1.0f;
 
 	UPROPERTY(EditAnywhere, Category="LS/AI|Debug")
 	bool bDrawSenseDebug = false;
@@ -141,6 +177,12 @@ private:
 
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI|Sense")
 	bool bReturnHomeMode = false;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI|Dormant")
+	float NearestPlayerDistance = 0.0f;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI|Dormant")
+	bool bIsDormantByDistance = false;
 
 	// 최초 인식 시점의 몬스터 위치(P0 이탈 판정 기준점). 복귀 목적지(HomeLocation)와 별개.
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI|Sense")

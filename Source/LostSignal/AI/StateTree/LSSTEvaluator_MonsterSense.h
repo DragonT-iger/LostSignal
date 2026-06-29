@@ -52,6 +52,12 @@ struct FLSSTEvaluator_MonsterSenseInstanceData
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	float AlertMoveSpeedMultiplier = 1.0f;
 
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	float PatrolMoveSpeedMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	float NearestPlayerDistance = 0.0f;
+
 	/** 현재 타겟을 이번 틱 실제로 보고 있는지(FOV+LOS). Attack/즉시 추격 판정용. */
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bHasVisualTarget = false;
@@ -80,6 +86,9 @@ struct FLSSTEvaluator_MonsterSenseInstanceData
 	/** Mirrors temporary CC movement lock state such as Override knockback. */
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bIsKnockback = false;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI")
+	bool bIsDormantByDistance = false;
 };
 
 /** StateTree evaluator that exposes monster sensing data to transitions and tasks. */

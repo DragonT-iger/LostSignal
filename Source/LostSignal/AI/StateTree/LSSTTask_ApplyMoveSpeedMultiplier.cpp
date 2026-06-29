@@ -1,13 +1,12 @@
-#include "AI/StateTree/LSSTTask_SetReturnHomeMode.h"
+#include "AI/StateTree/LSSTTask_ApplyMoveSpeedMultiplier.h"
 
-#include "AI/LSMonsterSenseComponent.h"
 #include "AIController.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "StateTreeExecutionContext.h"
 #include "LostSignal.h"
 
-FLSSTTask_SetReturnHomeMode::FLSSTTask_SetReturnHomeMode()
+FLSSTTask_ApplyMoveSpeedMultiplier::FLSSTTask_ApplyMoveSpeedMultiplier()
 {
 	bShouldCallTick = false;
 	bShouldCopyBoundPropertiesOnTick = false;
@@ -17,7 +16,7 @@ FLSSTTask_SetReturnHomeMode::FLSSTTask_SetReturnHomeMode()
 #endif
 }
 
-EStateTreeRunStatus FLSSTTask_SetReturnHomeMode::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
+EStateTreeRunStatus FLSSTTask_ApplyMoveSpeedMultiplier::EnterState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
@@ -32,53 +31,27 @@ EStateTreeRunStatus FLSSTTask_SetReturnHomeMode::EnterState(FStateTreeExecutionC
 		InstanceData.EnemyCharacter = Cast<ALSEnemyCharacter>(InstanceData.AIController->GetPawn());
 	}
 
-	if (!InstanceData.SenseComponent && InstanceData.EnemyCharacter)
+	if (!InstanceData.EnemyCharacter)
 	{
-		InstanceData.SenseComponent = InstanceData.EnemyCharacter->FindComponentByClass<ULSMonsterSenseComponent>();
-	}
-
-	if (!InstanceData.EnemyCharacter || !InstanceData.SenseComponent)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Failed To Enter ReturnHome State"))
+		UE_LOG(LogLS, Warning, TEXT("Failed To Apply Move Speed Multiplier"));
 		return EStateTreeRunStatus::Failed;
 	}
-
-	if (InstanceData.bClearFocusOnEnter && InstanceData.AIController)
-	{
-		InstanceData.AIController->ClearFocus(EAIFocusPriority::Gameplay);
-	}
-
-	if (InstanceData.bClearStaleInterestOnEnter)
-	{
-		InstanceData.SenseComponent->ClearInterest();
-	}
-
-	InstanceData.SenseComponent->SetReturnHomeMode(true);
-	InstanceData.SenseComponent->SetForceMaxSightRadius(true);
 
 	const float BaseMaxWalkSpeed = InstanceData.EnemyCharacter->GetDefaultMaxWalkSpeed();
 	if (UCharacterMovementComponent* MovementComponent = InstanceData.EnemyCharacter->GetCharacterMovement())
 	{
 		if (BaseMaxWalkSpeed > 0.0f)
 		{
-			MovementComponent->MaxWalkSpeed = BaseMaxWalkSpeed * FMath::Max(0.0f, InstanceData.AlertMoveSpeedMultiplier);
+			MovementComponent->MaxWalkSpeed = BaseMaxWalkSpeed * FMath::Max(0.0f, InstanceData.MoveSpeedMultiplier);
 		}
 	}
 
 	return EStateTreeRunStatus::Running;
 }
 
-void FLSSTTask_SetReturnHomeMode::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
+void FLSSTTask_ApplyMoveSpeedMultiplier::ExitState(FStateTreeExecutionContext& Context, const FStateTreeTransitionResult& Transition) const
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
-
-	UE_LOG(LogLS, Warning, TEXT("Exit ReturnHome"))
-
-	if (InstanceData.SenseComponent)
-	{
-		InstanceData.SenseComponent->SetReturnHomeMode(false);
-		InstanceData.SenseComponent->SetForceMaxSightRadius(false);
-	}
 
 	if (InstanceData.EnemyCharacter)
 	{

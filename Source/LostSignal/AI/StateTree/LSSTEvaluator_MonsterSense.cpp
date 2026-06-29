@@ -59,6 +59,10 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 		InstanceData.bIsAttacking = false;
 		InstanceData.bIsDead = false;
 		InstanceData.bIsKnockback = false;
+		InstanceData.bIsDormantByDistance = false;
+		InstanceData.PatrolMoveSpeedMultiplier = 1.0f;
+		InstanceData.AlertMoveSpeedMultiplier = 1.0f;
+		InstanceData.NearestPlayerDistance = 0.0f;
 		return;
 	}
 
@@ -68,11 +72,14 @@ void FLSSTEvaluator_MonsterSense::UpdateData(FStateTreeExecutionContext& Context
 	InstanceData.LeashDistance = InstanceData.SenseComponent->GetLeashDistance();
 	InstanceData.DistanceFromHome = InstanceData.SenseComponent->GetDistanceFromHome();
 	InstanceData.AlertDuration = InstanceData.SenseComponent->GetAlertDuration();
+	InstanceData.PatrolMoveSpeedMultiplier = InstanceData.SenseComponent->GetPatrolMoveSpeedMultiplier();
 	InstanceData.AlertMoveSpeedMultiplier = InstanceData.SenseComponent->GetAlertMoveSpeedMultiplier();
+	InstanceData.NearestPlayerDistance = InstanceData.SenseComponent->GetNearestPlayerDistance();
 	InstanceData.bHasVisualTarget = InstanceData.SenseComponent->HasVisualTarget();
 	InstanceData.bHasTarget = InstanceData.SenseComponent->HasTarget();
 	InstanceData.bHasInterestLocation = InstanceData.SenseComponent->HasInterestLocation();
 	InstanceData.bIsBeyondLeashDistance = InstanceData.SenseComponent->IsBeyondLeashDistance();
+	InstanceData.bIsDormantByDistance = InstanceData.SenseComponent->IsDormantByDistance();
 	InstanceData.bIsAttacking = false;
 	InstanceData.bIsDead = false;
 	InstanceData.bIsKnockback = false;

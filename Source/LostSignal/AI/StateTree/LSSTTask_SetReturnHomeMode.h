@@ -31,9 +31,6 @@ struct FLSSTTask_SetReturnHomeModeInstanceData
 
 	UPROPERTY(EditAnywhere, Category="LS/AI")
 	bool bClearStaleInterestOnEnter = true;
-
-	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI")
-	float PreviousMaxWalkSpeed = 0.0f;
 };
 
 /** StateTree task for ReturnHome: faster return movement and max sight radius until the state exits. */

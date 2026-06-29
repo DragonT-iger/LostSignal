@@ -13,7 +13,7 @@
 ULSMonsterSenseComponent::ULSMonsterSenseComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.TickInterval = 0.1f;
+	PrimaryComponentTick.TickInterval = ActiveSenseTickInterval;
 }
 
 void ULSMonsterSenseComponent::BeginPlay()
@@ -32,6 +32,8 @@ void ULSMonsterSenseComponent::BeginPlay()
 			}
 		}
 	}
+
+	ApplySenseTickInterval();
 }
 
 void ULSMonsterSenseComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -76,6 +78,12 @@ void ULSMonsterSenseComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 		return;
 	}
 
+	UpdateDistanceDormancy();
+	if (bIsDormantByDistance)
+	{
+		return;
+	}
+
 	UpdateSensing(DeltaTime);
 }
 
@@ -83,7 +91,9 @@ void ULSMonsterSenseComponent::ApplyArchetype(const FLSMonsterArchetypeRow& Row)
 {
 	BaseSightRadius = Row.Sight_Radius;
 	HearingRadius = Row.Hearing_Radius;
-	AlertMoveSpeedMultiplier = Row.Chase_Speed;
+	PatrolMoveSpeedMultiplier = FMath::Max(0.0f, Row.Patrol_Speed);
+	AlertMoveSpeedMultiplier = FMath::Max(0.0f, Row.Chase_Speed);
+	bHasArchetypeMoveSpeedMultipliers = true;
 }
 
 void ULSMonsterSenseComponent::RegisterNoiseEvent(const FLSNoiseEvent& NoiseEvent)
@@ -113,6 +123,8 @@ void ULSMonsterSenseComponent::RegisterNoiseEvent(const FLSNoiseEvent& NoiseEven
 
 	InterestLocation = NoiseEvent.Location;
 	bHasInterestLocation = true;
+	bIsDormantByDistance = false;
+	ApplySenseTickInterval();
 }
 
 void ULSMonsterSenseComponent::SetCurrentTargetFromDamage(AActor* DamageInstigator)
@@ -203,6 +215,72 @@ void ULSMonsterSenseComponent::ClearInterest()
 	ReleaseTarget();
 	InterestLocation = FVector::ZeroVector;
 	bHasInterestLocation = false;
+}
+
+void ULSMonsterSenseComponent::UpdateDistanceDormancy()
+{
+	NearestPlayerDistance = ComputeNearestPlayerDistance();
+
+	if (ShouldForceActiveSense())
+	{
+		bIsDormantByDistance = false;
+		ApplySenseTickInterval();
+		return;
+	}
+
+	const float WakeThreshold = FMath::Max(0.0f, WakeDistance);
+	const float SleepThreshold = FMath::Max(WakeThreshold, SleepDistance);
+	const bool bNextDormant = bIsDormantByDistance
+		? NearestPlayerDistance > WakeThreshold
+		: NearestPlayerDistance > SleepThreshold;
+
+	if (bIsDormantByDistance != bNextDormant)
+	{
+		bIsDormantByDistance = bNextDormant;
+		bTargetVisibleThisTick = false;
+		ApplySenseTickInterval();
+	}
+}
+
+float ULSMonsterSenseComponent::ComputeNearestPlayerDistance() const
+{
+	UWorld* World = GetWorld();
+	const AActor* OwnerActor = GetOwner();
+	if (!World || !OwnerActor)
+	{
+		return MAX_flt;
+	}
+
+	float NearestDistanceSq = MAX_flt;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PlayerController = It->Get();
+		const APawn* Pawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+		if (!Pawn || Pawn == OwnerActor)
+		{
+			continue;
+		}
+
+		const float DistSq = FVector::DistSquared2D(OwnerActor->GetActorLocation(), Pawn->GetActorLocation());
+		NearestDistanceSq = FMath::Min(NearestDistanceSq, DistSq);
+	}
+
+	return NearestDistanceSq < MAX_flt ? FMath::Sqrt(NearestDistanceSq) : MAX_flt;
+}
+
+bool ULSMonsterSenseComponent::ShouldForceActiveSense() const
+{
+	return !bEnableDistanceDormancy
+		|| CurrentTarget.IsValid()
+		|| bHasInterestLocation
+		|| bReturnHomeMode
+		|| IsOwnerAttacking();
+}
+
+void ULSMonsterSenseComponent::ApplySenseTickInterval()
+{
+	const float TargetInterval = bIsDormantByDistance ? DormantSenseTickInterval : ActiveSenseTickInterval;
+	PrimaryComponentTick.TickInterval = FMath::Max(0.0f, TargetInterval);
 }
 
 bool ULSMonsterSenseComponent::CanSeeActor(const AActor* Actor) const
@@ -301,6 +379,8 @@ void ULSMonsterSenseComponent::SetTarget(AActor* NewTarget, bool bCaptureAnchor)
 {
 	CurrentTarget = NewTarget;
 	TimeSinceTargetLastSeen = 0.0f;
+	bIsDormantByDistance = false;
+	ApplySenseTickInterval();
 
 	if (bCaptureAnchor)
 	{

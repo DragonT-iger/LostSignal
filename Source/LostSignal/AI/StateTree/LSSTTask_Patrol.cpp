@@ -1,5 +1,6 @@
 #include "AI/StateTree/LSSTTask_Patrol.h"
 
+#include "AI/LSMonsterSenseComponent.h"
 #include "AIController.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -30,6 +31,20 @@ namespace
 		}
 
 		return Direction.GetSafeNormal2D();
+	}
+
+	float ResolvePatrolTaskSpeedMultiplier(const FLSSTTask_PatrolInstanceData& InstanceData)
+	{
+		const ULSMonsterSenseComponent* SenseComponent = InstanceData.EnemyCharacter
+			? InstanceData.EnemyCharacter->GetMonsterSenseComponent()
+			: nullptr;
+
+		if (SenseComponent && SenseComponent->HasArchetypeMoveSpeedMultipliers())
+		{
+			return SenseComponent->GetPatrolMoveSpeedMultiplier();
+		}
+
+		return InstanceData.PatrolSpeedMultiplier;
 	}
 
 	// 직선 구간 목적지: 방향 선택 → 반경 클램프 → 네비 경계 정지(여유거리) → 도달 가능 위치 보정.
@@ -109,10 +124,14 @@ EStateTreeRunStatus FLSSTTask_Patrol::EnterState(FStateTreeExecutionContext& Con
 		InstanceData.HomeLocation = InstanceData.EnemyCharacter->GetActorLocation();
 	}
 
+	const float BaseMaxWalkSpeed = InstanceData.EnemyCharacter->GetDefaultMaxWalkSpeed();
 	if (UCharacterMovementComponent* MovementComponent = InstanceData.EnemyCharacter->GetCharacterMovement())
 	{
-		InstanceData.PreviousMaxWalkSpeed = MovementComponent->MaxWalkSpeed;
-		MovementComponent->MaxWalkSpeed = InstanceData.PreviousMaxWalkSpeed * FMath::Max(0.0f, InstanceData.PatrolSpeedMultiplier);
+		if (BaseMaxWalkSpeed > 0.0f)
+		{
+			const float SpeedMultiplier = ResolvePatrolTaskSpeedMultiplier(InstanceData);
+			MovementComponent->MaxWalkSpeed = BaseMaxWalkSpeed * FMath::Max(0.0f, SpeedMultiplier);
+		}
 	}
 
 	InstanceData.LookAroundElapsed = 0.0f;
@@ -162,11 +181,15 @@ void FLSSTTask_Patrol::ExitState(FStateTreeExecutionContext& Context, const FSta
 		InstanceData.AIController->StopMovement();
 	}
 
-	if (InstanceData.EnemyCharacter && InstanceData.PreviousMaxWalkSpeed > 0.0f)
+	if (InstanceData.EnemyCharacter)
 	{
-		if (UCharacterMovementComponent* MovementComponent = InstanceData.EnemyCharacter->GetCharacterMovement())
+		const float BaseMaxWalkSpeed = InstanceData.EnemyCharacter->GetDefaultMaxWalkSpeed();
+		if (BaseMaxWalkSpeed > 0.0f)
 		{
-			MovementComponent->MaxWalkSpeed = InstanceData.PreviousMaxWalkSpeed;
+			if (UCharacterMovementComponent* MovementComponent = InstanceData.EnemyCharacter->GetCharacterMovement())
+			{
+				MovementComponent->MaxWalkSpeed = BaseMaxWalkSpeed;
+			}
 		}
 	}
 }

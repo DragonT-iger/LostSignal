@@ -64,9 +64,6 @@ struct FLSSTTask_PatrolInstanceData
 
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI")
 	float LookAroundElapsed = 0.0f;
-
-	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI")
-	float PreviousMaxWalkSpeed = 0.0f;
 };
 
 /** StateTree task: HomeLocation 주변을 직선 구간 이동 + 정지 대기로 배회하는 순찰. */
