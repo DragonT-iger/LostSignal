@@ -5,6 +5,7 @@
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
+#include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Policies\PrettyJsonPrintPolicy.h"
@@ -664,10 +665,29 @@ bool ULSSaveSubsystem::HasExistingSave() const
 
 void ULSSaveSubsystem::StartNewGame()
 {
+	// 기존 세이브를 모두 지우고 빈 데이터로 새로 시작한다. 즉시 재저장하지 않으므로
+	// 이후 게임 플레이가 저장을 일으키기 전까지는 세이브 파일이 없는 상태가 된다.
+	DeleteAllSaveFiles();
+
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	EnsureChipEquipmentSlots();
-	Save();
-	UE_LOG(LogLS, Log, TEXT("[Save] New game started - progress reset for slot %s"), *GetResolvedSlotName());
+	UE_LOG(LogLS, Log, TEXT("[Save] New game started - all save files deleted for a fresh start"));
+}
+
+void ULSSaveSubsystem::DeleteAllSaveFiles() const
+{
+	const FString ResolvedSlotName = GetResolvedSlotName();
+
+	UGameplayStatics::DeleteGameInSlot(ResolvedSlotName, 0);
+	UGameplayStatics::DeleteGameInSlot(SlotName, 0);
+
+	// .sav 외에 디버그 json도 함께 정리한다.
+	IFileManager& FileManager = IFileManager::Get();
+	const FString SaveGamesDir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"));
+	FileManager.Delete(*FPaths::Combine(SaveGamesDir, GetResolvedDebugFileName()), false, false, true);
+	FileManager.Delete(*FPaths::Combine(SaveGamesDir, DebugFileName), false, false, true);
+
+	UE_LOG(LogLS, Log, TEXT("[Save] Deleted save files for slots %s and %s"), *ResolvedSlotName, *SlotName);
 }
 
 void ULSSaveSubsystem::Load()

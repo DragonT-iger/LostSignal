@@ -1,11 +1,15 @@
 #include "UI/Title/LSTitleMenuWidget.h"
 
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSettings.h"
+#include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/Title/LSTitleMenuButtonWidget.h"
+
+#define LOCTEXT_NAMESPACE "LSTitleMenu"
 
 void ULSTitleMenuWidget::NativeConstruct()
 {
@@ -103,14 +107,25 @@ void ULSTitleMenuWidget::HandleContinueClicked()
 
 void ULSTitleMenuWidget::HandleNewClicked()
 {
+	// 데이터가 삭제되므로 확인 다이얼로그를 거친다.
+	ULSConfirmDialogWidget* Dialog = ShowConfirmDialog(
+		LOCTEXT("NewGameConfirm", "저장된 데이터가 삭제됩니다. 계속 진행하시겠습니까?"));
+	if (Dialog)
+	{
+		Dialog->OnConfirmed.AddDynamic(this, &ULSTitleMenuWidget::HandleNewConfirmed);
+	}
+}
+
+void ULSTitleMenuWidget::HandleNewConfirmed()
+{
 	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
 	if (!SaveSubsystem)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Title] New clicked but SaveSubsystem is missing."));
+		UE_LOG(LogLS, Warning, TEXT("[Title] New confirmed but SaveSubsystem is missing."));
 		return;
 	}
 
-	UE_LOG(LogLS, Log, TEXT("[Title] New game - resetting save and opening lobby."));
+	UE_LOG(LogLS, Log, TEXT("[Title] New game confirmed - resetting save and opening lobby."));
 	SaveSubsystem->StartNewGame();
 	OpenLobbyLevel();
 }
@@ -129,8 +144,25 @@ void ULSTitleMenuWidget::HandleCrewClicked()
 
 void ULSTitleMenuWidget::HandleExitClicked()
 {
-	UE_LOG(LogLS, Log, TEXT("[Title] Exit - quitting game."));
+	// 종료 전에도 같은 확인 다이얼로그를 거친다.
+	ULSConfirmDialogWidget* Dialog = ShowConfirmDialog(
+		LOCTEXT("ExitConfirm", "게임을 종료하시겠습니까?"));
+	if (Dialog)
+	{
+		Dialog->OnConfirmed.AddDynamic(this, &ULSTitleMenuWidget::HandleExitConfirmed);
+	}
+}
+
+void ULSTitleMenuWidget::HandleExitConfirmed()
+{
+	UE_LOG(LogLS, Log, TEXT("[Title] Exit confirmed - quitting game."));
 	UKismetSystemLibrary::QuitGame(this, GetOwningPlayer(), EQuitPreference::Quit, false);
+}
+
+void ULSTitleMenuWidget::HandleDialogCancelled()
+{
+	UE_LOG(LogLS, Log, TEXT("[Title] Confirm dialog cancelled."));
+	ActiveConfirmDialog = nullptr;
 }
 
 ULSSaveSubsystem* ULSTitleMenuWidget::GetSaveSubsystem() const
@@ -154,3 +186,36 @@ void ULSTitleMenuWidget::OpenLobbyLevel()
 
 	UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->LobbyLevel);
 }
+
+ULSConfirmDialogWidget* ULSTitleMenuWidget::ShowConfirmDialog(const FText& Message)
+{
+	// 이미 다이얼로그가 떠 있으면 중복 생성하지 않는다.
+	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
+	{
+		return nullptr;
+	}
+
+	if (!ConfirmDialogClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Title] ConfirmDialogClass is not set on %s. Check WBP_TitleMenu."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	ULSConfirmDialogWidget* Dialog = OwningPlayer
+		? CreateWidget<ULSConfirmDialogWidget>(OwningPlayer, ConfirmDialogClass)
+		: CreateWidget<ULSConfirmDialogWidget>(this, ConfirmDialogClass);
+	if (!Dialog)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Title] Failed to create confirm dialog on %s."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	Dialog->SetMessage(Message);
+	Dialog->OnCancelled.AddDynamic(this, &ULSTitleMenuWidget::HandleDialogCancelled);
+	Dialog->AddToViewport(100);
+	ActiveConfirmDialog = Dialog;
+	return Dialog;
+}
+
+#undef LOCTEXT_NAMESPACE

@@ -98,6 +98,8 @@ private:
 	FString GetResolvedDebugFileName() const;
 	void Load();
 	void Save();
+	// 현재 슬롯(PIE 포함)과 기본 슬롯의 세이브 파일·디버그 json을 모두 삭제한다.
+	void DeleteAllSaveFiles() const;
 	void SaveDebugJson() const;
 	void ResolveInterruptedRaid();
 	void MigrateInventory();

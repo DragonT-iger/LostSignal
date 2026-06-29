@@ -46,6 +46,9 @@ void ULSTitleMenuButtonWidget::SetLabelText(const FText& NewText) const
 
 void ULSTitleMenuButtonWidget::SetButtonEnabled(const bool bEnabled)
 {
+	// 위젯 전체를 비활성화하면 내부 Button/Text까지 회색으로 표시되고 입력도 차단된다.
+	SetIsEnabled(bEnabled);
+
 	if (!Button)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot set enabled because Button is not bound on %s."), *GetNameSafe(this));
