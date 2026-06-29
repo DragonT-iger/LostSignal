@@ -86,8 +86,6 @@ EStateTreeRunStatus FLSSTTask_Patrol::EnterState(FStateTreeExecutionContext& Con
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 
-	UE_LOG(LogLS, Warning, TEXT("Enter Patrol State Task Patrol"));
-
 	// 에셋 AIController 바인딩 누락 대비 컨텍스트 소유자에서 해석.
 	if (!InstanceData.AIController)
 	{
@@ -175,8 +173,6 @@ void FLSSTTask_Patrol::ExitState(FStateTreeExecutionContext& Context, const FSta
 
 void FLSSTTask_Patrol::BeginWalkSegment(FInstanceDataType& InstanceData) const
 {
-	UE_LOG(LogLS, Warning, TEXT("AI BeginWalkSegment Called"));
-
 	AAIController* AIController = InstanceData.AIController;
 	const APawn* Pawn = AIController ? AIController->GetPawn() : nullptr;
 	if (!AIController || !Pawn)
