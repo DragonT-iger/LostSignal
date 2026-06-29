@@ -12,8 +12,16 @@ class AActor;
 class ALSCharacterBase;
 class UAbilitySystemComponent;
 class UGameplayEffect;
+class ULSCharacterVoiceData;
 struct FOnAttributeChangeData;
 enum class ELSCharacterSkillEffectTarget : uint8;
+
+// 캐릭터 보이스 종류. 공격 음성은 몽타주 AnimNotify로 처리하므로 여기엔 없다.
+enum class ELSCharacterVoiceType : uint8
+{
+	Hit,
+	Death
+};
 
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
 class LOSTSIGNAL_API ULSCharacterCombatComponent : public UActorComponent
@@ -86,6 +94,8 @@ private:
 	void ClearKnockback();
 	bool CanDamageTarget(AActor* TargetActor) const;
 	bool IsFriendlyTarget(AActor* TargetActor) const;
+	// VoiceData에서 타입별 변주를 랜덤 선택해 GameplayCue.Voice로 발동(서버→전 클라 복제). 스로틀로 도배 방지.
+	void PlayVoice(ELSCharacterVoiceType Type);
 
 	UPROPERTY()
 	TMap<FGameplayTag, int32> LooseTagRefCounts;
@@ -98,4 +108,11 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Combat")
 	FVector DamageNumberWorldOffset = FVector(0.0f, 0.0f, 120.0f);
+
+	// 캐릭터별 보이스 뱅크. 캐릭터 BP의 컴포넌트 기본값에서 매핑(미할당이면 보이스 무음).
+	UPROPERTY(EditDefaultsOnly, Category="LS/Audio")
+	TObjectPtr<ULSCharacterVoiceData> VoiceData;
+
+	// 타입별 마지막 보이스 재생 월드시각(초). 스로틀용.
+	TMap<ELSCharacterVoiceType, double> LastVoiceTimes;
 };

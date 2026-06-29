@@ -7,6 +7,7 @@
 #include "AI/LSAIController.h"
 #include "AI/LSMonsterSenseComponent.h"
 #include "Characters/LSCharacterBase.h"
+#include "Characters/LSCharacterVoiceData.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Characters/LSPlayerCharacter.h"
 #include "Combat/LSCombatStateComponent.h"
@@ -20,6 +21,7 @@
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
 #include "LostSignal.h"
+#include "Sound/SoundBase.h"
 #include "TimerManager.h"
 
 ULSCharacterCombatComponent::ULSCharacterCombatComponent()
@@ -336,6 +338,61 @@ void ULSCharacterCombatComponent::BindStateTagDelegates()
 void ULSCharacterCombatComponent::HandleCurrentHealthChanged(const FOnAttributeChangeData& ChangeData)
 {
 	RefreshDeathState();
+
+	// 데미지로 체력이 줄었으면 피격 음성. 치사타도 일단 피격 음성으로 처리한다(사망 보이스 미보유).
+	if (ChangeData.NewValue < ChangeData.OldValue)
+	{
+		PlayVoice(ELSCharacterVoiceType::Hit);
+	}
+}
+
+void ULSCharacterCombatComponent::PlayVoice(ELSCharacterVoiceType Type)
+{
+	ALSCharacterBase* OwnerCharacter = GetOwnerCharacter();
+	if (!OwnerCharacter || !OwnerCharacter->HasAuthority() || !VoiceData)
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC)
+	{
+		return;
+	}
+
+	const TArray<TObjectPtr<USoundBase>>& Clips =
+		(Type == ELSCharacterVoiceType::Death) ? VoiceData->DeathVoices : VoiceData->HitVoices;
+	if (Clips.Num() == 0)
+	{
+		return;
+	}
+
+	// 스로틀: 같은 타입이 짧은 간격에 도배되지 않게 한다.
+	const UWorld* World = GetWorld();
+	const double Now = World ? World->GetTimeSeconds() : 0.0;
+	if (const double* LastTime = LastVoiceTimes.Find(Type))
+	{
+		if (Now - *LastTime < VoiceData->VoiceMinInterval)
+		{
+			return;
+		}
+	}
+
+	// 서버에서 변주를 골라 파라미터로 넘긴다 → 전 클라가 같은 클립을 재생.
+	USoundBase* Clip = Clips[FMath::RandHelper(Clips.Num())].Get();
+	if (!Clip)
+	{
+		return;
+	}
+
+	LastVoiceTimes.Add(Type, Now);
+
+	FGameplayCueParameters CueParams;
+	CueParams.SourceObject = Clip;
+	CueParams.Location = OwnerCharacter->GetActorLocation();
+	CueParams.Instigator = OwnerCharacter;
+
+	ASC->ExecuteGameplayCue(LSGameplayTags::GameplayCue_Voice, CueParams);
 }
 
 void ULSCharacterCombatComponent::HandleStunnedTagChanged(const FGameplayTag CallbackTag, int32 NewCount)

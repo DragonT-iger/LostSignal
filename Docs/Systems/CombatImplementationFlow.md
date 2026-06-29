@@ -325,6 +325,20 @@ ASC와 AttributeSet 관계:
 
 - `ULSGCN_SkillCast`는 사운드를 직접 들지 않고 파라미터로 받은 것만 재생하므로, 스킬마다 GCN/태그가 늘지 않는다. BP는 `GameplayCue.Skill.Cast` 태그 바인딩용 1개면 된다.
 
+캐릭터 보이스(피격 음성)는 임팩트 퍽(`GCN_Hit`)과 **다른 레이어**다. 퍽은 공유 물리음이고, 보이스는 캐릭터별 + 변주가 있는 목소리다. 보이스 사운드는 `ULSCharacterVoiceData`(캐릭터별 뱅크)에 두고, 피격 시점에 코드로 발동한다(현재 경직/피격 리액션 애니가 없어 노티파이로는 띄울 자리가 없음).
+
+```text
+데미지로 CurrentHealth 감소(서버 권한)
+-> ULSCharacterCombatComponent::HandleCurrentHealthChanged (NewValue < OldValue)
+-> PlayVoice(Hit): VoiceData.HitVoices에서 랜덤 1개(서버 선택) + VoiceMinInterval 스로틀
+-> ASC->ExecuteGameplayCue(GameplayCue.Voice, Params{SourceObject=클립, Location=피격자})
+-> NetMulticast로 전 클라가 피격자 위치에서 재생 (GCN은 GCN_SkillCast 재사용)
+```
+
+- 서버에서 변주를 골라 파라미터로 넘기므로 전 클라가 같은 클립을 듣고, 권한 경로 발동이라 클라 중복이 없다.
+- **공격 음성(기합)**은 코드가 아니라 공격 몽타주의 `LSAN_PlaySound` 노티파이로 처리한다(변주는 Sound Cue 내부 랜덤).
+- 사망 음성은 `VoiceData.DeathVoices` + `PlayVoice(Death)` 훅으로 확장한다(에셋 생기면 치사타에서 분기).
+
 ## 쿨타임 흐름
 
 쿨타임은 GameplayTag와 GameplayEffect로 관리한다. 스킬 입력 시 쿨타임 중이면 프리뷰 진입도 막는다.
