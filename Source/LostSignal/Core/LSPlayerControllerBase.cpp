@@ -29,6 +29,7 @@
 #include "UI/LSBackgroundBlurWidget.h"
 #include "UI/LSPlayerHUDWidget.h"
 #include "UI/LSUILayer.h"
+#include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Protocol/LSProtocolUIWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
@@ -289,6 +290,57 @@ void ALSPlayerControllerBase::HideChipStationWidget()
 bool ALSPlayerControllerBase::IsChipStationWidgetOpen() const
 {
 	return ChipStationWidgetInstance && ChipStationWidgetInstance->IsVisible();
+}
+
+void ALSPlayerControllerBase::RegisterLobbyInventoryWidget(ULSInventoryWidget* InWidget)
+{
+	LobbyInventoryWidgetInstance = InWidget;
+}
+
+void ALSPlayerControllerBase::UnregisterLobbyInventoryWidget(const ULSInventoryWidget* InWidget)
+{
+	if (LobbyInventoryWidgetInstance == InWidget)
+	{
+		LobbyInventoryWidgetInstance = nullptr;
+	}
+}
+
+void ALSPlayerControllerBase::RegisterLobbyStorageWidget(ULSLobbyStorageWidget* InWidget)
+{
+	LobbyStorageWidgetInstance = InWidget;
+}
+
+void ALSPlayerControllerBase::UnregisterLobbyStorageWidget(const ULSLobbyStorageWidget* InWidget)
+{
+	if (LobbyStorageWidgetInstance == InWidget)
+	{
+		LobbyStorageWidgetInstance = nullptr;
+	}
+}
+
+void ALSPlayerControllerBase::RefreshActiveInventoryWidget()
+{
+	// 폰이 있으면 폰의 인벤토리 위젯을, 없으면(로비) 등록된 로비 인벤토리 위젯을 갱신한다.
+	if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetPawn()))
+	{
+		PlayerCharacter->RebuildInventoryWidgetSlots();
+		return;
+	}
+
+	if (LobbyInventoryWidgetInstance)
+	{
+		LobbyInventoryWidgetInstance->RebuildInventorySlots();
+	}
+}
+
+bool ALSPlayerControllerBase::IsInventoryUIOpen() const
+{
+	if (const ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetPawn()))
+	{
+		return PlayerCharacter->IsInventoryWidgetOpen();
+	}
+
+	return LobbyInventoryWidgetInstance && LobbyInventoryWidgetInstance->IsVisible();
 }
 
 void ALSPlayerControllerBase::ClientShowLobbyStorageWidget_Implementation(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass)

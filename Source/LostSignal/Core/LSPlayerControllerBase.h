@@ -15,6 +15,7 @@ class ALSLootBox;
 class ALSWorldDroppedItem;
 class UInputMappingContext;
 class ULSLobbyStorageWidget;
+class ULSInventoryWidget;
 class ULSChipStationWidget;
 class ULSBackgroundBlurWidget;
 class ULSRaidInventoryComponent;
@@ -61,6 +62,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/UI")
 	bool IsChipStationWidgetOpen() const;
+
+	// 로비(폰 없음)에서 오버레이로 띄운 인벤토리/창고 위젯을 PC에 등록한다.
+	// 폰에 묶여 있던 갱신/열림 판정이 폰이 없을 때 이 위젯들로 우회된다. 위젯이 스스로 생성/소멸 시 호출한다.
+	void RegisterLobbyInventoryWidget(ULSInventoryWidget* InWidget);
+	void UnregisterLobbyInventoryWidget(const ULSInventoryWidget* InWidget);
+	void RegisterLobbyStorageWidget(ULSLobbyStorageWidget* InWidget);
+	void UnregisterLobbyStorageWidget(const ULSLobbyStorageWidget* InWidget);
+
+	// 폰이 있으면 폰의 인벤토리 위젯을, 없으면 등록된 로비 인벤토리 위젯을 갱신한다.
+	void RefreshActiveInventoryWidget();
+	// 폰의 인벤토리가 열려 있거나, 등록된 로비 인벤토리 위젯이 보이면 true.
+	bool IsInventoryUIOpen() const;
 
 	// 모달 패널(인벤토리/창고/칩스테이션/루트드랍) 표시 상태에 맞춰 공유 블러를 켜고 끈다.
 	// 어느 패널이든 show/hide 직후 호출하면 되며, 매번 현재 상태를 재계산하므로 중복 호출에 안전하다.
@@ -175,6 +188,10 @@ protected:
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSChipStationWidget> ChipStationWidgetInstance;
+
+	// 로비 오버레이에 배치돼 PC에 등록된 인벤토리 위젯(폰 없는 로비용). 폰이 있으면 사용하지 않는다.
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSInventoryWidget> LobbyInventoryWidgetInstance;
 
 	// 시연용 프로토콜 조정 패널 인스턴스.
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug")

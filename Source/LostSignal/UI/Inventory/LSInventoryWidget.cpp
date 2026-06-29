@@ -56,6 +56,12 @@ void ULSInventoryWidget::NativeConstruct()
 
 	RebuildInventorySlots();
 	RebuildConfirmedStorageSlots();
+
+	// 폰 없는 로비에서도 창고↔인벤토리 갱신이 동작하도록 PC에 자신을 등록한다(폰이 있으면 PC가 폰을 우선 사용).
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		PlayerController->RegisterLobbyInventoryWidget(this);
+	}
 }
 
 void ULSInventoryWidget::NativeDestruct()
@@ -68,6 +74,11 @@ void ULSInventoryWidget::NativeDestruct()
 	if (SortButton)
 	{
 		SortButton->OnClicked.RemoveDynamic(this, &ULSInventoryWidget::HandleSortButtonClicked);
+	}
+
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		PlayerController->UnregisterLobbyInventoryWidget(this);
 	}
 
 	Super::NativeDestruct();
@@ -207,6 +218,8 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 				{
 					RebuildInventorySlots();
 					RebuildConfirmedStorageSlots();
+					// 창고↔인벤토리 이동이면 열려 있는 창고 위젯도 같이 갱신한다.
+					PlayerController->RefreshOpenLobbyStorageWidget();
 				}
 				return bChanged;
 			}

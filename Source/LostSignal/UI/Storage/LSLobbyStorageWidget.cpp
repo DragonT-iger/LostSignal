@@ -1,6 +1,5 @@
 #include "UI/Storage/LSLobbyStorageWidget.h"
 
-#include "Characters/LSPlayerCharacter.h"
 #include "Components/TextBlock.h"
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
@@ -41,11 +40,22 @@ void ULSLobbyStorageWidget::NativeConstruct()
 	BindStorageButtons();
 	ApplyFilterButtonState();
 	RefreshStorage();
+
+	// 폰 없는 로비에서도 인벤토리↔창고 이동이 동작하도록 PC에 자신을 등록한다(폰이 있으면 PC가 폰을 우선 사용).
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		PlayerController->RegisterLobbyStorageWidget(this);
+	}
 }
 
 void ULSLobbyStorageWidget::NativeDestruct()
 {
 	UnbindStorageButtons();
+
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		PlayerController->UnregisterLobbyStorageWidget(this);
+	}
 
 	Super::NativeDestruct();
 }
@@ -186,9 +196,9 @@ bool ULSLobbyStorageWidget::HandleStorageSlotDrop(const ELSInventorySlotArea Fro
 	if (bSuccess)
 	{
 		RefreshStorage();
-		if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
+		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 		{
-			PlayerCharacter->RebuildInventoryWidgetSlots();
+			PlayerController->RefreshActiveInventoryWidget();
 		}
 	}
 	return bSuccess;
@@ -232,10 +242,7 @@ bool ULSLobbyStorageWidget::TryDropStorageDragToWorld(const ULSInventoryDragDrop
 	if (bDropped)
 	{
 		RefreshStorage();
-		if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
-		{
-			PlayerCharacter->RebuildInventoryWidgetSlots();
-		}
+		PlayerController->RefreshActiveInventoryWidget();
 	}
 
 	return bDropped;
@@ -243,8 +250,8 @@ bool ULSLobbyStorageWidget::TryDropStorageDragToWorld(const ULSInventoryDragDrop
 
 bool ULSLobbyStorageWidget::TransferStorageSlotToInventory(const int32 WarehouseSlotIndex, const bool bRefreshSourceStorage)
 {
-	ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn());
-	if (!PlayerCharacter || !PlayerCharacter->IsInventoryWidgetOpen())
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController || !PlayerController->IsInventoryUIOpen())
 	{
 		return false;
 	}
@@ -270,7 +277,7 @@ bool ULSLobbyStorageWidget::TransferStorageSlotToInventory(const int32 Warehouse
 		{
 			RefreshStorageCountText();
 		}
-		PlayerCharacter->RebuildInventoryWidgetSlots();
+		PlayerController->RefreshActiveInventoryWidget();
 	}
 
 	return bTransferred;
