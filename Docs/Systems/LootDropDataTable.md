@@ -291,11 +291,28 @@ C: 50+60+120=230 ≥ 137 → C 당첨
 파일: `Source/LostSignal/Gameplay/LSLootBox.cpp` `Interact_Implementation`
 
 1. **서버만** `DropSubsystem->OpenRootingObject()` 호출 (`HasAuthority()` 체크)
-2. 결과 `LootResults`는 `Replicated`로 클라이언트에 미러링
-3. 클라이언트는 `LSLootDropWidget`에서 결과 표시
-4. `RootingObjectRowName`은 LootBox 액터의 에디터 프로퍼티로 설정
+2. 전체 결과는 **서버 전용 `PendingLootResults`(복제 안 함)** 에 보관한다. 복제되는 `LootResults`는 빈 배열로 시작한다.
+3. 총 드랍 개수는 **`TotalLootCount`(복제)** 로 즉시 내려간다 — 클라가 미공개 placeholder 슬롯을 그리기 위함이며, 개수만 알 뿐 아이템 정체는 모른다.
+4. 클라이언트는 `LSLootDropWidget`에서 `LootResults`(공개분) + `TotalLootCount`(총 개수)로 슬롯을 그린다.
+5. `RootingObjectRowName`은 LootBox 액터의 에디터 프로퍼티로 설정
 
-UI 드랍 연출: 아이템은 등급이 높을수록 0.2초의 추가 대기시간을 가진다 (기획 의도).
+### 단계 공개 연출 (서버 주도)
+
+아이템은 한 번에 다 뜨지 않고 **등급에 따른 시간차를 두고 하나씩** 공개된다. 연출이 아니라 신뢰 경계의 문제라 **서버가 공개를 주도한다.**
+
+- 서버 타이머(`ScheduleNextReveal` → `RevealNextLootItem`)가 `PendingLootResults`에서 한 개씩 꺼내 복제되는 `LootResults`에 append하고, 매번 **다음 아이템 등급의 딜레이로 다음 공개를 재예약**한다(고정 간격 아님).
+- 공개 전 아이템 정체는 `LootResults`에 없으므로 **클라로 복제되지 않는다** → 미리보기 불가, 공개 전 선취 불가. (총 개수 `TotalLootCount`만 복제 — 정체 아님.) 공개된(배열에 존재하는) 슬롯은 즉시 줍기 가능, 미공개 placeholder는 클릭/드래그/줍기 불가.
+- `NotifyLootResultsChanged` / `OnRep_LootResults`가 모든 PlayerController의 위젯을 갱신하므로 여러 플레이어가 같은 공개 진행을 동시에 본다(서버 단일 타이머).
+- 기존 transfer/drop 로직은 전부 `IsValidIndex(LootResults)` 기반이라 배열이 append로 자라도 인덱스가 안전하다. placeholder 인덱스는 `LootResults`에 없으므로 자동 차단된다.
+- 타이머는 `EndPlay`에서 정리한다.
+
+등급별 공개 딜레이(초)는 **`ULSDropSettings.GradeRevealDelaySeconds`(프로젝트 설정 > LS Drop Settings)** 가 단일 출처다. 등급은 `LSInventorySlotUtils::ResolveItemGradeFromRowName`로 RowName에서 파싱한다(`FLSDropResult`에 등급 필드 없음). 수치는 여기 복붙하지 않는다.
+
+### 표시/연출 (클라, 전부 C++)
+
+- `LSLootDropWidget::RebuildLootSlots`는 **`max(공개수, TotalLootCount)`개 슬롯 프레임**을 그린다. 공개된 인덱스는 `SetItem`, **바로 다음에 공개될 한 칸만** `ULSItemSlotWidget::SetPlaceholder()`(미확인 아이콘 + 펄스)로 스캔 연출하고, 그 이후 칸은 빈 기본 배경 프레임(`ClearItem`)만 둔다. 즉 동시에 펄스하는 슬롯은 항상 하나뿐이다.
+- 등장 연출은 **`ULSItemSlotWidget`의 C++ `NativeTick`** 이 구동한다(BP 타임라인 아님). placeholder는 미확인 아이콘 알파를 sin으로 펄스(슬롯 프레임 배경은 또렷 유지). `SetItem`이 placeholder→아이템 전환을 감지하면 pop-in(RenderScale `PopInStartScale`→1.0 + RenderOpacity 0→1, `InterpEaseInOut`)을 재생. 등장 연출 수치는 슬롯 위젯의 `PopIn*`/`Placeholder*` UPROPERTY로 조정한다. 등급 배경색은 기존 `*GradeColor` 필드 재사용.
+- 박스 메시 오픈·발광·오픈 SFX만 3D 에셋/사운드라 `OnLootBoxOpenedVisual()`(BlueprintImplementableEvent, `OnRep_IsOpened` + 호스트 오픈 시점 호출)로 BP가 담당한다. 미확인 아이콘 텍스처(`UnconfirmedIconTexture`)도 WBP 기본값으로 에셋만 매핑한다(로직 아님).
 
 ---
 

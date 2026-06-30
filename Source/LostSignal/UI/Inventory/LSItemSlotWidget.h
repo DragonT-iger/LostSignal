@@ -48,8 +48,13 @@ public:
 	// 이 슬롯에 아이템이 들어 있는지. 빈 슬롯(hole) 재사용 여부 판단 등에 쓴다.
 	bool HasItem() const { return bHasItem; }
 
+	// 루트 단계 공개: 아직 공개되지 않은 미공개 슬롯으로 만든다(미확인 아이콘 + 펄스, 클릭/드래그/줍기 불가).
+	// 이후 SetItem이 호출되면 placeholder→아이템 전환을 감지해 등장 pop-in을 재생한다.
+	void SetPlaceholder();
+
 protected:
 	virtual void NativePreConstruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
@@ -116,6 +121,28 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTexture2D> DefaultSlotTexture;
 
+	// 루트 단계 공개 연출(전부 C++ NativeTick 구동). 수치는 연출 튜닝용이라 에디터에서 조정.
+	// 등장 pop-in 지속 시간(초)과 시작 스케일(1.0까지 커짐).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Loot")
+	float PopInDuration = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Loot")
+	float PopInStartScale = 0.7f;
+
+	// 미공개 placeholder 펄스 속도(Hz)와 아이콘 알파 범위(Min↔Max).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Loot")
+	float PlaceholderPulseSpeed = 2.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Loot")
+	float PlaceholderPulseMinAlpha = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Loot")
+	float PlaceholderPulseMaxAlpha = 0.85f;
+
+	// 미공개 슬롯에 표시할 "미확인" 아이콘. 아트가 WBP 기본값으로 에셋만 매핑한다(로직 아님).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Loot")
+	TObjectPtr<UTexture2D> UnconfirmedIconTexture;
+
 private:
 	TWeakObjectPtr<ULSInventoryWidget> InventoryWidget;
 	TWeakObjectPtr<ULSLootDropWidget> LootDropWidget;
@@ -136,6 +163,12 @@ private:
 	bool bIsDragVisual = false;
 	// 현재 표시 중인 아이템 등급에 해당하는 배경색. 빈 슬롯·등급 없는 아이템은 DefaultGradeColor.
 	FLinearColor CurrentGradeBackgroundColor = FLinearColor::White;
+
+	// 루트 단계 공개: 미공개 placeholder 상태(클릭/드래그/줍기 차단, 아이콘 펄스).
+	bool bIsPlaceholder = false;
+	// 등장 pop-in 애니 진행 상태(NativeTick에서 스케일/투명도 보간).
+	bool bIsPopInAnimating = false;
+	float PopInElapsed = 0.f;
 
 	// 현재 아이콘 브러시를 식별하는 키. 같은 아이템을 다시 표시할 때 동기 텍스처 로딩을 건너뛰기 위한 캐시다.
 	// 아이템 행 이름, 빈 슬롯 키, NAME_None(미적용/로드 실패) 중 하나를 가진다.

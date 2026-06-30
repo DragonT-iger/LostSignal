@@ -21,6 +21,8 @@ namespace
 {
 // 빈 슬롯(기본 텍스처)이 적용된 상태를 나타내는 예약 키. 실제 아이템 행 이름과 겹치지 않는다.
 const FName EmptySlotIconKey(TEXT("__LSEmptySlot__"));
+// 미공개 placeholder(미확인 아이콘)가 적용된 상태를 나타내는 예약 키.
+const FName PlaceholderIconKey(TEXT("__LSUnconfirmed__"));
 }
 
 void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats)
@@ -43,6 +45,11 @@ void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, con
 		ClearItem();
 		return;
 	}
+
+	// 미공개 placeholder였다가 실제 아이템이 들어오는 전환이면 등장 pop-in을 재생한다.
+	// 아래 본문(ApplyHoverVisual 등)이 정상 아이템으로 동작하도록 플래그를 먼저 끈다.
+	const bool bWasPlaceholder = bIsPlaceholder;
+	bIsPlaceholder = false;
 
 	// 같은 아이템을 다시 표시하는 경우 동기 텍스처 로딩과 브러시 갱신을 건너뛴다.
 	if (DisplayedIconKey != ItemRowName)
@@ -75,6 +82,13 @@ void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, con
 	DragAmount = Amount;
 	DragChipStats = ChipStats;
 	bHasItem = true;
+
+	// placeholder → 아이템 전환에서만 등장 pop-in을 시작한다. (인벤토리 등 일반 SetItem은 팝인 없음)
+	if (bWasPlaceholder)
+	{
+		bIsPopInAnimating = true;
+		PopInElapsed = 0.f;
+	}
 }
 
 void ULSItemSlotWidget::ClearItem()
@@ -95,6 +109,9 @@ void ULSItemSlotWidget::ClearItem()
 	DisplayedIconKey = EmptySlotIconKey;
 	// 빈 슬롯은 등급색을 쓰지 않고 전용 빈 슬롯 배경색으로 되돌린다.
 	CurrentGradeBackgroundColor = EmptySlotBackgroundColor;
+	// placeholder/등장 연출 상태도 정리한다(공개됐다가 looted된 빈 칸, 풀 재사용 등).
+	bIsPlaceholder = false;
+	bIsPopInAnimating = false;
 
 	ApplyHoverVisual();
 	ItemIconImage->SetVisibility(ESlateVisibility::Collapsed);
@@ -105,6 +122,59 @@ void ULSItemSlotWidget::ClearItem()
 	DragAmount = 0;
 	DragChipStats.Reset();
 	ClearTooltipItem();
+}
+
+void ULSItemSlotWidget::SetPlaceholder()
+{
+	if (!ItemIconImage)
+	{
+		UE_LOG(LogLS, Warning, TEXT("ItemIconImage is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	bIsPlaceholder = true;
+	bIsPopInAnimating = false;
+	bHasItem = false;
+	DragItemRowName = NAME_None;
+	DragAmount = 0;
+	DragChipStats.Reset();
+	ClearTooltipItem();
+
+	// 미공개이므로 등급색을 쓰지 않고 빈 슬롯 배경색을 유지(슬롯 프레임은 항상 또렷).
+	CurrentGradeBackgroundColor = EmptySlotBackgroundColor;
+	if (SlotBackgroundImage)
+	{
+		SlotBackgroundImage->SetColorAndOpacity(CurrentGradeBackgroundColor);
+	}
+
+	// 미확인 아이콘 브러시 적용(미설정 시 기본 슬롯 텍스처로 폴백).
+	if (DisplayedIconKey != PlaceholderIconKey)
+	{
+		UTexture2D* IconTexture = UnconfirmedIconTexture ? UnconfirmedIconTexture.Get() : DefaultSlotTexture.Get();
+		if (!IconTexture)
+		{
+			UE_LOG(LogLS, Warning, TEXT("UnconfirmedIconTexture/DefaultSlotTexture not set for loot placeholder on %s."), *GetNameSafe(this));
+		}
+		else
+		{
+			ItemIconImage->SetBrushFromTexture(IconTexture);
+		}
+		DisplayedIconKey = PlaceholderIconKey;
+	}
+	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
+
+	// 펄스 시작값(다음 NativeTick부터 sin으로 갱신).
+	ItemIconImage->SetColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, PlaceholderPulseMinAlpha));
+
+	if (AmountText)
+	{
+		AmountText->SetText(FText::GetEmpty());
+		AmountText->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	// pop-in/호버 강조와 무관하게 슬롯 자체는 정상 크기·불투명(아이콘만 펄스).
+	SetRenderScale(FVector2D::UnitVector);
+	SetRenderOpacity(1.f);
 }
 
 void ULSItemSlotWidget::SetSlotLocked(const bool bInLocked)
@@ -136,6 +206,47 @@ void ULSItemSlotWidget::NativePreConstruct()
 	if (!bHasItem)
 	{
 		ClearItem();
+	}
+}
+
+void ULSItemSlotWidget::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	// 루트 단계 공개 연출 외에는 비용이 들지 않도록 조기 종료한다(모든 슬롯이 공유하는 클래스).
+	if (!bIsPopInAnimating && !bIsPlaceholder)
+	{
+		return;
+	}
+
+	// 등장 pop-in: 스케일(PopInStartScale→1.0) + 페이드(0→1). LSChipStatWidget과 동일한 이징.
+	if (bIsPopInAnimating)
+	{
+		PopInElapsed += InDeltaTime;
+		const float Duration = FMath::Max(KINDA_SMALL_NUMBER, PopInDuration);
+		const float LinearAlpha = FMath::Clamp(PopInElapsed / Duration, 0.f, 1.f);
+		const float Alpha = FMath::InterpEaseInOut(0.f, 1.f, LinearAlpha, 2.f);
+
+		const float Scale = FMath::Lerp(PopInStartScale, 1.f, Alpha);
+		SetRenderScale(FVector2D(Scale, Scale));
+		SetRenderOpacity(Alpha);
+
+		if (LinearAlpha >= 1.f)
+		{
+			SetRenderScale(FVector2D::UnitVector);
+			SetRenderOpacity(1.f);
+			bIsPopInAnimating = false;
+		}
+		return;
+	}
+
+	// 미공개 placeholder 펄스: 미확인 아이콘 알파만 sin으로 진동(슬롯 프레임 배경은 또렷하게 유지).
+	if (ItemIconImage)
+	{
+		const float Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+		const float PulseT = (FMath::Sin(Time * PlaceholderPulseSpeed * 2.f * PI) + 1.f) * 0.5f;
+		const float PulseAlpha = FMath::Lerp(PlaceholderPulseMinAlpha, PlaceholderPulseMaxAlpha, PulseT);
+		ItemIconImage->SetColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, PulseAlpha));
 	}
 }
 
@@ -461,6 +572,8 @@ void ULSItemSlotWidget::ResetTransientSlotState()
 	SetVisibility(ESlateVisibility::Visible);
 	SetRenderOpacity(1.0f);
 	SetRenderScale(FVector2D::UnitVector);
+	// 진행 중이던 등장 pop-in은 멈춘다. (다음 NativeTick이 다시 적용하므로 공개 직후 슬롯은 다시 popin 됨)
+	bIsPopInAnimating = false;
 }
 
 void ULSItemSlotWidget::RefreshHoverStateFromCursor()
@@ -480,6 +593,12 @@ void ULSItemSlotWidget::RefreshHoverStateFromCursor()
 
 void ULSItemSlotWidget::ApplyHoverVisual()
 {
+	// 미공개 placeholder는 호버/등급색을 적용하지 않는다(아이콘 펄스는 NativeTick이 담당).
+	if (bIsPlaceholder)
+	{
+		return;
+	}
+
 	FLinearColor Tint = NormalIconTint;
 	if (bIsLocked)
 	{
@@ -557,6 +676,11 @@ FLinearColor ULSItemSlotWidget::ResolveGradeBackgroundColor(const FName ItemRowN
 
 bool ULSItemSlotWidget::CanStartItemDrag() const
 {
+	if (bIsPlaceholder)
+	{
+		return false;
+	}
+
 	if (!bHasItem)
 	{
 		return false;
@@ -587,6 +711,12 @@ bool ULSItemSlotWidget::IsQuickTransferPointerEvent(const FPointerEvent& InMouse
 
 bool ULSItemSlotWidget::TryHandleQuickTransfer()
 {
+	// 미공개 placeholder는 빠른 이동(Shift+클릭) 불가.
+	if (bIsPlaceholder)
+	{
+		return false;
+	}
+
 	// 칩 장착 슬롯: Shift+좌클릭 -> 창고로 해제. (장착 슬롯은 SlotIndex가 INDEX_NONE이라 아래 가드보다 먼저 처리한다.)
 	if (ChipEquipmentSlotWidget.IsValid())
 	{

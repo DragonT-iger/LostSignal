@@ -80,18 +80,42 @@ void ULSLootDropWidget::RebuildLootSlots()
 		return;
 	}
 
-	LSSlotWidgetSync::SyncSlotWidgets(LootItemWrapBox, ItemSlotWidgetClass, GetOwningPlayer(), GetWorld(), LootItems.Num(),
-		[this](const int32 SlotIndex, ULSItemSlotWidget& SlotWidget)
+	// 단계 공개: 총 드랍 개수만큼 슬롯 프레임을 그린다.
+	// - 공개된 인덱스: 실제 아이템(전환 시 스스로 pop-in).
+	// - 바로 다음에 공개될 한 칸만: 스캔 placeholder(미확인 아이콘 + 펄스) — 연출은 이 칸 하나뿐.
+	// - 그 이후 칸: 빈 기본 배경 프레임(연출 없음).
+	const int32 TotalCount = SourceLootBox ? SourceLootBox->GetTotalLootCount() : LootItems.Num();
+	const int32 SlotCount = FMath::Max(LootItems.Num(), TotalCount);
+	const int32 NextRevealSlotIndex = LootItems.Num();
+
+	LSSlotWidgetSync::SyncSlotWidgets(LootItemWrapBox, ItemSlotWidgetClass, GetOwningPlayer(), GetWorld(), SlotCount,
+		[this, NextRevealSlotIndex](const int32 SlotIndex, ULSItemSlotWidget& SlotWidget)
 		{
-			const FLSDropResult& Item = LootItems[SlotIndex];
-			const bool bHasItem = !Item.ItemRowName.IsNone() && Item.Amount > 0;
-			SlotWidget.SetLootSlotContext(this, SlotIndex, bHasItem);
-			if (bHasItem)
+			if (LootItems.IsValidIndex(SlotIndex))
 			{
-				SlotWidget.SetItem(Item.ItemRowName, Item.Amount, Item.ChipStats);
+				const FLSDropResult& Item = LootItems[SlotIndex];
+				const bool bHasItem = !Item.ItemRowName.IsNone() && Item.Amount > 0;
+				SlotWidget.SetLootSlotContext(this, SlotIndex, bHasItem);
+				if (bHasItem)
+				{
+					SlotWidget.SetItem(Item.ItemRowName, Item.Amount, Item.ChipStats);
+				}
+				else
+				{
+					// 공개됐지만 looted되어 비워진 슬롯.
+					SlotWidget.ClearItem();
+				}
+			}
+			else if (SlotIndex == NextRevealSlotIndex)
+			{
+				// 다음에 공개될 한 칸만 스캔 연출.
+				SlotWidget.SetLootSlotContext(this, SlotIndex, /*bHasItem*/ false);
+				SlotWidget.SetPlaceholder();
 			}
 			else
 			{
+				// 아직 차례가 아닌 칸: 빈 기본 배경 프레임만(연출 없음).
+				SlotWidget.SetLootSlotContext(this, SlotIndex, /*bHasItem*/ false);
 				SlotWidget.ClearItem();
 			}
 		});

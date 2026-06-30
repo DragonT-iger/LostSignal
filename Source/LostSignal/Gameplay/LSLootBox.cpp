@@ -1,11 +1,13 @@
 #include "Gameplay/LSLootBox.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Data/LSDropSettings.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Minimap/LSMinimapMarkerComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Session/LSSaveSubsystem.h"
+#include "TimerManager.h"
 
 ALSLootBox::ALSLootBox()
 {
@@ -19,6 +21,7 @@ void ALSLootBox::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ALSLootBox, bIsOpened);
 	DOREPLIFETIME(ALSLootBox, LootResults);
+	DOREPLIFETIME(ALSLootBox, TotalLootCount);
 }
 
 bool ALSLootBox::CanInteract_Implementation(APawn* Interactor)
@@ -48,16 +51,25 @@ void ALSLootBox::Interact_Implementation(APawn* Interactor)
 			return;
 		}
 
-		LootResults = DropSubsystem->OpenRootingObject(RootingObjectRowName);
+		// 전체 결과는 서버 전용으로 보관하고, 복제되는 LootResults는 비운 채 시작한다.
+		// 타이머가 등급 딜레이마다 한 개씩 LootResults로 옮겨 단계 공개한다.
+		PendingLootResults = DropSubsystem->OpenRootingObject(RootingObjectRowName);
+		LootResults.Reset();
+		// 총 개수는 즉시 복제해 클라가 placeholder 슬롯을 그리게 한다(아이템 정체는 점진 공개).
+		TotalLootCount = PendingLootResults.Num();
+		NextRevealIndex = 0;
 		bIsOpened = true;
 		if (MinimapMarkerComponent)
 		{
 			MinimapMarkerComponent->SetMinimapVisible(false);
 		}
 		RefreshWidgetVisibility();
-		OnLootResultReceived(LootResults);
+		OnLootResultReceived(PendingLootResults);
+		// 리슨서버 호스트는 OnRep_IsOpened가 호출되지 않으므로 오픈 비주얼을 여기서 직접 띄운다.
+		OnLootBoxOpenedVisual();
 		NotifyLootResultsChanged();
 		ForceNetUpdate();
+		ScheduleNextReveal();
 	}
 
 	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Interactor ? Interactor->GetController() : nullptr))
@@ -74,6 +86,15 @@ void ALSLootBox::Interact_Implementation(APawn* Interactor)
 	}
 }
 
+void ALSLootBox::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RevealTimerHandle);
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
 void ALSLootBox::OnRep_IsOpened()
 {
 	if (MinimapMarkerComponent)
@@ -81,6 +102,73 @@ void ALSLootBox::OnRep_IsOpened()
 		MinimapMarkerComponent->SetMinimapVisible(!bIsOpened);
 	}
 	RefreshWidgetVisibility();
+	if (bIsOpened)
+	{
+		OnLootBoxOpenedVisual();
+	}
+}
+
+void ALSLootBox::ScheduleNextReveal()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (!PendingLootResults.IsValidIndex(NextRevealIndex))
+	{
+		// 모두 공개됨: 타이머 정리.
+		World->GetTimerManager().ClearTimer(RevealTimerHandle);
+		return;
+	}
+
+	// 딜레이를 0으로 두면 타이머가 발동하지 않아 공개 체인이 멈출 수 있으므로 최소값으로 보정한다.
+	const float Delay = FMath::Max(GetItemRevealDelay(PendingLootResults[NextRevealIndex]), 0.01f);
+	World->GetTimerManager().SetTimer(RevealTimerHandle, this, &ALSLootBox::RevealNextLootItem, Delay, false);
+}
+
+void ALSLootBox::RevealNextLootItem()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (PendingLootResults.IsValidIndex(NextRevealIndex))
+	{
+		LootResults.Add(PendingLootResults[NextRevealIndex]);
+		++NextRevealIndex;
+		NotifyLootResultsChanged();
+		ForceNetUpdate();
+	}
+
+	ScheduleNextReveal();
+}
+
+float ALSLootBox::GetItemRevealDelay(const FLSDropResult& Item) const
+{
+	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
+	const float DefaultDelay = Settings ? Settings->DefaultRevealDelaySeconds : 0.5f;
+
+	const FString Grade = LSInventorySlotUtils::ResolveItemGradeFromRowName(Item.ItemRowName);
+	if (Settings && !Grade.IsEmpty())
+	{
+		if (const float* Found = Settings->GradeRevealDelaySeconds.Find(Grade))
+		{
+			if (*Found > 0.0f)
+			{
+				return *Found;
+			}
+		}
+	}
+
+	return FMath::Max(DefaultDelay, 0.0f);
 }
 
 void ALSLootBox::OnRep_LootResults()
