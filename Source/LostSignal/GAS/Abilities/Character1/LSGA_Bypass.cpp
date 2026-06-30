@@ -19,7 +19,6 @@
 #include "LostSignal.h"
 #include "Skills/LSBypassHologramActor.h"
 #include "Skills/LSBypassSkillDataAsset.h"
-#include "Skills/LSPlayerSkillComponent.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "TimerManager.h"
 
@@ -34,101 +33,78 @@ namespace
 	}
 }
 
-ULSGA_Bypass::ULSGA_Bypass()
+bool ULSGA_Bypass::PrepareSkillExecution()
 {
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);
-	ActivationBlockedTags.AddTag(LSGameplayTags::Combat_SkillCasting); // 스킬끼리만 차단 (기본공격은 통과)
-	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);      // 공통 "진행 중" 의미 유지
-	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_SkillCasting);   // 시전 중 표식
-	CancelAbilitiesWithTag.AddTag(LSGameplayTags::Ability_PlayerBasicAttack); // 기본공격 모션 캔슬 후 발동
-
-	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
-}
-
-void ULSGA_Bypass::ActivateAbility(
-	const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	const FGameplayEventData* TriggerEventData)
-{
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
-	ACharacter* SourceCharacter = Cast<ACharacter>(GetAvatarActorFromActorInfo());
-	AActor* SourceActor = SourceCharacter;
-	ULSPlayerSkillComponent* SkillComponent = SourceActor ? SourceActor->FindComponentByClass<ULSPlayerSkillComponent>() : nullptr;
-	if (!SourceActor || !SourceActor->HasAuthority() || !SourceCharacter || !SkillComponent)
+	ACharacter* SourceCharacter = Cast<ACharacter>(GetSkillSourceActor());
+	const FLSSkillActivationContext& SkillCtx = GetSkillContext();
+	if (!SourceCharacter || !SkillCtx.SkillData)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
+		return false;
 	}
-
-	FLSSkillActivationContext SkillContext;
-	if (!SkillComponent->ConsumePendingAbilityContext(GetClass(), SkillContext) || !SkillContext.SkillData)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s Bypass ability missing pending skill context."), *GetNameSafe(SourceActor));
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-	ActiveSkillData = SkillContext.SkillData;
+	ActiveSkillData = SkillCtx.SkillData;
 
 	float Distance = 0.0f;
 	float Duration = 0.0f;
-	if (!ResolveMovementParams(SkillContext.SkillData, SkillContext.bHasSkillRow ? &SkillContext.SkillRow : nullptr, Distance, Duration))
+	if (!ResolveMovementParams(SkillCtx.SkillData, SkillCtx.bHasSkillRow ? &SkillCtx.SkillRow : nullptr, Distance, Duration))
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
+		return false;
 	}
 
-	FVector AimDirection = SkillContext.TargetLocation - SourceActor->GetActorLocation();
+	FVector AimDirection = SkillCtx.TargetLocation - SourceCharacter->GetActorLocation();
 	AimDirection.Z = 0.0f;
 	if (AimDirection.IsNearlyZero())
 	{
-		AimDirection = FRotator(0.0f, SkillContext.AimYaw, 0.0f).Vector();
+		AimDirection = FRotator(0.0f, SkillCtx.AimYaw, 0.0f).Vector();
 	}
 
 	AimDirection = AimDirection.GetSafeNormal2D();
 	if (AimDirection.IsNearlyZero())
 	{
-		AimDirection = SourceActor->GetActorForwardVector().GetSafeNormal2D();
+		AimDirection = SourceCharacter->GetActorForwardVector().GetSafeNormal2D();
 	}
 
-	UCharacterMovementComponent* MovementComponent = SourceCharacter->GetCharacterMovement();
-	if (AimDirection.IsNearlyZero() || !MovementComponent)
+	if (AimDirection.IsNearlyZero() || !SourceCharacter->GetCharacterMovement())
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return false;
+	}
+
+	CachedDistance = Distance;
+	CachedDuration = Duration;
+	CachedDirection = AimDirection;
+	return true;
+}
+
+void ULSGA_Bypass::OnSkillStarted()
+{
+	ACharacter* SourceCharacter = Cast<ACharacter>(GetSkillSourceActor());
+	UCharacterMovementComponent* MovementComponent = SourceCharacter ? SourceCharacter->GetCharacterMovement() : nullptr;
+	if (!SourceCharacter || !MovementComponent)
+	{
 		return;
 	}
 
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
-
-	const FVector StartLocation = SourceActor->GetActorLocation();
+	const FVector StartLocation = SourceCharacter->GetActorLocation();
 	SetInvincibleTagActive(true);
-	ApplyBypassStartEffects(Duration);
+	ApplyBypassStartEffects(CachedDuration);
 	ApplySpoofingStartEffects(StartLocation);
-	IgnoreEnemiesForBypass(SourceCharacter, StartLocation, AimDirection, Distance);
+	IgnoreEnemiesForBypass(SourceCharacter, StartLocation, CachedDirection, CachedDistance);
 
-	const float SlideSpeed = Distance / Duration;
+	const float SlideSpeed = CachedDistance / CachedDuration;
 	TSharedPtr<FRootMotionSource_ConstantForce> RootMotion = MakeShared<FRootMotionSource_ConstantForce>();
 	RootMotion->InstanceName = FName("Bypass");
 	RootMotion->AccumulateMode = ERootMotionAccumulateMode::Override;
 	RootMotion->Priority = 5;
-	RootMotion->Force = AimDirection * SlideSpeed;
-	RootMotion->Duration = Duration;
+	RootMotion->Force = CachedDirection * SlideSpeed;
+	RootMotion->Duration = CachedDuration;
 	RootMotion->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
 	RootMotion->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
 
 	RootMotionSourceID = MovementComponent->ApplyRootMotionSource(RootMotion);
 
+	// 종료 권위: 슬라이드 Duration 타이머(서버). 몽타주 끝이 아니다.
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimer(BypassTimerHandle, this, &ULSGA_Bypass::FinishBypass, Duration, false);
+		World->GetTimerManager().SetTimer(BypassTimerHandle, this, &ULSGA_Bypass::FinishBypass, CachedDuration, false);
 	}
 
 	if (bEnableDebugLog)
@@ -137,12 +113,18 @@ void ULSGA_Bypass::ActivateAbility(
 			LogLS,
 			Log,
 			TEXT("[GA_Bypass] Source=%s Direction=%s Distance=%.2f Duration=%.2f Speed=%.2f"),
-			*GetNameSafe(SourceActor),
-			*AimDirection.ToCompactString(),
-			Distance,
-			Duration,
+			*GetNameSafe(SourceCharacter),
+			*CachedDirection.ToCompactString(),
+			CachedDistance,
+			CachedDuration,
 			SlideSpeed);
 	}
+}
+
+float ULSGA_Bypass::GetSkillMontagePlayRate() const
+{
+	// 몽타주 전체 길이를 슬라이드 Duration에 맞춰 자동 스케일(수동 동기화 불필요).
+	return ComputeMontagePlayRateForDuration(GetSkillMontage(), NAME_None, CachedDuration);
 }
 
 bool ULSGA_Bypass::ResolveMovementParams(const ULSSkillDataAsset* SkillData, const FLSCharacterSkillRow* SkillRow, float& OutDistance, float& OutDuration) const

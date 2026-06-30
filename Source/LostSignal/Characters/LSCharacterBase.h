@@ -12,6 +12,7 @@ class UAnimMontage;
 class ULSCharacterCombatComponent;
 class ULSCombatStateComponent;
 class ULSStatusEffectComponent;
+class ULSFootstepComponent;
 
 UCLASS(Abstract)
 class LOSTSIGNAL_API ALSCharacterBase : public ACharacter, public IAbilitySystemInterface
@@ -66,4 +67,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/StatusEffect")
 	TObjectPtr<ULSStatusEffectComponent> StatusEffectComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Audio")
+	TObjectPtr<ULSFootstepComponent> FootstepComponent;
 };

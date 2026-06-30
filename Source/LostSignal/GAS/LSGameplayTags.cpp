@@ -29,6 +29,7 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Buff_AttackSpeed, "LS.Buff.AttackSpeed")
 
 	UE_DEFINE_GAMEPLAY_TAG(Event_Combat_BasicAttackHit, "LS.Event.Combat.BasicAttackHit")
+	UE_DEFINE_GAMEPLAY_TAG(Event_Skill_Hit, "LS.Event.Skill.Hit")
 
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Combat_Hit, "GameplayCue.Combat.Hit")
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Skill_Cast, "GameplayCue.Skill.Cast")

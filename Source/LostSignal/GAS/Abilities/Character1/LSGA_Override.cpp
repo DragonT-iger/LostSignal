@@ -10,7 +10,6 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
 #include "Skills/LSOverrideSkillDataAsset.h"
-#include "Skills/LSPlayerSkillComponent.h"
 #include "Skills/LSSkillDataAsset.h"
 
 namespace
@@ -50,18 +49,18 @@ namespace
 		return VariantValue > 0.0f ? VariantValue : AbilityFallback;
 	}
 
-	FVector ResolveOverrideAimDirection(const AActor* SourceActor, const FLSSkillActivationContext& SkillContext)
+	FVector ResolveOverrideAimDirection(const AActor* SourceActor, const FLSSkillActivationContext& SkillCtx)
 	{
 		if (!SourceActor)
 		{
 			return FVector::ForwardVector;
 		}
 
-		FVector AimDirection = SkillContext.TargetLocation - SourceActor->GetActorLocation();
+		FVector AimDirection = SkillCtx.TargetLocation - SourceActor->GetActorLocation();
 		AimDirection.Z = 0.0f;
 		if (AimDirection.IsNearlyZero())
 		{
-			AimDirection = FRotator(0.0f, SkillContext.AimYaw, 0.0f).Vector();
+			AimDirection = FRotator(0.0f, SkillCtx.AimYaw, 0.0f).Vector();
 		}
 
 		AimDirection = AimDirection.GetSafeNormal2D();
@@ -122,59 +121,36 @@ namespace
 ULSGA_Override::ULSGA_Override()
 {
 	DamageEffectClass = ULSGE_PlayerBasicDamage::StaticClass();
-
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);
-	ActivationBlockedTags.AddTag(LSGameplayTags::Combat_SkillCasting); // 스킬끼리만 차단 (기본공격은 통과)
-	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);      // 공통 "진행 중" 의미 유지
-	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_SkillCasting);   // 시전 중 표식
-	CancelAbilitiesWithTag.AddTag(LSGameplayTags::Ability_PlayerBasicAttack); // 기본공격 모션 캔슬 후 발동
-
-	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
-void ULSGA_Override::ActivateAbility(
-	const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	const FGameplayEventData* TriggerEventData)
+bool ULSGA_Override::PrepareSkillExecution()
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	AActor* SourceActor = GetSkillSourceActor();
+	const FLSSkillActivationContext& SkillCtx = GetSkillContext();
 
-	AActor* SourceActor = GetAvatarActorFromActorInfo();
-	ULSPlayerSkillComponent* SkillComponent = SourceActor ? SourceActor->FindComponentByClass<ULSPlayerSkillComponent>() : nullptr;
-	if (!SourceActor || !SourceActor->HasAuthority() || !SkillComponent)
+	CachedDamageEffectClass = SkillCtx.SkillData && SkillCtx.SkillData->DamageEffectClass
+		? SkillCtx.SkillData->DamageEffectClass
+		: DamageEffectClass;
+	CachedCombatComponent = SourceActor ? SourceActor->FindComponentByClass<ULSCharacterCombatComponent>() : nullptr;
+
+	// 전투 컴포넌트나 데미지 GE가 없으면 커밋·쿨타임 없이 발동을 취소한다(기존 즉발 경로와 동일).
+	return CachedCombatComponent != nullptr && CachedDamageEffectClass != nullptr;
+}
+
+void ULSGA_Override::ExecuteSkillEffect()
+{
+	AActor* SourceActor = GetSkillSourceActor();
+	const FLSSkillActivationContext& SkillCtx = GetSkillContext();
+	if (!SourceActor || !CachedCombatComponent || !CachedDamageEffectClass)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	FLSSkillActivationContext SkillContext;
-	if (!SkillComponent->ConsumePendingAbilityContext(GetClass(), SkillContext) || !SkillContext.SkillData)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s Override ability missing pending skill context."), *GetNameSafe(SourceActor));
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = CachedDamageEffectClass;
+	ULSCharacterCombatComponent* SourceCombatComponent = CachedCombatComponent;
 
-	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = SkillContext.SkillData->DamageEffectClass ? SkillContext.SkillData->DamageEffectClass : DamageEffectClass;
-	ULSCharacterCombatComponent* SourceCombatComponent = SourceActor->FindComponentByClass<ULSCharacterCombatComponent>();
-	if (!SourceCombatComponent || !ResolvedDamageEffectClass)
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
-
-	const FLSCharacterSkillRow* Row = SkillContext.bHasSkillRow ? &SkillContext.SkillRow : nullptr;
-	const ULSOverrideSkillDataAsset* OverrideData = Cast<ULSOverrideSkillDataAsset>(SkillContext.SkillData);
+	const FLSCharacterSkillRow* Row = SkillCtx.bHasSkillRow ? &SkillCtx.SkillRow : nullptr;
+	const ULSOverrideSkillDataAsset* OverrideData = Cast<ULSOverrideSkillDataAsset>(SkillCtx.SkillData);
 	const ELSCharacterSkillRangeShape ResolvedShape = Row && Row->Range_Shape != ELSCharacterSkillRangeShape::None
 		? Row->Range_Shape
 		: OverrideData ? OverrideData->FallbackRangeShape : ELSCharacterSkillRangeShape::Circle;
@@ -200,13 +176,12 @@ void ULSGA_Override::ActivateAbility(
 	const ELSCharacterSkillCrowdControlType ResolvedCCType = Row && Row->CC_Type != ELSCharacterSkillCrowdControlType::None
 		? Row->CC_Type
 		: ELSCharacterSkillCrowdControlType::KnockBack;
-	const FVector AimDirection = ResolveOverrideAimDirection(SourceActor, SkillContext);
+	const FVector AimDirection = ResolveOverrideAimDirection(SourceActor, SkillCtx);
 	const float QueryRadius = ResolvedShape == ELSCharacterSkillRangeShape::Box
 		? FMath::Sqrt(FMath::Square(Length) + FMath::Square(Width * 0.5f))
 		: Radius;
 	if (QueryRadius <= 0.0f || AimDirection.IsNearlyZero())
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
@@ -307,7 +282,7 @@ void ULSGA_Override::ActivateAbility(
 		if (ASC && OverrideData->AttackSpeedBuffEffectClass && AttackSpeedBonus > 0.0f && AttackSpeedDuration > 0.0f)
 		{
 			FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
-			EffectContext.AddSourceObject(SkillContext.SkillData);
+			EffectContext.AddSourceObject(SkillCtx.SkillData);
 
 			const FGameplayEffectSpecHandle SpecHandle = ASC->MakeOutgoingSpec(OverrideData->AttackSpeedBuffEffectClass, 1.0f, EffectContext);
 			if (SpecHandle.IsValid())
@@ -337,6 +312,4 @@ void ULSGA_Override::ActivateAbility(
 			ResolvedAttackCoefficient,
 			static_cast<int32>(ResolvedBreakPower));
 	}
-
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }

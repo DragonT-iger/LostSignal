@@ -231,14 +231,17 @@ ULSPlayerSkillComponent::ServerRequestActivateSkill
 Ability 실행:
 
 ```text
-GameplayAbility::ActivateAbility
+ULSGA_PlayerSkillBase::ActivateAbility
 -> ULSPlayerSkillComponent::ConsumePendingAbilityContext
--> SkillData와 SkillRow 읽기
--> 몽타주, 이동, 판정, 투사체, 장판 등 실행
--> 데미지/버프/상태이상 GameplayEffect 적용
--> ApplySkillCooldown
--> EndAbility
+-> PrepareSkillExecution (SkillData/SkillRow 검증·캐싱)
+-> CommitAbility + ApplySkillCooldown
+-> SkillMontage 재생 (없으면 즉발)
+-> LSAN_SkillEffect 노티파이(LS.Event.Skill.Hit) 수신
+-> ExecuteSkillEffect: 판정/데미지/버프/상태이상 GameplayEffect 적용
+-> 몽타주 종료 -> EndAbility
 ```
+
+스킬 효과 발동 지점은 베이스가 소유한다. 각 스킬은 `ExecuteSkillEffect`에 효과만 구현하고, 몽타주 재생·노티파이 대기·종료 타이밍은 `ULSGA_PlayerSkillBase`가 처리한다. 자세한 구조는 [SkillSystemStructure.md](SkillSystemStructure.md)가 단일 출처.
 
 ## 빠른 이동 스킬 흐름
 
@@ -376,7 +379,25 @@ Ability 실행
 -> Ability End
 ```
 
-즉발 스킬은 Ability에서 바로 효과를 실행할 수 있다. 나중에 애니메이션이 생겨 타이밍이 중요해지면 효과 발동 지점을 Notify로 옮긴다.
+플레이어 액티브 스킬은 `ULSGA_PlayerSkillBase`가 `SkillMontage`를 재생하고, 몽타주의 `LSAN_SkillEffect` 노티파이가 `LS.Event.Skill.Hit` 이벤트를 보내는 시점에 효과(`ExecuteSkillEffect`)를 발동한다. 몽타주가 없는 스킬은 발동 즉시 효과가 나가는 즉발로 fallback한다(애니메이션 미적용 스킬 호환). 노티파이가 누락된 몽타주는 몽타주 종료 시점에 효과를 보장하고, 윈드업 중 캔슬(스턴/사망)되면 효과가 발동하지 않는다.
+
+### 발소리 (거리 기반)
+
+이동 로코모션은 AnimBP 스테이트머신의 8방향 블렌드스페이스(걷기/달리기 포함)다. 걷기·달리기의 **보폭 수가 달라**(걷기 2세트 / 달리기 3세트) 마커·커브 기반 동기화로는 발 착지를 못 맞춘다. 그래서 발소리를 **애니 타이밍이 아니라 이동 거리**로 발동하며, movement 도메인이라 AnimBP가 아니라 **전용 [ULSFootstepComponent](../../Source/LostSignal/Characters/LSFootstepComponent.h)** 가 담당한다(`ALSCharacterBase`에 부착).
+
+```text
+ULSFootstepComponent::TickComponent
+-> 소유자 수평 이동거리 누적(사망·공중·정지 제외)
+-> 누적이 StrideLength 넘으면 좌우 발 번갈아 PlayFootstep(발 소켓 위치) + 거리 차감
+-> 속도가 빠를수록 거리가 빨리 차 발소리도 빨라짐
+```
+
+- 트리거가 C++ 컴포넌트 한 곳이라 시퀀스에 마커/커브/노티파이를 **아무것도 안 넣어도 된다.** 어떤 블렌드·속도에도 견고.
+- AnimInstance가 아니라 컴포넌트인 이유: 거리 기반은 movement 도메인이고, AnimInstance는 URO로 업데이트가 throttle돼 박자가 틀어질 수 있다.
+- `FootstepSound`(Sound Cue로 변주), `StrideLength`, `MinFootstepSpeed`, 발 본 이름은 캐릭터 BP의 `FootstepComponent`에서 매핑.
+- 컴포넌트 틱은 클라마다 로컬로 도므로 발소리도 로컬 재생 → MO 복제 불필요.
+- 트레이드오프: 발소리가 화면상 발 착지와 100% 일치하진 않으나 탑다운 쿼터뷰라 무시 가능. 지면 재질별이 필요하면 `PlayFootstep`에서 발밑 라인트레이스 → `PhysicalMaterial` → 사운드 선택으로 확장(트리거가 한 곳이라 여기만 수정).
+- AI 청각용 `Noise_Walk`/`Noise_Run` 태그는 발소리 오디오와 별개 레이어다.
 
 ## 몬스터와 플레이어 전투 연결
 

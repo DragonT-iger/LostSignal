@@ -5,6 +5,7 @@
 #include "GameplayTagContainer.h"
 #include "LSSkillDataAssetBase.generated.h"
 
+class UAnimMontage;
 class UGameplayAbility;
 class UGameplayEffect;
 class USoundBase;
@@ -29,6 +30,11 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TSubclassOf<UGameplayAbility> AbilityClass;
+
+	// 확정 입력 시 재생할 스킬 몽타주. 실제 효과는 몽타주의 LSAN_SkillEffect 노티파이 시점에 발동한다.
+	// 미할당이면 발동 즉시 효과가 나가는 즉발로 동작한다(애니메이션 미적용 스킬 호환).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
+	TObjectPtr<UAnimMontage> SkillMontage;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Cooldown")
 	FGameplayTag CooldownTag;

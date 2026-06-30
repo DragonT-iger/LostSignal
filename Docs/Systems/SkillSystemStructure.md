@@ -96,6 +96,11 @@ GameplayEffect
 AbilityClass
 - 실제 실행할 GameplayAbility
 
+SkillMontage
+- 확정 입력 시 재생할 스킬 몽타주
+- 실제 효과는 몽타주의 LSAN_SkillEffect 노티파이 시점에 발동한다
+- 미할당이면 발동 즉시 효과가 나가는 즉발로 동작한다(애니메이션 미적용 스킬 호환)
+
 CooldownTag
 - 쿨타임 차단에 사용할 태그
 - 비어 있으면 일부 기본 AbilityClass 기준으로 fallback 태그를 찾는다
@@ -162,7 +167,8 @@ PassiveSkill_ID
 실제 스킬 실행 로직이다.
 
 - 발동 가능 여부를 확인한다.
-- 몽타주를 재생하거나 즉발 판정을 수행한다.
+- 공통 베이스는 `ULSGA_PlayerSkillBase`다. 컨텍스트 소비, 커밋, 쿨타임, 몽타주 재생, 노티파이 대기, 종료 처리를 베이스가 담당하고, 각 스킬은 `PrepareSkillExecution`(검증/캐싱)과 `ExecuteSkillEffect`(실제 효과)만 override한다.
+- `SkillMontage`가 있으면 몽타주를 재생하고, 몽타주의 `LSAN_SkillEffect` 노티파이가 `LS.Event.Skill.Hit` GameplayEvent를 보내는 시점에 `ExecuteSkillEffect`가 실행된다. 몽타주가 없으면 발동 즉시 실행되는 즉발이다.
 - 서버 권한에서 데미지, 상태이상, 넉백을 적용한다.
 - 필요하면 쿨타임 GE를 적용한다.
 - 필요하면 DataAsset과 DataTable row를 읽어서 수치를 해석한다.
@@ -203,12 +209,15 @@ PassiveSkill_ID
 -> 빠른 이동 스킬이면 로컬 예측 시작
 -> ServerRequestActivateSkill
 -> 서버에서 AbilityClass 활성화
--> Ability가 PendingAbilityContext 소비
--> Ability 실행
--> 쿨타임 GE 적용
+-> Ability(ULSGA_PlayerSkillBase)가 PendingAbilityContext 소비
+-> PrepareSkillExecution 검증 후 커밋 + 쿨타임 GE 적용
+-> SkillMontage 재생 (전 클라 멀티캐스트)
+-> [임팩트 프레임] LSAN_SkillEffect 노티파이 -> LS.Event.Skill.Hit 이벤트
+-> Ability의 WaitGameplayEvent 수신 -> ExecuteSkillEffect (데미지/CC/버프)
+-> 몽타주 종료 -> EndAbility
 ```
 
-프리뷰가 없는 즉발 스킬도 같은 DataAsset과 Ability 경로를 사용한다. 차이는 PreviewSpec을 보여주느냐의 문제다.
+`SkillMontage`가 없으면 커밋 직후 `ExecuteSkillEffect`가 바로 실행되는 즉발로 동작한다. 프리뷰 유무는 PreviewSpec을 보여주느냐의 문제로, 즉발/몽타주 분기와는 별개다.
 
 ## 기본 공격 캔슬과 스킬 차단 태그
 
@@ -505,13 +514,21 @@ TryPredictFastMovementSkill
 
 서버 Ability도 별도로 이동을 실행한다. 클라이언트 예측은 렌더링 버벅임을 줄이기 위한 것이고, 최종 결과는 서버가 결정한다.
 
+이동 스킬은 즉발/연출형(Override 등)과 몽타주 처리 규칙이 다르다. 다음을 지킨다.
+
+- **종료 권위는 몽타주 끝이 아니라 서버 타이머(이동 Duration)** 다. `ULSGA_PlayerSkillBase::ShouldMontageDriveEnd`를 `false`로 override하면 베이스는 몽타주를 재생만 하고 종료 델리게이트를 바인딩하지 않는다. 데디케이티드 서버에서 서버 메시 애니가 tick되지 않아도 능력이 결정적으로 종료된다.
+- **몽타주는 비주얼 전용이고 루트모션 트랙을 넣지 않는다.** 이동은 `FRootMotionSource`(클라 예측 + 서버 권위)만 담당한다. 몽타주가 루트모션을 가지면 소유 클라에서 예측 루트모션과 이중 적용되어 튄다.
+- **몽타주 길이는 이동 Duration에 자동으로 맞춘다.** `GetSkillMontagePlayRate`에서 `ComputeMontagePlayRateForDuration(몽타주, None, 이동Duration)`를 반환하면 베이스가 그 playRate로 재생한다. DataTable `Skill_Time`을 바꿔도 몽타주 재오써링 없이 길이가 따라간다. (`ResolveComboPlayRate`와 같은 원리, [CombatImplementationFlow.md](../Systems/CombatImplementationFlow.md))
+
 새 전방 이동 스킬을 추가할 때:
 
 ```text
 1. 전용 DataAsset에 이동 거리/시간 fallback을 둔다.
-2. Ability에서 서버 이동을 구현한다.
-3. ULSPlayerSkillComponent::ResolvePredictedFastMovementParams에 예측 파라미터 해석을 추가한다.
-4. 이동 중 적 충돌을 무시해야 하면 기존 IgnoreEnemiesForPredictedFastMovement 경로를 사용한다.
+2. ULSGA_PlayerSkillBase 상속, PrepareSkillExecution(검증·캐싱)/OnSkillStarted(루트모션·타이머)로 서버 이동을 구현한다.
+3. ShouldMontageDriveEnd=false, GetSkillMontagePlayRate에서 이동 Duration 기준 자동 스케일.
+4. ULSPlayerSkillComponent::ResolvePredictedFastMovementParams에 예측 파라미터 해석을 추가한다.
+5. 이동 중 적 충돌을 무시해야 하면 기존 IgnoreEnemiesForPredictedFastMovement 경로를 사용한다.
+6. 몽타주는 루트모션 없는 비주얼로 author, DataAsset SkillMontage에 할당(미할당이면 타이머로만 동작).
 ```
 
 ## 강화 스킬 구조
@@ -637,9 +654,12 @@ Skill Input
   -> FLSSkillActivationContext 생성
   -> Local prediction if fast movement
   -> ServerRequestActivateSkill
-  -> ASC activates GameplayAbility
-  -> Ability reads SkillData / DataTable
-  -> Apply damage / buff / cooldown GameplayEffect
+  -> ASC activates GameplayAbility (ULSGA_PlayerSkillBase)
+  -> Commit + cooldown, then play SkillMontage
+  -> LSAN_SkillEffect notify (LS.Event.Skill.Hit) or 즉발 if no montage
+  -> ExecuteSkillEffect reads SkillData / DataTable
+  -> Apply damage / buff GameplayEffect
+  -> Montage end -> EndAbility
 
 Passive Event
   -> ULSPlayerSkillComponent
