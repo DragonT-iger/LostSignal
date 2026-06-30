@@ -99,6 +99,7 @@ private:
 	void ClearPreviewSignalChip();
 	void ResolveSurvivalProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const;
 	bool IsSurvivalFeatureVisible(FName EnableName) const;
+	bool ShouldShowSignalIndicator() const;
 	void SetWidgetVisibility(UWidget* Widget, bool bVisible) const;
 	void HandleAttributeChanged(const FOnAttributeChangeData& ChangeData);
 	const ULSCombatAttributeSet* ResolveCombatAttributeSet() const;

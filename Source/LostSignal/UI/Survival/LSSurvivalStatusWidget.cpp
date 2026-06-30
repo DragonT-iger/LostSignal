@@ -248,7 +248,7 @@ void ULSSurvivalStatusWidget::SetSignalChipIcon(const FName ChipItemRowName)
 	}
 	else if (ChipImage)
 	{
-		ChipImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		ChipImage->SetVisibility(ShouldShowSignalIndicator() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	}
 }
 
@@ -441,7 +441,8 @@ void ULSSurvivalStatusWidget::SetRingCooldownProgress(float Progress)
 {
 	if (SurvivalCooldownRingImage)
 	{
-		SurvivalCooldownRingImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		// 생존 프로토콜이 0이면 신호 유실 링을 숨긴다(HP/스태미나 바 게이팅과 동일 기준).
+		SurvivalCooldownRingImage->SetVisibility(ShouldShowSignalIndicator() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	}
 	if (SurvivalCooldownRingMaterial)
 	{
@@ -470,7 +471,8 @@ void ULSSurvivalStatusWidget::SetChipImageTexture(UTexture2D* Texture)
 	{
 		ChipImage->SetBrushFromTexture(Texture);
 	}
-	ChipImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	// 생존 프로토콜이 0이면 링 안의 칩 아이콘도 함께 숨긴다.
+	ChipImage->SetVisibility(ShouldShowSignalIndicator() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 }
 
 void ULSSurvivalStatusWidget::ClearPreviewSignalChip()
@@ -529,6 +531,14 @@ bool ULSSurvivalStatusWidget::IsSurvivalFeatureVisible(const FName EnableName) c
 
 	const FLSProtocolUnlockRow* Row = GameDataSubsystem->FindProtocolUnlockRowByEnableName(ELSProtocolType::Survival, EnableName, TEXT("SurvivalStatus"));
 	return Row ? GameDataSubsystem->IsProtocolUnlockVisible(*Row, CurrentLevel, PreviousLevel) : true;
+}
+
+bool ULSSurvivalStatusWidget::ShouldShowSignalIndicator() const
+{
+	int32 CurrentSurvivalProtocolLevel = 0;
+	int32 PreviousSurvivalProtocolLevel = 0;
+	ResolveSurvivalProtocolLevels(CurrentSurvivalProtocolLevel, PreviousSurvivalProtocolLevel);
+	return CurrentSurvivalProtocolLevel >= 1;
 }
 
 void ULSSurvivalStatusWidget::SetWidgetVisibility(UWidget* Widget, const bool bVisible) const

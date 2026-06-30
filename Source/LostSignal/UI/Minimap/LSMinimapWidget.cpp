@@ -145,16 +145,17 @@ int32 ULSMinimapWidget::NativePaint(
 	const FVector2D Center = Size * 0.5f;
 	const float PixelsPerCm = Radius / FMath::Max(ViewRadiusCm, 1.0f);
 
-	DrawFilledCircle(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, Radius, BackgroundColor);
-	DrawCircleOutline(OutDrawElements, CurrentLayer, AllottedGeometry, Center, Radius - 0.75f, BackgroundColor, 1.5f);
-
 	int32 CurrentNavigationProtocol = 0;
 	int32 PreviousNavigationProtocol = 0;
 	ResolveNavigationProtocolLevels(CurrentNavigationProtocol, PreviousNavigationProtocol);
+	// 탐색 프로토콜이 0이라 미니맵이 잠겨 있으면 기본 원(배경/외곽선)부터 그리지 않는다.
 	if (!IsNavigationFeatureVisible(TEXT("Minimap"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.LootVisibleNavigation))
 	{
 		return CurrentLayer;
 	}
+
+	DrawFilledCircle(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, Radius, BackgroundColor);
+	DrawCircleOutline(OutDrawElements, CurrentLayer, AllottedGeometry, Center, Radius - 0.75f, BackgroundColor, 1.5f);
 
 	if (bUsePreviewNavigationLevels)
 	{
