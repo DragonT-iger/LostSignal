@@ -521,11 +521,11 @@ void ULSChipStationWidget::HandleCarryingSlotCapacityChanged()
 	{
 		PlayerController->DropOverflowInventorySlotsToWorld(nullptr, FVector::ZeroVector);
 		PlayerController->RefreshOpenLobbyStorageWidget();
-	}
-
-	if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
-	{
-		PlayerCharacter->RebuildInventoryWidgetSlots();
+		// 폰 전용 RebuildInventoryWidgetSlots 만 호출하면 폰이 없는 로비에서 인벤토리 위젯이 갱신되지 않는다.
+		// 그러면 인벤토리에 있던 칩을 장착해 슬롯을 비운 뒤에도 인벤토리 위젯이 stale 상태로 남아,
+		// 그 칸을 창고로 옮길 때 GetInventory()[Index] 가 비어 전송이 실패한다(간헐적 인벤토리→창고 실패).
+		// PC 의 통합 경로는 폰이 있으면 폰을, 없으면 등록된 로비 인벤토리 위젯을 갱신한다.
+		PlayerController->RefreshActiveInventoryWidget();
 	}
 }
 

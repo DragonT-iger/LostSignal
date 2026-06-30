@@ -9,6 +9,7 @@ class UProgressBar;
 class UTextBlock;
 class UWidgetSwitcher;
 class ULSLobbyTabWidget;
+class ULSLobbyQuestWidget;
 
 // 로비 탭/페이지 종류. WidgetSwitcher 인덱스와 순서를 맞춘다(Play=0, Equip=1, Quest=2, Character=3, Inventory=4).
 // Inventory는 상단 탭이 아니라 TAB 키/인벤토리 버튼으로 여는 창고+인벤토리 페이지다.
@@ -66,6 +67,10 @@ protected:
 	// 탭별 콘텐츠 전환. 인덱스는 ELSLobbyTab 순서를 따른다. 현재는 플레이(0)만 채운다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
 	TObjectPtr<UWidgetSwitcher> TabSwitcher;
+
+	// 퀘스트 탭(인덱스 2) 콘텐츠. 메인 1 + 서브 3 퀘스트를 묶는 패널. 데이터 연동은 추후 작업.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
+	TObjectPtr<ULSLobbyQuestWidget> LobbyQuest;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
 	TObjectPtr<UTextBlock> LevelText;

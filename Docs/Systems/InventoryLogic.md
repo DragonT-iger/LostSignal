@@ -288,6 +288,7 @@ Item   -> 300000 + DataTable row 순서
 ## 현재 주의점
 
 - `ItemRowName` 접두사 규칙에 의존한다. 새 아이템 타입을 추가하면 아이콘 로드, 최대 스택, 정렬 키 처리도 같이 추가해야 한다.
+- 저장 슬롯(`SaveSubsystem`)을 바꾸는 UI(칩스테이션 장착/해제 등)는 인벤토리 위젯을 폰 전용 `RebuildInventoryWidgetSlots`가 아니라 PC의 `RefreshActiveInventoryWidget`로 갱신해야 한다. 로비는 폰이 없어 폰 전용 경로가 무시되며, 그러면 인벤토리에 있던 칩을 장착해 슬롯을 비운 뒤 인벤토리 위젯이 stale로 남아 이후 창고 이동이 `GetInventory()[Index]` 빈 슬롯으로 실패한다.
 - 아이콘과 DataTable은 UI 표시 중 동기 로드될 수 있다. 아이템 수가 많아지면 캐싱을 고려한다.
 - Quit 복구에서 플레이어별 소모품 차감이 필요하면 `ULSRaidInventoryComponent`에 `ConsumedItems` 기록을 추가해야 한다.
 - 로컬/PIE 다중 프로필 테스트가 필요하면 SaveGame을 `PlayerSaves[ProfileId]` 형태로 확장하는 설계는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)를 따른다.

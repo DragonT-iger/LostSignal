@@ -42,6 +42,10 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> NavigationLevelText;
 
+	// "레이드 종료" 버튼 — 레이드 중에만 보인다. (로비에서는 숨김)
+	UPROPERTY(Transient)
+	TObjectPtr<UButton> EndRaidButton;
+
 	// 버튼 클릭 핸들러 (UButton::OnClicked 은 dynamic delegate 이므로 UFUNCTION 필요).
 	UFUNCTION()
 	void HandleSurvivalMinus();
@@ -63,6 +67,8 @@ protected:
 	void HandleClear();
 	UFUNCTION()
 	void HandleMaxAll();
+	UFUNCTION()
+	void HandleEndRaid();
 
 private:
 	static constexpr int32 MaxProtocolLevel = 8;
@@ -73,6 +79,10 @@ private:
 	UTextBlock* MakeText(const FString& InText, int32 FontSize);
 
 	ALSPlayerControllerBase* ResolvePC() const;
+	// 현재 레이드 진행 중인지 — 소유 PC 의 레이드 인벤토리 활성 여부로 판정.
+	bool IsRaidActive() const;
+	// 레이드 상태에 맞춰 "레이드 종료" 버튼 표시/숨김을 갱신한다.
+	void UpdateEndRaidVisibility();
 	int32 GetDisplayLevel(ELSProtocolType Type) const;
 	void ApplyLevel(ELSProtocolType Type, int32 NewLevel);
 	void AdjustLevel(ELSProtocolType Type, int32 Delta);

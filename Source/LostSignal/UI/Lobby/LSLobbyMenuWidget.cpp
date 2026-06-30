@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "InputCoreTypes.h"
 #include "LostSignal.h"
+#include "UI/Lobby/LSLobbyQuestWidget.h"
 #include "UI/Lobby/LSLobbyTabWidget.h"
 
 void ULSLobbyMenuWidget::NativeConstruct()
@@ -57,6 +58,10 @@ void ULSLobbyMenuWidget::NativeConstruct()
 	if (!TabSwitcher)
 	{
 		UE_LOG(LogLS, Warning, TEXT("TabSwitcher is not bound on %s."), *GetNameSafe(this));
+	}
+	if (!LobbyQuest)
+	{
+		UE_LOG(LogLS, Warning, TEXT("LobbyQuest is not bound on %s."), *GetNameSafe(this));
 	}
 	if (!LevelText)
 	{

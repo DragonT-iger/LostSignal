@@ -12,7 +12,11 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Core/LSFarmingGameMode.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Inventory/LSRaidInventoryComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "LostSignal.h"
 
 TSharedRef<SWidget> ULSProtocolDebugWidget::RebuildWidget()
 {
@@ -28,6 +32,7 @@ void ULSProtocolDebugWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	RefreshLevelTexts();
+	UpdateEndRaidVisibility();
 }
 
 void ULSProtocolDebugWidget::BuildPanel()
@@ -71,6 +76,16 @@ void ULSProtocolDebugWidget::BuildPanel()
 	{
 		ActionSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 8.f));
 		ActionSlot->SetHorizontalAlignment(HAlign_Center);
+	}
+
+	// "레이드 종료" 버튼 — 레이드 중에만 보인다. (탈출 성공 처리 → 로비 복귀)
+	EndRaidButton = MakeButton(TEXT("레이드 종료"), 16);
+	EndRaidButton->SetBackgroundColor(FLinearColor(0.6f, 0.1f, 0.1f, 1.f));
+	EndRaidButton->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleEndRaid);
+	if (UVerticalBoxSlot* EndRaidSlot = VBox->AddChildToVerticalBox(EndRaidButton))
+	{
+		EndRaidSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 8.f));
+		EndRaidSlot->SetHorizontalAlignment(HAlign_Center);
 	}
 
 	// 프로토콜 4행
@@ -248,6 +263,48 @@ void ULSProtocolDebugWidget::RefreshLevelTexts()
 	if (NavigationLevelText)
 	{
 		NavigationLevelText->SetText(FText::FromString(FString::FromInt(GetDisplayLevel(ELSProtocolType::Navigation))));
+	}
+
+	// 패널을 다시 열 때마다 레이드 상태가 바뀌었을 수 있으므로 종료 버튼 표시를 재평가한다.
+	UpdateEndRaidVisibility();
+}
+
+bool ULSProtocolDebugWidget::IsRaidActive() const
+{
+	if (const ALSPlayerControllerBase* PC = ResolvePC())
+	{
+		if (const ULSRaidInventoryComponent* RaidInventory = PC->GetRaidInventoryComponent())
+		{
+			return RaidInventory->IsRaidActive();
+		}
+	}
+
+	return false;
+}
+
+void ULSProtocolDebugWidget::UpdateEndRaidVisibility()
+{
+	if (EndRaidButton)
+	{
+		EndRaidButton->SetVisibility(IsRaidActive() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+}
+
+void ULSProtocolDebugWidget::HandleEndRaid()
+{
+	// 레이드 중이 아니면 무시한다. (로비 등에서 오작동 방지)
+	if (!IsRaidActive())
+	{
+		return;
+	}
+
+	if (ALSFarmingGameMode* FarmingGameMode = Cast<ALSFarmingGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		FarmingGameMode->OnExtraction();
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("[ProtocolDebug] 레이드 종료 실패: ALSFarmingGameMode 를 찾지 못했습니다."));
 	}
 }
 
