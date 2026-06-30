@@ -2,6 +2,7 @@
 
 #include "Abilities/GameplayAbility.h"
 #include "AbilitySystemComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Combat/LSCharacterCombatComponent.h"
@@ -35,6 +36,9 @@ ALSCharacterBase::ALSCharacterBase()
 	CharacterCombatComponent = CreateDefaultSubobject<ULSCharacterCombatComponent>(TEXT("CharacterCombatComponent"));
 	CombatStateComponent = CreateDefaultSubobject<ULSCombatStateComponent>(TEXT("CombatStateComponent"));
 	StatusEffectComponent = CreateDefaultSubobject<ULSStatusEffectComponent>(TEXT("StatusEffectComponent"));
+
+	GetMesh()->SetRenderCustomDepth(true);
+	GetMesh()->SetCustomDepthStencilValue(1);
 }
 
 UAbilitySystemComponent* ALSCharacterBase::GetAbilitySystemComponent() const
