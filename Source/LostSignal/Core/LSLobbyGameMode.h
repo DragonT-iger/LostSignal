@@ -23,6 +23,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Lobby")
 	void StartRaid();
 
+	// 디버그: 정식 레이드 진입 시퀀스(로드아웃 제출·세션/세이브 셋업)를 그대로 실행하되 목적지만
+	// Settings->TestRaidLevel 로 바꿔 진입한다. 레이드 환경이 100% 동일(결과 저장 포함).
+	// (프로토콜 디버그 패널의 "테스트 맵 가기" 버튼이 호출 — 로비에서만 동작)
+	void StartRaidToTestLevel();
+
 	void NotifyRaidEntryDataSubmitted(ALSPlayerControllerBase* PlayerController);
 
 protected:
@@ -47,6 +52,10 @@ private:
 
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Lobby")
 	bool bRaidStartRequested = false;
+
+	// 설정 시 이번 진입의 목적지를 FarmingLevel 대신 이 레벨로 바꾼다(디버그 테스트 맵). TryStart 에서 1회 소비.
+	UPROPERTY(Transient)
+	TSoftObjectPtr<UWorld> RaidLevelOverride;
 
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Lobby")
 	bool bWaitingForRaidEntryData = false;

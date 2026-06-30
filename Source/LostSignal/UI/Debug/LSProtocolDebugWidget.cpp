@@ -13,6 +13,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Core/LSFarmingGameMode.h"
+#include "Core/LSLobbyGameMode.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -76,6 +77,16 @@ void ULSProtocolDebugWidget::BuildPanel()
 	{
 		ActionSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 8.f));
 		ActionSlot->SetHorizontalAlignment(HAlign_Center);
+	}
+
+	// "테스트 맵 가기" 버튼 — 정식 레이드 진입을 타되 목적지만 TestRaidLevel 로. (로비에서만 표시)
+	TestMapButton = MakeButton(TEXT("테스트 맵 가기"), 16);
+	TestMapButton->SetBackgroundColor(FLinearColor(0.1f, 0.4f, 0.6f, 1.f));
+	TestMapButton->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleGoToTestMap);
+	if (UVerticalBoxSlot* TestMapSlot = VBox->AddChildToVerticalBox(TestMapButton))
+	{
+		TestMapSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 8.f));
+		TestMapSlot->SetHorizontalAlignment(HAlign_Center);
 	}
 
 	// "레이드 종료" 버튼 — 레이드 중에만 보인다. (탈출 성공 처리 → 로비 복귀)
@@ -288,6 +299,16 @@ void ULSProtocolDebugWidget::UpdateEndRaidVisibility()
 	{
 		EndRaidButton->SetVisibility(IsRaidActive() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
+	// 테스트 맵 진입은 정식 진입과 동일하게 로비에서만 가능하므로 로비에서만 보인다.
+	if (TestMapButton)
+	{
+		TestMapButton->SetVisibility(IsLobbyActive() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+}
+
+bool ULSProtocolDebugWidget::IsLobbyActive() const
+{
+	return Cast<ALSLobbyGameMode>(UGameplayStatics::GetGameMode(this)) != nullptr;
 }
 
 void ULSProtocolDebugWidget::HandleEndRaid()
@@ -305,6 +326,20 @@ void ULSProtocolDebugWidget::HandleEndRaid()
 	else
 	{
 		UE_LOG(LogLS, Warning, TEXT("[ProtocolDebug] 레이드 종료 실패: ALSFarmingGameMode 를 찾지 못했습니다."));
+	}
+}
+
+void ULSProtocolDebugWidget::HandleGoToTestMap()
+{
+	// 정식 레이드 진입 시퀀스를 그대로 타되 목적지만 테스트 레벨로 바꾼다(레이드 세션·세이브 동일).
+	// 로비에서만 가능 — 로드아웃 제출 등 진입 셋업이 로비 게임모드 권한에서 이뤄지기 때문.
+	if (ALSLobbyGameMode* LobbyGameMode = Cast<ALSLobbyGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		LobbyGameMode->StartRaidToTestLevel();
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("[ProtocolDebug] 테스트 맵 이동은 로비에서만 가능합니다. (ALSLobbyGameMode 아님)"));
 	}
 }
 

@@ -31,6 +31,13 @@ public:
 
 	void NotifyRaidResultSaved(ALSPlayerControllerBase* PlayerController);
 
+	// 신호 게이지가 다음 10% 단계(= 칩 1칸)로 떨어지기까지 남은 초. 드레인 타이머가 멈춰 있으면 음수.
+	// HUD 생존 링이 자체 추정 대신 실제 잔여시간을 읽도록 노출한다(서버 권한에서만 유효).
+	float GetSignalGaugeDrainRemainingSeconds() const;
+
+	// 드레인 한 주기 길이(초). 신호 링 카운트다운의 분모로 쓰여 60초 값을 단일 출처화한다.
+	float GetSignalGaugeDrainInterval() const;
+
 private:
 	void EndRaid(ELSRaidResult Result);
 	void BeginRaidResultSave(ELSRaidResult Result);

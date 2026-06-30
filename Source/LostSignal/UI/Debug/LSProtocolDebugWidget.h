@@ -46,6 +46,10 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UButton> EndRaidButton;
 
+	// "테스트 맵 가기" 버튼 — 정식 레이드 진입을 타되 목적지만 TestRaidLevel 로. 로비에서만 보인다.
+	UPROPERTY(Transient)
+	TObjectPtr<UButton> TestMapButton;
+
 	// 버튼 클릭 핸들러 (UButton::OnClicked 은 dynamic delegate 이므로 UFUNCTION 필요).
 	UFUNCTION()
 	void HandleSurvivalMinus();
@@ -69,6 +73,8 @@ protected:
 	void HandleMaxAll();
 	UFUNCTION()
 	void HandleEndRaid();
+	UFUNCTION()
+	void HandleGoToTestMap();
 
 private:
 	static constexpr int32 MaxProtocolLevel = 8;
@@ -81,7 +87,9 @@ private:
 	ALSPlayerControllerBase* ResolvePC() const;
 	// 현재 레이드 진행 중인지 — 소유 PC 의 레이드 인벤토리 활성 여부로 판정.
 	bool IsRaidActive() const;
-	// 레이드 상태에 맞춰 "레이드 종료" 버튼 표시/숨김을 갱신한다.
+	// 현재 로비인지 — 현재 게임모드가 ALSLobbyGameMode 인지로 판정. (테스트 맵 진입 버튼 게이팅)
+	bool IsLobbyActive() const;
+	// 레이드/로비 상태에 맞춰 "레이드 종료"·"테스트 맵 가기" 버튼 표시/숨김을 갱신한다.
 	void UpdateEndRaidVisibility();
 	int32 GetDisplayLevel(ELSProtocolType Type) const;
 	void ApplyLevel(ELSProtocolType Type, int32 NewLevel);

@@ -5,7 +5,9 @@
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Core/LSFarmingGameMode.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Kismet/GameplayStatics.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSProtocolUnlockRow.h"
@@ -407,34 +409,60 @@ void ULSSurvivalStatusWidget::RefreshSignalChipFromSave()
 	const float SignalPercent = SaveSubsystem->GetChipSignalGaugePercent();
 	const int32 DisappearingSlotIndex = CalculateSurvivalDisappearingSignalSlotIndex(SignalPercent);
 	const TArray<FLSSessionItem>& EquipmentItems = SaveSubsystem->GetChipEquipmentSlots();
-	const FLSSessionItem* DisappearingItem = EquipmentItems.IsValidIndex(DisappearingSlotIndex)
-		? &EquipmentItems[DisappearingSlotIndex]
-		: nullptr;
-	if (!DisappearingItem || !LSInventorySlotUtils::IsFilled(*DisappearingItem))
+
+	// 비활성화는 슬롯 번호 순이라 DisappearingSlotIndex가 "다음에 비활성화될 첫 활성 슬롯"이다.
+	// 그 슬롯이 비어 있으면 다음으로 채워진 칩까지 건너뛴다(= 실제로 다음에 사라질 칩).
+	int32 TargetSlotIndex = INDEX_NONE;
+	if (DisappearingSlotIndex != INDEX_NONE)
+	{
+		for (int32 SlotIndex = DisappearingSlotIndex; SlotIndex < EquipmentItems.Num(); ++SlotIndex)
+		{
+			if (LSInventorySlotUtils::IsFilled(EquipmentItems[SlotIndex]))
+			{
+				TargetSlotIndex = SlotIndex;
+				break;
+			}
+		}
+	}
+
+	// 더 이상 사라질 칩이 없으면(전부 비활성화됐거나 장착 칩 없음) 아이콘은 숨기고,
+	// 데모 카운트다운은 끈 뒤 시간이 다 지난 링(0)만 남긴다.
+	if (TargetSlotIndex == INDEX_NONE)
 	{
 		ClearPreviewSignalChip();
+		PreviewRingCooldownRemaining = 0.0f;
+		SetRingCooldownProgress(0.0f);
 		ActiveSignalSlotIndex = INDEX_NONE;
 		return;
 	}
 
-	// 신호 게이지는 레이드에서만 시간에 따라 감소한다. 로비 등 비레이드에서는 게이지가
-	// 고정이므로 링을 시간 카운트다운하지 않고 현재 구간 위치만 정적으로 표시한다.
-	if (!SaveSubsystem->IsRaidSaveActive())
+	const FLSSessionItem& DisappearingItem = EquipmentItems[TargetSlotIndex];
+
+	// 신호 게이지는 드레인 타이머가 도는 곳(= ALSFarmingGameMode 가 있는 레이드/테스트 레벨)에서만
+	// 시간에 따라 감소한다. 로비/결과 등 다른 게임모드에서는 캐스트가 실패하고, 타이머가 멈춰 있으면
+	// 잔여시간이 음수라 아래에서 정적 표시로 폴백한다. (정식 레이드 세션 플래그가 아니라 실제 타이머 기준)
+	const ALSFarmingGameMode* FarmingGameMode = Cast<ALSFarmingGameMode>(UGameplayStatics::GetGameMode(this));
+	const float DrainInterval = FarmingGameMode ? FarmingGameMode->GetSignalGaugeDrainInterval() : 0.0f;
+	const float DrainRemaining = FarmingGameMode ? FarmingGameMode->GetSignalGaugeDrainRemainingSeconds() : -1.0f;
+
+	// 레이드가 아니거나(로비/프리뷰), 드레인 타이머에 접근할 수 없거나(비권한 원격 클라),
+	// 타이머가 멈춰 있으면(게이지 0%) 실제 잔여시간이 없으므로 구간 위치를 정적으로 표시한다.
+	if (DrainRemaining < 0.0f || DrainInterval <= 0.0f)
 	{
-		SetPreviewSignalChip(DisappearingItem->ItemRowName, CalculateSurvivalSignalSlotDisappearProgress(SignalPercent, DisappearingSlotIndex));
+		SetPreviewSignalChip(DisappearingItem.ItemRowName, CalculateSurvivalSignalSlotDisappearProgress(SignalPercent, TargetSlotIndex));
 		ActiveSignalSlotIndex = INDEX_NONE;
 		return;
 	}
 
-	// 레이드: 게이지는 1분마다 10% 단계로만 떨어져 구간 내 위치로는 링이 멈춘다.
-	// "다음에 사라질 칩(구간)"이 바뀌는 순간 시간 카운트다운(드레인 주기)을 새로 시작하고,
-	// 같은 구간 동안에는 RefreshPreviewRingCooldown이 매 틱 링을 1.0→0.0으로 깎는다.
-	if (DisappearingSlotIndex != ActiveSignalSlotIndex)
+	// 레이드: 게이지는 1분마다 10% 단계로만 떨어지므로, 링은 자체 추정 대신 게임모드 드레인 타이머의
+	// 실제 잔여시간(1.0→0.0)을 매 틱 그대로 반영한다. 구간이 바뀐 순간에만 아이콘을 교체한다.
+	if (TargetSlotIndex != ActiveSignalSlotIndex)
 	{
-		SetSignalChipIcon(DisappearingItem->ItemRowName);
-		StartPreviewRingCooldown(SignalDrainInterval);
-		ActiveSignalSlotIndex = DisappearingSlotIndex;
+		SetSignalChipIcon(DisappearingItem.ItemRowName);
+		ActiveSignalSlotIndex = TargetSlotIndex;
 	}
+	PreviewRingCooldownRemaining = 0.0f;
+	SetRingCooldownProgress(DrainRemaining / DrainInterval);
 }
 
 void ULSSurvivalStatusWidget::SetRingCooldownProgress(float Progress)

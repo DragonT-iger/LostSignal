@@ -113,6 +113,20 @@ void ALSLobbyGameMode::StartRaid()
 	TryStartRaidWithSubmittedData();
 }
 
+void ALSLobbyGameMode::StartRaidToTestLevel()
+{
+	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
+	if (!Settings || Settings->TestRaidLevel.IsNull())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] TestRaidLevel is not set. Check Project Settings > LS Session Settings."));
+		return;
+	}
+
+	// 정식 진입 경로(StartRaid)를 그대로 타되 목적지만 테스트 레벨로 덮어쓴다(1회).
+	RaidLevelOverride = Settings->TestRaidLevel;
+	StartRaid();
+}
+
 void ALSLobbyGameMode::NotifyRaidEntryDataSubmitted(ALSPlayerControllerBase* PlayerController)
 {
 	if (!bWaitingForRaidEntryData)
@@ -195,9 +209,14 @@ void ALSLobbyGameMode::TryStartRaidWithSubmittedData()
 	}
 
 	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
-	if (!Settings || Settings->FarmingLevel.IsNull())
+	// 디버그 테스트 맵 진입이면 목적지만 TestRaidLevel 로 바꾸고, 나머지 세션 셋업은 동일하게 진행한다.
+	const TSoftObjectPtr<UWorld> DestinationLevel = !RaidLevelOverride.IsNull()
+		? RaidLevelOverride
+		: (Settings ? Settings->FarmingLevel : TSoftObjectPtr<UWorld>());
+	RaidLevelOverride.Reset();
+	if (DestinationLevel.IsNull())
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] FarmingLevel is not set. Check Project Settings > LS Session Settings."));
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Raid destination level is not set. Check Project Settings > LS Session Settings (FarmingLevel/TestRaidLevel)."));
 		ClearRaidEntryDataWait();
 		return;
 	}
@@ -210,10 +229,10 @@ void ALSLobbyGameMode::TryStartRaidWithSubmittedData()
 		return;
 	}
 
-	const FString FarmingLevelPath = Settings->FarmingLevel.ToSoftObjectPath().GetLongPackageName();
-	if (FarmingLevelPath.IsEmpty())
+	const FString RaidLevelPath = DestinationLevel.ToSoftObjectPath().GetLongPackageName();
+	if (RaidLevelPath.IsEmpty())
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot start raid because FarmingLevel path is invalid."));
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot start raid because destination level path is invalid."));
 		ClearRaidEntryDataWait();
 		return;
 	}
@@ -251,9 +270,9 @@ void ALSLobbyGameMode::TryStartRaidWithSubmittedData()
 	ClearRaidEntryDataWait();
 	bRaidStartRequested = true;
 
-	if (!World->ServerTravel(FarmingLevelPath))
+	if (!World->ServerTravel(RaidLevelPath))
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] Failed to server travel to raid level: %s"), *FarmingLevelPath);
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Failed to server travel to raid level: %s"), *RaidLevelPath);
 		ClearRaidEntryDataWait();
 	}
 }

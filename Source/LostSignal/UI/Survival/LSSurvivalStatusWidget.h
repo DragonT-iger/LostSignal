@@ -73,11 +73,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Survival")
 	bool bStartPreviewRingCooldownOnConstruct = true;
 
-	// 레이드 HUD에서 신호 칩 카운트다운 링이 한 바퀴(1.0→0.0) 도는 시간(초).
-	// 반드시 ALSFarmingGameMode의 SignalGaugeDrainIntervalSeconds(60초)와 일치해야 한다.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Survival", meta=(ClampMin="0.0"))
-	float SignalDrainInterval = 60.0f;
-
 private:
 	TWeakObjectPtr<ALSCharacterBase> ObservedCharacter;
 	TWeakObjectPtr<UAbilitySystemComponent> ObservedASC;

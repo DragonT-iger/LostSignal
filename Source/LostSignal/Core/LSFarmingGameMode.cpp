@@ -312,6 +312,23 @@ void ALSFarmingGameMode::StopSignalGaugeDrain()
 	}
 }
 
+float ALSFarmingGameMode::GetSignalGaugeDrainRemainingSeconds() const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return -1.0f;
+	}
+
+	// 비활성/정지 상태면 음수를 반환하므로 호출부가 폴백을 판단할 수 있다.
+	return World->GetTimerManager().GetTimerRemaining(SignalGaugeDrainTimerHandle);
+}
+
+float ALSFarmingGameMode::GetSignalGaugeDrainInterval() const
+{
+	return SignalGaugeDrainIntervalSeconds;
+}
+
 ULSSaveSubsystem* ALSFarmingGameMode::GetSaveSubsystem() const
 {
 	UGameInstance* GameInstance = GetGameInstance();
