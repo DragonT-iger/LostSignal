@@ -299,45 +299,47 @@ ASC와 AttributeSet 관계:
 
 즉 Ability가 Attribute 값을 참조하면 해당 캐릭터 인스턴스에 등록된 AttributeSet 값을 읽는다. 서버에서 적용된 Attribute 변경은 복제를 통해 클라이언트 UI와 표시 상태에 반영된다.
 
-## 피격 연출 흐름 (GameplayCue)
+## 타격 사운드 레이어 (GameplayCue + AnimNotify)
 
-타격 사운드는 주체로 나뉜다. **공격음(휘두름)은 때리는 쪽**이 `LSAN_PlaySound`(공격 몽타주 Notify)로 내고, **피격음은 맞는 쪽**이 GameplayCue로 낸다. 피격음을 GameplayCue로 두면 데미지 GE 한 곳에 Cue를 다는 것만으로 몬스터/플레이어/스킬 등 모든 공격원이 자동 커버되고, 멀티에서도 복제 재생된다.
+타격 사운드는 **주체(때리는 쪽/맞는 쪽)** 와 **레이어**로 나뉜다.
 
-```text
-데미지 GE(Instant)가 대상 ASC에 적용
--> GE에 달린 GameplayCue.Combat.Hit "Executed" 발동
--> GameplayCueManager가 태그로 GameplayCueNotify 매칭 (ULSGCN_Hit 파생 BP)
--> ULSGCN_Hit::OnExecute에서 피격자 위치에 피격음 재생
-```
+| 레이어 | 주체 | 발동 위치 |
+|--------|------|-----------|
+| 휘두름 효과음 / 공격 음성(기합) | 때리는 쪽 | 공격 몽타주의 `LSAN_PlaySound` 노티파이 (코드 무관, 아트 영역) |
+| 스킬 시전음 | 때리는 쪽 | 스킬 발동 시 코드가 Cue 발동 |
+| 피격 임팩트음(재질) + 피격 보이스 | 맞는 쪽 | 데미지 수신 시 코드가 Cue 발동 |
 
-- 데미지 적용 = Cue 발동 시점이라, 무적/슈퍼아머로 GE가 막히면(`bDamageBlocked`) 피격음도 자연히 안 난다.
-- Cue 태그는 `GameplayCue.Combat.Hit` 단일로 시작한다. 재질/부위별로 쪼갤 때는 `GameplayCue.Combat.Hit.<재질>` 하위 태그를 추가하고, 그때만 발동을 "GE-박기"에서 "코드가 대상 재질을 읽어 `ExecuteGameplayCue`"로 옮긴다. 단일 태그는 부모 폴백으로 계속 동작한다.
-- 사운드 에셋은 `ULSGCN_Hit` 파생 BP에서 매핑한다(경로 하드코딩 금지). Notify BP는 `/Game/LostSignal` 하위에 두며 스캔 경로는 `DefaultGame.ini`의 `GameplayCueNotifyPaths`로 지정한다.
+**공통 GCN**: 세 Cue 모두 사운드를 직접 들지 않고 `GameplayCueParameters.SourceObject`로 받은 `USoundBase`를 대상 위치에서 재생하는 **`ULSGCN_PlaySound` 한 클래스**를 공유한다. 태그별로 BP만 하나씩 둔다(`GameplayCue.Combat.Hit` / `GameplayCue.Voice` / `GameplayCue.Skill.Cast`). 사운드는 BP가 아니라 데이터(피격자/스킬)에서 오므로 종류가 늘어도 GCN/태그가 늘지 않는다. Notify BP는 `/Game/LostSignal` 하위, 스캔 경로는 `DefaultGame.ini`의 `GameplayCueNotifyPaths`.
 
-스킬 시전음도 GameplayCue로 처리하되, 사운드 출처가 다르다. 피격음은 공유라 GCN BP에 사운드를 매핑하지만, 시전음은 스킬별이라 **사운드 에셋을 스킬 DataAsset(`CastSound`)에 두고 GameplayCueParameters로 전달**한다. DataAsset 필드는 [SkillSystemStructure.md](SkillSystemStructure.md)의 `ULSSkillDataAssetBase`가 단일 출처다.
+### 피격 사운드 (맞는 쪽, victim-side)
 
-```text
-스킬 발동(서버 권한, ULSPlayerSkillComponent::TryActivateGameplayAbility 성공)
--> CastSound를 GameplayCueParameters.SourceObject에 담아 ASC->ExecuteGameplayCue(GameplayCue.Skill.Cast, Params)
--> 서버 ExecuteGameplayCue가 NetMulticast로 전 클라(소유자 포함) 실행
--> ULSGCN_SkillCast::OnExecute가 받은 SourceObject(USoundBase)를 캐스터 위치에서 재생
-```
-
-- `ULSGCN_SkillCast`는 사운드를 직접 들지 않고 파라미터로 받은 것만 재생하므로, 스킬마다 GCN/태그가 늘지 않는다. BP는 `GameplayCue.Skill.Cast` 태그 바인딩용 1개면 된다.
-
-캐릭터 보이스(피격 음성)는 임팩트 퍽(`GCN_Hit`)과 **다른 레이어**다. 퍽은 공유 물리음이고, 보이스는 캐릭터별 + 변주가 있는 목소리다. 보이스 사운드는 `ULSCharacterVoiceData`(캐릭터별 뱅크)에 두고, 피격 시점에 코드로 발동한다(현재 경직/피격 리액션 애니가 없어 노티파이로는 띄울 자리가 없음).
+피격 임팩트음과 피격 보이스를 **피격자 데이터([ULSCharacterHitAudioData](../../Source/LostSignal/Characters/LSCharacterHitAudioData.h))** 가 단일 출처로 들고, 데미지 수신 시 한 곳에서 발동한다. **피격자 종류·재질별 분기는 데이터 에셋 교체만으로** 된다(태그 안 늘림). 같은 재질은 여러 적이 같은 Sound Cue를 참조해 공유.
 
 ```text
 데미지로 CurrentHealth 감소(서버 권한)
 -> ULSCharacterCombatComponent::HandleCurrentHealthChanged (NewValue < OldValue)
--> PlayVoice(Hit): VoiceData.HitVoices에서 랜덤 1개(서버 선택) + VoiceMinInterval 스로틀
--> ASC->ExecuteGameplayCue(GameplayCue.Voice, Params{SourceObject=클립, Location=피격자})
--> NetMulticast로 전 클라가 피격자 위치에서 재생 (GCN은 GCN_SkillCast 재사용)
+-> PlayHitAudio():
+   ├─ HitImpactSound(재질 퍽) → ExecuteGameplayCue(GameplayCue.Combat.Hit, {SourceObject=사운드, Location=피격자})
+   └─ HitVoices 랜덤 1개(서버 선택) + VoiceMinInterval 스로틀 → ExecuteGameplayCue(GameplayCue.Voice, ...)
+-> 서버 ExecuteGameplayCue가 NetMulticast로 전 클라가 피격자 위치에서 재생
 ```
 
+- victim-side라 어떤 공격원(몬스터/플레이어/스킬)이든 자동 커버되고, 무적/막힘으로 체력이 안 깎이면 자연히 안 난다.
 - 서버에서 변주를 골라 파라미터로 넘기므로 전 클라가 같은 클립을 듣고, 권한 경로 발동이라 클라 중복이 없다.
-- **공격 음성(기합)**은 코드가 아니라 공격 몽타주의 `LSAN_PlaySound` 노티파이로 처리한다(변주는 Sound Cue 내부 랜덤).
-- 사망 음성은 `VoiceData.DeathVoices` + `PlayVoice(Death)` 훅으로 확장한다(에셋 생기면 치사타에서 분기).
+- 데미지 GE에는 Cue를 박지 않는다(과거 GE-박기 방식은 피격자 재질을 몰라 재질 분기 불가 → victim-side로 통합).
+- 사망 음성은 `DeathVoices` + `HandleDeathStateChanged` 훅으로 확장(에셋 생기면 치사타에서 분기).
+
+### 스킬 시전음 (때리는 쪽, 스킬별)
+
+사운드 에셋을 스킬 DataAsset(`CastSound`)에 두고 발동 시 파라미터로 전달한다. DataAsset 필드는 [SkillSystemStructure.md](SkillSystemStructure.md)의 `ULSSkillDataAssetBase`가 단일 출처.
+
+```text
+스킬 발동(서버 권한, ULSPlayerSkillComponent::TryActivateGameplayAbility 성공)
+-> CastSound를 GameplayCueParameters.SourceObject에 담아 ASC->ExecuteGameplayCue(GameplayCue.Skill.Cast, Params)
+-> NetMulticast로 전 클라가 캐스터 위치에서 재생 (GCN은 ULSGCN_PlaySound)
+```
+
+- **공격 음성(기합)·휘두름 효과음**은 코드가 아니라 공격 몽타주의 `LSAN_PlaySound` 노티파이로 처리한다(변주는 Sound Cue 내부 랜덤, 캐릭터별 차이는 캐릭터 몽타주에 각자 배치).
 
 ## 쿨타임 흐름
 

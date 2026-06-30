@@ -7,7 +7,7 @@
 #include "AI/LSAIController.h"
 #include "AI/LSMonsterSenseComponent.h"
 #include "Characters/LSCharacterBase.h"
-#include "Characters/LSCharacterVoiceData.h"
+#include "Characters/LSCharacterHitAudioData.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Characters/LSPlayerCharacter.h"
 #include "Combat/LSCombatStateComponent.h"
@@ -339,60 +339,57 @@ void ULSCharacterCombatComponent::HandleCurrentHealthChanged(const FOnAttributeC
 {
 	RefreshDeathState();
 
-	// 데미지로 체력이 줄었으면 피격 음성. 치사타도 일단 피격 음성으로 처리한다(사망 보이스 미보유).
+	// 데미지로 체력이 줄었으면 피격 오디오(재질 임팩트음 + 보이스). 치사타도 일단 피격 처리(사망 보이스 미보유).
 	if (ChangeData.NewValue < ChangeData.OldValue)
 	{
-		PlayVoice(ELSCharacterVoiceType::Hit);
+		PlayHitAudio();
 	}
 }
 
-void ULSCharacterCombatComponent::PlayVoice(ELSCharacterVoiceType Type)
+void ULSCharacterCombatComponent::PlayHitAudio()
 {
-	ALSCharacterBase* OwnerCharacter = GetOwnerCharacter();
-	if (!OwnerCharacter || !OwnerCharacter->HasAuthority() || !VoiceData)
+	const ALSCharacterBase* OwnerCharacter = GetOwnerCharacter();
+	if (!OwnerCharacter || !OwnerCharacter->HasAuthority() || !HitAudioData)
 	{
 		return;
 	}
 
-	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
-	if (!ASC)
-	{
-		return;
-	}
-
-	const TArray<TObjectPtr<USoundBase>>& Clips =
-		(Type == ELSCharacterVoiceType::Death) ? VoiceData->DeathVoices : VoiceData->HitVoices;
-	if (Clips.Num() == 0)
-	{
-		return;
-	}
-
-	// 스로틀: 같은 타입이 짧은 간격에 도배되지 않게 한다.
 	const UWorld* World = GetWorld();
 	const double Now = World ? World->GetTimeSeconds() : 0.0;
-	if (const double* LastTime = LastVoiceTimes.Find(Type))
+
+	// 재질 임팩트음 — 피격자 데이터가 단일 출처라 종류·재질별 분기가 데이터 교체로 끝난다.
+	if (HitAudioData->HitImpactSound && (Now - LastImpactTime) >= HitAudioData->ImpactMinInterval)
 	{
-		if (Now - *LastTime < VoiceData->VoiceMinInterval)
-		{
-			return;
-		}
+		LastImpactTime = Now;
+		FireHitAudioCue(LSGameplayTags::GameplayCue_Combat_Hit, HitAudioData->HitImpactSound);
 	}
 
-	// 서버에서 변주를 골라 파라미터로 넘긴다 → 전 클라가 같은 클립을 재생.
-	USoundBase* Clip = Clips[FMath::RandHelper(Clips.Num())].Get();
-	if (!Clip)
+	// 피격 보이스 — 서버에서 변주를 골라 파라미터로 넘겨 전 클라가 같은 클립을 듣게 한다.
+	if (HitAudioData->HitVoices.Num() > 0 && (Now - LastVoiceTime) >= HitAudioData->VoiceMinInterval)
+	{
+		if (USoundBase* Voice = HitAudioData->HitVoices[FMath::RandHelper(HitAudioData->HitVoices.Num())].Get())
+		{
+			LastVoiceTime = Now;
+			FireHitAudioCue(LSGameplayTags::GameplayCue_Voice, Voice);
+		}
+	}
+}
+
+void ULSCharacterCombatComponent::FireHitAudioCue(FGameplayTag CueTag, USoundBase* Sound) const
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	AActor* OwnerActor = GetOwner();
+	if (!ASC || !OwnerActor || !Sound)
 	{
 		return;
 	}
 
-	LastVoiceTimes.Add(Type, Now);
-
 	FGameplayCueParameters CueParams;
-	CueParams.SourceObject = Clip;
-	CueParams.Location = OwnerCharacter->GetActorLocation();
-	CueParams.Instigator = OwnerCharacter;
+	CueParams.SourceObject = Sound;
+	CueParams.Location = OwnerActor->GetActorLocation();
+	CueParams.Instigator = OwnerActor;
 
-	ASC->ExecuteGameplayCue(LSGameplayTags::GameplayCue_Voice, CueParams);
+	ASC->ExecuteGameplayCue(CueTag, CueParams);
 }
 
 void ULSCharacterCombatComponent::HandleStunnedTagChanged(const FGameplayTag CallbackTag, int32 NewCount)

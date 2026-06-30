@@ -12,16 +12,10 @@ class AActor;
 class ALSCharacterBase;
 class UAbilitySystemComponent;
 class UGameplayEffect;
-class ULSCharacterVoiceData;
+class ULSCharacterHitAudioData;
+class USoundBase;
 struct FOnAttributeChangeData;
 enum class ELSCharacterSkillEffectTarget : uint8;
-
-// 캐릭터 보이스 종류. 공격 음성은 몽타주 AnimNotify로 처리하므로 여기엔 없다.
-enum class ELSCharacterVoiceType : uint8
-{
-	Hit,
-	Death
-};
 
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
 class LOSTSIGNAL_API ULSCharacterCombatComponent : public UActorComponent
@@ -94,8 +88,10 @@ private:
 	void ClearKnockback();
 	bool CanDamageTarget(AActor* TargetActor) const;
 	bool IsFriendlyTarget(AActor* TargetActor) const;
-	// VoiceData에서 타입별 변주를 랜덤 선택해 GameplayCue.Voice로 발동(서버→전 클라 복제). 스로틀로 도배 방지.
-	void PlayVoice(ELSCharacterVoiceType Type);
+	// 피격 시 재질 임팩트음 + 보이스를 GameplayCue로 발동(서버→전 클라 복제). 피격자 데이터(HitAudioData)가 종류·재질별 단일 출처.
+	void PlayHitAudio();
+	// 주어진 사운드를 파라미터에 실어 GameplayCue 발동(피격자 위치). 권한 측에서 호출돼 멀티캐스트된다.
+	void FireHitAudioCue(FGameplayTag CueTag, USoundBase* Sound) const;
 
 	UPROPERTY()
 	TMap<FGameplayTag, int32> LooseTagRefCounts;
@@ -109,10 +105,11 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Combat")
 	FVector DamageNumberWorldOffset = FVector(0.0f, 0.0f, 120.0f);
 
-	// 캐릭터별 보이스 뱅크. 캐릭터 BP의 컴포넌트 기본값에서 매핑(미할당이면 보이스 무음).
+	// 캐릭터/몬스터별 피격 오디오 묶음. 캐릭터 BP의 컴포넌트 기본값에서 매핑(미할당이면 무음).
 	UPROPERTY(EditDefaultsOnly, Category="LS/Audio")
-	TObjectPtr<ULSCharacterVoiceData> VoiceData;
+	TObjectPtr<ULSCharacterHitAudioData> HitAudioData;
 
-	// 타입별 마지막 보이스 재생 월드시각(초). 스로틀용.
-	TMap<ELSCharacterVoiceType, double> LastVoiceTimes;
+	// 임팩트음/보이스 스로틀용 마지막 재생 월드시각(초).
+	double LastImpactTime = 0.0;
+	double LastVoiceTime = 0.0;
 };
