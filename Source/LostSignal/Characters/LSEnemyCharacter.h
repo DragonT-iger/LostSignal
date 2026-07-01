@@ -15,6 +15,7 @@ class ULSMinimapMarkerComponent;
 class ULSMonsterCombatComponent;
 class ULSMonsterSenseComponent;
 class ULSNoiseEmitterComponent;
+class ULSVisionTargetComponent;
 class ULSEnemyHealthBarComponent;
 class ULSSkillPreviewComponent;
 struct FLSMonsterArchetypeRow;
@@ -48,6 +49,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/Noise")
 	ULSNoiseEmitterComponent* GetNoiseEmitterComponent() const { return NoiseEmitterComponent; }
+
+	UFUNCTION(BlueprintPure, Category="LS/Vision")
+	ULSVisionTargetComponent* GetVisionTargetComponent() const { return VisionTargetComponent; }
 
 	UFUNCTION(BlueprintPure, Category="LS/UI|Combat")
 	ULSEnemyHealthBarComponent* GetHealthBarComponent() const { return HealthBarComponent; }
@@ -93,6 +97,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Noise")
 	TObjectPtr<ULSNoiseEmitterComponent> NoiseEmitterComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Vision")
+	TObjectPtr<ULSVisionTargetComponent> VisionTargetComponent;
 
 	// 공격 범위 텔레그래프(스킬 인디케이터 재사용). ULSMonsterCombatComponent가 구동한다.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Combat")

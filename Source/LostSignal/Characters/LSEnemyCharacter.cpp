@@ -20,6 +20,7 @@
 #include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "UI/Debug/LSHpDebugWidget.h"
 #include "UI/Combat/LSEnemyHealthBarComponent.h"
+#include "Vision/LSVisionTargetComponent.h"
 
 namespace
 {
@@ -42,6 +43,7 @@ ALSEnemyCharacter::ALSEnemyCharacter()
 	MonsterCombatComponent = CreateDefaultSubobject<ULSMonsterCombatComponent>(TEXT("MonsterCombatComponent"));
 	MinimapMarkerComponent = CreateDefaultSubobject<ULSMinimapMarkerComponent>(TEXT("MinimapMarkerComponent"));
 	NoiseEmitterComponent = CreateDefaultSubobject<ULSNoiseEmitterComponent>(TEXT("NoiseEmitterComponent"));
+	VisionTargetComponent = CreateDefaultSubobject<ULSVisionTargetComponent>(TEXT("VisionTargetComponent"));
 	HealthBarComponent = CreateDefaultSubobject<ULSEnemyHealthBarComponent>(TEXT("HealthBarComponent"));
 	HealthBarComponent->SetupAttachment(GetRootComponent());
 	NoiseEmitterComponent->SetNotifyMonsterSense(false);
