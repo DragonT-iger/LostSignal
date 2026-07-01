@@ -24,6 +24,7 @@ class ULSHpDebugWidget;
 class ULSLootDropWidget;
 class ULSPlayerHUDWidget;
 class ULSProtocolDebugWidget;
+class ULSSettingsWidget;
 struct FLSNoiseEvent;
 
 UCLASS(Abstract)
@@ -82,6 +83,11 @@ public:
 	int32 GetOpenLobbyStorageMaxSlotCount() const;
 	void RefreshOpenLobbyStorageWidget();
 
+	// 칩 스테이션이 열려 있으면 칩 리스트를 다시 그린다. 인벤토리/창고 "창"에서 칩을 옮기거나 버려
+	// 원본 슬롯이 비면, 칩 스테이션 칩 리스트가 그 칸을 stale로 들고 있어 빠른 장착이 빈 슬롯을 가리키게 된다.
+	// 창 주도 편집 직후 호출한다. (칩 스테이션 내부 빠른 장착 경로에서는 호출하지 않는다 — 쓸기 중 리스트 재정렬 방지.)
+	void RefreshOpenChipStationWidget();
+
 	void RefreshLootDropWidgetForSource(ALSLootBox* SourceLootBox, const TArray<FLSDropResult>& Results);
 	void SyncRaidInventoryToClient();
 	void RequestRaidEntryDataForRaidStart();
@@ -127,6 +133,13 @@ public:
 	// 프로토콜 디버그 패널이 현재 화면에 떠 있는지. 칩스테이션은 패널이 떠 있을 때만 오버라이드를 따른다.
 	bool IsProtocolDebugWidgetVisible() const;
 
+	// 레이드 중 ESC로 여는 세팅 화면(WBP_Settings) 토글. 레이드 중이 아니면 무시한다.
+	void ToggleRaidSettingsWidget();
+
+	// 세팅 화면의 BackButton으로 스스로 닫혔을 때(RemoveFromParent) 캐시를 비워 다음 ESC에서 다시 생성되게 한다.
+	UFUNCTION()
+	void HandleRaidSettingsClosed();
+
 	bool HasSurvivalProtocolTestLevel() const { return HasProtocolTestLevel(ELSProtocolType::Survival); }
 	int32 GetSurvivalProtocolTestLevel() const { return GetProtocolTestLevel(ELSProtocolType::Survival); }
 	bool HasProtocolTestLevel(ELSProtocolType ProtocolType) const;
@@ -168,6 +181,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
 	TSubclassOf<ULSBackgroundBlurWidget> BackgroundBlurWidgetClass;
 
+	// 레이드 중 ESC로 여는 세팅 화면. 타이틀/로비와 동일한 WBP_Settings를 재사용한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
+	TSubclassOf<ULSSettingsWidget> RaidSettingsWidgetClass;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Noise", meta=(ClampMin="0.0"))
 	float SoundIndicatorDetectionRadiusMeters = 10.0f;
 
@@ -196,6 +213,10 @@ protected:
 	// 시연용 프로토콜 조정 패널 인스턴스.
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug")
 	TObjectPtr<ULSProtocolDebugWidget> ProtocolDebugWidgetInstance;
+
+	// 레이드 중 ESC로 여는 세팅 화면 인스턴스.
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSSettingsWidget> RaidSettingsWidgetInstance;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Input")
 	bool bDefaultMappingContextsApplied = false;

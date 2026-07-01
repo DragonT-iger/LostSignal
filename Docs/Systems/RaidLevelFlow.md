@@ -40,6 +40,20 @@ ULSSessionSubsystem
 - ServerTravel 후 플레이어별 인벤토리 복원용 PendingRaidEntries 큐 보유
 - 1인/legacy 호환용 세션 미러 상태(SessionInventory/SessionSafeInventory)도 함께 보유
 - 레이드 중 아이템의 원본은 PlayerController별 RaidInventoryComponent
+- bAllowQuitRecovery: 중도 포기 시 출발 장비 복구 여부
+
+ULSSettingsWidget
+- 세팅 화면(WBP_Settings). 타이틀/로비/레이드(ESC) 어디서든 동일한 위젯을 재사용한다 — 레이드 전용 별도 메뉴는 없다
+- 레이드 중에는 ALSPlayerControllerBase가 ESC로 이 위젯을 직접 토글해서 띄운다
+- "메인메뉴로 돌아가기"(MainMenuButton, ULSTitleMenuButtonWidget) 클릭 시: 레이드 여부와 무관하게 항상 타이틀로 나간다.
+  - 레이드 중이 아니면(타이틀/로비): 바로 TitleLevel로 OpenLevel
+  - 레이드 중이면: 확인 다이얼로그 → bAllowQuitRecovery=true → ALSFarmingGameMode::OnQuit() → TitleLevel
+- BackButton(일반 UButton)은 세팅 패널만 닫는다(OnBackToMenu 브로드캐스트). ESC 키로도 동일하게 닫힌다
+  (ULSSettingsWidget::NativeOnKeyDown → CloseSettings). 레이드 중에는 이 위젯이 스스로 RemoveFromParent 하므로
+  PlayerController가 OnBackToMenu로 캐시를 비워 다음 ESC에 재생성한다
+- 레이드 ESC 토글(ALSPlayerControllerBase::ToggleRaidSettingsWidget): 안 떠 있으면 생성, 떠 있으면
+  CloseSettings로 닫는다. 위젯에 키보드 포커스가 있으면 위젯의 NativeOnKeyDown이 ESC를 먼저 소비하고,
+  포커스가 게임 뷰포트에 있으면 이 토글이 폴백으로 닫는다(중복 처리 없음)
 ```
 
 ## 레벨 설정
@@ -48,6 +62,7 @@ ULSSessionSubsystem
 
 ```text
 Project Settings > LS Session Settings
+- TitleLevel
 - LobbyLevel
 - FarmingLevel
 - ResultLevel
@@ -64,6 +79,11 @@ Lobby -> Farming
 Farming -> Result
 - ALSFarmingGameMode::TravelToResultLevel
 - Settings->ResultLevel
+- UGameplayStatics::OpenLevelBySoftObjectPtr
+
+Farming -> Title (Quit)
+- ALSFarmingGameMode::TravelToResultLevel (PendingRaidResult == Quit)
+- Settings->TitleLevel
 - UGameplayStatics::OpenLevelBySoftObjectPtr
 
 Result -> Lobby
@@ -251,10 +271,13 @@ ALSFarmingGameMode::TravelToResultLevel
 -> 각 PlayerController->ClearSubmittedRaidEntryData
 -> SessionSubsystem->ClearRaidSessionState
 -> 종료 결과가 Extracted면 LobbyLevel로 OpenLevel (일단 ResultLevel 건너뜀)
--> 그 외(Dead/Quit)는 ResultLevel로 OpenLevel
+-> 종료 결과가 Quit이면 TitleLevel로 OpenLevel (ResultLevel 건너뜀)
+-> Dead는 ResultLevel로 OpenLevel
 ```
 
 > 현재 탈출(Extracted) 성공은 임시로 ResultLevel을 거치지 않고 바로 `LobbyLevel`로 복귀한다. 결과 레벨(전리품 정산 등)이 준비되면 이 분기를 제거하고 다시 ResultLevel을 거치도록 되돌린다.
+>
+> 중도 포기(Quit)는 레이드 자체를 그만두는 행동이라 결과를 보여줄 필요가 없어 `TitleLevel`로 바로 나간다. 레이드 중 ESC로 띄운 `ULSSettingsWidget`(WBP_Settings, 타이틀/로비와 동일한 위젯)의 "메인메뉴로 돌아가기"(BackButton)가 이 경로를 탄다 — 확인 다이얼로그를 거친 뒤 `ULSSessionSubsystem::bAllowQuitRecovery`를 true로 설정하고 `ALSFarmingGameMode::OnQuit()`을 호출해 출발 장비(SubmittedRaidLoadout)를 복구한다.
 
 ## 타임아웃과 실패 처리
 

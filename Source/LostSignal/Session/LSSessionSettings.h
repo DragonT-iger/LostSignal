@@ -11,6 +11,9 @@ class LOSTSIGNAL_API ULSSessionSettings : public UDeveloperSettings
 
 public:
 	UPROPERTY(config, EditAnywhere, Category="Levels")
+	TSoftObjectPtr<UWorld> TitleLevel;
+
+	UPROPERTY(config, EditAnywhere, Category="Levels")
 	TSoftObjectPtr<UWorld> LobbyLevel;
 
 	UPROPERTY(config, EditAnywhere, Category="Levels")

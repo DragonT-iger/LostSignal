@@ -10,6 +10,7 @@ class UTextBlock;
 class UWidgetSwitcher;
 class ULSLobbyTabWidget;
 class ULSLobbyQuestWidget;
+class ULSSettingsWidget;
 
 // 로비 탭/페이지 종류. WidgetSwitcher 인덱스와 순서를 맞춘다(Play=0, Equip=1, Quest=2, Character=3, Inventory=4).
 // Inventory는 상단 탭이 아니라 TAB 키/인벤토리 버튼으로 여는 창고+인벤토리 페이지다.
@@ -96,6 +97,14 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
 	TObjectPtr<UButton> InventoryButton;
 
+	// 세팅 화면(WBP_Settings) 진입 버튼.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
+	TObjectPtr<UButton> SettingsButton;
+
+	// BP(WBP_Lobby)에서 WBP_Settings를 매핑한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Lobby")
+	TSubclassOf<ULSSettingsWidget> SettingsWidgetClass;
+
 private:
 	UFUNCTION()
 	void HandlePlayTabClicked();
@@ -111,9 +120,22 @@ private:
 	UFUNCTION()
 	void HandleMissionStartClicked();
 
+	UFUNCTION()
+	void HandleSettingsClicked();
+
+	// Settings 화면 Back 클릭 시: 참조만 정리(위젯 자체는 이미 스스로 닫혔다).
+	UFUNCTION()
+	void HandleSettingsBackToMenu();
+
 	// 탭 콘텐츠 전환을 ELSLobbyTab 순서(인덱스)대로 적용한다.
 	void ShowTab(ELSLobbyTab Tab) const;
 
 	// 인벤토리 페이지 토글: 현재 인벤토리면 플레이로, 아니면 인벤토리로 전환.
 	void ToggleInventoryTab() const;
+
+	// Settings 화면을 생성해 뷰포트에 띄운다. 이미 떠 있으면 nullptr 반환.
+	ULSSettingsWidget* ShowSettingsWidget();
+
+	UPROPERTY(Transient)
+	TObjectPtr<ULSSettingsWidget> ActiveSettingsWidget;
 };

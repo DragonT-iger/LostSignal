@@ -254,6 +254,20 @@ void ALSFarmingGameMode::TravelToResultLevel()
 		return;
 	}
 
+	// 중도 포기(Quit)는 레이드 자체를 그만두는 행동이라 ResultLevel을 건너뛰고 바로 타이틀로 나간다.
+	if (PendingRaidResult == ELSRaidResult::Quit)
+	{
+		if (Settings && !Settings->TitleLevel.IsNull())
+		{
+			UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->TitleLevel);
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] TitleLevel is not set. Check Project Settings > LS Session Settings."));
+		}
+		return;
+	}
+
 	if (Settings && !Settings->ResultLevel.IsNull())
 	{
 		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->ResultLevel);

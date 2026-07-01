@@ -199,6 +199,8 @@ bool ULSLobbyStorageWidget::HandleStorageSlotDrop(const ELSInventorySlotArea Fro
 		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 		{
 			PlayerController->RefreshActiveInventoryWidget();
+			// 칩이 창고로 들어오거나 나갔으면 열려 있는 칩 스테이션 칩 리스트도 다시 그린다(stale 방지).
+			PlayerController->RefreshOpenChipStationWidget();
 		}
 	}
 	return bSuccess;
@@ -243,6 +245,7 @@ bool ULSLobbyStorageWidget::TryDropStorageDragToWorld(const ULSInventoryDragDrop
 	{
 		RefreshStorage();
 		PlayerController->RefreshActiveInventoryWidget();
+		PlayerController->RefreshOpenChipStationWidget();
 	}
 
 	return bDropped;
@@ -278,6 +281,7 @@ bool ULSLobbyStorageWidget::TransferStorageSlotToInventory(const int32 Warehouse
 			RefreshStorageCountText();
 		}
 		PlayerController->RefreshActiveInventoryWidget();
+		PlayerController->RefreshOpenChipStationWidget();
 	}
 
 	return bTransferred;
@@ -289,6 +293,11 @@ void ULSLobbyStorageWidget::HandleSortButtonClicked()
 	{
 		SaveSubsystem->SortWarehouse();
 		RefreshStorage();
+		// 정렬은 창고를 압축해 인덱스를 재배치하므로, 열려 있는 칩 스테이션 칩 리스트도 다시 그린다.
+		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+		{
+			PlayerController->RefreshOpenChipStationWidget();
+		}
 		return;
 	}
 

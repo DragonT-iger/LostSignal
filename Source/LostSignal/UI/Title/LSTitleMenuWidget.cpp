@@ -7,6 +7,8 @@
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSettings.h"
 #include "UI/Common/LSConfirmDialogWidget.h"
+#include "UI/LSUILayer.h"
+#include "UI/Settings/LSSettingsWidget.h"
 #include "UI/Title/LSTitleMenuButtonWidget.h"
 
 #define LOCTEXT_NAMESPACE "LSTitleMenu"
@@ -132,8 +134,7 @@ void ULSTitleMenuWidget::HandleNewConfirmed()
 
 void ULSTitleMenuWidget::HandleSettingsClicked()
 {
-	// 미구현: Settings 화면 준비되면 연결.
-	UE_LOG(LogLS, Warning, TEXT("[Title] Settings is not implemented yet."));
+	ShowSettingsWidget();
 }
 
 void ULSTitleMenuWidget::HandleCrewClicked()
@@ -163,6 +164,11 @@ void ULSTitleMenuWidget::HandleDialogCancelled()
 {
 	UE_LOG(LogLS, Log, TEXT("[Title] Confirm dialog cancelled."));
 	ActiveConfirmDialog = nullptr;
+}
+
+void ULSTitleMenuWidget::HandleSettingsBackToMenu()
+{
+	ActiveSettingsWidget = nullptr;
 }
 
 ULSSaveSubsystem* ULSTitleMenuWidget::GetSaveSubsystem() const
@@ -216,6 +222,36 @@ ULSConfirmDialogWidget* ULSTitleMenuWidget::ShowConfirmDialog(const FText& Messa
 	Dialog->AddToViewport(100);
 	ActiveConfirmDialog = Dialog;
 	return Dialog;
+}
+
+ULSSettingsWidget* ULSTitleMenuWidget::ShowSettingsWidget()
+{
+	// 이미 세팅 화면이 떠 있으면 중복 생성하지 않는다.
+	if (ActiveSettingsWidget && ActiveSettingsWidget->IsInViewport())
+	{
+		return nullptr;
+	}
+
+	if (!SettingsWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Title] SettingsWidgetClass is not set on %s. Check WBP_TitleMenu."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	ULSSettingsWidget* SettingsWidget = OwningPlayer
+		? CreateWidget<ULSSettingsWidget>(OwningPlayer, SettingsWidgetClass)
+		: CreateWidget<ULSSettingsWidget>(this, SettingsWidgetClass);
+	if (!SettingsWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Title] Failed to create settings widget on %s."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	SettingsWidget->OnBackToMenu.AddDynamic(this, &ULSTitleMenuWidget::HandleSettingsBackToMenu);
+	SettingsWidget->AddToViewport(LSUILayer::Settings);
+	ActiveSettingsWidget = SettingsWidget;
+	return SettingsWidget;
 }
 
 #undef LOCTEXT_NAMESPACE

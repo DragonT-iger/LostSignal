@@ -29,6 +29,7 @@
 #include "UI/LSBackgroundBlurWidget.h"
 #include "UI/LSPlayerHUDWidget.h"
 #include "UI/LSUILayer.h"
+#include "UI/Settings/LSSettingsWidget.h"
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Protocol/LSProtocolUIWidget.h"
@@ -119,6 +120,8 @@ void ALSPlayerControllerBase::SetupInputComponent()
 	{
 		// 시연용 프로토콜 패널 토글 (레거시 BindKey; Enhanced Input 과 공존).
 		InputComponent->BindKey(EKeys::Insert, IE_Pressed, this, &ALSPlayerControllerBase::ToggleProtocolDebugWidget);
+		// 레이드 중 세팅 화면 토글 (레거시 BindKey; 위 Insert 토글과 동일한 방식으로 공존).
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ALSPlayerControllerBase::ToggleRaidSettingsWidget);
 	}
 
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -265,6 +268,14 @@ void ALSPlayerControllerBase::RefreshOpenLobbyStorageWidget()
 	}
 }
 
+void ALSPlayerControllerBase::RefreshOpenChipStationWidget()
+{
+	if (IsChipStationWidgetOpen())
+	{
+		ChipStationWidgetInstance->RefreshChipStation();
+	}
+}
+
 void ALSPlayerControllerBase::ShowChipStationWidget(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass)
 {
 	if (IsLocalPlayerController())
@@ -330,6 +341,9 @@ void ALSPlayerControllerBase::RefreshActiveInventoryWidget()
 	if (LobbyInventoryWidgetInstance)
 	{
 		LobbyInventoryWidgetInstance->RebuildInventorySlots();
+		// Safe(영구보관) 영역도 함께 갱신한다. 폰 경로(RebuildInventoryWidgetSlots)는 둘 다 갱신하지만
+		// 폰 없는 로비에서 이 함수만 인벤토리만 갱신하면, Safe→창고 이동 후 비워진 Safe 슬롯이 stale로 남는다.
+		LobbyInventoryWidgetInstance->RebuildConfirmedStorageSlots();
 	}
 }
 
@@ -1128,6 +1142,49 @@ void ALSPlayerControllerBase::ToggleProtocolDebugWidget()
 bool ALSPlayerControllerBase::IsProtocolDebugWidgetVisible() const
 {
 	return ProtocolDebugWidgetInstance && ProtocolDebugWidgetInstance->GetVisibility() != ESlateVisibility::Collapsed;
+}
+
+void ALSPlayerControllerBase::ToggleRaidSettingsWidget()
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	// 레이드 중이 아니면 무시한다. (로비 등에서 ESC 오작동 방지)
+	if (!RaidInventoryComponent || !RaidInventoryComponent->IsRaidActive())
+	{
+		return;
+	}
+
+	// 이미 떠 있으면 ESC로 닫는다. 위젯이 스스로 RemoveFromParent + OnBackToMenu 브로드캐스트 →
+	// HandleRaidSettingsClosed가 캐시를 비운다. (위젯에 포커스가 있으면 위젯의 NativeOnKeyDown이 먼저
+	// ESC를 소비하므로 이 분기는 포커스가 게임 뷰포트에 있을 때의 폴백이다.)
+	if (RaidSettingsWidgetInstance)
+	{
+		RaidSettingsWidgetInstance->CloseSettings();
+		return;
+	}
+
+	if (!RaidSettingsWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("RaidSettingsWidgetClass is not set on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	RaidSettingsWidgetInstance = CreateWidget<ULSSettingsWidget>(this, RaidSettingsWidgetClass);
+	if (RaidSettingsWidgetInstance)
+	{
+		// BackButton/ESC로 스스로 닫히면 캐시를 비워, 다음 ESC에서 다시 생성되도록 한다.
+		RaidSettingsWidgetInstance->OnBackToMenu.AddDynamic(this, &ALSPlayerControllerBase::HandleRaidSettingsClosed);
+		RaidSettingsWidgetInstance->AddToViewport(LSUILayer::Settings);
+	}
+}
+
+void ALSPlayerControllerBase::HandleRaidSettingsClosed()
+{
+	// 위젯은 스스로 RemoveFromParent 했으므로 캐시만 비우면 된다.
+	RaidSettingsWidgetInstance = nullptr;
 }
 
 int32 ALSPlayerControllerBase::GetEffectiveProtocolLevel(const ELSProtocolType ProtocolType) const

@@ -6,10 +6,13 @@
 #include "Components/WidgetSwitcher.h"
 #include "Core/LSLobbyGameMode.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "InputCoreTypes.h"
 #include "LostSignal.h"
+#include "UI/LSUILayer.h"
 #include "UI/Lobby/LSLobbyQuestWidget.h"
 #include "UI/Lobby/LSLobbyTabWidget.h"
+#include "UI/Settings/LSSettingsWidget.h"
 
 void ULSLobbyMenuWidget::NativeConstruct()
 {
@@ -93,6 +96,15 @@ void ULSLobbyMenuWidget::NativeConstruct()
 		UE_LOG(LogLS, Warning, TEXT("InventoryButton is not bound on %s."), *GetNameSafe(this));
 	}
 
+	if (SettingsButton)
+	{
+		SettingsButton->OnClicked.AddDynamic(this, &ULSLobbyMenuWidget::HandleSettingsClicked);
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("SettingsButton is not bound on %s."), *GetNameSafe(this));
+	}
+
 	// 로비는 플레이 탭에서 시작한다.
 	ShowTab(ELSLobbyTab::Play);
 }
@@ -114,6 +126,10 @@ void ULSLobbyMenuWidget::NativeDestruct()
 	if (MissionStartButton)
 	{
 		MissionStartButton->OnClicked.RemoveDynamic(this, &ULSLobbyMenuWidget::HandleMissionStartClicked);
+	}
+	if (SettingsButton)
+	{
+		SettingsButton->OnClicked.RemoveDynamic(this, &ULSLobbyMenuWidget::HandleSettingsClicked);
 	}
 
 	Super::NativeDestruct();
@@ -212,6 +228,46 @@ void ULSLobbyMenuWidget::HandleMissionStartClicked()
 
 	UE_LOG(LogLS, Log, TEXT("[Lobby] Mission start - requesting raid start."));
 	LobbyGameMode->StartRaid();
+}
+
+void ULSLobbyMenuWidget::HandleSettingsClicked()
+{
+	ShowSettingsWidget();
+}
+
+void ULSLobbyMenuWidget::HandleSettingsBackToMenu()
+{
+	ActiveSettingsWidget = nullptr;
+}
+
+ULSSettingsWidget* ULSLobbyMenuWidget::ShowSettingsWidget()
+{
+	// 이미 세팅 화면이 떠 있으면 중복 생성하지 않는다.
+	if (ActiveSettingsWidget && ActiveSettingsWidget->IsInViewport())
+	{
+		return nullptr;
+	}
+
+	if (!SettingsWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] SettingsWidgetClass is not set on %s. Check WBP_Lobby."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	ULSSettingsWidget* SettingsWidget = OwningPlayer
+		? CreateWidget<ULSSettingsWidget>(OwningPlayer, SettingsWidgetClass)
+		: CreateWidget<ULSSettingsWidget>(this, SettingsWidgetClass);
+	if (!SettingsWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Failed to create settings widget on %s."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	SettingsWidget->OnBackToMenu.AddDynamic(this, &ULSLobbyMenuWidget::HandleSettingsBackToMenu);
+	SettingsWidget->AddToViewport(LSUILayer::Settings);
+	ActiveSettingsWidget = SettingsWidget;
+	return SettingsWidget;
 }
 
 void ULSLobbyMenuWidget::ShowTab(const ELSLobbyTab Tab) const

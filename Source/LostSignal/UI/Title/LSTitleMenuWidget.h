@@ -6,9 +6,10 @@
 
 class ULSTitleMenuButtonWidget;
 class ULSConfirmDialogWidget;
+class ULSSettingsWidget;
 
 // 타이틀 화면 우측 메뉴 패널. Continue/New/Settings/Crew/Exit 버튼(WBP_TitleMenuButton)을 바인딩한다.
-// Settings/Crew는 아직 미구현이라 클릭 시 경고 로그만 남긴다.
+// Settings는 WBP_Settings를 띄운다. Crew는 아직 미구현이라 클릭 시 경고 로그만 남긴다.
 // New/Exit는 확인 다이얼로그(WBP_ConfirmDialog)를 띄우고, 확인을 눌러야 실제로 진행한다.
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSTitleMenuWidget : public UUserWidget
@@ -39,6 +40,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Title")
 	TSubclassOf<ULSConfirmDialogWidget> ConfirmDialogClass;
 
+	// BP(WBP_TitleMenu)에서 WBP_Settings를 매핑한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Title")
+	TSubclassOf<ULSSettingsWidget> SettingsWidgetClass;
+
 private:
 	UFUNCTION()
 	void HandleContinueClicked();
@@ -67,6 +72,10 @@ private:
 	UFUNCTION()
 	void HandleDialogCancelled();
 
+	// Settings 화면 Back 클릭 시: 참조만 정리(위젯 자체는 이미 스스로 닫혔다).
+	UFUNCTION()
+	void HandleSettingsBackToMenu();
+
 	// 세이브 서브시스템 조회. 없으면 nullptr.
 	class ULSSaveSubsystem* GetSaveSubsystem() const;
 
@@ -76,6 +85,12 @@ private:
 	// 확인 다이얼로그를 생성해 뷰포트에 띄운다. 이미 떠 있으면 nullptr 반환.
 	ULSConfirmDialogWidget* ShowConfirmDialog(const FText& Message);
 
+	// Settings 화면을 생성해 뷰포트에 띄운다. 이미 떠 있으면 nullptr 반환.
+	ULSSettingsWidget* ShowSettingsWidget();
+
 	UPROPERTY(Transient)
 	TObjectPtr<ULSConfirmDialogWidget> ActiveConfirmDialog;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ULSSettingsWidget> ActiveSettingsWidget;
 };

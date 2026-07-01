@@ -29,6 +29,13 @@ namespace LSUILayer
 	// 인벤토리를 덮지 않게 한다. (같은 Z면 뷰포트 삽입 순서에 휘둘려 덮이는 경우가 생김)
 	constexpr int32 ModalPanelInventory = 300;
 
+	// 세팅 화면(WBP_Settings). 타이틀/로비/레이드(ESC) 등 여러 레벨에서 공용으로 띄우는
+	// 최상위 오버레이라 그 레벨의 다른 레이어(로비 메뉴/모달 패널 포함)보다 위에 둔다.
+	constexpr int32 Settings = 400;
+
+	// 세팅 화면 안에서 뜨는 서브 패널(WBP_Sound, WBP_ConfirmDialog 등). Settings보다 위.
+	constexpr int32 SettingsSubPanel = 410;
+
 	// 시연용 프로토콜 디버그 패널.
 	constexpr int32 ProtocolDebug = 1000;
 

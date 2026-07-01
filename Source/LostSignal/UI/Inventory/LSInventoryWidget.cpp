@@ -220,6 +220,8 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 					RebuildConfirmedStorageSlots();
 					// 창고↔인벤토리 이동이면 열려 있는 창고 위젯도 같이 갱신한다.
 					PlayerController->RefreshOpenLobbyStorageWidget();
+					// 칩이 옮겨졌으면 열려 있는 칩 스테이션 칩 리스트도 다시 그린다(stale 방지).
+					PlayerController->RefreshOpenChipStationWidget();
 				}
 				return bChanged;
 			}
@@ -429,6 +431,7 @@ void ULSInventoryWidget::HandleStoreAllButtonClicked()
 		RebuildInventorySlots();
 		RebuildConfirmedStorageSlots();
 		PlayerController->RefreshOpenLobbyStorageWidget();
+		PlayerController->RefreshOpenChipStationWidget();
 	}
 
 	if (bStoppedBecauseFull)
@@ -469,6 +472,11 @@ void ULSInventoryWidget::HandleSortButtonClicked()
 
 	RebuildInventorySlots();
 	RebuildConfirmedStorageSlots();
+	// 정렬은 인벤토리를 압축해 인덱스를 재배치하므로, 열려 있는 칩 스테이션 칩 리스트도 다시 그린다.
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		PlayerController->RefreshOpenChipStationWidget();
+	}
 }
 
 void ULSInventoryWidget::InitializeDisplayOnlyEquipmentSlot(ULSItemSlotWidget* SlotWidget, const TCHAR* SlotName) const
@@ -551,6 +559,7 @@ bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOper
 	{
 		RebuildInventorySlots();
 		RebuildConfirmedStorageSlots();
+		PlayerController->RefreshOpenChipStationWidget();
 	}
 
 	return bDropped;
