@@ -46,8 +46,9 @@ ULSSettingsWidget
 - 세팅 화면(WBP_Settings). 타이틀/로비/레이드(ESC) 어디서든 동일한 위젯을 재사용한다 — 레이드 전용 별도 메뉴는 없다
 - 레이드 중에는 ALSPlayerControllerBase가 ESC로 이 위젯을 직접 토글해서 띄운다
 - "메인메뉴로 돌아가기"(MainMenuButton, ULSTitleMenuButtonWidget) 클릭 시: 레이드 여부와 무관하게 항상 타이틀로 나간다.
-  - 레이드 중이 아니면(타이틀/로비): 바로 TitleLevel로 OpenLevel
+  - 레이드 중이 아니면(로비): 바로 TitleLevel로 OpenLevel
   - 레이드 중이면: 확인 다이얼로그 → bAllowQuitRecovery=true → ALSFarmingGameMode::OnQuit() → TitleLevel
+  - 타이틀에서 열 때는 이미 메인메뉴라 불필요하므로 이 버튼을 숨긴다(SetMainMenuButtonVisible(false), 타이틀 메뉴가 세팅 생성 시 호출)
 - BackButton(일반 UButton)은 세팅 패널만 닫는다(OnBackToMenu 브로드캐스트). ESC 키로도 동일하게 닫힌다
   (ULSSettingsWidget::NativeOnKeyDown → CloseSettings). 레이드 중에는 이 위젯이 스스로 RemoveFromParent 하므로
   PlayerController가 OnBackToMenu로 캐시를 비워 다음 ESC에 재생성한다

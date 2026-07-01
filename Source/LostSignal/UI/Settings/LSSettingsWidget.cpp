@@ -59,6 +59,8 @@ void ULSSettingsWidget::NativeConstruct()
 	if (MainMenuButton)
 	{
 		MainMenuButton->OnClicked.AddDynamic(this, &ULSSettingsWidget::HandleMainMenuClicked);
+		// 타이틀에서 열렸으면 이 시점 이전에 SetMainMenuButtonVisible(false)가 호출돼 있으므로 반영한다.
+		MainMenuButton->SetVisibility(bMainMenuButtonVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
 	else
 	{
@@ -150,20 +152,20 @@ void ULSSettingsWidget::HandleSoundClosed()
 
 void ULSSettingsWidget::HandleControlClicked()
 {
-	// 미구현: Control 화면 준비되면 연결.
-	UE_LOG(LogLS, Warning, TEXT("[Settings] Control is not implemented yet."));
+	// 미구현: Control 화면 준비되면 연결. 그전까지는 안내창만 띄운다.
+	ShowNotImplementedNotice();
 }
 
 void ULSSettingsWidget::HandleGraphicsClicked()
 {
-	// 미구현: Graphics 화면 준비되면 연결.
-	UE_LOG(LogLS, Warning, TEXT("[Settings] Graphics is not implemented yet."));
+	// 미구현: Graphics 화면 준비되면 연결. 그전까지는 안내창만 띄운다.
+	ShowNotImplementedNotice();
 }
 
 void ULSSettingsWidget::HandleLanguageClicked()
 {
-	// 미구현: Language 화면 준비되면 연결.
-	UE_LOG(LogLS, Warning, TEXT("[Settings] Language is not implemented yet."));
+	// 미구현: Language 화면 준비되면 연결. 그전까지는 안내창만 띄운다.
+	ShowNotImplementedNotice();
 }
 
 void ULSSettingsWidget::HandleMainMenuClicked()
@@ -204,6 +206,16 @@ void ULSSettingsWidget::CloseSettings()
 	RemoveFromParent();
 }
 
+void ULSSettingsWidget::SetMainMenuButtonVisible(bool bVisible)
+{
+	bMainMenuButtonVisible = bVisible;
+	// NativeConstruct 전/후 어느 시점에 호출돼도 반영되도록, 바인딩돼 있으면 즉시 적용한다.
+	if (MainMenuButton)
+	{
+		MainMenuButton->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+}
+
 void ULSSettingsWidget::HandleReturnToTitleConfirmed()
 {
 	if (ULSSessionSubsystem* SessionSub = GetGameInstance() ? GetGameInstance()->GetSubsystem<ULSSessionSubsystem>() : nullptr)
@@ -225,6 +237,8 @@ void ULSSettingsWidget::HandleReturnToTitleConfirmed()
 void ULSSettingsWidget::HandleDialogCancelled()
 {
 	ActiveConfirmDialog = nullptr;
+	// 다이얼로그가 닫혔으니 ESC가 다시 세팅으로 오도록 포커스를 회수한다.
+	SetKeyboardFocus();
 }
 
 bool ULSSettingsWidget::IsRaidActive() const
@@ -236,7 +250,34 @@ bool ULSSettingsWidget::IsRaidActive() const
 
 ULSConfirmDialogWidget* ULSSettingsWidget::ShowReturnToTitleConfirmDialog()
 {
-	// 이미 확인 다이얼로그가 떠 있으면 중복 생성하지 않는다.
+	ULSConfirmDialogWidget* Dialog = CreateDialog(
+		LOCTEXT("ReturnToTitleConfirm", "레이드를 포기하고 타이틀로 돌아가시겠습니까? 파밍한 아이템은 사라지고 출발 장비만 복구됩니다."));
+	if (!Dialog)
+	{
+		return nullptr;
+	}
+
+	Dialog->OnConfirmed.AddDynamic(this, &ULSSettingsWidget::HandleReturnToTitleConfirmed);
+	Dialog->OnCancelled.AddDynamic(this, &ULSSettingsWidget::HandleDialogCancelled);
+	return Dialog;
+}
+
+void ULSSettingsWidget::ShowNotImplementedNotice()
+{
+	ULSConfirmDialogWidget* Dialog = CreateDialog(LOCTEXT("NotImplemented", "아직 구현되지 않았습니다."));
+	if (!Dialog)
+	{
+		return;
+	}
+
+	// 확인/취소 어느 쪽을 눌러도(또는 ESC) 그냥 닫히고 세팅으로 돌아온다.
+	Dialog->OnConfirmed.AddDynamic(this, &ULSSettingsWidget::HandleDialogCancelled);
+	Dialog->OnCancelled.AddDynamic(this, &ULSSettingsWidget::HandleDialogCancelled);
+}
+
+ULSConfirmDialogWidget* ULSSettingsWidget::CreateDialog(const FText& Message)
+{
+	// 이미 다이얼로그가 떠 있으면 중복 생성하지 않는다.
 	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
 	{
 		return nullptr;
@@ -258,9 +299,7 @@ ULSConfirmDialogWidget* ULSSettingsWidget::ShowReturnToTitleConfirmDialog()
 		return nullptr;
 	}
 
-	Dialog->SetMessage(LOCTEXT("ReturnToTitleConfirm", "레이드를 포기하고 타이틀로 돌아가시겠습니까? 파밍한 아이템은 사라지고 출발 장비만 복구됩니다."));
-	Dialog->OnConfirmed.AddDynamic(this, &ULSSettingsWidget::HandleReturnToTitleConfirmed);
-	Dialog->OnCancelled.AddDynamic(this, &ULSSettingsWidget::HandleDialogCancelled);
+	Dialog->SetMessage(Message);
 	Dialog->AddToViewport(LSUILayer::SettingsSubPanel);
 	ActiveConfirmDialog = Dialog;
 	return Dialog;

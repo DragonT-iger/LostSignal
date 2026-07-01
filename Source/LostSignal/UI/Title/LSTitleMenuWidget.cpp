@@ -139,8 +139,13 @@ void ULSTitleMenuWidget::HandleSettingsClicked()
 
 void ULSTitleMenuWidget::HandleCrewClicked()
 {
-	// 미구현: Crew 화면 준비되면 연결.
-	UE_LOG(LogLS, Warning, TEXT("[Title] Crew is not implemented yet."));
+	// 미구현: Crew 화면 준비되면 연결. 그전까지는 안내창만 띄운다.
+	ULSConfirmDialogWidget* Dialog = ShowConfirmDialog(LOCTEXT("NotImplemented", "아직 구현되지 않았습니다."));
+	if (Dialog)
+	{
+		// 확인/취소 어느 쪽을 눌러도(또는 ESC) 그냥 닫힌다.
+		Dialog->OnConfirmed.AddDynamic(this, &ULSTitleMenuWidget::HandleDialogCancelled);
+	}
 }
 
 void ULSTitleMenuWidget::HandleExitClicked()
@@ -249,6 +254,8 @@ ULSSettingsWidget* ULSTitleMenuWidget::ShowSettingsWidget()
 	}
 
 	SettingsWidget->OnBackToMenu.AddDynamic(this, &ULSTitleMenuWidget::HandleSettingsBackToMenu);
+	// 타이틀에서는 이미 메인메뉴이므로 "메인메뉴로 돌아가기" 버튼을 숨긴다.
+	SettingsWidget->SetMainMenuButtonVisible(false);
 	SettingsWidget->AddToViewport(LSUILayer::Settings);
 	ActiveSettingsWidget = SettingsWidget;
 	return SettingsWidget;

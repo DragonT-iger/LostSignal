@@ -38,6 +38,10 @@ public:
 	// BackButton / ESC / 외부(레이드 PlayerController)가 공용으로 호출한다.
 	void CloseSettings();
 
+	// "메인메뉴로 돌아가기" 버튼 표시 여부. 타이틀에서 열 때는 이미 메인메뉴라 불필요하므로 false로 숨긴다.
+	// (로비/레이드에서는 기본 true 그대로 둔다.)
+	void SetMainMenuButtonVisible(bool bVisible);
+
 	UPROPERTY(BlueprintAssignable, Category="LS/UI|Settings")
 	FLSSettingsBackToMenu OnBackToMenu;
 
@@ -105,8 +109,18 @@ private:
 	// 레이드 중 메인메뉴 클릭 시: 확인 다이얼로그를 띄운다. 이미 떠 있으면 nullptr 반환.
 	ULSConfirmDialogWidget* ShowReturnToTitleConfirmDialog();
 
+	// 아직 구현되지 않은 항목(Control/Graphics/Language) 클릭 시 안내창을 띄운다.
+	void ShowNotImplementedNotice();
+
+	// ConfirmDialogClass로 메시지 다이얼로그를 생성해 서브패널에 띄운다. 델리게이트 연결은 호출자가 한다.
+	// 이미 떠 있거나 클래스 미지정이면 nullptr 반환.
+	ULSConfirmDialogWidget* CreateDialog(const FText& Message);
+
 	// 타이틀 레벨로 이동(레이드가 아닐 때 직접 호출). 레이드 중에는 Quit 경로가 타이틀로 보낸다.
 	void TravelToTitle();
+
+	// MainMenuButton 표시 여부. 타이틀에서 열 때 false로 지정되어 버튼을 숨긴다.
+	bool bMainMenuButtonVisible = true;
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULSSoundSettingsWidget> ActiveSoundWidget;

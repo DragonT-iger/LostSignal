@@ -30,6 +30,10 @@ void ULSConfirmDialogWidget::NativeConstruct()
 	{
 		UE_LOG(LogLS, Warning, TEXT("MessageText is not bound on %s."), *GetNameSafe(this));
 	}
+
+	// ESC를 받을 수 있도록, 그리고 뒤의 화면이 ESC를 가로채지 않도록 키보드 포커스를 가져온다.
+	SetIsFocusable(true);
+	SetKeyboardFocus();
 }
 
 void ULSConfirmDialogWidget::NativeDestruct()
@@ -55,6 +59,18 @@ void ULSConfirmDialogWidget::SetMessage(const FText& InMessage) const
 	}
 
 	MessageText->SetText(InMessage);
+}
+
+FReply ULSConfirmDialogWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (InKeyEvent.GetKey() == EKeys::Escape)
+	{
+		// ESC는 취소로 처리한다.
+		HandleCancelClicked();
+		return FReply::Handled();
+	}
+
+	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
 
 void ULSConfirmDialogWidget::HandleConfirmClicked()

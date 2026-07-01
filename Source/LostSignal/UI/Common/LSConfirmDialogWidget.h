@@ -21,6 +21,9 @@ public:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
+	// ESC로 취소(닫기). 다이얼로그가 키보드 포커스를 쥐고 있어, 뒤의 세팅 화면으로 ESC가 새지 않는다.
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
 	UPROPERTY(BlueprintAssignable, Category="LS/UI|Common")
 	FLSConfirmDialogConfirmed OnConfirmed;
 
