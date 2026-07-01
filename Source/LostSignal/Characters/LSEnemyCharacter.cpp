@@ -7,6 +7,8 @@
 #include "AI/LSMonsterSenseComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSMonsterArchetypeRow.h"
 #include "Engine/DataTable.h"
@@ -118,6 +120,28 @@ void ALSEnemyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	DestroyDebugHpWidget();
 
 	Super::EndPlay(EndPlayReason);
+}
+
+void ALSEnemyCharacter::OnDeathStateChanged(bool bIsDead)
+{
+	Super::OnDeathStateChanged(bIsDead);
+
+	// Dead는 몬스터의 터미널 상태(부활 없음)라 사망 진입만 처리. 부활이 생기면 여기서 프로파일 복원 필요.
+	if (!bIsDead)
+	{
+		return;
+	}
+
+	// 시체가 이동을 막지 않고, 추가 타격/타겟팅 대상에서 빠지도록 캡슐·메시 콜리전 모두 해제.
+	// 메시는 계속 보이며 사망 몽타주가 재생된다(가시성은 건드리지 않음).
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
 }
 
 const FLSMonsterArchetypeRow* ALSEnemyCharacter::FindMonsterArchetypeRow() const

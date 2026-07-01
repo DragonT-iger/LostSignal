@@ -432,6 +432,9 @@ void ULSCharacterCombatComponent::HandleDeathStateChanged(bool bIsDead)
 		return;
 	}
 
+	// 파생 클래스 사망 후처리 위임(몬스터: 콜리전 해제). 모든 머신에서 실행.
+	OwnerCharacter->OnDeathStateChanged(bIsDead);
+
 	if (ULSCombatStateComponent* CombatStateComponent = OwnerCharacter->GetCombatStateComponent())
 	{
 		if (bIsDead)

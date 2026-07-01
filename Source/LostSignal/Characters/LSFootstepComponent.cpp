@@ -36,6 +36,12 @@ void ULSFootstepComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 		return;
 	}
 
+	// 이동 스킬(대시/바이패스/처형 등 RootMotionSource 이동) 중에는 보행 발소리를 내지 않는다.
+	if (Movement && Movement->CurrentRootMotion.HasActiveRootMotionSources())
+	{
+		return;
+	}
+
 	const float Speed2D = OwnerCharacter->GetVelocity().Size2D();
 	if (Speed2D < MinFootstepSpeed)
 	{

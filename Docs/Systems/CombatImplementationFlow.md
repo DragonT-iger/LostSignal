@@ -392,6 +392,8 @@ ULSFootstepComponent::TickComponent
 -> 속도가 빠를수록 거리가 빨리 차 발소리도 빨라짐
 ```
 
+- 이동 스킬(대시/바이패스/처형 등 `ApplyRootMotionSource` 이동) 중에는 발소리를 억제한다: 틱에서 `Movement->CurrentRootMotion.HasActiveRootMotionSources()`면 스킵. 스크립트 이동이라 보행 발소리가 부적합하고, 태그/어빌리티를 안 건드려도 RootMotion 이동기 전부(향후 추가분 포함) 자동 커버. 몽타주 애님 루트모션은 그룹 API라 대상 아님.
+
 - 트리거가 C++ 컴포넌트 한 곳이라 시퀀스에 마커/커브/노티파이를 **아무것도 안 넣어도 된다.** 어떤 블렌드·속도에도 견고.
 - AnimInstance가 아니라 컴포넌트인 이유: 거리 기반은 movement 도메인이고, AnimInstance는 URO로 업데이트가 throttle돼 박자가 틀어질 수 있다.
 - `FootstepSound`(Sound Cue로 변주), `StrideLength`, `MinFootstepSpeed`, 발 본 이름은 캐릭터 BP의 `FootstepComponent`에서 매핑.

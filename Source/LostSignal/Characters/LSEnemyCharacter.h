@@ -72,6 +72,9 @@ public:
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+	/** 사망 진입 시 캡슐·메시 콜리전을 해제해 시체가 이동을 막거나 추가 타격 대상이 되지 않게 한다. */
+	virtual void OnDeathStateChanged(bool bIsDead) override;
+
 	/** Data-driven monster attack ability granted on BeginPlay; activated via ULSMonsterCombatComponent::RequestAction. */
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TSubclassOf<UGameplayAbility> MonsterActionAbilityClass;

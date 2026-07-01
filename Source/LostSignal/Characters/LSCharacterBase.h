@@ -50,6 +50,9 @@ public:
 
 	void GrantAbility(TSubclassOf<UGameplayAbility> AbilityClass);
 
+	/** 사망 상태가 바뀔 때 CharacterCombatComponent가 모든 머신에서 호출. 파생 클래스가 콜리전·마커 등 사망 후처리를 붙이는 확장점. 기본 동작 없음. */
+	virtual void OnDeathStateChanged(bool bIsDead) {}
+
 protected:
 	virtual void BeginPlay() override;
 
