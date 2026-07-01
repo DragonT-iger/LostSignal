@@ -230,6 +230,18 @@ PassiveSkill_ID
 
 `LS.Combat.Attacking`은 몬스터 감지/소음, 전투 컴포넌트 등 다른 시스템이 "공격/스킬 진행 중" 의미로 참조하므로 차단/캔슬 판정에는 쓰지 않는다. 차단은 `LS.Combat.SkillCasting`, 캔슬은 `LS.Ability.Player.BasicAttack`으로 분리한다.
 
+## 스킬 시전 중 입력 차단
+
+스킬 몽타주가 재생되는 동안 플레이어의 전투 입력(이동·대시·스킬·기본공격 등)을 무시한다. (이 문서가 단일 출처)
+
+- 단일 게이트 태그: `LS.State.InputBlocked`. 캐릭터의 `ALSPlayerCharacter::IsInputBlocked()`가 ASC에서 이 태그를 확인하고, `Move`/`OnAttack`/`OnDash`/`BeginSkillPreview`(Skill1~4·Ultimate 공통) 상단에서 게이트한다.
+- 태그를 켜는 소스는 둘이며 같은 태그를 토글한다.
+  - **기본(몽타주 전체)**: `ULSGA_PlayerSkillBase`가 스킬 몽타주를 재생할 때, 그 몽타주에 입력차단 NotifyState가 **없으면** 몽타주 시작~종료(취소 포함) 동안 태그를 부여한다.
+  - **구간 지정**: 몽타주에 `ULSANS_BlockInput`(AnimNotifyState)을 배치하면, 베이스는 기본 차단을 걸지 않고 그 **NotifyState 구간에만** 태그를 토글한다. 애니메이터가 프레임 단위로 차단 창을 제어한다.
+- **루트모션 무영향**: 게이트는 입력 이동(`AddMovementInput`)만 막는다. 이동 스킬의 `FRootMotionSource`(Bypass 슬라이드·Execution 대시)는 별도 경로라 그대로 이동한다.
+- 몽타주가 없는 즉발 스킬은 이 경로를 타지 않아 차단이 걸리지 않는다(막을 애니메이션이 없음).
+- 멀티(데디케이티드): 기본(몽타주 전체) 차단은 서버 권위 Ability가 `AddLooseGameplayTag(..., EGameplayTagReplicationState::TagOnly)`로 부여해 소유 클라로 복제된다. NotifyState 경로는 소유 클라에서 몽타주가 재생되며 로컬로 토글되어 별개로 동작한다. 둘 다 데디 호환이며, 기본 차단은 서버→클라 복제 RTT만큼 시작 지연이 있으나 몽타주 멀티캐스트도 같은 RTT를 타 정렬된다. 시작 지연까지 없애려면 확정 시점 소유 클라 예측 차단을 추가한다(선택).
+
 ## 패시브 스킬
 
 패시브는 `ULSPlayerSkillComponent::PassiveSkills`에 `ULSPassiveSkillDataAsset` 파생 DataAsset을 등록한다.

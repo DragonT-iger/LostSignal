@@ -7,6 +7,7 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(State_Dead, "LS.State.Dead")
 	UE_DEFINE_GAMEPLAY_TAG(State_Knockback, "LS.State.Knockback")
 	UE_DEFINE_GAMEPLAY_TAG(State_Stunned, "LS.State.Stunned")
+	UE_DEFINE_GAMEPLAY_TAG(State_InputBlocked, "LS.State.InputBlocked")
 
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Dash, "LS.Ability.Dash")
 	UE_DEFINE_GAMEPLAY_TAG(Ability_PlayerBasicAttack, "LS.Ability.Player.BasicAttack")

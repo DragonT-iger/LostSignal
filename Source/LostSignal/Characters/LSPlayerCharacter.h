@@ -279,6 +279,9 @@ private:
 	float LastStaminaSpendTime = -FLT_MAX;
 	FVector LastMoveWorldDirection = FVector::ZeroVector;
 
+	// 스킬 몽타주 재생 중(LS.State.InputBlocked 태그) 전투 입력을 무시할지. 이동·대시·스킬 입력 공통 게이트.
+	bool IsInputBlocked() const;
+
 	void Move(const FInputActionValue& Value);
 	void FaceMovementDirection(float DeltaSeconds);
 	void OnAttack();

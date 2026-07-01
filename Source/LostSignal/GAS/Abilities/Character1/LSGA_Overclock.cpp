@@ -9,7 +9,6 @@
 #include "GAS/LSGameplayTags.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
-#include "Skills/LSPlayerSkillComponent.h"
 #include "Skills/LSSkillDataAsset.h"
 
 namespace
@@ -38,58 +37,35 @@ namespace
 ULSGA_Overclock::ULSGA_Overclock()
 {
 	DamageEffectClass = ULSGE_PlayerBasicDamage::StaticClass();
-
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);
-	ActivationBlockedTags.AddTag(LSGameplayTags::Combat_SkillCasting); // 스킬끼리만 차단 (기본공격은 통과)
-	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);      // 공통 "진행 중" 의미 유지
-	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_SkillCasting);   // 시전 중 표식
-	CancelAbilitiesWithTag.AddTag(LSGameplayTags::Ability_PlayerBasicAttack); // 기본공격 모션 캔슬 후 발동
-
-	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
-void ULSGA_Overclock::ActivateAbility(
-	const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	const FGameplayEventData* TriggerEventData)
+bool ULSGA_Overclock::PrepareSkillExecution()
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	AActor* SourceActor = GetSkillSourceActor();
+	const FLSSkillActivationContext& SkillCtx = GetSkillContext();
 
-	AActor* SourceActor = GetAvatarActorFromActorInfo();
-	ULSPlayerSkillComponent* SkillComponent = SourceActor ? SourceActor->FindComponentByClass<ULSPlayerSkillComponent>() : nullptr;
-	if (!SourceActor || !SourceActor->HasAuthority() || !SkillComponent)
+	CachedDamageEffectClass = SkillCtx.SkillData && SkillCtx.SkillData->DamageEffectClass
+		? SkillCtx.SkillData->DamageEffectClass
+		: DamageEffectClass;
+	CachedCombatComponent = SourceActor ? SourceActor->FindComponentByClass<ULSCharacterCombatComponent>() : nullptr;
+
+	// 전투 컴포넌트나 데미지 GE가 없으면 커밋·쿨타임 없이 발동을 취소한다(기존 즉발 경로와 동일).
+	return CachedCombatComponent != nullptr && CachedDamageEffectClass != nullptr;
+}
+
+void ULSGA_Overclock::ExecuteSkillEffect()
+{
+	AActor* SourceActor = GetSkillSourceActor();
+	const FLSSkillActivationContext& SkillCtx = GetSkillContext();
+	if (!SourceActor || !CachedCombatComponent || !CachedDamageEffectClass)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	FLSSkillActivationContext SkillContext;
-	if (!SkillComponent->ConsumePendingAbilityContext(GetClass(), SkillContext) || !SkillContext.SkillData)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s Overclock ability missing pending skill context."), *GetNameSafe(SourceActor));
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = CachedDamageEffectClass;
+	ULSCharacterCombatComponent* SourceCombatComponent = CachedCombatComponent;
 
-	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = SkillContext.SkillData->DamageEffectClass ? SkillContext.SkillData->DamageEffectClass : DamageEffectClass;
-	ULSCharacterCombatComponent* SourceCombatComponent = SourceActor->FindComponentByClass<ULSCharacterCombatComponent>();
-	if (!SourceCombatComponent || !ResolvedDamageEffectClass)
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
-
-	const FLSCharacterSkillRow* Row = SkillContext.bHasSkillRow ? &SkillContext.SkillRow : nullptr;
+	const FLSCharacterSkillRow* Row = SkillCtx.bHasSkillRow ? &SkillCtx.SkillRow : nullptr;
 	const float Range = Row && Row->Range_X > 0.0f ? Row->Range_X : FallbackRange;
 	const float ConeDegrees = Row && Row->Range_Y > 0.0f ? Row->Range_Y : FallbackConeDegrees;
 	const float BaseAttackCoefficient = Row && Row->Skill_Multiplier > 0.0f ? Row->Skill_Multiplier : FallbackAttackCoefficient;
@@ -97,11 +73,11 @@ void ULSGA_Overclock::ActivateAbility(
 	const ELSBreakPowerTier ResolvedBreakPower = Row ? ToOverclockAbilityBreakPowerTier(Row->Skill_Impact, BreakPower) : BreakPower;
 
 	const FVector SourceLocation = SourceActor->GetActorLocation();
-	FVector AimDirection = SkillContext.TargetLocation - SourceLocation;
+	FVector AimDirection = SkillCtx.TargetLocation - SourceLocation;
 	AimDirection.Z = 0.0f;
 	if (AimDirection.IsNearlyZero())
 	{
-		AimDirection = FRotator(0.0f, SkillContext.AimYaw, 0.0f).Vector();
+		AimDirection = FRotator(0.0f, SkillCtx.AimYaw, 0.0f).Vector();
 	}
 
 	AimDirection = AimDirection.GetSafeNormal2D();
@@ -112,7 +88,6 @@ void ULSGA_Overclock::ActivateAbility(
 
 	if (AimDirection.IsNearlyZero() || Range <= 0.0f)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
@@ -150,7 +125,6 @@ void ULSGA_Overclock::ActivateAbility(
 
 	if (ConeTargets.Num() == 0)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 		return;
 	}
 
@@ -192,8 +166,6 @@ void ULSGA_Overclock::ActivateAbility(
 			ConsumedStacks,
 			FinalAttackCoefficient);
 	}
-
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
 
 int32 ULSGA_Overclock::ConsumeCombatAccelerationStacks(AActor* SourceActor) const

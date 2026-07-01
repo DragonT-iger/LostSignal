@@ -3,6 +3,7 @@
 #include "Vision/LSCharacterLightingComponent.h"
 
 #include "Components/CapsuleComponent.h"
+#include "Components/DirectionalLightComponent.h"
 #include "Components/MeshComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/World.h"
@@ -86,7 +87,7 @@ void ULSCharacterLightingComponent::InitializeMaterialInstances()
 	}
 }
 
-// 레벨의 첫 디렉셔널 라이트를 태양으로 채택한다. 없으면 명암 적응을 비활성(항상 SunlitLevel)한다.
+// 렌더링에 영향을 주는 디렉셔널 라이트 중 ForwardShadingPriority가 가장 높은 라이트를 태양으로 채택한다.
 void ULSCharacterLightingComponent::ResolveSunLight()
 {
 	UWorld* World = GetWorld();
@@ -95,11 +96,35 @@ void ULSCharacterLightingComponent::ResolveSunLight()
 		return;
 	}
 
+	ADirectionalLight* BestLight = nullptr;
+	int32 BestPriority = INDEX_NONE;
+	float BestBrightnessSquared = -1.0f;
+
 	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
 	{
-		SunLight = *It;
-		break;
+		ADirectionalLight* CandidateLight = *It;
+		UDirectionalLightComponent* LightComponent = CandidateLight != nullptr
+			? Cast<UDirectionalLightComponent>(CandidateLight->GetLightComponent())
+			: nullptr;
+		if (LightComponent == nullptr || !LightComponent->bAffectsWorld || !LightComponent->IsVisible())
+		{
+			continue;
+		}
+
+		const int32 Priority = LightComponent->ForwardShadingPriority;
+		const FLinearColor LightColor = LightComponent->GetLightColor() * LightComponent->Intensity;
+		const float BrightnessSquared =
+			LightColor.R * LightColor.R + LightColor.G * LightColor.G + LightColor.B * LightColor.B;
+
+		if (Priority > BestPriority || (Priority == BestPriority && BrightnessSquared > BestBrightnessSquared))
+		{
+			BestLight = CandidateLight;
+			BestPriority = Priority;
+			BestBrightnessSquared = BrightnessSquared;
+		}
 	}
+
+	SunLight = BestLight;
 
 	if (!SunLight.IsValid())
 	{

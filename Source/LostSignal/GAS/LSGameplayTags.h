@@ -14,6 +14,7 @@ namespace LSGameplayTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dead)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Knockback)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Stunned)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_InputBlocked)
 
 	// Ability tags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Dash)

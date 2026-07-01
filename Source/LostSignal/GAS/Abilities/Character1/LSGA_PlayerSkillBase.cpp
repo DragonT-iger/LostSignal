@@ -1,8 +1,10 @@
 #include "GAS/Abilities/Character1/LSGA_PlayerSkillBase.h"
 
+#include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/LSANS_BlockInput.h"
 #include "Characters/LSCharacterBase.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GAS/LSGameplayTags.h"
@@ -80,6 +82,7 @@ void ULSGA_PlayerSkillBase::ActivateAbility(
 
 	bSkillEffectExecuted = false;
 	bEndingAbility = false;
+	bDefaultInputBlockApplied = false;
 	ActiveSkillMontage = nullptr;
 	SkillContext = FLSSkillActivationContext();
 
@@ -136,6 +139,13 @@ void ULSGA_PlayerSkillBase::ActivateAbility(
 
 	ActiveSkillMontage = Montage;
 
+	// 입력 차단: 몽타주에 LSANS_BlockInput NotifyState가 없으면 몽타주 전체를 기본 차단한다.
+	// 있으면 그 NotifyState가 지정 구간에만 토글하므로 여기선 아무것도 하지 않는다.
+	if (!MontageHasInputBlockNotify(Montage))
+	{
+		SetDefaultInputBlockActive(true);
+	}
+
 	// 노티파이 이벤트 대기 태스크를 먼저 활성화한 뒤 몽타주를 재생한다(노티파이 없는 스킬엔 무해).
 	UAbilityTask_WaitGameplayEvent* WaitTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
 		this, SkillEffectEventTag, nullptr, /*OnlyTriggerOnce=*/false, /*OnlyMatchExact=*/true);
@@ -185,9 +195,56 @@ void ULSGA_PlayerSkillBase::EndAbility(
 		}
 	}
 
+	// 기본 입력 차단을 적용했다면 종료(취소 포함) 시 반드시 해제한다.
+	if (bDefaultInputBlockApplied)
+	{
+		SetDefaultInputBlockActive(false);
+	}
+
 	ActiveSkillMontage = nullptr;
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+bool ULSGA_PlayerSkillBase::MontageHasInputBlockNotify(const UAnimMontage* Montage)
+{
+	if (!Montage)
+	{
+		return false;
+	}
+
+	for (const FAnimNotifyEvent& NotifyEvent : Montage->Notifies)
+	{
+		if (Cast<ULSANS_BlockInput>(NotifyEvent.NotifyStateClass))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void ULSGA_PlayerSkillBase::SetDefaultInputBlockActive(bool bActive)
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!ASC)
+	{
+		return;
+	}
+
+	// 복제 loose 태그(TagOnly): 서버 권위 Ability가 부여해도 소유 클라로 복제되어 데디케이티드에서 입력 차단이 반영된다.
+	// 입력 게이트는 태그 존재만 확인(카운트 불필요)하므로 TagOnly로 충분하다.
+	// (NotifyState 경로는 소유 클라에서 몽타주가 재생되며 로컬 토글하므로 여기와 별개로 이미 데디 호환)
+	if (bActive)
+	{
+		ASC->AddLooseGameplayTag(LSGameplayTags::State_InputBlocked, 1, EGameplayTagReplicationState::TagOnly);
+		bDefaultInputBlockApplied = true;
+	}
+	else
+	{
+		ASC->RemoveLooseGameplayTag(LSGameplayTags::State_InputBlocked, 1, EGameplayTagReplicationState::TagOnly);
+		bDefaultInputBlockApplied = false;
+	}
 }
 
 void ULSGA_PlayerSkillBase::TriggerSkillEffectOnce()

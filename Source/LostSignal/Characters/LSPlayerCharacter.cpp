@@ -230,6 +230,11 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 void ALSPlayerCharacter::OnAttack()
 {
+	if (IsInputBlocked())
+	{
+		return;
+	}
+
 	if (PlayerSkillComponent && PlayerSkillComponent->IsPreviewingSkill())
 	{
 		if (!ConfirmActiveSkillPreview())
@@ -251,6 +256,11 @@ void ALSPlayerCharacter::OnAttack()
 
 void ALSPlayerCharacter::OnDash()
 {
+	if (IsInputBlocked())
+	{
+		return;
+	}
+
 	if (CancelActiveSkillPreview())
 	{
 		return;
@@ -614,6 +624,12 @@ bool ALSPlayerCharacter::IsInventoryWidgetOpen() const
 
 void ALSPlayerCharacter::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 {
+	// 스킬 시전(몽타주) 중에는 새 스킬 프리뷰 진입을 막는다(Skill1~4/Ultimate 공통 게이트).
+	if (IsInputBlocked())
+	{
+		return;
+	}
+
 	if (!IsLocallyControlled() || !PlayerSkillComponent)
 	{
 		return;
@@ -757,8 +773,21 @@ void ALSPlayerCharacter::OnRunEnd()
 	}
 }
 
+bool ALSPlayerCharacter::IsInputBlocked() const
+{
+	const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	return ASC && ASC->HasMatchingGameplayTag(LSGameplayTags::State_InputBlocked);
+}
+
 void ALSPlayerCharacter::Move(const FInputActionValue& Value)
 {
+	// 스킬 몽타주 재생 중이면 입력 이동을 무시한다(루트모션 이동은 별도 경로라 영향 없음).
+	if (IsInputBlocked())
+	{
+		LastMoveWorldDirection = FVector::ZeroVector;
+		return;
+	}
+
 	const FVector2D Input = Value.Get<FVector2D>();
 
 	FVector ForwardDirection = FollowCamera->GetForwardVector();

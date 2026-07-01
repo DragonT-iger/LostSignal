@@ -1,9 +1,8 @@
 #include "GAS/Abilities/Character1/LSGA_ShortCircuit.h"
 
+#include "Data/LSCharacterSkillRow.h"
 #include "GameFramework/Pawn.h"
-#include "GAS/LSGameplayTags.h"
 #include "LostSignal.h"
-#include "Skills/LSPlayerSkillComponent.h"
 #include "Skills/LSShortCircuitProjectile.h"
 #include "Skills/LSShortCircuitSkillDataAsset.h"
 #include "Skills/LSSkillDataAsset.h"
@@ -58,82 +57,49 @@ namespace
 	}
 }
 
-ULSGA_ShortCircuit::ULSGA_ShortCircuit()
+bool ULSGA_ShortCircuit::PrepareSkillExecution()
 {
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);
-	ActivationBlockedTags.AddTag(LSGameplayTags::Combat_SkillCasting); // 스킬끼리만 차단 (기본공격은 통과)
-	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);      // 공통 "진행 중" 의미 유지
-	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_SkillCasting);   // 시전 중 표식
-	CancelAbilitiesWithTag.AddTag(LSGameplayTags::Ability_PlayerBasicAttack); // 기본공격 모션 캔슬 후 발동
+	const FLSSkillActivationContext& SkillCtx = GetSkillContext();
 
-	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+	CachedShortCircuitData = Cast<ULSShortCircuitSkillDataAsset>(SkillCtx.SkillData);
+	CachedProjectileClass = CachedShortCircuitData ? CachedShortCircuitData->ResolveProjectileClass() : nullptr;
+
+	// 데이터에셋/발사체 클래스가 없으면 커밋·쿨타임 없이 발동을 취소한다(기존 즉발 경로와 동일).
+	if (!CachedShortCircuitData || !CachedProjectileClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s ShortCircuit ability requires ULSShortCircuitSkillDataAsset with ProjectileClass."), *GetNameSafe(GetSkillSourceActor()));
+		return false;
+	}
+
+	return true;
 }
 
-void ULSGA_ShortCircuit::ActivateAbility(
-	const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	const FGameplayEventData* TriggerEventData)
+void ULSGA_ShortCircuit::ExecuteSkillEffect()
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
-	AActor* SourceActor = GetAvatarActorFromActorInfo();
-	ULSPlayerSkillComponent* SkillComponent = SourceActor ? SourceActor->FindComponentByClass<ULSPlayerSkillComponent>() : nullptr;
-	if (!SourceActor || !SourceActor->HasAuthority() || !SkillComponent)
+	AActor* SourceActor = GetSkillSourceActor();
+	const FLSSkillActivationContext& SkillCtx = GetSkillContext();
+	UWorld* World = SourceActor ? SourceActor->GetWorld() : nullptr;
+	if (!SourceActor || !World || !CachedShortCircuitData || !CachedProjectileClass)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	FLSSkillActivationContext SkillContext;
-	if (!SkillComponent->ConsumePendingAbilityContext(GetClass(), SkillContext) || !SkillContext.SkillData)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s ShortCircuit ability missing pending skill context."), *GetNameSafe(SourceActor));
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+	ULSShortCircuitSkillDataAsset* ShortCircuitData = CachedShortCircuitData;
+	const TSubclassOf<ALSShortCircuitProjectile> ResolvedProjectileClass = CachedProjectileClass;
 
-	ULSShortCircuitSkillDataAsset* ShortCircuitData = Cast<ULSShortCircuitSkillDataAsset>(SkillContext.SkillData);
-	const TSubclassOf<ALSShortCircuitProjectile> ResolvedProjectileClass = ShortCircuitData
-		? ShortCircuitData->ResolveProjectileClass()
-		: nullptr;
-	if (!ShortCircuitData || !ResolvedProjectileClass)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s ShortCircuit ability requires ULSShortCircuitSkillDataAsset with ProjectileClass."), *GetNameSafe(SourceActor));
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
-
-	UWorld* World = SourceActor->GetWorld();
-	if (!World)
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
-	const FLSCharacterSkillRow* Row = SkillContext.bHasSkillRow ? &SkillContext.SkillRow : nullptr;
+	const FLSCharacterSkillRow* Row = SkillCtx.bHasSkillRow ? &SkillCtx.SkillRow : nullptr;
 	if (!Row)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s ShortCircuit ability missing active skill row."), *GetNameSafe(SourceActor));
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
 	const FVector SourceLocation = SourceActor->GetActorLocation();
-	FVector AimDirection = SkillContext.TargetLocation - SourceLocation;
+	FVector AimDirection = SkillCtx.TargetLocation - SourceLocation;
 	AimDirection.Z = 0.0f;
 	if (AimDirection.IsNearlyZero())
 	{
-		AimDirection = FRotator(0.0f, SkillContext.AimYaw, 0.0f).Vector();
+		AimDirection = FRotator(0.0f, SkillCtx.AimYaw, 0.0f).Vector();
 	}
 
 	AimDirection = AimDirection.GetSafeNormal2D();
@@ -141,9 +107,8 @@ void ULSGA_ShortCircuit::ActivateAbility(
 	{
 		UE_LOG(LogLS, Warning, TEXT("[GA_ShortCircuit] Activate rejected: AimDirection is zero. Source=%s Target=%s AimYaw=%.2f"),
 			*GetNameSafe(SourceActor),
-			*SkillContext.TargetLocation.ToCompactString(),
-			SkillContext.AimYaw);
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			*SkillCtx.TargetLocation.ToCompactString(),
+			SkillCtx.AimYaw);
 		return;
 	}
 
@@ -170,26 +135,23 @@ void ULSGA_ShortCircuit::ActivateAbility(
 		UE_LOG(LogLS, Warning, TEXT("[GA_ShortCircuit] Failed to spawn projectile. Source=%s ProjectileClass=%s"),
 			*GetNameSafe(SourceActor),
 			*GetNameSafe(ResolvedProjectileClass.Get()));
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	const float ProjectileDuration = ResolveShortCircuitProjectileDuration(Row, ShortCircuitData, SpawnLocation, SkillContext.TargetLocation);
+	const float ProjectileDuration = ResolveShortCircuitProjectileDuration(Row, ShortCircuitData, SpawnLocation, SkillCtx.TargetLocation);
 	const float ProjectileArcHeight = ResolveShortCircuitArcHeight(Row, ShortCircuitData);
 	const float ProjectileLifeSeconds = ResolveShortCircuitLifeSeconds(ProjectileDuration, ShortCircuitData);
-	Projectile->InitializeProjectile(SourceActor, ShortCircuitData, SkillContext.TargetLocation, ProjectileDuration, ProjectileArcHeight, ProjectileLifeSeconds);
+	Projectile->InitializeProjectile(SourceActor, ShortCircuitData, SkillCtx.TargetLocation, ProjectileDuration, ProjectileArcHeight, ProjectileLifeSeconds);
 
 	if (ShortCircuitData->bEnableDebugVisualization)
 	{
 		UE_LOG(LogLS, Log, TEXT("[GA_ShortCircuit] Projectile=%s SpawnLocation=%s Target=%s AimDirection=%s Duration=%.2f Arc=%.2f Life=%.2f"),
 			*GetNameSafe(Projectile),
 			*SpawnLocation.ToCompactString(),
-			*SkillContext.TargetLocation.ToCompactString(),
+			*SkillCtx.TargetLocation.ToCompactString(),
 			*AimDirection.ToCompactString(),
 			ProjectileDuration,
 			ProjectileArcHeight,
 			ProjectileLifeSeconds);
 	}
-
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }

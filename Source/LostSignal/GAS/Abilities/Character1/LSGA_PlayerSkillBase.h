@@ -78,10 +78,17 @@ private:
 
 	void HandleSkillMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
+	// 몽타주에 입력차단 NotifyState(LSANS_BlockInput)가 배치돼 있는지. 있으면 기본 전체 차단을 적용하지 않는다.
+	static bool MontageHasInputBlockNotify(const UAnimMontage* Montage);
+
+	// 기본 입력 차단(몽타주 전체) 적용/해제. NotifyState가 없는 몽타주에만 사용한다.
+	void SetDefaultInputBlockActive(bool bActive);
+
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveSkillMontage = nullptr;
 
 	FLSSkillActivationContext SkillContext;
 	bool bSkillEffectExecuted = false;
 	bool bEndingAbility = false;
+	bool bDefaultInputBlockApplied = false;
 };
