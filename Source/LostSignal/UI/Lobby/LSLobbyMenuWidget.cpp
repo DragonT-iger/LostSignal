@@ -1,6 +1,7 @@
 #include "UI/Lobby/LSLobbyMenuWidget.h"
 
 #include "Components/Button.h"
+#include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Components/WidgetSwitcher.h"
@@ -9,10 +10,14 @@
 #include "GameFramework/PlayerController.h"
 #include "InputCoreTypes.h"
 #include "LostSignal.h"
+#include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/LSUILayer.h"
+#include "UI/Lobby/LSLoadoutPreparationWidget.h"
 #include "UI/Lobby/LSLobbyQuestWidget.h"
 #include "UI/Lobby/LSLobbyTabWidget.h"
 #include "UI/Settings/LSSettingsWidget.h"
+
+#define LOCTEXT_NAMESPACE "LSLobbyMenu"
 
 void ULSLobbyMenuWidget::NativeConstruct()
 {
@@ -21,7 +26,7 @@ void ULSLobbyMenuWidget::NativeConstruct()
 	// TAB 키 입력을 받기 위해 포커스 가능하게 둔다. 실제 포커스는 GameMode가 SetWidgetToFocus로 준다.
 	SetIsFocusable(true);
 
-	// 플레이 탭만 클릭을 구독한다. 나머지 탭은 바인딩 검증만 한다.
+	// 상단 탭 4개 모두 클릭을 구독해 해당 페이지로 전환한다.
 	if (PlayTab)
 	{
 		PlayTab->OnClicked.AddDynamic(this, &ULSLobbyMenuWidget::HandlePlayTabClicked);
@@ -31,20 +36,28 @@ void ULSLobbyMenuWidget::NativeConstruct()
 		UE_LOG(LogLS, Warning, TEXT("PlayTab is not bound on %s."), *GetNameSafe(this));
 	}
 
-	// 개인정비 탭은 WidgetSwitcher를 개인정비(칩 스테이션) 페이지로 전환한다.
-	if (EquipTab)
+	// 개인정비 탭은 WidgetSwitcher를 개인정비(WBP_LoadoutPreparation) 페이지로 전환한다.
+	if (LoadoutPreparation)
 	{
-		EquipTab->OnClicked.AddDynamic(this, &ULSLobbyMenuWidget::HandleEquipTabClicked);
+		LoadoutPreparation->OnClicked.AddDynamic(this, &ULSLobbyMenuWidget::HandleLoadoutPreparationClicked);
 	}
 	else
 	{
-		UE_LOG(LogLS, Warning, TEXT("EquipTab is not bound on %s."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("LoadoutPreparation is not bound on %s."), *GetNameSafe(this));
 	}
-	if (!QuestTab)
+	if (QuestTab)
+	{
+		QuestTab->OnClicked.AddDynamic(this, &ULSLobbyMenuWidget::HandleQuestTabClicked);
+	}
+	else
 	{
 		UE_LOG(LogLS, Warning, TEXT("QuestTab is not bound on %s."), *GetNameSafe(this));
 	}
-	if (!CharacterTab)
+	if (CharacterTab)
+	{
+		CharacterTab->OnClicked.AddDynamic(this, &ULSLobbyMenuWidget::HandleCharacterTabClicked);
+	}
+	else
 	{
 		UE_LOG(LogLS, Warning, TEXT("CharacterTab is not bound on %s."), *GetNameSafe(this));
 	}
@@ -61,6 +74,10 @@ void ULSLobbyMenuWidget::NativeConstruct()
 	if (!TabSwitcher)
 	{
 		UE_LOG(LogLS, Warning, TEXT("TabSwitcher is not bound on %s."), *GetNameSafe(this));
+	}
+	if (!WBP_LoadoutPreparation)
+	{
+		UE_LOG(LogLS, Warning, TEXT("WBP_LoadoutPreparation is not bound on %s."), *GetNameSafe(this));
 	}
 	if (!LobbyQuest)
 	{
@@ -105,6 +122,16 @@ void ULSLobbyMenuWidget::NativeConstruct()
 		UE_LOG(LogLS, Warning, TEXT("SettingsButton is not bound on %s."), *GetNameSafe(this));
 	}
 
+	// 개인정비 페이지에서 배경을 교체하기 위해 WBP 기본 배경 브러시를 캐시한다.
+	if (BackgroundImage)
+	{
+		DefaultBackgroundBrush = BackgroundImage->GetBrush();
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("BackgroundImage is not bound on %s."), *GetNameSafe(this));
+	}
+
 	// 로비는 플레이 탭에서 시작한다.
 	ShowTab(ELSLobbyTab::Play);
 }
@@ -115,9 +142,17 @@ void ULSLobbyMenuWidget::NativeDestruct()
 	{
 		PlayTab->OnClicked.RemoveDynamic(this, &ULSLobbyMenuWidget::HandlePlayTabClicked);
 	}
-	if (EquipTab)
+	if (LoadoutPreparation)
 	{
-		EquipTab->OnClicked.RemoveDynamic(this, &ULSLobbyMenuWidget::HandleEquipTabClicked);
+		LoadoutPreparation->OnClicked.RemoveDynamic(this, &ULSLobbyMenuWidget::HandleLoadoutPreparationClicked);
+	}
+	if (QuestTab)
+	{
+		QuestTab->OnClicked.RemoveDynamic(this, &ULSLobbyMenuWidget::HandleQuestTabClicked);
+	}
+	if (CharacterTab)
+	{
+		CharacterTab->OnClicked.RemoveDynamic(this, &ULSLobbyMenuWidget::HandleCharacterTabClicked);
 	}
 	if (InventoryButton)
 	{
@@ -173,14 +208,33 @@ void ULSLobbyMenuWidget::HandlePlayTabClicked()
 	ShowTab(ELSLobbyTab::Play);
 }
 
-void ULSLobbyMenuWidget::HandleEquipTabClicked()
+void ULSLobbyMenuWidget::HandleLoadoutPreparationClicked()
 {
-	ShowTab(ELSLobbyTab::Equip);
+	// 상단 탭으로 진입할 때는 항상 내부 탭 목록부터 보여준다.
+	if (WBP_LoadoutPreparation)
+	{
+		WBP_LoadoutPreparation->ResetToTabs();
+	}
+	ShowTab(ELSLobbyTab::LoadoutPreparation);
+}
+
+void ULSLobbyMenuWidget::HandleQuestTabClicked()
+{
+	// 퀘스트 페이지는 아직 스위쳐에 없다. 플레이 페이지를 유지한 채 미구현 안내창만 띄운다.
+	ShowTab(ELSLobbyTab::Play);
+	ShowNotImplementedNotice();
+}
+
+void ULSLobbyMenuWidget::HandleCharacterTabClicked()
+{
+	// 캐릭터변경 페이지는 아직 스위쳐에 없다. 플레이 페이지를 유지한 채 미구현 안내창만 띄운다.
+	ShowTab(ELSLobbyTab::Play);
+	ShowNotImplementedNotice();
 }
 
 void ULSLobbyMenuWidget::HandleInventoryButtonClicked()
 {
-	ToggleInventoryTab();
+	ToggleStoragePage();
 }
 
 FReply ULSLobbyMenuWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
@@ -188,32 +242,65 @@ FReply ULSLobbyMenuWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, c
 	// 포커스가 버튼으로 넘어가도 터널링 단계라 루트가 먼저 받는다. TAB은 여기서 소비해 포커스 이동을 막는다.
 	if (InKeyEvent.GetKey() == EKeys::Tab)
 	{
-		ToggleInventoryTab();
+		ToggleStoragePage();
 		return FReply::Handled();
 	}
 
-	// 플레이 페이지가 아니면 ESC로 플레이로 돌아온다. 이미 플레이면 통과시킨다.
 	if (InKeyEvent.GetKey() == EKeys::Escape && TabSwitcher
 		&& TabSwitcher->GetActiveWidgetIndex() != static_cast<int32>(ELSLobbyTab::Play))
 	{
-		ShowTab(ELSLobbyTab::Play);
+		// 개인정비에서 콘텐츠가 열려 있으면 먼저 내부 탭 목록으로, 그 외에는 플레이 페이지로 돌아온다.
+		const bool bLoadoutActive =
+			TabSwitcher->GetActiveWidgetIndex() == static_cast<int32>(ELSLobbyTab::LoadoutPreparation);
+		if (bLoadoutActive && WBP_LoadoutPreparation && WBP_LoadoutPreparation->IsContentOpen())
+		{
+			WBP_LoadoutPreparation->ResetToTabs();
+		}
+		else
+		{
+			ShowTab(ELSLobbyTab::Play);
+		}
 		return FReply::Handled();
 	}
 
 	return Super::NativeOnPreviewKeyDown(InGeometry, InKeyEvent);
 }
 
-void ULSLobbyMenuWidget::ToggleInventoryTab() const
+FReply ULSLobbyMenuWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	// 여기까지 왔다는 것은 어떤 자식도 클릭을 처리하지 않았다는 뜻(버블링 종점). 포커스가 뷰포트로
+	// 빠지면 TAB/ESC가 죽으므로 빈 영역 클릭은 소비하면서 포커스를 루트로 되돌린다.
+	Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+	return FReply::Handled().SetUserFocus(TakeWidget(), EFocusCause::Mouse);
+}
+
+void ULSLobbyMenuWidget::ToggleStoragePage() const
 {
 	if (!TabSwitcher)
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot toggle inventory because TabSwitcher is not bound on %s."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("Cannot toggle storage because TabSwitcher is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+	if (!WBP_LoadoutPreparation)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot toggle storage because WBP_LoadoutPreparation is not bound on %s."), *GetNameSafe(this));
 		return;
 	}
 
-	const int32 InventoryIndex = static_cast<int32>(ELSLobbyTab::Inventory);
-	const bool bInventoryActive = TabSwitcher->GetActiveWidgetIndex() == InventoryIndex;
-	ShowTab(bInventoryActive ? ELSLobbyTab::Play : ELSLobbyTab::Inventory);
+	// 개인정비에서 콘텐츠(칩 연구소/물품창고 등)가 열려 있으면 먼저 탭 목록으로 되돌린다.
+	// 그 상태에서 TAB을 한 번 더 누르면 아래 분기로 내려와 물품창고가 열린다. 플레이로는 돌아가지 않는다.
+	const bool bLoadoutContentOpen =
+		TabSwitcher->GetActiveWidgetIndex() == static_cast<int32>(ELSLobbyTab::LoadoutPreparation)
+		&& WBP_LoadoutPreparation->IsContentOpen();
+	if (bLoadoutContentOpen)
+	{
+		WBP_LoadoutPreparation->ResetToTabs();
+		return;
+	}
+
+	// 플레이 등 다른 페이지나 개인정비 탭 목록에서는 물품창고로 바로 진입한다.
+	WBP_LoadoutPreparation->OpenTab(ELSLoadoutTab::Storage);
+	ShowTab(ELSLobbyTab::LoadoutPreparation);
 }
 
 void ULSLobbyMenuWidget::HandleMissionStartClicked()
@@ -270,6 +357,45 @@ ULSSettingsWidget* ULSLobbyMenuWidget::ShowSettingsWidget()
 	return SettingsWidget;
 }
 
+void ULSLobbyMenuWidget::ShowNotImplementedNotice()
+{
+	// 이미 안내창이 떠 있으면 중복 생성하지 않는다.
+	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
+	{
+		return;
+	}
+
+	if (!ConfirmDialogClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] ConfirmDialogClass is not set on %s. Check WBP_LobbyMenu."), *GetNameSafe(this));
+		return;
+	}
+
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	ULSConfirmDialogWidget* Dialog = OwningPlayer
+		? CreateWidget<ULSConfirmDialogWidget>(OwningPlayer, ConfirmDialogClass)
+		: CreateWidget<ULSConfirmDialogWidget>(this, ConfirmDialogClass);
+	if (!Dialog)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Failed to create confirm dialog on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	// 확인/취소 어느 쪽을 눌러도(또는 ESC) 그냥 닫히고 로비로 돌아온다.
+	Dialog->SetMessage(LOCTEXT("NotImplemented", "아직 구현되지 않았습니다."));
+	Dialog->OnConfirmed.AddDynamic(this, &ULSLobbyMenuWidget::HandleNotImplementedDialogClosed);
+	Dialog->OnCancelled.AddDynamic(this, &ULSLobbyMenuWidget::HandleNotImplementedDialogClosed);
+	Dialog->AddToViewport(LSUILayer::ModalPanel);
+	ActiveConfirmDialog = Dialog;
+}
+
+void ULSLobbyMenuWidget::HandleNotImplementedDialogClosed()
+{
+	ActiveConfirmDialog = nullptr;
+	// 안내창이 닫혔으니 TAB/ESC가 다시 로비로 오도록 포커스를 회수한다.
+	SetKeyboardFocus();
+}
+
 void ULSLobbyMenuWidget::ShowTab(const ELSLobbyTab Tab) const
 {
 	if (!TabSwitcher)
@@ -278,4 +404,20 @@ void ULSLobbyMenuWidget::ShowTab(const ELSLobbyTab Tab) const
 	}
 
 	TabSwitcher->SetActiveWidgetIndex(static_cast<int32>(Tab));
+	UpdateBackground(Tab);
 }
+
+void ULSLobbyMenuWidget::UpdateBackground(const ELSLobbyTab Tab) const
+{
+	if (!BackgroundImage)
+	{
+		return;
+	}
+
+	// 개인정비 페이지이고 전용 배경 리소스가 지정돼 있으면 교체하고, 그 외에는 기본 배경으로 복원한다.
+	const bool bUseLoadoutBackground = Tab == ELSLobbyTab::LoadoutPreparation
+		&& LoadoutPreparationBackgroundBrush.GetResourceObject() != nullptr;
+	BackgroundImage->SetBrush(bUseLoadoutBackground ? LoadoutPreparationBackgroundBrush : DefaultBackgroundBrush);
+}
+
+#undef LOCTEXT_NAMESPACE
