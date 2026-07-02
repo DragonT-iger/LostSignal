@@ -55,6 +55,9 @@ protected:
 	// 몽타주 재생 playRate. 이동 스킬은 override해 몽타주 길이를 이동 Duration에 맞춘다.
 	virtual float GetSkillMontagePlayRate() const { return 1.0f; }
 
+	// 몽타주 재생 시작 섹션. 다구간 스킬(Execution 대시 섹션 등)이 override한다. None이면 처음부터.
+	virtual FName GetSkillMontageStartSection() const { return NAME_None; }
+
 	// true면 몽타주 끝이 능력 종료를 주관(즉발/연출형). false면 서브클래스 타이머가 종료를 책임진다(이동 스킬).
 	// false일 때 베이스는 몽타주를 스케일 재생만 하고 종료 델리게이트를 바인딩하지 않는다.
 	virtual bool ShouldMontageDriveEnd() const { return true; }
@@ -66,13 +69,14 @@ protected:
 	UAnimMontage* GetSkillMontage() const;
 	const FLSSkillActivationContext& GetSkillContext() const { return SkillContext; }
 
+	// 효과를 아직 안 냈으면 ExecuteSkillEffect를 1회 실행(중복 가드). 타이머 종료형 스킬의 폴백 보장용.
+	void TriggerSkillEffectOnce();
+
 	// 효과를 발동시킬 GameplayEvent 태그. 비우면 LS.Event.Skill.Hit.
 	UPROPERTY(EditDefaultsOnly, Category="LS/Skill")
 	FGameplayTag SkillEffectEventTag;
 
 private:
-	void TriggerSkillEffectOnce();
-
 	UFUNCTION()
 	void OnSkillEffectEventReceived(FGameplayEventData Payload);
 

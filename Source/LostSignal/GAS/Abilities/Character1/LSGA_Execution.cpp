@@ -2,7 +2,9 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Animation/AnimMontage.h"
 #include "Combat/LSCharacterCombatComponent.h"
+#include "Characters/LSCharacterBase.h"
 #include "Characters/LSEnemyCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "Data/LSCharacterSkillRow.h"
@@ -16,7 +18,6 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
 #include "Skills/LSExecutionSkillDataAsset.h"
-#include "Skills/LSPlayerSkillComponent.h"
 #include "Skills/LSShortCircuitField.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "TimerManager.h"
@@ -47,16 +48,6 @@ namespace
 ULSGA_Execution::ULSGA_Execution()
 {
 	DamageEffectClass = ULSGE_PlayerBasicDamage::StaticClass();
-
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
-	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);
-	ActivationBlockedTags.AddTag(LSGameplayTags::Combat_SkillCasting); // 스킬끼리만 차단 (기본공격은 통과)
-	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);      // 공통 "진행 중" 의미 유지
-	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_SkillCasting);   // 시전 중 표식
-	CancelAbilitiesWithTag.AddTag(LSGameplayTags::Ability_PlayerBasicAttack); // 기본공격 모션 캔슬 후 발동
-
-	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 }
 
 bool ULSGA_Execution::ResolveMovementParams(const ULSSkillDataAsset* InSkillData, const FLSCharacterSkillRow* SkillRow, float& OutDistance, float& OutDuration) const
@@ -70,115 +61,145 @@ bool ULSGA_Execution::ResolveMovementParams(const ULSSkillDataAsset* InSkillData
 		? SkillRow->Skill_Time
 		: InExecutionData ? InExecutionData->FallbackDashDuration : 0.25f;
 
-	UE_LOG(LogLS, Warning, TEXT("Excution Distance = %.2f, Duration = %.2f"), OutDistance, OutDuration)
-
 	return OutDistance > 0.0f && OutDuration > 0.0f;
 }
 
-void ULSGA_Execution::ActivateAbility(
-	const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	const FGameplayEventData* TriggerEventData)
+bool ULSGA_Execution::PrepareSkillExecution()
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
-	ACharacter* SourceCharacter = Cast<ACharacter>(GetAvatarActorFromActorInfo());
-	AActor* SourceActor = SourceCharacter;
-	ULSPlayerSkillComponent* SkillComponent = SourceActor ? SourceActor->FindComponentByClass<ULSPlayerSkillComponent>() : nullptr;
-	if (!SourceActor || !SourceActor->HasAuthority() || !SourceCharacter || !SkillComponent)
+	ACharacter* SourceCharacter = Cast<ACharacter>(GetSkillSourceActor());
+	const FLSSkillActivationContext& SkillCtx = GetSkillContext();
+	if (!SourceCharacter || !SkillCtx.SkillData)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
+		return false;
 	}
 
-	FLSSkillActivationContext SkillContext;
-	if (!SkillComponent->ConsumePendingAbilityContext(GetClass(), SkillContext) || !SkillContext.SkillData)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s Execution ability missing pending skill context."), *GetNameSafe(SourceActor));
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+	SkillData = SkillCtx.SkillData;
+	ExecutionData = Cast<ULSExecutionSkillDataAsset>(SkillCtx.SkillData);
 
-	SkillData = SkillContext.SkillData;
-	ExecutionData = Cast<ULSExecutionSkillDataAsset>(SkillContext.SkillData);
-
-	ULSCharacterCombatComponent* SourceCombatComponent = SourceActor->FindComponentByClass<ULSCharacterCombatComponent>();
-	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = SkillContext.SkillData->DamageEffectClass
-		? SkillContext.SkillData->DamageEffectClass
+	ULSCharacterCombatComponent* SourceCombatComponent = SourceCharacter->FindComponentByClass<ULSCharacterCombatComponent>();
+	const TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass = SkillCtx.SkillData->DamageEffectClass
+		? SkillCtx.SkillData->DamageEffectClass
 		: DamageEffectClass;
 	if (!SourceCombatComponent || !ResolvedDamageEffectClass)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
+		return false;
 	}
 
-	const FLSCharacterSkillRow* Row = SkillContext.bHasSkillRow ? &SkillContext.SkillRow : nullptr;
-	float DashDuration = 0.0f;
-	ResolveMovementParams(SkillContext.SkillData, Row, CachedDashDistance, DashDuration);
+	const FLSCharacterSkillRow* Row = SkillCtx.bHasSkillRow ? &SkillCtx.SkillRow : nullptr;
+	ResolveMovementParams(SkillCtx.SkillData, Row, CachedDashDistance, CachedDashDuration);
 	CachedSlashWidth = Row && Row->Range_Y > 0.0f
 		? Row->Range_Y
 		: ExecutionData ? ExecutionData->FallbackSlashWidth : 220.0f;
-	const float BaseAttackCoefficient = Row && Row->Skill_Multiplier > 0.0f
-		? Row->Skill_Multiplier
-		: FallbackAttackCoefficient;
-
-	if (CachedDashDistance <= 0.0f || DashDuration <= 0.0f || CachedSlashWidth <= 0.0f)
+	if (CachedDashDistance <= 0.0f || CachedDashDuration <= 0.0f || CachedSlashWidth <= 0.0f)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
+		return false;
 	}
 
-	CachedDirection = SkillContext.TargetLocation - SourceActor->GetActorLocation();
+	CachedDirection = SkillCtx.TargetLocation - SourceCharacter->GetActorLocation();
 	CachedDirection.Z = 0.0f;
 	if (CachedDirection.IsNearlyZero())
 	{
-		CachedDirection = FRotator(0.0f, SkillContext.AimYaw, 0.0f).Vector();
+		CachedDirection = FRotator(0.0f, SkillCtx.AimYaw, 0.0f).Vector();
 	}
 
 	CachedDirection = CachedDirection.GetSafeNormal2D();
 	if (CachedDirection.IsNearlyZero())
 	{
-		CachedDirection = SourceActor->GetActorForwardVector().GetSafeNormal2D();
+		CachedDirection = SourceCharacter->GetActorForwardVector().GetSafeNormal2D();
 	}
 
-	UCharacterMovementComponent* MovementComponent = SourceCharacter->GetCharacterMovement();
-	if (CachedDirection.IsNearlyZero() || !MovementComponent)
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-	SkillComponent->ApplySkillCooldown(SkillContext.SkillData);
-
-	CachedStartLocation = SourceActor->GetActorLocation();
-	CachedConsumedAccelerationStacks = ConsumeCombatAccelerationStacks(SourceActor);
-	const float DataAssetAdditionalCoefficient = ExecutionData ? ExecutionData->AdditionalAttackCoefficientPerAccelerationStack : 0.25f;
-	const float AdditionalCoefficient = Row && Row->Res_Multiplier > 0.0f ? Row->Res_Multiplier : DataAssetAdditionalCoefficient;
-	CachedAttackCoefficient = BaseAttackCoefficient + (AdditionalCoefficient * CachedConsumedAccelerationStacks);
 	CachedSkillRow = Row ? *Row : FLSCharacterSkillRow();
 	bHasCachedSkillRow = Row != nullptr;
+	return !CachedDirection.IsNearlyZero() && SourceCharacter->GetCharacterMovement() != nullptr;
+}
+
+void ULSGA_Execution::OnSkillStarted()
+{
+	ACharacter* SourceCharacter = Cast<ACharacter>(GetSkillSourceActor());
+	UCharacterMovementComponent* MovementComponent = SourceCharacter ? SourceCharacter->GetCharacterMovement() : nullptr;
+	if (!SourceCharacter || !MovementComponent)
+	{
+		return;
+	}
+
+	CachedStartLocation = SourceCharacter->GetActorLocation();
+	CachedConsumedAccelerationStacks = ConsumeCombatAccelerationStacks(SourceCharacter);
+	const float BaseAttackCoefficient = bHasCachedSkillRow && CachedSkillRow.Skill_Multiplier > 0.0f
+		? CachedSkillRow.Skill_Multiplier
+		: FallbackAttackCoefficient;
+	const float DataAssetAdditionalCoefficient = ExecutionData ? ExecutionData->AdditionalAttackCoefficientPerAccelerationStack : 0.25f;
+	const float AdditionalCoefficient = bHasCachedSkillRow && CachedSkillRow.Res_Multiplier > 0.0f
+		? CachedSkillRow.Res_Multiplier
+		: DataAssetAdditionalCoefficient;
+	CachedAttackCoefficient = BaseAttackCoefficient + (AdditionalCoefficient * CachedConsumedAccelerationStacks);
 	IgnoreEnemiesForDash(SourceCharacter);
 
 	TSharedPtr<FRootMotionSource_ConstantForce> RootMotion = MakeShared<FRootMotionSource_ConstantForce>();
 	RootMotion->InstanceName = FName("ExecutionDash");
 	RootMotion->AccumulateMode = ERootMotionAccumulateMode::Override;
 	RootMotion->Priority = 9;
-	RootMotion->Force = CachedDirection * (CachedDashDistance / DashDuration);
-	RootMotion->Duration = DashDuration;
+	RootMotion->Force = CachedDirection * (CachedDashDistance / CachedDashDuration);
+	RootMotion->Duration = CachedDashDuration;
 	RootMotion->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
 	RootMotion->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
 	RootMotionSourceID = MovementComponent->ApplyRootMotionSource(RootMotion);
 
+	// 대시 단계 종료 권위: 서버 타이머. 몽타주 끝이 아니다.
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimer(SheathHitTimerHandle, this, &ULSGA_Execution::PerformSheathHit, DashDuration, false);
+		World->GetTimerManager().SetTimer(PhaseTimerHandle, this, &ULSGA_Execution::HandleDashFinished, CachedDashDuration, false);
 	}
+}
+
+float ULSGA_Execution::GetSkillMontagePlayRate() const
+{
+	// Dash 섹션만 DashDuration에 자동 스케일. 섹션 미분할 몽타주면 1.0(오써링 속도 그대로).
+	return ComputeMontagePlayRateForDuration(GetSkillMontage(), DashSectionName, CachedDashDuration);
+}
+
+FName ULSGA_Execution::GetSkillMontageStartSection() const
+{
+	const UAnimMontage* Montage = GetSkillMontage();
+	return Montage && Montage->GetSectionIndex(DashSectionName) != INDEX_NONE ? DashSectionName : NAME_None;
+}
+
+void ULSGA_Execution::HandleDashFinished()
+{
+	if (!IsActive())
+	{
+		return;
+	}
+
+	UAnimMontage* Montage = GetSkillMontage();
+	ALSCharacterBase* Character = Cast<ALSCharacterBase>(GetSkillSourceActor());
+	const int32 SlashSectionIndex = Montage ? Montage->GetSectionIndex(SlashSectionName) : INDEX_NONE;
+	const float SlashSectionLength = SlashSectionIndex != INDEX_NONE ? Montage->GetSectionLength(SlashSectionIndex) : 0.0f;
+	if (!Character || !Montage || SlashSectionLength <= 0.0f)
+	{
+		// 몽타주/발도 섹션이 없으면 기존 즉발과 동일하게 대시 끝에 타격 후 종료한다.
+		FinishExecution();
+		return;
+	}
+
+	// 발도 구간은 오써링 속도(1.0) 그대로. 재생 RPC 재호출로 섹션 점프 + playRate 복구(기본 공격 콤보와 동일 패턴).
+	Character->MulticastPlayLSMontage(Montage, SlashSectionName, 1.0f);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(PhaseTimerHandle, this, &ULSGA_Execution::FinishExecution, SlashSectionLength, false);
+	}
+}
+
+void ULSGA_Execution::FinishExecution()
+{
+	if (!IsActive())
+	{
+		return;
+	}
+
+	// 노티파이 누락/몽타주 없음 폴백: 종료 전에 타격 1회를 보장한다(중복은 베이스 가드가 차단).
+	TriggerSkillEffectOnce();
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void ULSGA_Execution::EndAbility(
@@ -190,7 +211,7 @@ void ULSGA_Execution::EndAbility(
 {
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().ClearTimer(SheathHitTimerHandle);
+		World->GetTimerManager().ClearTimer(PhaseTimerHandle);
 	}
 
 	if (ACharacter* SourceCharacter = Cast<ACharacter>(GetAvatarActorFromActorInfo()))
@@ -206,6 +227,7 @@ void ULSGA_Execution::EndAbility(
 	RootMotionSourceID = 0;
 	ExecutionData = nullptr;
 	SkillData = nullptr;
+	CachedDashDuration = 0.0f;
 	CachedConsumedAccelerationStacks = 0;
 	CachedSkillRow = FLSCharacterSkillRow();
 	bHasCachedSkillRow = false;
@@ -213,13 +235,12 @@ void ULSGA_Execution::EndAbility(
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
-void ULSGA_Execution::PerformSheathHit()
+void ULSGA_Execution::ExecuteSkillEffect()
 {
-	AActor* SourceActor = GetAvatarActorFromActorInfo();
+	AActor* SourceActor = GetSkillSourceActor();
 	ULSCharacterCombatComponent* SourceCombatComponent = SourceActor ? SourceActor->FindComponentByClass<ULSCharacterCombatComponent>() : nullptr;
 	if (!SourceActor || !SourceActor->HasAuthority() || !SkillData || !SourceCombatComponent)
 	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
 
@@ -230,6 +251,25 @@ void ULSGA_Execution::PerformSheathHit()
 		? SkillData->DamageEffectClass
 		: DamageEffectClass;
 
+	const int32 ValidHitCount = ApplySheathDamage(SourceActor, SourceCombatComponent, ResolvedDamageEffectClass, ResolvedBreakPower);
+	const int32 ExplodedFieldCount = ExplodeShortCircuitFields(SourceActor, ResolvedBreakPower);
+
+	if (ExecutionData && ExecutionData->bEnableDebugLog)
+	{
+		UE_LOG(
+			LogLS,
+			Log,
+			TEXT("[GA_Execution] Source=%s ValidHits=%d ConsumedAcceleration=%d Coef=%.2f ExplodedFields=%d"),
+			*GetNameSafe(SourceActor),
+			ValidHitCount,
+			CachedConsumedAccelerationStacks,
+			CachedAttackCoefficient,
+			ExplodedFieldCount);
+	}
+}
+
+int32 ULSGA_Execution::ApplySheathDamage(AActor* SourceActor, ULSCharacterCombatComponent* SourceCombatComponent, TSubclassOf<UGameplayEffect> ResolvedDamageEffectClass, ELSBreakPowerTier ResolvedBreakPower) const
+{
 	TArray<AActor*> OverlappedActors;
 	TArray<AActor*> ActorsToIgnore;
 	ActorsToIgnore.Add(SourceActor);
@@ -277,45 +317,39 @@ void ULSGA_Execution::PerformSheathHit()
 		}
 	}
 
-	int32 ExplodedFieldCount = 0;
+	return ValidHitCount;
+}
+
+int32 ULSGA_Execution::ExplodeShortCircuitFields(AActor* SourceActor, ELSBreakPowerTier ResolvedBreakPower) const
+{
 	UWorld* World = GetWorld();
-	if (World)
+	if (!World)
 	{
-		for (TActorIterator<ALSShortCircuitField> It(World); It; ++It)
+		return 0;
+	}
+
+	int32 ExplodedFieldCount = 0;
+	for (TActorIterator<ALSShortCircuitField> It(World); It; ++It)
+	{
+		ALSShortCircuitField* Field = *It;
+		if (!Field || !IsPointInExecutionArea(Field->GetActorLocation()))
 		{
-			ALSShortCircuitField* Field = *It;
-			if (!Field || !IsPointInExecutionArea(Field->GetActorLocation()))
-			{
-				continue;
-			}
+			continue;
+		}
 
-			const float FieldExplosionCoefficient = ExecutionData && ExecutionData->FieldExplosionAttackCoefficient > 0.0f
-				? ExecutionData->FieldExplosionAttackCoefficient
-				: CachedAttackCoefficient;
-			const float FieldRadiusOverride = ExecutionData ? ExecutionData->FieldExplosionRadiusOverride : 0.0f;
-			const bool bDestroyField = !ExecutionData || ExecutionData->bDestroyShortCircuitFieldOnExplosion;
+		const float FieldExplosionCoefficient = ExecutionData && ExecutionData->FieldExplosionAttackCoefficient > 0.0f
+			? ExecutionData->FieldExplosionAttackCoefficient
+			: CachedAttackCoefficient;
+		const float FieldRadiusOverride = ExecutionData ? ExecutionData->FieldExplosionRadiusOverride : 0.0f;
+		const bool bDestroyField = !ExecutionData || ExecutionData->bDestroyShortCircuitFieldOnExplosion;
 
-			if (Field->ExplodeByExecution(SourceActor, SkillData, FieldExplosionCoefficient, bCanCrit, ResolvedBreakPower, FieldRadiusOverride, bDestroyField))
-			{
-				++ExplodedFieldCount;
-			}
+		if (Field->ExplodeByExecution(SourceActor, SkillData, FieldExplosionCoefficient, bCanCrit, ResolvedBreakPower, FieldRadiusOverride, bDestroyField))
+		{
+			++ExplodedFieldCount;
 		}
 	}
 
-	if (ExecutionData && ExecutionData->bEnableDebugLog)
-	{
-		UE_LOG(
-			LogLS,
-			Log,
-			TEXT("[GA_Execution] Source=%s ValidHits=%d ConsumedAcceleration=%d Coef=%.2f ExplodedFields=%d"),
-			*GetNameSafe(SourceActor),
-			ValidHitCount,
-			CachedConsumedAccelerationStacks,
-			CachedAttackCoefficient,
-			ExplodedFieldCount);
-	}
-
-	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	return ExplodedFieldCount;
 }
 
 int32 ULSGA_Execution::ConsumeCombatAccelerationStacks(AActor* SourceActor) const

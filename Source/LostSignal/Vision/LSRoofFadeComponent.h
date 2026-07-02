@@ -84,7 +84,7 @@ public:
 	FVector TriggerExtentPadding = FVector(0.0f, 0.0f, 0.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
-	bool bDrawDebugTriggerVolume = true;
+	bool bDrawDebugTriggerVolume = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	FColor TriggerDebugColor = FColor::Cyan;

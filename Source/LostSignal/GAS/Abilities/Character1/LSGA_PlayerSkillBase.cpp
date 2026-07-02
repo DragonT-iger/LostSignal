@@ -155,8 +155,8 @@ void ULSGA_PlayerSkillBase::ActivateAbility(
 		WaitTask->ReadyForActivation();
 	}
 
-	// 몽타주는 비주얼. 이동 스킬은 playRate로 길이를 이동 Duration에 맞춘다.
-	Character->MulticastPlayLSMontage(Montage, NAME_None, GetSkillMontagePlayRate());
+	// 몽타주는 비주얼. 이동 스킬은 playRate로 길이를 이동 Duration에 맞춘다. 다구간 스킬은 시작 섹션을 지정한다.
+	Character->MulticastPlayLSMontage(Montage, GetSkillMontageStartSection(), GetSkillMontagePlayRate());
 
 	if (!bMontageDrivesEnd)
 	{
