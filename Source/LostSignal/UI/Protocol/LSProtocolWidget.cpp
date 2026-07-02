@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/Border.h"
 #include "Components/Image.h"
 #include "Components/RichTextBlock.h"
 #include "Components/TextBlock.h"
@@ -21,17 +22,25 @@ void ULSProtocolWidget::NativePreConstruct()
 	{
 		ProtocolNameImage->SetBrushFromTexture(ProtocolNameTexture, /*bMatchSize=*/false);
 	}
+
+	ApplyProtocolBorderColor(ProtocolBorderColor);
 }
 
 void ULSProtocolWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	if (!ProtocolBorder)
+	{
+		UE_LOG(LogLS, Warning, TEXT("ProtocolBorder is not bound on %s."), *GetNameSafe(this));
+	}
+
 	if (!ProtocolNameTexture)
 	{
 		UE_LOG(LogLS, Warning, TEXT("ProtocolNameTexture is not set on %s."), *GetNameSafe(this));
 	}
 
+	ApplyProtocolBorderColor(ProtocolBorderColor);
 	EnsureHoverHitTestable();
 }
 
@@ -111,6 +120,12 @@ void ULSProtocolWidget::SetProtocolStageLevels(const TArray<int32>& InSynergySta
 void ULSProtocolWidget::SetProtocolType(const ELSProtocolType InProtocolType)
 {
 	ProtocolType = InProtocolType;
+}
+
+void ULSProtocolWidget::SetProtocolBorderColor(const FLinearColor& InColor)
+{
+	ProtocolBorderColor = InColor;
+	ApplyProtocolBorderColor(ProtocolBorderColor);
 }
 
 FString ULSProtocolWidget::BuildSynergyMarkup(int32 ActiveStage) const
@@ -281,4 +296,12 @@ void ULSProtocolWidget::UpdateTooltipPosition()
 
 	// bRemoveDPIScale=true로 픽셀→레이아웃 단위 변환.
 	ActiveTooltipWidget->SetPositionInViewport(PositionPx, true);
+}
+
+void ULSProtocolWidget::ApplyProtocolBorderColor(const FLinearColor& InColor) const
+{
+	if (ProtocolBorder)
+	{
+		ProtocolBorder->SetBrushColor(InColor);
+	}
 }

@@ -10,6 +10,7 @@ class ULSProtocolTooltipWidget;
 class UTextBlock;
 class URichTextBlock;
 class UTexture2D;
+class UBorder;
 
 // 프로토콜 한 줄 위젯 (WBP_Protocol 등 한 칸의 부모 클래스).
 //
@@ -45,6 +46,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
 	void SetProtocolType(ELSProtocolType InProtocolType);
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Protocol")
+	void SetProtocolBorderColor(const FLinearColor& InColor);
+
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
@@ -57,9 +61,15 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
 	FLinearColor HoveredTint = FLinearColor(0.55f, 0.9f, 1.0f, 1.0f);
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
+	FLinearColor ProtocolBorderColor = FLinearColor::White;
+
 	// 호버 툴팁이 마우스 커서 기준으로 떨어지는 오프셋(픽셀). X 양수면 커서 오른쪽에 표시된다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
 	FVector2D TooltipCursorOffset = FVector2D(48.0f, 8.0f);
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UBorder> ProtocolBorder;
 
 	// 프로토콜 이름 이미지. 배치한 WBP 에서 인스턴스별로 ProtocolNameTexture 를 지정한다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
@@ -101,6 +111,7 @@ private:
 	void ShowProtocolTooltip();
 	void HideProtocolTooltip();
 	void UpdateTooltipPosition();
+	void ApplyProtocolBorderColor(const FLinearColor& InColor) const;
 
 	// 표시 중인 호버 툴팁 인스턴스. 뷰포트에 올라가 있는 동안 GC되지 않도록 UPROPERTY로 추적한다.
 	UPROPERTY(Transient)

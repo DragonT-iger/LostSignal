@@ -137,7 +137,7 @@
 
 `DT_Protocol`은 프로토콜 해금 항목의 단일 출처다. 첫 컬럼 RowName의 접두사로 생존/적재/전투/탐색 타입을 판정하고, `Protocol_Required_Level` 이하의 수치는 코드나 문서에 중복 저장하지 않는다.
 프로토콜 위젯의 숫자 스트립은 해당 타입의 최대 `Protocol_Required_Level`까지 표시하고, 볼드 처리는 현재 프로토콜 레벨 숫자만큼만 적용한다. 개별 항목의 보호 표시 여부는 각 row의 `Protocol_Protected_Level`로 별도 판정한다.
-프로토콜 이름 이미지는 `ULSProtocolWidget`의 `ProtocolNameImage`(BindWidget)에 표시하며, 텍스처는 배치한 WBP(WBP_ChipStation 등)에서 인스턴스별 `ProtocolNameTexture`로 4종을 각각 지정한다.
+프로토콜 이름 이미지는 `ULSProtocolWidget`의 `ProtocolNameImage`(BindWidget)에 표시하며, 텍스처는 배치한 WBP(WBP_ChipStation 등)에서 인스턴스별 `ProtocolNameTexture`로 4종을 각각 지정한다. 프로토콜 칸 배경/테두리 Border는 `ProtocolBorder`(BindWidget)로 바인드하고, 색은 `ProtocolBorderColor`에서 조정한다.
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
