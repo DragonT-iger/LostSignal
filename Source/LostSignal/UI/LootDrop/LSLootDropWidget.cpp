@@ -5,6 +5,7 @@
 #include "Core/LSPlayerControllerBase.h"
 #include "Gameplay/LSLootBox.h"
 #include "Inventory/LSInventorySlotUtils.h"
+#include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
 #include "UI/Inventory/LSSlotWidgetSync.h"
@@ -63,7 +64,36 @@ void ULSLootDropWidget::RefreshLootItemsFromSource(ALSLootBox* InSourceLootBox, 
 		return;
 	}
 
+	// 단계 공개로 슬롯이 늘어난 경우에만 등장 사운드를 재생한다.
+	// (박스 재오픈은 ShowLootDropWidget → SetLootItems 직행이라 여기로 오지 않음)
+	const int32 PreviousItemCount = LootItems.Num();
 	SetLootItems(InItems);
+	if (LootItems.Num() > PreviousItemCount)
+	{
+		PlayRevealSoundForNewItems(PreviousItemCount);
+	}
+}
+
+void ULSLootDropWidget::PlayRevealSoundForNewItems(const int32 FirstNewItemIndex)
+{
+	for (int32 ItemIndex = FirstNewItemIndex; ItemIndex < LootItems.Num(); ++ItemIndex)
+	{
+		const FLSDropResult& Item = LootItems[ItemIndex];
+		if (Item.ItemRowName.IsNone() || Item.Amount <= 0)
+		{
+			continue;
+		}
+
+		const FString Grade = LSInventorySlotUtils::ResolveItemGradeFromRowName(Item.ItemRowName);
+		const TObjectPtr<USoundBase>* FoundSound = GradeRevealSounds.Find(FName(*Grade));
+		if (!FoundSound || !*FoundSound)
+		{
+			UE_LOG(LogLS, Warning, TEXT("GradeRevealSounds has no sound mapped for grade '%s' on %s."), *Grade, *GetNameSafe(this));
+			continue;
+		}
+
+		UGameplayStatics::PlaySound2D(this, *FoundSound);
+	}
 }
 
 void ULSLootDropWidget::RebuildLootSlots()

@@ -8,6 +8,7 @@
 
 class ULSItemSlotWidget;
 class UTextBlock;
+class USoundBase;
 class UWrapBox;
 class ALSLootBox;
 
@@ -63,6 +64,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
 
+	// 등급명(Supply/Standard/Precision/Tuning/Prototype/Masterpiece) → 슬롯 공개 순간 재생할 사운드. WBP에서 매핑한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
+	TMap<FName, TObjectPtr<USoundBase>> GradeRevealSounds;
+
 private:
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/UI")
 	TArray<FLSDropResult> LootItems;
@@ -74,4 +79,5 @@ private:
 
 	void SetLootSlotFromSessionItem(int32 SlotIndex, const FLSSessionItem& SessionItem);
 	void RebuildLootSlots();
+	void PlayRevealSoundForNewItems(int32 FirstNewItemIndex);
 };

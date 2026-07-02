@@ -65,6 +65,7 @@
 - **칩 스테이션 닫힘** (`ALSChipStationActor`): 칩 설정 상호작용 범위에서 로컬 플레이어가 벗어나면 `ALSPlayerControllerBase::HideChipStationWidget`으로 스테이션 UI를 닫는다.
 - **하드웨어 슬롯** (`ULSChipEquipmentSlotWidget`): 칩 스테이션 목록에서 드래그한 칩을 `EquipmentSlot_0~9` 내부 `ItemSlot`에 저장 이동으로 장착할 수 있다. 장착 슬롯끼리 드래그하면 빈 슬롯으로는 이동하고, 이미 장착된 슬롯과는 교환한다. 장착 칩을 `ChipSlotBorder` 빈 영역으로 드래그하면 장착 해제되어 창고로 이동하고, 칩 리스트 아이템 위에 드롭하면 해당 인벤토리/창고 슬롯과 교환한다. 신호 게이지가 90.0% 이하로 내려갈 때부터 1번 슬롯부터 10% 단위로 비활성 처리하며, 장착 칩의 기본 `ChipStats` 10종 합산값은 활성·비활성 슬롯을 모두 포함한다. 비활성 슬롯의 `ChipStats` 50%는 스탯 UI의 `SignalLossText`에 표시하고, 최종 스탯은 기본 표시값과 `SignalLossText` 표시값을 합산한다. 장착 칩과 신호 게이지 값은 SaveGame에 저장되어 칩 스테이션 재오픈 시 복원된다. 장착 칩의 `Item_MemoryCost` 합계는 `MemoryText`에 `현재/최대` 형식으로 표시한다. 메모리 검증은 아직 없다.
   - **빠른 장착 (Shift+좌클릭)**: 칩 리스트(인벤토리+창고 합친 창) 슬롯을 Shift+좌클릭하면 첫 빈 장착칸에 1개 장착하고, **그 소스 슬롯 한 칸만 그 자리에서 비운다**(칩 리스트는 재정렬/리빌드하지 않음 — 정렬은 스테이션을 다시 열 때만). Shift를 누른 채 커서를 칩들 위로 쓸면 지나가는 칸이 차례로 장착된다(다른 빠른이동과 동일하게 `NativeOnMouseEnter`/`NativeOnMouseMove` 기반, 별도 타이머 없음). 슬롯이 당겨지지 않으므로 같은 칸이 재호출돼도 비어 있어 무해하다. 장착마다 칩 리스트 전체를 다시 그리지 않고 장착칸·요약·용량만 다음 틱에 1회로 합쳐 경량 갱신한다. (`ULSItemSlotWidget::TryHandleChipStationQuickTransfer` → `ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot` / `QueueRefreshEquippedChipState`)
+  - **장착/해제 사운드**: 장착 성공(드래그/빠른 장착/리스트 교환) 시 `ULSChipStationWidget::ChipEquipSound`, 창고 해제 성공 시 `ChipUnequipSound`를 2D로 재생한다. 두 사운드는 `WBP_ChipStation` 클래스 디폴트에서 매핑하며(`Content/LostSignal/Audio/SFX/Chip/Chip In·Chip Out`), 미할당이면 `LogLS` Warning만 남긴다. 장착칸끼리 이동/교환은 무음.
   - **장착 해제 (Shift+좌클릭 / `ChipSlotBorder` 빈 영역 드래그)**: 장착칸에서 창고로 해제할 때도 칩 리스트를 재정렬/리빌드하지 않는다. 돌아온 칩을 **칩 리스트의 첫 빈 칸(빠른 장착으로 생긴 hole)에 넣거나, 없으면 맨 뒤에 새 슬롯으로 추가**한다. 돌아온 칩의 창고 슬롯 위치는 해제 전/후 "채워진 창고 인덱스" 차이로 찾는다(기존 스택에 합쳐져 새 인덱스를 못 찾는 예외 케이스만 풀 새로고침으로 폴백). 드래그·Shift 두 해제 경로 공용. (`ULSChipStationWidget::UnequipChipFromSlotToWarehouse` / `InsertChipListSlot`)
 
 ### ✅ 칩 전투 스탯 → 캐릭터 GAS 연동
@@ -136,6 +137,7 @@
 
 `DT_Protocol`은 프로토콜 해금 항목의 단일 출처다. 첫 컬럼 RowName의 접두사로 생존/적재/전투/탐색 타입을 판정하고, `Protocol_Required_Level` 이하의 수치는 코드나 문서에 중복 저장하지 않는다.
 프로토콜 위젯의 숫자 스트립은 해당 타입의 최대 `Protocol_Required_Level`까지 표시하고, 볼드 처리는 현재 프로토콜 레벨 숫자만큼만 적용한다. 개별 항목의 보호 표시 여부는 각 row의 `Protocol_Protected_Level`로 별도 판정한다.
+프로토콜 이름 이미지는 `ULSProtocolWidget`의 `ProtocolNameImage`(BindWidget)에 표시하며, 텍스처는 배치한 WBP(WBP_ChipStation 등)에서 인스턴스별 `ProtocolNameTexture`로 4종을 각각 지정한다.
 
 | 필드 | 타입 | 설명 |
 |---|---|---|

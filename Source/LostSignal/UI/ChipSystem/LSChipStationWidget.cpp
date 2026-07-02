@@ -13,6 +13,7 @@
 #include "Data/LSDropSettings.h"
 #include "Engine/DataTable.h"
 #include "Inventory/LSInventorySlotUtils.h"
+#include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "TimerManager.h"
@@ -551,6 +552,7 @@ bool ULSChipStationWidget::EquipChipToHardwareSlot(const ULSInventoryDragDropOpe
 		EquipmentSlotIndex);
 	if (bEquipped)
 	{
+		PlayChipSound(ChipEquipSound, TEXT("ChipEquipSound"));
 		HandleCarryingSlotCapacityChanged();
 		QueueRefreshChipStation();
 	}
@@ -637,6 +639,7 @@ bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDrag
 		DragOperation.SourceEquipmentSlotIndex);
 	if (bSwapped)
 	{
+		PlayChipSound(ChipEquipSound, TEXT("ChipEquipSound"));
 		HandleCarryingSlotCapacityChanged();
 		QueueRefreshChipStation();
 	}
@@ -675,6 +678,7 @@ bool ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot(const ELSInven
 	const bool bEquipped = SaveSubsystem->EquipChipFromStoredSlot(SourceArea, SourceSlotIndex, TargetEquipmentSlotIndex);
 	if (bEquipped)
 	{
+		PlayChipSound(ChipEquipSound, TEXT("ChipEquipSound"));
 		// 칩 리스트는 호출 측(소스 슬롯 위젯)이 ClearItem으로 그 칸만 비운다. 여기선 리스트를 재정렬/리빌드하지 않고
 		// 장착칸·요약·용량만 경량 갱신한다(정렬은 스테이션을 다시 열 때만).
 		QueueRefreshEquippedChipState();
@@ -704,6 +708,8 @@ bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentS
 	{
 		return false;
 	}
+
+	PlayChipSound(ChipUnequipSound, TEXT("ChipUnequipSound"));
 
 	// 칩 리스트는 재정렬/리빌드하지 않고, 돌아온 칩을 빈 칸(빠른 장착으로 생긴 hole) 또는 맨 뒤에 꽂는다.
 	const TArray<FLSSessionItem>& WarehouseAfter = SaveSubsystem->GetWarehouseItems();
@@ -918,6 +924,17 @@ bool ULSChipStationWidget::IsPointerInsideChipSlotBorder(const FVector2D ScreenP
 		LocalPosition.Y >= 0.0f &&
 		LocalPosition.X <= ChipSlotBorderGeometry.GetLocalSize().X &&
 		LocalPosition.Y <= ChipSlotBorderGeometry.GetLocalSize().Y;
+}
+
+void ULSChipStationWidget::PlayChipSound(USoundBase* Sound, const TCHAR* SoundPropertyName) const
+{
+	if (!Sound)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s is not set on %s."), SoundPropertyName, *GetNameSafe(this));
+		return;
+	}
+
+	UGameplayStatics::PlaySound2D(this, Sound);
 }
 
 void ULSChipStationWidget::SetChipStat(FName StatKey, int32 StatValue, int32 SignalLoss)

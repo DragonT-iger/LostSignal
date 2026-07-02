@@ -313,6 +313,7 @@ C: 50+60+120=230 ≥ 137 → C 당첨
 - `LSLootDropWidget::RebuildLootSlots`는 **`max(공개수, TotalLootCount)`개 슬롯 프레임**을 그린다. 공개된 인덱스는 `SetItem`, **바로 다음에 공개될 한 칸만** `ULSItemSlotWidget::SetPlaceholder()`(미확인 아이콘 + 펄스)로 스캔 연출하고, 그 이후 칸은 빈 기본 배경 프레임(`ClearItem`)만 둔다. 즉 동시에 펄스하는 슬롯은 항상 하나뿐이다.
 - 등장 연출은 **`ULSItemSlotWidget`의 C++ `NativeTick`** 이 구동한다(BP 타임라인 아님). placeholder는 미확인 아이콘 알파를 sin으로 펄스(슬롯 프레임 배경은 또렷 유지). `SetItem`이 placeholder→아이템 전환을 감지하면 pop-in(RenderScale `PopInStartScale`→1.0 + RenderOpacity 0→1, `InterpEaseInOut`)을 재생. 등장 연출 수치는 슬롯 위젯의 `PopIn*`/`Placeholder*` UPROPERTY로 조정한다. 등급 배경색은 기존 `*GradeColor` 필드 재사용.
 - 박스 메시 오픈·발광·오픈 SFX만 3D 에셋/사운드라 `OnLootBoxOpenedVisual()`(BlueprintImplementableEvent, `OnRep_IsOpened` + 호스트 오픈 시점 호출)로 BP가 담당한다. 미확인 아이콘 텍스처(`UnconfirmedIconTexture`)도 WBP 기본값으로 에셋만 매핑한다(로직 아님).
+- **등장(공개) 사운드**: 공개 갱신(`RefreshLootItemsFromSource`)에서 슬롯 개수가 늘어난 순간에만, 새로 공개된 아이템의 등급(`ResolveItemGradeFromRowName`)으로 `ULSLootDropWidget::GradeRevealSounds`(등급명 → `USoundBase`, WBP 기본값 매핑)를 찾아 2D로 재생한다(`PlayRevealSoundForNewItems`). 박스 재오픈 시 초기 표시는 `SetLootItems` 직행이라 소리가 나지 않고, 매핑 없는 등급은 `LogLS` Warning만 남긴다. 사운드 에셋은 `Content/LostSignal/Audio/SFX/ItemDrop/drop1~6`(숫자가 클수록 높은 등급, drop1=Supply … drop6=Masterpiece).
 
 ---
 

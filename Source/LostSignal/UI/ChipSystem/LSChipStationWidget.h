@@ -24,6 +24,7 @@ class ULSSkillBarWidget;
 class ULSSurvivalStatusWidget;
 class ULSSoundDirectionIndicatorWidget;
 class USlider;
+class USoundBase;
 class UWrapBox;
 
 UCLASS(BlueprintType, Blueprintable)
@@ -83,6 +84,8 @@ protected:
 	// 프로토콜 디버그 오버라이드가 켜져 있으면 그 값을, 아니면 장착 칩 합산값(현재=활성칩, 이전=전체칩)을 돌려준다.
 	void ResolveProtocolPreviewLevels(ELSProtocolType ProtocolType, const FLSChipProtocolTotals& ActiveTotals, const FLSChipProtocolTotals& AllTotals, int32& OutCurrentLevel, int32& OutPreviousLevel) const;
 	bool IsPointerInsideChipSlotBorder(FVector2D ScreenPosition) const;
+	// 장착/해제 사운드 재생. 미할당이면 경고 로그만 남긴다.
+	void PlayChipSound(USoundBase* Sound, const TCHAR* SoundPropertyName) const;
 	float GetSignalGaugePercent() const;
 	int32 GetInactiveSignalSlotCount() const;
 	void SynchronizeSignalGauge(float Percent);
@@ -164,6 +167,14 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip")
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
+
+	// 칩 장착 성공 시 재생할 사운드. WBP에서 매핑한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Chip")
+	TObjectPtr<USoundBase> ChipEquipSound;
+
+	// 칩 장착 해제(창고 반환) 성공 시 재생할 사운드. WBP에서 매핑한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Chip")
+	TObjectPtr<USoundBase> ChipUnequipSound;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
 	TObjectPtr<ULSChipEquipmentSlotWidget> EquipmentSlot_0;

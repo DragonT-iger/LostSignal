@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/Image.h"
 #include "Components/RichTextBlock.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
@@ -10,9 +11,26 @@
 #include "UI/LSUILayer.h"
 #include "UI/Protocol/LSProtocolTooltipWidget.h"
 
+void ULSProtocolWidget::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+
+	// 디자이너에서도 인스턴스별 지정 텍스처가 바로 보이도록 PreConstruct 에서 적용한다.
+	// 미지정이면 WBP 브러시를 그대로 둔다(크기는 WBP 브러시 설정 유지).
+	if (ProtocolNameImage && ProtocolNameTexture)
+	{
+		ProtocolNameImage->SetBrushFromTexture(ProtocolNameTexture, /*bMatchSize=*/false);
+	}
+}
+
 void ULSProtocolWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	if (!ProtocolNameTexture)
+	{
+		UE_LOG(LogLS, Warning, TEXT("ProtocolNameTexture is not set on %s."), *GetNameSafe(this));
+	}
 
 	EnsureHoverHitTestable();
 }

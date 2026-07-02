@@ -5,15 +5,17 @@
 #include "Data/LSProtocolTypes.h"
 #include "LSProtocolWidget.generated.h"
 
+class UImage;
 class ULSProtocolTooltipWidget;
 class UTextBlock;
 class URichTextBlock;
 class UTexture2D;
 
 // 프로토콜 한 줄 위젯 (WBP_Protocol 등 한 칸의 부모 클래스).
-// 프로토콜 이름은 WBP 에서 이미지로 직접 표시한다(여기서 다루지 않음).
 //
 // 표시 요소
+//  - ProtocolNameImage : 프로토콜 이름 이미지. 배치한 쪽(WBP_ChipStation 등)에서
+//      인스턴스별로 ProtocolNameTexture 를 지정해 4종 프로토콜 이미지를 구분한다.
 //  - LevelText        : 레벨 (숫자 텍스트)
 //  - SynergyStageText : 시너지 단계 1~N 을 RichTextBlock 으로 표시.
 //      활성 단계(1..SynergyStage)는 <Bold>, 나머지는 <Light> 태그로 감싼다.
@@ -44,6 +46,7 @@ public:
 	void SetProtocolType(ELSProtocolType InProtocolType);
 
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
@@ -57,6 +60,14 @@ protected:
 	// 호버 툴팁이 마우스 커서 기준으로 떨어지는 오프셋(픽셀). X 양수면 커서 오른쪽에 표시된다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
 	FVector2D TooltipCursorOffset = FVector2D(48.0f, 8.0f);
+
+	// 프로토콜 이름 이미지. 배치한 WBP 에서 인스턴스별로 ProtocolNameTexture 를 지정한다.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UImage> ProtocolNameImage;
+
+	// ProtocolNameImage 에 표시할 텍스처. 미지정이면 WBP 브러시를 그대로 둔다(런타임 경고 로그).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
+	TObjectPtr<UTexture2D> ProtocolNameTexture;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTextBlock> LevelText;
