@@ -3,6 +3,7 @@
 #include "Characters/LSCharacterBase.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "LostSignal.h"
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 
@@ -59,9 +60,13 @@ void ULSAN_SpawnNiagara::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceB
 
 	if (bAttachToSocket)
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAttached(
+		UNiagaraComponent* SpawnedComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
 			NiagaraSystem, MeshComp, ResolvedSocketName, LocationOffset, RotationOffset, Scale,
 			EAttachLocation::KeepRelativeOffset, bAutoDestroy, ENCPoolMethod::None, bAutoActivate);
+		if (bDetachAfterSpawn && SpawnedComponent)
+		{
+			SpawnedComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+		}
 		return;
 	}
 

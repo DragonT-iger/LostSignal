@@ -44,6 +44,9 @@ private:
 	UPROPERTY(EditAnywhere, Category="LS/VFX")
 	bool bAttachToSocket = true;
 
+	UPROPERTY(EditAnywhere, Category="LS/VFX", meta=(EditCondition="bAttachToSocket"))
+	bool bDetachAfterSpawn = false;
+
 	UPROPERTY(EditAnywhere, Category="LS/VFX")
 	bool bAutoDestroy = true;
 
