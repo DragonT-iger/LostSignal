@@ -6,7 +6,8 @@
 #include "LSShortCircuitField.generated.h"
 
 class USphereComponent;
-class UStaticMeshComponent;
+class UNiagaraComponent;
+class UNiagaraSystem;
 class ULSShortCircuitSkillDataAsset;
 class ULSSkillDataAsset;
 
@@ -35,8 +36,14 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Skill|ShortCircuit")
 	TObjectPtr<USphereComponent> AreaComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Skill|ShortCircuit|Debug")
-	TObjectPtr<UStaticMeshComponent> DebugFieldSphereMeshComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Skill|ShortCircuit|VFX")
+	TObjectPtr<UNiagaraComponent> FieldNiagaraComponent;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|ShortCircuit|VFX")
+	TObjectPtr<UNiagaraSystem> PulseNiagaraSystem;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|ShortCircuit|VFX")
+	TObjectPtr<UNiagaraSystem> ExplosionNiagaraSystem;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit")
 	TObjectPtr<AActor> SourceActor;
@@ -46,23 +53,31 @@ protected:
 
 private:
 	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastBlinkDebugFieldMesh(float Radius, float VisibleSeconds);
+	void MulticastPlayPulseEffect(float Radius);
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayExplosionEffect(FVector_NetQuantize EffectLocation, float Radius);
 
 	FTimerHandle PulseTimerHandle;
-	FTimerHandle DebugFieldMeshBlinkTimerHandle;
 	int32 PulsesRemaining = 0;
 	bool bFieldStarted = false;
 
-	UPROPERTY(ReplicatedUsing=OnRep_DebugFieldMeshRadius, Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit|Debug", meta=(AllowPrivateAccess="true"))
-	float DebugFieldMeshRadius = 0.0f;
+	UPROPERTY(ReplicatedUsing=OnRep_FieldVisualParams, Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit", meta=(AllowPrivateAccess="true"))
+	float FieldRadius = 0.0f;
+
+	UPROPERTY(ReplicatedUsing=OnRep_FieldVisualParams, Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit", meta=(AllowPrivateAccess="true"))
+	float FieldDurationSeconds = 0.0f;
+
+	UPROPERTY(ReplicatedUsing=OnRep_FieldVisualParams, Transient, VisibleInstanceOnly, Category="LS/Skill|ShortCircuit", meta=(AllowPrivateAccess="true"))
+	float FieldPulseIntervalSeconds = 0.0f;
 
 	UFUNCTION()
-	void OnRep_DebugFieldMeshRadius();
+	void OnRep_FieldVisualParams();
 
 	void StartField();
 	void ConfigureFromSkillData();
 	void ApplyPulse();
 	void ApplySlowEffect(AActor* TargetActor) const;
-	void SetDebugFieldMeshVisible(bool bVisible, float Radius);
-	void HideDebugFieldMesh();
+	void ApplyFieldRadius(float Radius);
+	void ApplyFieldNiagaraParameters();
 };

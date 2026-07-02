@@ -249,7 +249,7 @@ UInputAction* ALSPlayerCharacter::GetSkillInputAction(const ELSPlayerSkillSlot S
 
 void ALSPlayerCharacter::OnAttack()
 {
-	if (IsInputBlocked())
+	if (IsInputBlocked() || IsModalUIBlockingInput())
 	{
 		return;
 	}
@@ -275,7 +275,7 @@ void ALSPlayerCharacter::OnAttack()
 
 void ALSPlayerCharacter::OnDash()
 {
-	if (IsInputBlocked())
+	if (IsInputBlocked() || IsModalUIBlockingInput())
 	{
 		return;
 	}
@@ -358,6 +358,9 @@ void ALSPlayerCharacter::OnInteract()
 	AActor* BestTarget = ResolveBestInteractTarget();
 	if (BestTarget)
 	{
+		// 칩스테이션처럼 인벤토리 위젯을 거치지 않는 모달도 있으므로 상호작용 직전에 프리뷰를 정리한다.
+		CancelActiveSkillPreview();
+
 		ServerRequestInteract(BestTarget);
 
 		if (BestTarget->IsA<ALSLootBox>() || BestTarget->IsA<ALSLobbyStorageActor>())
@@ -548,6 +551,9 @@ bool ALSPlayerCharacter::ShowInventoryWidgetInternal(bool bShowStoreAllButton)
 
 	InventoryWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 
+	// 인벤토리가 뜨면 진행 중이던 스킬 프리뷰는 취소한다(모달 아래 프리뷰 잔류 방지).
+	CancelActiveSkillPreview();
+
 	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(PlayerController))
 	{
 		LSPlayerController->UpdateBackgroundBlurVisibility();
@@ -643,8 +649,8 @@ bool ALSPlayerCharacter::IsInventoryWidgetOpen() const
 
 void ALSPlayerCharacter::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 {
-	// 스킬 시전(몽타주) 중에는 새 스킬 프리뷰 진입을 막는다(Skill1~4/Ultimate 공통 게이트).
-	if (IsInputBlocked())
+	// 스킬 시전(몽타주) 중이거나 모달 UI가 열려 있으면 새 스킬 프리뷰 진입을 막는다(Skill1~4/Ultimate 공통 게이트).
+	if (IsInputBlocked() || IsModalUIBlockingInput())
 	{
 		return;
 	}
@@ -796,6 +802,12 @@ bool ALSPlayerCharacter::IsInputBlocked() const
 {
 	const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	return ASC && ASC->HasMatchingGameplayTag(LSGameplayTags::State_InputBlocked);
+}
+
+bool ALSPlayerCharacter::IsModalUIBlockingInput() const
+{
+	const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetController());
+	return PlayerController && PlayerController->IsAnyModalPanelOpen();
 }
 
 void ALSPlayerCharacter::Move(const FInputActionValue& Value)

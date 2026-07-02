@@ -81,6 +81,9 @@ public:
 	// 어느 패널이든 show/hide 직후 호출하면 되며, 매번 현재 상태를 재계산하므로 중복 호출에 안전하다.
 	void UpdateBackgroundBlurVisibility();
 
+	// 모달 패널(인벤토리/창고/칩스테이션/루트드랍)이 하나라도 보이면 true. 매번 현재 상태를 재계산한다.
+	bool IsAnyModalPanelOpen() const;
+
 	int32 GetOpenLobbyStorageMaxSlotCount() const;
 	void RefreshOpenLobbyStorageWidget();
 
@@ -331,7 +334,6 @@ private:
 	void HideChipStationWidgetLocal();
 	void CreatePlayerHUDWidgetLocal();
 	void CreateBackgroundBlurWidgetLocal();
-	bool IsAnyModalPanelOpen() const;
 	void InitializeRaidInventoryFromSessionSubsystem();
 	void SubmitLocalRaidEntryData();
 	void StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);

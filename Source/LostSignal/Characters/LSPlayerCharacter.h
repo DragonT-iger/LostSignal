@@ -284,6 +284,9 @@ private:
 	// 스킬 몽타주 재생 중(LS.State.InputBlocked 태그) 전투 입력을 무시할지. 이동·대시·스킬 입력 공통 게이트.
 	bool IsInputBlocked() const;
 
+	// 모달 UI(인벤토리/룻드랍/로비창고/칩스테이션) 열림 중 전투 입력(공격·스킬·대시)을 무시할지. 이동은 허용.
+	bool IsModalUIBlockingInput() const;
+
 	void Move(const FInputActionValue& Value);
 	void FaceMovementDirection(float DeltaSeconds);
 	void OnAttack();

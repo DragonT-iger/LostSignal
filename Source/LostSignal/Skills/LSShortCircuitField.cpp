@@ -4,21 +4,21 @@
 #include "AbilitySystemComponent.h"
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Components/SphereComponent.h"
-#include "Components/StaticMeshComponent.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/GameInstance.h"
-#include "Engine/StaticMesh.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
 #include "Net/UnrealNetwork.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "Skills/LSShortCircuitSkillDataAsset.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "TimerManager.h"
-#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -42,9 +42,12 @@ namespace
 		return Fallback;
 	}
 
-	constexpr float DebugSphereMeshBaseDiameter = 100.0f;
 	constexpr float DefaultShortCircuitAttackCoefficient = 1.5f;
 	constexpr bool bDefaultShortCircuitCanCrit = false;
+
+	const FName ShortCircuitFieldRadiusParameterName(TEXT("User.FieldRadius"));
+	const FName ShortCircuitFieldDurationParameterName(TEXT("User.FieldDuration"));
+	const FName ShortCircuitPulseIntervalParameterName(TEXT("User.PulseInterval"));
 
 	const FLSCharacterSkillRow* ResolveShortCircuitSkillRow(const UObject* WorldContextObject, const ULSSkillDataAsset* SkillData, const TCHAR* Context)
 	{
@@ -68,19 +71,10 @@ ALSShortCircuitField::ALSShortCircuitField()
 	AreaComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
 	AreaComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 
-	DebugFieldSphereMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DebugFieldSphereMesh"));
-	DebugFieldSphereMeshComponent->SetupAttachment(AreaComponent);
-	DebugFieldSphereMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	DebugFieldSphereMeshComponent->SetGenerateOverlapEvents(false);
-	DebugFieldSphereMeshComponent->SetCastShadow(false);
-	DebugFieldSphereMeshComponent->SetHiddenInGame(true);
-	DebugFieldSphereMeshComponent->SetVisibility(false, true);
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMeshFinder(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	if (SphereMeshFinder.Succeeded())
-	{
-		DebugFieldSphereMeshComponent->SetStaticMesh(SphereMeshFinder.Object);
-	}
+	FieldNiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FieldNiagara"));
+	FieldNiagaraComponent->SetupAttachment(AreaComponent);
+	FieldNiagaraComponent->SetAutoActivate(true);
+	FieldNiagaraComponent->SetRelativeLocation(FVector::ZeroVector);
 }
 
 void ALSShortCircuitField::BeginPlay()
@@ -92,14 +86,16 @@ void ALSShortCircuitField::BeginPlay()
 		StartField();
 	}
 
-	OnRep_DebugFieldMeshRadius();
+	OnRep_FieldVisualParams();
 }
 
 void ALSShortCircuitField::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(ALSShortCircuitField, DebugFieldMeshRadius);
+	DOREPLIFETIME(ALSShortCircuitField, FieldRadius);
+	DOREPLIFETIME(ALSShortCircuitField, FieldDurationSeconds);
+	DOREPLIFETIME(ALSShortCircuitField, FieldPulseIntervalSeconds);
 }
 
 void ALSShortCircuitField::InitializeField(AActor* InSourceActor, ULSShortCircuitSkillDataAsset* InSkillData)
@@ -199,6 +195,8 @@ bool ALSShortCircuitField::ExplodeByExecution(
 		ValidHitCount,
 		AttackCoefficient);
 
+	MulticastPlayExplosionEffect(GetActorLocation(), Radius);
+
 	if (bDestroyAfterExplosion)
 	{
 		GetWorldTimerManager().ClearTimer(PulseTimerHandle);
@@ -234,48 +232,49 @@ void ALSShortCircuitField::StartField()
 			*GetActorLocation().ToCompactString(),
 			Radius,
 			PulsesRemaining,
-			SkillData->FieldPulseInterval);
-	}
-
-	if (SkillData->bEnableDebugVisualization)
-	{
-		const float Radius = AreaComponent ? AreaComponent->GetScaledSphereRadius() : 350.0f;
-		DebugFieldMeshRadius = Radius;
-		SetDebugFieldMeshVisible(false, Radius);
+			FieldPulseIntervalSeconds);
 	}
 
 	ApplyPulse();
 
 	if (PulsesRemaining > 0)
 	{
-		const float Interval = FMath::Max(SkillData->FieldPulseInterval, 1.0f);
+		const float Interval = FMath::Max(FieldPulseIntervalSeconds, 1.0f);
 		GetWorldTimerManager().SetTimer(PulseTimerHandle, this, &ALSShortCircuitField::ApplyPulse, Interval, true);
 	}
 }
 
-void ALSShortCircuitField::OnRep_DebugFieldMeshRadius()
+void ALSShortCircuitField::OnRep_FieldVisualParams()
 {
-	SetDebugFieldMeshVisible(false, DebugFieldMeshRadius);
+	ApplyFieldRadius(FieldRadius);
 }
 
-void ALSShortCircuitField::SetDebugFieldMeshVisible(bool bVisible, float Radius)
+void ALSShortCircuitField::ApplyFieldRadius(float Radius)
 {
-	if (!DebugFieldSphereMeshComponent)
+	FieldRadius = FMath::Max(Radius, 0.0f);
+
+	if (AreaComponent && FieldRadius > 0.0f)
+	{
+		AreaComponent->SetSphereRadius(FieldRadius, true);
+	}
+
+	ApplyFieldNiagaraParameters();
+}
+
+void ALSShortCircuitField::ApplyFieldNiagaraParameters()
+{
+	if (!FieldNiagaraComponent)
 	{
 		return;
 	}
 
-	const float SafeRadius = FMath::Max(Radius, 0.0f);
-	const float Scale = SafeRadius > 0.0f ? (SafeRadius * 2.0f) / DebugSphereMeshBaseDiameter : 1.0f;
-	DebugFieldSphereMeshComponent->SetRelativeLocation(FVector::ZeroVector);
-	DebugFieldSphereMeshComponent->SetRelativeScale3D(FVector(Scale));
-	DebugFieldSphereMeshComponent->SetHiddenInGame(!bVisible);
-	DebugFieldSphereMeshComponent->SetVisibility(bVisible, true);
-}
-
-void ALSShortCircuitField::HideDebugFieldMesh()
-{
-	SetDebugFieldMeshVisible(false, DebugFieldMeshRadius);
+	FieldNiagaraComponent->SetFloatParameter(ShortCircuitFieldRadiusParameterName, FieldRadius);
+	FieldNiagaraComponent->SetFloatParameter(
+		ShortCircuitFieldDurationParameterName,
+		FieldDurationSeconds);
+	FieldNiagaraComponent->SetFloatParameter(
+		ShortCircuitPulseIntervalParameterName,
+		FieldPulseIntervalSeconds);
 }
 
 void ALSShortCircuitField::ConfigureFromSkillData()
@@ -301,11 +300,9 @@ void ALSShortCircuitField::ConfigureFromSkillData()
 		}
 	}
 
-	if (AreaComponent)
-	{
-		AreaComponent->SetSphereRadius(Radius, true);
-	}
-
+	FieldDurationSeconds = Duration;
+	FieldPulseIntervalSeconds = Interval;
+	ApplyFieldRadius(Radius);
 	PulsesRemaining = HitCount;
 	SetLifeSpan(Duration + 0.25f);
 }
@@ -356,12 +353,7 @@ void ALSShortCircuitField::ApplyPulse()
 			AttackCoefficient);
 	}
 
-	if (SkillData->bEnableDebugVisualization)
-	{
-		MulticastBlinkDebugFieldMesh(
-			Radius,
-			FMath::Min(FMath::Max(SkillData->FieldPulseInterval * 0.35f, 0.08f), 0.35f));
-	}
+	MulticastPlayPulseEffect(Radius);
 
 	TArray<AActor*> OverlappedActors;
 	TArray<AActor*> ActorsToIgnore;
@@ -459,21 +451,46 @@ void ALSShortCircuitField::ApplySlowEffect(AActor* TargetActor) const
 	}
 }
 
-void ALSShortCircuitField::MulticastBlinkDebugFieldMesh_Implementation(float Radius, float VisibleSeconds)
+void ALSShortCircuitField::MulticastPlayPulseEffect_Implementation(float Radius)
 {
 	UWorld* World = GetWorld();
-	if (!World)
+	if (!World || !PulseNiagaraSystem)
 	{
 		return;
 	}
 
-	DebugFieldMeshRadius = Radius;
-	SetDebugFieldMeshVisible(true, Radius);
-	World->GetTimerManager().ClearTimer(DebugFieldMeshBlinkTimerHandle);
-	World->GetTimerManager().SetTimer(
-		DebugFieldMeshBlinkTimerHandle,
-		this,
-		&ALSShortCircuitField::HideDebugFieldMesh,
-		FMath::Max(VisibleSeconds, 0.01f),
-		false);
+	UNiagaraComponent* PulseComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		World,
+		PulseNiagaraSystem,
+		GetActorLocation(),
+		GetActorRotation());
+
+	if (PulseComponent)
+	{
+		PulseComponent->SetFloatParameter(ShortCircuitFieldRadiusParameterName, FMath::Max(Radius, 0.0f));
+		PulseComponent->SetFloatParameter(ShortCircuitFieldDurationParameterName, FieldDurationSeconds);
+		PulseComponent->SetFloatParameter(ShortCircuitPulseIntervalParameterName, FieldPulseIntervalSeconds);
+	}
+}
+
+void ALSShortCircuitField::MulticastPlayExplosionEffect_Implementation(FVector_NetQuantize EffectLocation, float Radius)
+{
+	UWorld* World = GetWorld();
+	if (!World || !ExplosionNiagaraSystem)
+	{
+		return;
+	}
+
+	UNiagaraComponent* ExplosionComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		World,
+		ExplosionNiagaraSystem,
+		FVector(EffectLocation),
+		GetActorRotation());
+
+	if (ExplosionComponent)
+	{
+		ExplosionComponent->SetFloatParameter(ShortCircuitFieldRadiusParameterName, FMath::Max(Radius, 0.0f));
+		ExplosionComponent->SetFloatParameter(ShortCircuitFieldDurationParameterName, FieldDurationSeconds);
+		ExplosionComponent->SetFloatParameter(ShortCircuitPulseIntervalParameterName, FieldPulseIntervalSeconds);
+	}
 }
