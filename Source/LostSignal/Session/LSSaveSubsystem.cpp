@@ -1,8 +1,11 @@
 #include "Session/LSSaveSubsystem.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSChipStats.h"
+#include "Data/LSDropSettings.h"
 #include "Session/LSSaveGame.h"
+#include "Session/LSSaveSettings.h"
 #include "Inventory/LSInventorySlotUtils.h"
+#include "Engine/DataTable.h"
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
 #include "HAL/FileManager.h"
@@ -671,7 +674,137 @@ void ULSSaveSubsystem::StartNewGame()
 
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	EnsureChipEquipmentSlots();
+	ApplyStarterItems();
 	UE_LOG(LogLS, Log, TEXT("[Save] New game started - all save files deleted for a fresh start"));
+}
+
+void ULSSaveSubsystem::ApplyStarterItems()
+{
+	if (!SaveData)
+	{
+		return;
+	}
+
+	const ULSSaveSettings* Settings = GetDefault<ULSSaveSettings>();
+	if (!Settings)
+	{
+		return;
+	}
+
+	ApplyLowestGradeChipStarterItems();
+	ApplyConfiguredStarterItems();
+}
+
+void ULSSaveSubsystem::ApplyConfiguredStarterItems()
+{
+	const ULSSaveSettings* Settings = GetDefault<ULSSaveSettings>();
+	if (!Settings || Settings->StarterItems.IsEmpty())
+	{
+		return;
+	}
+
+	for (const FLSStarterItemConfig& StarterItem : Settings->StarterItems)
+	{
+		if (StarterItem.ItemRowName.IsNone() || StarterItem.Amount <= 0)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Save] Starter item skipped because row or amount is invalid. Row=%s Amount=%d"),
+				*StarterItem.ItemRowName.ToString(),
+				StarterItem.Amount);
+			continue;
+		}
+
+		AddStarterItemToArea(
+			StarterItem.ItemRowName,
+			StarterItem.Amount,
+			StarterItem.TargetArea,
+			TArray<FLSChipResolvedStat>(),
+			TEXT("Configured"));
+	}
+}
+
+void ULSSaveSubsystem::ApplyLowestGradeChipStarterItems()
+{
+	const ULSSaveSettings* SaveSettings = GetDefault<ULSSaveSettings>();
+	const ULSDropSettings* DropSettings = GetDefault<ULSDropSettings>();
+	if (!SaveSettings || !SaveSettings->bGrantLowestGradeChipsOnNewGame || !DropSettings)
+	{
+		return;
+	}
+
+	const UDataTable* ChipTable = DropSettings->ChipTable.LoadSynchronous();
+	if (!ChipTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot grant starter chips because ChipTable is missing."));
+		return;
+	}
+
+	constexpr TCHAR LowestChipGrade[] = TEXT("Supply");
+	for (const TPair<FName, uint8*>& Pair : ChipTable->GetRowMap())
+	{
+		if (LSInventorySlotUtils::ResolveItemGradeFromRowName(Pair.Key) != LowestChipGrade)
+		{
+			continue;
+		}
+
+		AddStarterItemToArea(
+			Pair.Key,
+			1,
+			SaveSettings->LowestGradeChipsStarterTargetArea,
+			LSChipStats::RollChipStats(Pair.Key),
+			TEXT("LowestGradeChips"));
+	}
+}
+
+void ULSSaveSubsystem::AddStarterItemToArea(
+	const FName ItemRowName,
+	const int32 Amount,
+	const ELSInventorySlotArea TargetArea,
+	const TArray<FLSChipResolvedStat>& ChipStats,
+	const TCHAR* SourceLabel)
+{
+	TArray<FLSSessionItem>* TargetSlots = GetMutableStoredSlots(TargetArea);
+	if (!TargetSlots)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Starter item skipped because target area is invalid. Source=%s Row=%s Area=%d"),
+			SourceLabel,
+			*ItemRowName.ToString(),
+			static_cast<int32>(TargetArea));
+		return;
+	}
+
+	FLSSessionItem RemainingItem;
+	LSInventorySlotUtils::TryAddItemsToSlotArray(
+		*TargetSlots,
+		ItemRowName,
+		Amount,
+		GetStarterTargetMaxSlotCount(TargetArea),
+		ChipStats,
+		RemainingItem);
+	if (LSInventorySlotUtils::IsFilled(RemainingItem))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Starter item was partially granted. Source=%s Row=%s Remaining=%d Area=%d"),
+			SourceLabel,
+			*RemainingItem.ItemRowName.ToString(),
+			RemainingItem.Amount,
+			static_cast<int32>(TargetArea));
+	}
+}
+
+int32 ULSSaveSubsystem::GetStarterTargetMaxSlotCount(const ELSInventorySlotArea TargetArea) const
+{
+	switch (TargetArea)
+	{
+	case ELSInventorySlotArea::Inventory:
+		return GetMaxInventorySlotCount();
+	case ELSInventorySlotArea::Safe:
+		return GetMaxSafeStashSlotCount();
+	case ELSInventorySlotArea::Warehouse:
+		return MAX_int32;
+	default:
+		{
+			return INDEX_NONE;
+		}
+	}
 }
 
 void ULSSaveSubsystem::DeleteAllSaveFiles() const

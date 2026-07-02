@@ -104,6 +104,11 @@ private:
 	void ResolveInterruptedRaid();
 	void MigrateInventory();
 	void EnsureChipEquipmentSlots();
+	void ApplyStarterItems();
+	void ApplyConfiguredStarterItems();
+	void ApplyLowestGradeChipStarterItems();
+	void AddStarterItemToArea(FName ItemRowName, int32 Amount, ELSInventorySlotArea TargetArea, const TArray<FLSChipResolvedStat>& ChipStats, const TCHAR* SourceLabel);
+	int32 GetStarterTargetMaxSlotCount(ELSInventorySlotArea TargetArea) const;
 	int32 GetCarryingProtocolSlotBonus(FName EnableName) const;
 	TArray<FLSSessionItem>& GetMutableInventory();
 	TArray<FLSSessionItem>* GetMutableStoredSlots(ELSInventorySlotArea SlotArea);

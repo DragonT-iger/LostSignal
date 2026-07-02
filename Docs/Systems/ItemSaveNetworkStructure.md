@@ -452,3 +452,11 @@ ULSSaveSubsystem
 - 레이드 종료 후 서버 결과가 각 클라이언트 로컬 SaveGame에 반영되는지
 - 강제 종료/연결 해제 시 어떤 결과를 저장할지 정책이 명확한지
 ```
+
+## 새 게임 기본 지급
+
+기본 지급 아이템은 저장 데이터 초기화 정책이므로 `ULSSaveSubsystem`이 적용한다. 실제 영구 저장 배열은 기존과 같이 `ULSSaveGame.Inventory`, `WarehouseItems`, `SafeStash`다.
+
+타이틀 New로 `StartNewGame()`이 호출되면 기존 저장 파일을 지우고 새 SaveGame 오브젝트를 만든 뒤 기본 지급을 현재 SaveData에 주입한다. `ULSSaveSettings.bGrantLowestGradeChipsOnNewGame`이 켜져 있으면 `ChipTable`에서 가장 낮은 등급인 `Supply` 칩 Row만 1개씩 지급한다. 추가 수동 지급 목록은 `ULSSaveSettings.StarterItems`가 단일 출처다.
+
+레이드 중 세션 원본인 `ULSRaidInventoryComponent`에는 직접 지급하지 않는다. 새 게임 이후 레이드에 들어갈 때 기존 레이드 시작 payload 흐름이 SaveSubsystem의 Inventory/SafeStash를 복사한다.

@@ -329,3 +329,11 @@ Raid End
 - 일반 인벤토리: 현재 최대 슬롯 수보다 뒤에 있는 아이템 슬롯은 기존 월드 드랍 흐름을 재사용해 플레이어 주변 바닥에 떨어뜨리고 원본 슬롯을 비운다.
 - 보호 슬롯: 현재 최대 보호 슬롯 수보다 뒤에 있는 아이템은 보존하되 잠긴 슬롯으로 표시한다. 잠긴 보호 슬롯은 드래그, 드롭, Shift-click, 월드 드랍 대상/원본으로 사용할 수 없다.
 - 로비에서 감소 시 초과 아이템을 창고로 넣거나 창 닫을 때 선택하게 하는 UX는 추후 결정한다. 현재 정책은 일반 슬롯 초과분 즉시 월드 드랍이다.
+
+## 새 게임 기본 지급
+
+타이틀의 New 버튼으로 새 게임을 시작할 때만 기본 아이템을 지급한다. 적용 경로는 `ULSTitleMenuWidget::HandleNewConfirmed()` -> `ULSSaveSubsystem::StartNewGame()`이다.
+
+칩 기본 지급은 `ULSSaveSettings.bGrantLowestGradeChipsOnNewGame`과 `LowestGradeChipsStarterTargetArea`가 제어한다. 기본값은 켜짐이며 대상은 `Warehouse`다. `ChipTable`에서 가장 낮은 등급인 `Supply` RowName만 읽어 칩 종류별로 1개씩 지급하고, 칩 스탯은 지급 시점에 `LSChipStats::RollChipStats`로 확정한다.
+
+추가 기본 아이템 목록은 `ULSSaveSettings.StarterItems`가 단일 출처다. 에디터에서는 `Project Settings > LS Save Settings`에서 `ItemRowName`, `Amount`, `TargetArea`를 설정한다. 수량/대상 영역이 잘못됐거나 슬롯 제한 때문에 전부 들어가지 못하면 `UE_LOG(LogLS, Warning, ...)`를 남긴다.
