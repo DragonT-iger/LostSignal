@@ -140,7 +140,7 @@ void ULSTitleMenuWidget::HandleSettingsClicked()
 void ULSTitleMenuWidget::HandleCrewClicked()
 {
 	// 미구현: Crew 화면 준비되면 연결. 그전까지는 안내창만 띄운다.
-	ULSConfirmDialogWidget* Dialog = ShowConfirmDialog(LOCTEXT("NotImplemented", "아직 구현되지 않았습니다."));
+	ULSConfirmDialogWidget* Dialog = ShowConfirmDialog(LOCTEXT("NotImplemented", "아직 <Emph>구현</>되지 않았습니다."));
 	if (Dialog)
 	{
 		// 확인/취소 어느 쪽을 눌러도(또는 ESC) 그냥 닫힌다.

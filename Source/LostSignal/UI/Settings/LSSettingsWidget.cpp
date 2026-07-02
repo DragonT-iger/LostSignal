@@ -264,7 +264,7 @@ ULSConfirmDialogWidget* ULSSettingsWidget::ShowReturnToTitleConfirmDialog()
 
 void ULSSettingsWidget::ShowNotImplementedNotice()
 {
-	ULSConfirmDialogWidget* Dialog = CreateDialog(LOCTEXT("NotImplemented", "아직 구현되지 않았습니다."));
+	ULSConfirmDialogWidget* Dialog = CreateDialog(LOCTEXT("NotImplemented", "아직 <Emph>구현</>되지 않았습니다."));
 	if (!Dialog)
 	{
 		return;

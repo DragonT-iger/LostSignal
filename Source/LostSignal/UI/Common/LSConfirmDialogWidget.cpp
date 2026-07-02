@@ -1,7 +1,7 @@
 #include "UI/Common/LSConfirmDialogWidget.h"
 
 #include "Components/Button.h"
-#include "Components/TextBlock.h"
+#include "Components/RichTextBlock.h"
 #include "LostSignal.h"
 
 void ULSConfirmDialogWidget::NativeConstruct()

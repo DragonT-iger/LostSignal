@@ -382,7 +382,7 @@ void ULSLobbyMenuWidget::ShowNotImplementedNotice()
 	}
 
 	// 확인/취소 어느 쪽을 눌러도(또는 ESC) 그냥 닫히고 로비로 돌아온다.
-	Dialog->SetMessage(LOCTEXT("NotImplemented", "아직 구현되지 않았습니다."));
+	Dialog->SetMessage(LOCTEXT("NotImplemented", "아직 <Emph>구현</>되지 않았습니다."));
 	Dialog->OnConfirmed.AddDynamic(this, &ULSLobbyMenuWidget::HandleNotImplementedDialogClosed);
 	Dialog->OnCancelled.AddDynamic(this, &ULSLobbyMenuWidget::HandleNotImplementedDialogClosed);
 	Dialog->AddToViewport(LSUILayer::ModalPanel);
