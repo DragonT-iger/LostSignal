@@ -1,9 +1,39 @@
 #include "Animation/LSAN_SpawnNiagara.h"
 
+#include "Characters/LSCharacterBase.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "LostSignal.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+
+namespace
+{
+FTransform BuildLSANSpawnNiagaraTransform(const FTransform& SourceTransform, const FVector& LocationOffset, const FRotator& RotationOffset, const FVector& Scale, ELSNiagaraSpawnTransformMode TransformMode)
+{
+	if (TransformMode == ELSNiagaraSpawnTransformMode::SourceLocationOnly)
+	{
+		return FTransform(RotationOffset, SourceTransform.GetLocation() + LocationOffset, Scale);
+	}
+
+	const FTransform OffsetTransform(FRotationMatrix(RotationOffset).ToQuat(), LocationOffset, Scale);
+	return OffsetTransform * SourceTransform;
+}
+
+FTransform BuildLSANSpawnNiagaraSkillSourceTransform(const USkeletalMeshComponent* MeshComp, const FTransform& SourceTransform)
+{
+	const ALSCharacterBase* Character = MeshComp ? Cast<ALSCharacterBase>(MeshComp->GetOwner()) : nullptr;
+
+	FRotator SkillActivationRotation;
+	if (!Character || !Character->TryGetSkillActivationRotation(SkillActivationRotation))
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s Niagara notify requested skill activation rotation, but no cached rotation exists. Falling back to source transform."),
+			*GetNameSafe(MeshComp ? MeshComp->GetOwner() : nullptr));
+		return SourceTransform;
+	}
+
+	return FTransform(SkillActivationRotation, SourceTransform.GetLocation(), SourceTransform.GetScale3D());
+}
+}
 
 void ULSAN_SpawnNiagara::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)
 {
@@ -38,8 +68,11 @@ void ULSAN_SpawnNiagara::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceB
 	const FTransform SourceTransform = ResolvedSocketName.IsNone()
 		? MeshComp->GetComponentTransform()
 		: MeshComp->GetSocketTransform(ResolvedSocketName);
-	const FTransform SpawnTransform(FRotationMatrix(RotationOffset).ToQuat(), LocationOffset, Scale);
-	const FTransform WorldTransform = SpawnTransform * SourceTransform;
+	const FTransform EffectiveSourceTransform = SpawnTransformMode == ELSNiagaraSpawnTransformMode::SkillActivationTransform
+		? BuildLSANSpawnNiagaraSkillSourceTransform(MeshComp, SourceTransform)
+		: SourceTransform;
+	const FTransform WorldTransform = BuildLSANSpawnNiagaraTransform(
+		EffectiveSourceTransform, LocationOffset, RotationOffset, Scale, SpawnTransformMode);
 
 	UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 		MeshComp->GetWorld(), NiagaraSystem, WorldTransform.GetLocation(),

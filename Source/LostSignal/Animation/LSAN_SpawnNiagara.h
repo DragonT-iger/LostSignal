@@ -5,6 +5,14 @@
 
 class UNiagaraSystem;
 
+UENUM(BlueprintType)
+enum class ELSNiagaraSpawnTransformMode : uint8
+{
+	SourceTransform,
+	SourceLocationOnly,
+	SkillActivationTransform
+};
+
 UCLASS()
 class LOSTSIGNAL_API ULSAN_SpawnNiagara : public UAnimNotify
 {
@@ -26,6 +34,9 @@ private:
 
 	UPROPERTY(EditAnywhere, Category="LS/VFX")
 	FRotator RotationOffset = FRotator::ZeroRotator;
+
+	UPROPERTY(EditAnywhere, Category="LS/VFX", meta=(EditCondition="!bAttachToSocket"))
+	ELSNiagaraSpawnTransformMode SpawnTransformMode = ELSNiagaraSpawnTransformMode::SourceTransform;
 
 	UPROPERTY(EditAnywhere, Category="LS/VFX")
 	FVector Scale = FVector(1.0f);

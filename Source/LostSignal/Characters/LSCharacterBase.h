@@ -40,6 +40,9 @@ public:
 	void MulticastPlayLSMontage(UAnimMontage* Montage, FName StartSection = NAME_None, float PlayRate = 1.0f);
 
 	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayLSSkillMontage(UAnimMontage* Montage, FRotator SkillActivationRotation, FName StartSection = NAME_None, float PlayRate = 1.0f);
+
+	UFUNCTION(NetMulticast, Reliable)
 	void MulticastJumpLSMontageSection(UAnimMontage* Montage, FName SectionName);
 
 	UFUNCTION(NetMulticast, Reliable)
@@ -52,6 +55,10 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastStopLSMontage(UAnimMontage* Montage, float BlendOutTime);
 
+	void SetSkillActivationRotation(const FRotator& InRotation);
+	bool TryGetSkillActivationRotation(FRotator& OutRotation) const;
+	void ClearSkillActivationRotation();
+
 	void GrantAbility(TSubclassOf<UGameplayAbility> AbilityClass);
 
 	/** 사망 상태가 바뀔 때 CharacterCombatComponent가 모든 머신에서 호출. 파생 클래스가 콜리전·마커 등 사망 후처리를 붙이는 확장점. 기본 동작 없음. */
@@ -59,6 +66,8 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	void PlayLSMontageLocal(UAnimMontage* Montage, FName StartSection, float PlayRate);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/GAS")
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
@@ -77,4 +86,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Audio")
 	TObjectPtr<ULSFootstepComponent> FootstepComponent;
+
+	FRotator CachedSkillActivationRotation = FRotator::ZeroRotator;
+	bool bHasSkillActivationRotation = false;
 };

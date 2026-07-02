@@ -50,6 +50,41 @@ UAbilitySystemComponent* ALSCharacterBase::GetAbilitySystemComponent() const
 
 void ALSCharacterBase::MulticastPlayLSMontage_Implementation(UAnimMontage* Montage, FName StartSection, float PlayRate)
 {
+	ClearSkillActivationRotation();
+	PlayLSMontageLocal(Montage, StartSection, PlayRate);
+}
+
+void ALSCharacterBase::MulticastPlayLSSkillMontage_Implementation(UAnimMontage* Montage, FRotator SkillActivationRotation, FName StartSection, float PlayRate)
+{
+	SetSkillActivationRotation(SkillActivationRotation);
+	PlayLSMontageLocal(Montage, StartSection, PlayRate);
+}
+
+void ALSCharacterBase::SetSkillActivationRotation(const FRotator& InRotation)
+{
+	CachedSkillActivationRotation = InRotation;
+	bHasSkillActivationRotation = true;
+}
+
+bool ALSCharacterBase::TryGetSkillActivationRotation(FRotator& OutRotation) const
+{
+	if (!bHasSkillActivationRotation)
+	{
+		return false;
+	}
+
+	OutRotation = CachedSkillActivationRotation;
+	return true;
+}
+
+void ALSCharacterBase::ClearSkillActivationRotation()
+{
+	CachedSkillActivationRotation = FRotator::ZeroRotator;
+	bHasSkillActivationRotation = false;
+}
+
+void ALSCharacterBase::PlayLSMontageLocal(UAnimMontage* Montage, FName StartSection, float PlayRate)
+{
 	if (!Montage)
 	{
 		return;
