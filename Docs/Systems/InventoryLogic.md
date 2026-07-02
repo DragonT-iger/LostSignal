@@ -121,7 +121,7 @@ SetWarehouseSlotContext
 -> Warehouse
 ```
 
-슬롯은 배경과 아이콘을 별도 위젯으로 겹쳐 표시한다. 슬롯 루트는 `Overlay`이고, 바닥에 `SlotBackgroundImage`(항상 표시되는 슬롯 배경 프레임), 그 위에 `ItemIconImage`(아이템 아이콘), 그 위에 `AmountText`를 둔다. 아이템 아이콘이 배경을 덮어쓰지 않으므로 아이템이 있어도 슬롯 배경이 유지된다.
+슬롯은 배경과 아이콘을 별도 위젯으로 겹쳐 표시한다. 슬롯 루트는 `Overlay`이고, 바닥에 `SlotBackgroundImage`(항상 표시되는 슬롯 배경 프레임), 그 위에 `ItemIconImage`(아이템 아이콘), 그 위에 `AmountText`를 둔다. `AmountText`는 DataTable의 최대 스택(`Item_Max`)이 2 이상인 아이템에서만 표시하고, 최대 스택이 1인 아이템은 수량 텍스트를 생략한다. 아이템 아이콘이 배경을 덮어쓰지 않으므로 아이템이 있어도 슬롯 배경이 유지된다.
 
 `SlotBackgroundImage` 브러시는 `DefaultSlotTexture`로 C++가 설정하며, `DefaultSlotTexture`가 미지정이면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다(이때 `UE_LOG(LogLS, Warning, ...)`). 호버/잠금/드래그 틴트는 배경과 아이콘 양쪽에 적용해 빈 슬롯에서도 피드백이 보인다.
 

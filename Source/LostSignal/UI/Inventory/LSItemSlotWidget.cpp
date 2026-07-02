@@ -75,8 +75,9 @@ void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, con
 
 	ApplyHoverVisual();
 	ItemIconImage->SetVisibility(ESlateVisibility::Visible);
-	AmountText->SetText(FText::AsNumber(Amount));
-	AmountText->SetVisibility(Amount > 0 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	const bool bShouldShowAmount = Amount > 0 && LSInventorySlotUtils::ResolveItemMaxStack(ItemRowName, TEXT("ULSItemSlotWidget::SetItem")) > 1;
+	AmountText->SetText(bShouldShowAmount ? FText::AsNumber(Amount) : FText::GetEmpty());
+	AmountText->SetVisibility(bShouldShowAmount ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	SetTooltipItem(ItemRowName, Amount, ChipStats);
 	DragItemRowName = ItemRowName;
 	DragAmount = Amount;
