@@ -183,7 +183,7 @@ Warehouse 슬롯 Shift+좌클릭
 
 ```text
 칩 목록 슬롯(인벤토리/창고의 칩) Shift+좌클릭
--> 첫 빈 장착 슬롯(index 0부터)에 순서대로 장착
+-> 첫 빈 장착 슬롯(마지막 인덱스부터 역방향)에 순서대로 장착
 -> ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot (SaveSubsystem::EquipChipFromStoredSlot)
 
 칩 장착 슬롯 Shift+좌클릭

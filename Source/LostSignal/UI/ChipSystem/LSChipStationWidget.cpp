@@ -657,10 +657,10 @@ bool ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot(const ELSInven
 		return false;
 	}
 
-	// 장착 슬롯 수는 SaveSubsystem이 단일 출처다. 첫 빈 칸을 index 0부터 찾는다.
+	// 장착 슬롯 수는 SaveSubsystem이 단일 출처다. 첫 빈 칸을 마지막 인덱스부터 역방향으로 찾는다.
 	const TArray<FLSSessionItem>& EquipmentItems = SaveSubsystem->GetChipEquipmentSlots();
 	int32 TargetEquipmentSlotIndex = INDEX_NONE;
-	for (int32 SlotIndex = 0; SlotIndex < EquipmentItems.Num(); ++SlotIndex)
+	for (int32 SlotIndex = EquipmentItems.Num() - 1; SlotIndex >= 0; --SlotIndex)
 	{
 		if (!LSInventorySlotUtils::IsFilled(EquipmentItems[SlotIndex]))
 		{
