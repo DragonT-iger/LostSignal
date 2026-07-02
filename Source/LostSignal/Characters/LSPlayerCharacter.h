@@ -287,6 +287,9 @@ private:
 	// 모달 UI(인벤토리/룻드랍/로비창고/칩스테이션) 열림 중 전투 입력(공격·스킬·대시)을 무시할지. 이동은 허용.
 	bool IsModalUIBlockingInput() const;
 
+	// 마우스 조준·이동 방향 회전을 잠글지. 스킬 시전은 전 구간, 기본공격은 히트 판정 프레임까지 잠근다.
+	bool IsFacingRotationLocked() const;
+
 	void Move(const FInputActionValue& Value);
 	void FaceMovementDirection(float DeltaSeconds);
 	void OnAttack();

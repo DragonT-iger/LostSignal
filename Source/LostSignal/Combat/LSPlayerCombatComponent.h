@@ -55,6 +55,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	bool IsAttackInProgress() const;
 
+	// 현재 콤보 스윙의 히트 판정(LSAN_PlayerMeleeHit)이 이미 발동했는지. 히트 프레임 이후 회전 잠금 해제 판정에 사용.
+	UFUNCTION(BlueprintPure, Category="LS/Combat")
+	bool IsBasicAttackHitConsumed() const { return bAttackHitConsumed; }
+
 protected:
 	virtual void BeginPlay() override;
 

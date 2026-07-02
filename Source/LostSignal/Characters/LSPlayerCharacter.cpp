@@ -100,13 +100,16 @@ void ALSPlayerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	if (bIsRunning)
+	if (!IsFacingRotationLocked())
 	{
-		FaceMovementDirection(DeltaSeconds);
-	}
-	else if (AimComponent)
-	{
-		AimComponent->UpdateFacing(DeltaSeconds);
+		if (bIsRunning)
+		{
+			FaceMovementDirection(DeltaSeconds);
+		}
+		else if (AimComponent)
+		{
+			AimComponent->UpdateFacing(DeltaSeconds);
+		}
 	}
 
 	UpdateInventoryWidgetDistance();
@@ -808,6 +811,21 @@ bool ALSPlayerCharacter::IsModalUIBlockingInput() const
 {
 	const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetController());
 	return PlayerController && PlayerController->IsAnyModalPanelOpen();
+}
+
+bool ALSPlayerCharacter::IsFacingRotationLocked() const
+{
+	// 스킬 시전(LS.Combat.SkillCasting)은 전 구간 회전 잠금.
+	const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (ASC && ASC->HasMatchingGameplayTag(LSGameplayTags::Combat_SkillCasting))
+	{
+		return true;
+	}
+
+	// 기본공격은 히트 판정 프레임(LSAN_PlayerMeleeHit)까지만 잠근다. 이후엔 다음 콤보 조준용 회전을 허용.
+	return PlayerCombatComponent
+		&& PlayerCombatComponent->IsAttackInProgress()
+		&& !PlayerCombatComponent->IsBasicAttackHitConsumed();
 }
 
 void ALSPlayerCharacter::Move(const FInputActionValue& Value)
