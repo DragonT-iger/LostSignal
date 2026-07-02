@@ -157,10 +157,21 @@ float ULSGA_Execution::GetSkillMontagePlayRate() const
 	return ComputeMontagePlayRateForDuration(GetSkillMontage(), DashSectionName, CachedDashDuration);
 }
 
-FName ULSGA_Execution::GetSkillMontageStartSection() const
+void ULSGA_Execution::OnSkillMontagePlaying()
 {
-	const UAnimMontage* Montage = GetSkillMontage();
-	return Montage && Montage->GetSectionIndex(DashSectionName) != INDEX_NONE ? DashSectionName : NAME_None;
+	// 몽타주를 처음부터 연속 재생하되 Dash→Slash 링크를 명시적으로 세팅한다.
+	// 이렇게 하면 대시 끝에서 재생을 끊지 않고 자연스럽게 발도로 흐르고, 경계에선 playRate만 바꾸면 된다(팝 없음).
+	UAnimMontage* Montage = GetSkillMontage();
+	ALSCharacterBase* Character = Cast<ALSCharacterBase>(GetSkillSourceActor());
+	if (!Character || !Montage)
+	{
+		return;
+	}
+
+	if (Montage->GetSectionIndex(DashSectionName) != INDEX_NONE && Montage->GetSectionIndex(SlashSectionName) != INDEX_NONE)
+	{
+		Character->MulticastSetLSMontageNextSection(Montage, DashSectionName, SlashSectionName);
+	}
 }
 
 void ULSGA_Execution::HandleDashFinished()
@@ -181,8 +192,8 @@ void ULSGA_Execution::HandleDashFinished()
 		return;
 	}
 
-	// 발도 구간은 오써링 속도(1.0) 그대로. 재생 RPC 재호출로 섹션 점프 + playRate 복구(기본 공격 콤보와 동일 패턴).
-	Character->MulticastPlayLSMontage(Montage, SlashSectionName, 1.0f);
+	// 재생을 끊지 않고 playRate만 1.0으로 복구한다. 몽타주는 Dash→Slash 링크를 따라 이미 발도로 흐르는 중(팝 없음).
+	Character->MulticastSetLSMontagePlayRate(Montage, 1.0f);
 
 	if (UWorld* World = GetWorld())
 	{

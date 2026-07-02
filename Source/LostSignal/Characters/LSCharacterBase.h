@@ -45,6 +45,10 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastSetLSMontageNextSection(UAnimMontage* Montage, FName SectionNameToChange, FName NextSection);
 
+	// 재생 중인 몽타주의 playRate만 바꾼다(재생 재시작·블렌드 없음). 다구간 스킬의 구간별 속도 전환용.
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastSetLSMontagePlayRate(UAnimMontage* Montage, float PlayRate);
+
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastStopLSMontage(UAnimMontage* Montage, float BlendOutTime);
 

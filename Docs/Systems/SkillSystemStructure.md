@@ -545,9 +545,10 @@ TryPredictFastMovementSkill
 
 다구간(섹션 분할) 이동 스킬 — 이동 구간과 타격 구간이 한 클립에 있는 스킬(Execution)은 시간 성질이 달라 단일 playRate 스케일이 불가능하다. 다음 패턴을 쓴다(`ULSGA_Execution`이 구현 예).
 
-- 아트가 몽타주에서 전환 프레임에 섹션 마커를 찍어 이동/타격 섹션으로 분할한다(클립 재분할 불필요). 섹션 이름은 Ability의 `DashSectionName`/`SlashSectionName` 기본값과 맞춘다.
-- 이동 섹션만 자동 스케일: `GetSkillMontagePlayRate`에서 `ComputeMontagePlayRateForDuration(몽타주, 이동섹션, 이동Duration)`. 시작 섹션은 `GetSkillMontageStartSection` override로 지정한다.
-- 이동 타이머(서버 권위) 만료 시 `MulticastPlayLSMontage(몽타주, 타격섹션, 1.0)` **재호출**로 섹션 점프 + playRate 복구를 한 번에 처리한다(기본 공격 콤보 `PlayComboSection`과 동일 패턴 — 별도 playRate RPC 없음). 이어서 타격 섹션 길이 타이머가 종료를 주관한다.
+- 아트가 몽타주에서 전환 프레임에 섹션 마커를 찍어 이동/타격 섹션으로 분할한다(클립 재분할 불필요). 섹션 이름은 Ability의 `DashSectionName`/`SlashSectionName` 기본값과 맞춘다. 이동 섹션이 몽타주의 첫 섹션이어야 한다.
+- **재생은 하나의 연속 재생으로 흘린다(끊김 방지)**. 베이스가 몽타주를 처음부터(`NAME_None`) 재생하고, `OnSkillMontagePlaying` override에서 `MulticastSetLSMontageNextSection(이동섹션, 타격섹션)`으로 이동→타격 링크를 명시적으로 세팅한다. 몽타주는 재생을 끊지 않고 자연스럽게 타격 구간으로 흐른다.
+- 이동 섹션만 자동 스케일: `GetSkillMontagePlayRate`에서 `ComputeMontagePlayRateForDuration(몽타주, 이동섹션, 이동Duration)`. 이 playRate로 재생을 시작한다.
+- 이동 타이머(서버 권위) 만료 시 `MulticastSetLSMontagePlayRate(몽타주, 1.0)`로 **재생을 재시작하지 않고 playRate만 복구**한다(Montage_Play 재호출은 블렌드-인 팝을 유발하므로 쓰지 않는다). 이어서 타격 섹션 길이 타이머가 종료를 주관한다.
 - 타격은 타격 섹션의 `LSAN_SkillEffect` 노티파이 시점. 종료 직전 `TriggerSkillEffectOnce()`로 노티파이 누락/몽타주 미할당 시에도 타격 1회를 보장한다(중복은 베이스 가드가 차단).
 - 몽타주/섹션 미존재 시 이동 타이머 만료 즉시 타격 후 종료(섹션 미분할 에셋·미할당 호환).
 

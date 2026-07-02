@@ -30,7 +30,7 @@ protected:
 	virtual void OnSkillStarted() override;
 	virtual void ExecuteSkillEffect() override;
 	virtual float GetSkillMontagePlayRate() const override;
-	virtual FName GetSkillMontageStartSection() const override;
+	virtual void OnSkillMontagePlaying() override;
 	virtual bool ShouldMontageDriveEnd() const override { return false; }
 
 	virtual void EndAbility(

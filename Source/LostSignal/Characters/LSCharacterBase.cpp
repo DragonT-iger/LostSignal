@@ -101,6 +101,22 @@ void ALSCharacterBase::MulticastSetLSMontageNextSection_Implementation(UAnimMont
 	AnimInstance->Montage_SetNextSection(SectionNameToChange, NextSection, Montage);
 }
 
+void ALSCharacterBase::MulticastSetLSMontagePlayRate_Implementation(UAnimMontage* Montage, float PlayRate)
+{
+	if (!Montage)
+	{
+		return;
+	}
+
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance || !AnimInstance->Montage_IsPlaying(Montage))
+	{
+		return;
+	}
+
+	AnimInstance->Montage_SetPlayRate(Montage, FMath::Max(0.01f, PlayRate));
+}
+
 void ALSCharacterBase::MulticastStopLSMontage_Implementation(UAnimMontage* Montage, float BlendOutTime)
 {
 	if (!Montage)
