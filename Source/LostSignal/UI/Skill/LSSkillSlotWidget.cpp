@@ -1,5 +1,6 @@
 #include "UI/Skill/LSSkillSlotWidget.h"
 
+#include "Characters/LSPlayerCharacter.h"
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
@@ -8,16 +9,22 @@
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSProtocolTypes.h"
 #include "Data/LSProtocolUnlockRow.h"
+#include "EnhancedActionKeyMapping.h"
+#include "InputCoreTypes.h"
+#include "InputMappingContext.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Skills/LSPlayerSkillComponent.h"
 #include "Skills/LSSkillDataAsset.h"
+
+#define LOCTEXT_NAMESPACE "LSSkillSlotWidget"
 
 void ULSSkillSlotWidget::InitializeSlot(ULSPlayerSkillComponent* InSkillComponent, ELSPlayerSkillSlot InSlot)
 {
 	SkillComponent = InSkillComponent;
 	Slot = InSlot;
 	RefreshSkillIcon();
+	RefreshShortcutText();
 	RefreshCooldown();
 }
 
@@ -41,16 +48,18 @@ void ULSSkillSlotWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (!IconImage || !CooldownText || !CooldownBar)
+	if (!IconImage || !ShortcutText || !CooldownText || !CooldownBar)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s is missing required skill slot widget binding. Icon=%s CooldownText=%s CooldownBar=%s"),
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required skill slot widget binding. Icon=%s ShortcutText=%s CooldownText=%s CooldownBar=%s"),
 			*GetNameSafe(this),
 			*GetNameSafe(IconImage),
+			*GetNameSafe(ShortcutText),
 			*GetNameSafe(CooldownText),
 			*GetNameSafe(CooldownBar));
 		return;
 	}
 
+	RefreshShortcutText();
 	CooldownText->SetVisibility(ESlateVisibility::Collapsed);
 	CooldownBar->SetVisibility(ESlateVisibility::Collapsed);
 }
@@ -83,6 +92,83 @@ void ULSSkillSlotWidget::RefreshSkillIcon()
 	}
 
 	IconImage->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+void ULSSkillSlotWidget::RefreshShortcutText()
+{
+	if (!ShortcutText)
+	{
+		return;
+	}
+
+	ShortcutText->SetText(ResolveShortcutText());
+	ShortcutText->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+FText ULSSkillSlotWidget::ResolveShortcutText() const
+{
+	const APlayerController* PlayerController = GetOwningPlayer();
+	const ALSPlayerCharacter* PlayerCharacter = PlayerController ? Cast<ALSPlayerCharacter>(PlayerController->GetPawn()) : nullptr;
+	const UInputAction* InputAction = PlayerCharacter ? PlayerCharacter->GetSkillInputAction(Slot) : nullptr;
+	const FText MappingText = ResolveShortcutTextFromInputMappings(InputAction);
+	return MappingText.IsEmpty() ? GetShortcutTextForSlot(Slot) : MappingText;
+}
+
+FText ULSSkillSlotWidget::ResolveShortcutTextFromInputMappings(const UInputAction* InputAction) const
+{
+	const ALSPlayerControllerBase* PlayerController = GetOwningPlayer<ALSPlayerControllerBase>();
+	if (!PlayerController || !InputAction)
+	{
+		return FText::GetEmpty();
+	}
+
+	FKey FirstValidKey;
+	for (const UInputMappingContext* MappingContext : PlayerController->GetDefaultMappingContexts())
+	{
+		if (!MappingContext)
+		{
+			continue;
+		}
+
+		for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
+		{
+			if (Mapping.Action != InputAction || !Mapping.Key.IsValid())
+			{
+				continue;
+			}
+
+			if (!FirstValidKey.IsValid())
+			{
+				FirstValidKey = Mapping.Key;
+			}
+
+			if (!Mapping.Key.IsGamepadKey())
+			{
+				return Mapping.Key.GetDisplayName(false);
+			}
+		}
+	}
+
+	return FirstValidKey.IsValid() ? FirstValidKey.GetDisplayName(false) : FText::GetEmpty();
+}
+
+FText ULSSkillSlotWidget::GetShortcutTextForSlot(const ELSPlayerSkillSlot InSlot)
+{
+	switch (InSlot)
+	{
+	case ELSPlayerSkillSlot::Skill1:
+		return LOCTEXT("Skill1Shortcut", "1");
+	case ELSPlayerSkillSlot::Skill2:
+		return LOCTEXT("Skill2Shortcut", "2");
+	case ELSPlayerSkillSlot::Skill3:
+		return LOCTEXT("Skill3Shortcut", "3");
+	case ELSPlayerSkillSlot::Skill4:
+		return LOCTEXT("Skill4Shortcut", "4");
+	case ELSPlayerSkillSlot::Ultimate:
+		return LOCTEXT("UltimateShortcut", "R");
+	default:
+		return FText::GetEmpty();
+	}
 }
 
 void ULSSkillSlotWidget::RefreshCooldown()
@@ -185,3 +271,5 @@ void ULSSkillSlotWidget::ResolveBattleProtocolLevels(int32& OutCurrentLevel, int
 	OutCurrentLevel = LSChipStats::AggregateChipProtocolTotals(ActiveEquipmentItems, this).Battle;
 	OutPreviousLevel = LSChipStats::AggregateChipProtocolTotals(SaveSubsystem->GetChipEquipmentSlots(), this).Battle;
 }
+
+#undef LOCTEXT_NAMESPACE

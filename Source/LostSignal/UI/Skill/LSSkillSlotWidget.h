@@ -8,11 +8,12 @@
 
 class ULSPlayerSkillComponent;
 class ULSSkillDataAsset;
+class UInputAction;
 class UImage;
 class UTextBlock;
 class UProgressBar;
 
-/** Single skill slot widget. WBP must bind IconImage, CooldownText, and CooldownBar. */
+/** Single skill slot widget. WBP must bind IconImage, ShortcutText, CooldownText, and CooldownBar. */
 UCLASS()
 class LOSTSIGNAL_API ULSSkillSlotWidget : public UUserWidget
 {
@@ -33,6 +34,9 @@ protected:
 	TObjectPtr<UImage> IconImage;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
+	TObjectPtr<UTextBlock> ShortcutText;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
 	TObjectPtr<UTextBlock> CooldownText;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
@@ -40,7 +44,11 @@ protected:
 
 private:
 	void RefreshSkillIcon();
+	void RefreshShortcutText();
 	void RefreshCooldown();
+	FText ResolveShortcutText() const;
+	FText ResolveShortcutTextFromInputMappings(const UInputAction* InputAction) const;
+	static FText GetShortcutTextForSlot(ELSPlayerSkillSlot InSlot);
 	bool IsCooldownNumberProtocolVisible() const;
 	bool IsCooldownGaugeProtocolVisible() const;
 	void ResolveBattleProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const;

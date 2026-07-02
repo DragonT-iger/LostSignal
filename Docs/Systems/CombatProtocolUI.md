@@ -99,7 +99,7 @@ Protocol_Required_Level = 3
 
 스킬 쿨타임 게이지바는 `ULSSkillSlotWidget`의 `CooldownBar`가 담당한다. 2단계의 `Skill_Cooldown`은 숫자만 표시하고, 3단계의 `Skill_Cooldown_Gauge`가 열려야 게이지바가 표시된다.
 
-버프 지속 시간은 `ULSCombatBuffListWidget`이 플레이어의 AbilitySystemComponent에서 지속 중인 `LS.Buff.*` 계열 GameplayEffect를 조회해 표시한다. 현재 표시 대상은 `LS.Buff.CombatAcceleration`, `LS.Buff.AttackSpeed`다. 개별 버프 표시는 `ULSCombatBuffIconWidget`이 담당한다.
+버프 지속 시간은 `ULSCombatBuffListWidget`이 플레이어의 AbilitySystemComponent에서 지속 중인 `LS.Buff.*` 계열 GameplayEffect를 조회해 표시한다. 현재 표시 대상은 `LS.Buff.CombatAcceleration`, `LS.Buff.AttackSpeed`다. 버프 이름/설명/아이콘 같은 표시 정보는 위젯 로컬 텍스처가 아니라 활성 GameplayEffect의 SourceObject에 들어 있는 `ULSSkillDataAssetBase` DataAsset에서 먼저 읽고, SourceObject가 없는 예외만 태그별 fallback DataAsset을 쓴다. 개별 버프 표시는 `ULSCombatBuffIconWidget`이 담당한다.
 
 스킬 캐스팅 게이지바는 `ULSSkillCastGaugeWidget`이 담당한다. 아직 실제 캐스팅 시스템이 없으므로 HUD의 `ShowSkillCastGauge`/`HideSkillCastGauge` API와 디버그 명령 `LSTestSkillCastGauge <Duration>`으로 표시 경로를 먼저 열어 둔다.
 

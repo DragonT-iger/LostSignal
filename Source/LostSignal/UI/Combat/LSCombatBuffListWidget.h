@@ -9,8 +9,8 @@
 
 class UAbilitySystemComponent;
 class ULSCombatBuffIconWidget;
+class ULSSkillDataAssetBase;
 class UPanelWidget;
-class UTexture2D;
 
 UCLASS()
 class LOSTSIGNAL_API ULSCombatBuffListWidget : public UUserWidget
@@ -32,11 +32,12 @@ protected:
 	TSubclassOf<ULSCombatBuffIconWidget> BuffIconWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Combat")
-	TMap<FGameplayTag, TObjectPtr<UTexture2D>> BuffIconTextures;
+	TMap<FGameplayTag, TObjectPtr<ULSSkillDataAssetBase>> FallbackBuffDisplayDataAssets;
 
 private:
 	void RefreshBuffList();
 	void BuildBuffDisplays(TArray<FLSCombatBuffDisplayData>& OutDisplays) const;
+	const ULSSkillDataAssetBase* ResolveBuffDisplayDataAsset(const UAbilitySystemComponent& ASC, FActiveGameplayEffectHandle Handle, FGameplayTag BuffTag) const;
 	ULSCombatBuffIconWidget* GetOrCreateBuffIcon(int32 Index);
 	bool IsBuffDurationProtocolVisible() const;
 	void ResolveBattleProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const;
@@ -48,4 +49,5 @@ private:
 	TArray<TObjectPtr<ULSCombatBuffIconWidget>> BuffIconPool;
 
 	bool bLoggedMissingIconClass = false;
+	mutable TSet<FGameplayTag> LoggedMissingBuffDisplayDataAssets;
 };

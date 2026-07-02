@@ -39,6 +39,7 @@ public:
 	TSubclassOf<ULSHpDebugWidget> GetDebugHpWidgetClass() const { return DebugHpWidgetClass; }
 
 	ULSRaidInventoryComponent* GetRaidInventoryComponent() const { return RaidInventoryComponent; }
+	const TArray<TObjectPtr<UInputMappingContext>>& GetDefaultMappingContexts() const { return DefaultMappingContexts; }
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void ShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);

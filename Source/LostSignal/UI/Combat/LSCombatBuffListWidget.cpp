@@ -12,6 +12,7 @@
 #include "GameplayEffect.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
+#include "Skills/LSSkillDataAssetBase.h"
 #include "UI/Combat/LSCombatBuffIconWidget.h"
 
 #define LOCTEXT_NAMESPACE "LSCombatBuffListWidget"
@@ -129,9 +130,13 @@ void ULSCombatBuffListWidget::BuildBuffDisplays(TArray<FLSCombatBuffDisplayData>
 				continue;
 			}
 
+			const ULSSkillDataAssetBase* DisplayDataAsset = ResolveBuffDisplayDataAsset(*ASC, Handle, BuffTag);
+
 			FLSCombatBuffDisplayData DisplayData;
 			DisplayData.BuffTag = BuffTag;
-			DisplayData.IconTexture = BuffIconTextures.FindRef(BuffTag);
+			DisplayData.IconTexture = DisplayDataAsset ? DisplayDataAsset->Icon.Get() : nullptr;
+			DisplayData.DisplayName = DisplayDataAsset ? DisplayDataAsset->DisplayName : FText::GetEmpty();
+			DisplayData.Description = DisplayDataAsset ? DisplayDataAsset->Description : FText::GetEmpty();
 			DisplayData.RemainingTime = RemainingTime;
 			DisplayData.TotalDuration = TotalDuration;
 			DisplayData.StackCount = FMath::Max(ASC->GetCurrentStackCount(Handle), 1);
@@ -143,6 +148,35 @@ void ULSCombatBuffListWidget::BuildBuffDisplays(TArray<FLSCombatBuffDisplayData>
 	{
 		return Left.RemainingTime < Right.RemainingTime;
 	});
+}
+
+const ULSSkillDataAssetBase* ULSCombatBuffListWidget::ResolveBuffDisplayDataAsset(
+	const UAbilitySystemComponent& ASC,
+	const FActiveGameplayEffectHandle Handle,
+	const FGameplayTag BuffTag) const
+{
+	if (const FActiveGameplayEffect* ActiveEffect = ASC.GetActiveGameplayEffect(Handle))
+	{
+		if (const ULSSkillDataAssetBase* SourceSkillData = Cast<ULSSkillDataAssetBase>(ActiveEffect->Spec.GetContext().GetSourceObject()))
+		{
+			return SourceSkillData;
+		}
+	}
+
+	if (const TObjectPtr<ULSSkillDataAssetBase>* DisplayDataAsset = FallbackBuffDisplayDataAssets.Find(BuffTag))
+	{
+		return DisplayDataAsset->Get();
+	}
+
+	if (!LoggedMissingBuffDisplayDataAssets.Contains(BuffTag))
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot resolve buff display DataAsset for tag %s from active effect source or fallback map."),
+			*GetNameSafe(this),
+			*BuffTag.ToString());
+		LoggedMissingBuffDisplayDataAssets.Add(BuffTag);
+	}
+
+	return nullptr;
 }
 
 ULSCombatBuffIconWidget* ULSCombatBuffListWidget::GetOrCreateBuffIcon(const int32 Index)

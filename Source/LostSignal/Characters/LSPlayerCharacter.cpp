@@ -228,6 +228,25 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	if (MenuAction) { EnhancedInput->BindAction(MenuAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnMenu); }
 }
 
+UInputAction* ALSPlayerCharacter::GetSkillInputAction(const ELSPlayerSkillSlot Slot) const
+{
+	switch (Slot)
+	{
+	case ELSPlayerSkillSlot::Skill1:
+		return Skill1Action;
+	case ELSPlayerSkillSlot::Skill2:
+		return Skill2Action;
+	case ELSPlayerSkillSlot::Skill3:
+		return Skill3Action;
+	case ELSPlayerSkillSlot::Skill4:
+		return Skill4Action;
+	case ELSPlayerSkillSlot::Ultimate:
+		return Ultimatection;
+	default:
+		return nullptr;
+	}
+}
+
 void ALSPlayerCharacter::OnAttack()
 {
 	if (IsInputBlocked())

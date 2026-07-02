@@ -65,6 +65,8 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Input")
 	UInputAction* GetInteractAction() const { return InteractAction; }
 
+	UInputAction* GetSkillInputAction(ELSPlayerSkillSlot Slot) const;
+
 	UFUNCTION(BlueprintPure, Category="LS/Movement")
 	bool IsRunning() const { return bIsRunning; }
 
