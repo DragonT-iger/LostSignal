@@ -158,35 +158,35 @@ WorldDroppedItem -> Inventory
 
 레이드 중 `Warehouse`는 세션 대상이 아니므로 레이드 인벤토리 조작에서 제외한다. 로비에서 `Warehouse` 조작은 `ULSSaveSubsystem::DropStoredSlot`, `TransferStoredSlotToArea`, `ReplaceStoredSlotItem` 같은 저장 슬롯 API를 통해 처리한다.
 
-## Shift-click 빠른 이동
+## Shift-click / 더블 클릭 빠른 이동
 
 빠른 이동은 열린 컨테이너 기준으로 동작한다.
 
 ```text
-LootBox 슬롯 Shift+좌클릭
+LootBox 슬롯 Shift+좌클릭 또는 더블 클릭
 -> LootBox에서 Inventory로 이동
 
-Inventory/Safe 슬롯 Shift+좌클릭
+Inventory/Safe 슬롯 Shift+좌클릭 또는 더블 클릭
 -> LootBox가 열려 있으면 LootBox로 이동
 -> LootBox가 없고 LobbyStorage가 열려 있으며 레이드가 아니면 Warehouse로 이동
 -> 인벤토리만 열려 있으면 아무 동작도 하지 않음
 
-Warehouse 슬롯 Shift+좌클릭
+Warehouse 슬롯 Shift+좌클릭 또는 더블 클릭
 -> Inventory로 이동
 ```
 
-중요한 의도는 "인벤토리만 켜져 있는 상태에서는 Shift-click이 동작하지 않는다"이다. 빠른 이동은 대상 컨테이너가 명확할 때만 처리한다.
+중요한 의도는 "인벤토리만 켜져 있는 상태에서는 빠른 이동이 동작하지 않는다"이다. 빠른 이동은 대상 컨테이너가 명확할 때만 처리한다.
 
-단, 빠른이동이 대상 부재 등으로 실패하면(`TryHandleQuickTransfer`가 false) 클릭을 소비하지 않고 일반 드래그 감지로 넘어간다. 달리기 키가 `LeftShift`라 뛰는 동안 Shift가 눌려 있어도, 인벤토리만 열린 상태에서 아이템을 슬롯 밖으로 드래그해 월드에 버릴 수 있다(월드 드랍은 드래그 취소 시 발생).
+단, Shift+좌클릭 빠른이동이 대상 부재 등으로 실패하면(`TryHandleQuickTransfer`가 false) 클릭을 소비하지 않고 일반 드래그 감지로 넘어간다. 달리기 키가 `LeftShift`라 뛰는 동안 Shift가 눌려 있어도, 인벤토리만 열린 상태에서 아이템을 슬롯 밖으로 드래그해 월드에 버릴 수 있다(월드 드랍은 드래그 취소 시 발생). 더블 클릭은 같은 빠른 이동 함수를 호출하되 실패하면 이동 없이 상위 더블 클릭 처리로 넘긴다.
 
 칩스테이션 안에서는 대상이 칩 장착(하드웨어)이라 컨테이너 조건 없이 동작한다.
 
 ```text
-칩 목록 슬롯(인벤토리/창고의 칩) Shift+좌클릭
+칩 목록 슬롯(인벤토리/창고의 칩) Shift+좌클릭 또는 더블 클릭
 -> 첫 빈 장착 슬롯(마지막 인덱스부터 역방향)에 순서대로 장착
 -> ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot (SaveSubsystem::EquipChipFromStoredSlot)
 
-칩 장착 슬롯 Shift+좌클릭
+칩 장착 슬롯 Shift+좌클릭 또는 더블 클릭
 -> 창고로 해제
 -> ULSChipStationWidget::QuickUnequipEquippedChipToWarehouse (SaveSubsystem::UnequipChipToWarehouse)
 ```
