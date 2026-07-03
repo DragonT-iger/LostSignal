@@ -13,6 +13,7 @@ class UInputAction;
 class ULSAimComponent;
 class ULSCharacterLightingComponent;
 class ULSChipStatComponent;
+class ULSEquipmentStatComponent;
 class ULSMPCVisionSourceComponent;
 class ULSNoiseEmitterComponent;
 class ULSPlayerCombatComponent;
@@ -119,6 +120,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Chip", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSChipStatComponent> ChipStatComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Equipment", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<ULSEquipmentStatComponent> EquipmentStatComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/UI", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UWidgetComponent> SurvivalOverheadWidgetComponent;

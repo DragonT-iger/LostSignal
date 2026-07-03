@@ -351,9 +351,29 @@ void ULSChipStationWidget::RefreshChipSlots()
 	AddChipViewItems(SaveSubsystem->GetWarehouseItems(), ELSInventorySlotArea::Warehouse, ChipTable, this, ViewItems);
 	SortChipViewItems(ViewItems);
 
-	LSSlotWidgetSync::SyncSlotWidgets(ChipSlotWrapBox, ItemSlotWidgetClass, GetOwningPlayer(), GetWorld(), ViewItems.Num(),
+	// 칩 리스트는 총 칩 개수(미장착 + 장착)만큼 고정 크기로 잡는다. 장착하면 그 칸이 빈 칸(hole)으로 남고,
+	// 해제하면 빈 칸에 다시 채워지므로 스테이션 조작 중에는 위젯을 추가/삭제할 필요가 없다(InsertChipListSlot 참고).
+	int32 EquippedChipCount = 0;
+	for (const FLSSessionItem& EquipmentItem : SaveSubsystem->GetChipEquipmentSlots())
+	{
+		if (LSInventorySlotUtils::IsFilled(EquipmentItem))
+		{
+			++EquippedChipCount;
+		}
+	}
+	const int32 TotalChipSlotCount = ViewItems.Num() + EquippedChipCount;
+
+	LSSlotWidgetSync::SyncSlotWidgets(ChipSlotWrapBox, ItemSlotWidgetClass, GetOwningPlayer(), GetWorld(), TotalChipSlotCount,
 		[this, &ViewItems](const int32 SlotIndex, ULSItemSlotWidget& SlotWidget)
 		{
+			if (!ViewItems.IsValidIndex(SlotIndex))
+			{
+				// 장착 칩 몫의 예비 빈 칸. 해제 시 InsertChipListSlot이 이 칸을 재사용한다.
+				SlotWidget.SetChipStationSlotContext(this, ELSInventorySlotArea::Warehouse, INDEX_NONE, NAME_None, 0, {});
+				SlotWidget.ClearItem();
+				return;
+			}
+
 			const FLSChipStationViewItem& ViewItem = ViewItems[SlotIndex];
 			SlotWidget.SetItem(ViewItem.Item.ItemRowName, ViewItem.Item.Amount, ViewItem.Item.ChipStats);
 			SlotWidget.SetChipStationSlotContext(this, ViewItem.SourceArea, ViewItem.SourceSlotIndex, ViewItem.Item.ItemRowName, ViewItem.Item.Amount, ViewItem.Item.ChipStats);
@@ -737,7 +757,8 @@ void ULSChipStationWidget::InsertChipListSlot(const FLSSessionItem& Chip, const 
 		return;
 	}
 
-	// 1) 빠른 장착으로 비워진 슬롯(hole)을 앞에서부터 재사용한다.
+	// 장착으로 비워진 슬롯(hole)을 앞에서부터 재사용한다. 칩 리스트는 총 칩 개수만큼 고정 크기로
+	// 만들어지므로(RefreshChipSlots 참고) 장착 칩이 돌아올 빈 칸은 항상 존재한다.
 	ULSItemSlotWidget* TargetSlot = nullptr;
 	for (int32 ChildIndex = 0; ChildIndex < ChipSlotWrapBox->GetChildrenCount(); ++ChildIndex)
 	{
@@ -749,26 +770,12 @@ void ULSChipStationWidget::InsertChipListSlot(const FLSSessionItem& Chip, const 
 		}
 	}
 
-	// 2) 빈 칸이 없으면 맨 뒤에 새 슬롯을 만든다.
+	// 고정 크기 계약이 깨진 예외 상황(외부에서 칩이 늘어난 채 리스트가 갱신 안 됨 등)이면 풀 새로고침으로 복구한다.
 	if (!TargetSlot)
 	{
-		if (!ItemSlotWidgetClass)
-		{
-			UE_LOG(LogLS, Warning, TEXT("Cannot append chip list slot because ItemSlotWidgetClass is not set on %s."), *GetNameSafe(this));
-			return;
-		}
-
-		APlayerController* OwningPlayer = GetOwningPlayer();
-		TargetSlot = OwningPlayer
-			? CreateWidget<ULSItemSlotWidget>(OwningPlayer, ItemSlotWidgetClass)
-			: CreateWidget<ULSItemSlotWidget>(GetWorld(), ItemSlotWidgetClass);
-		if (!TargetSlot)
-		{
-			UE_LOG(LogLS, Warning, TEXT("Failed to create chip list slot on %s."), *GetNameSafe(this));
-			return;
-		}
-
-		ChipSlotWrapBox->AddChildToWrapBox(TargetSlot);
+		UE_LOG(LogLS, Warning, TEXT("No empty chip list slot to insert returned chip on %s. Falling back to full refresh."), *GetNameSafe(this));
+		QueueRefreshChipStation();
+		return;
 	}
 
 	TargetSlot->ResetTransientSlotState();

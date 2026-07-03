@@ -4,6 +4,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "Characters/LSChipStatComponent.h"
+#include "Characters/LSEquipmentStatComponent.h"
 #include "Combat/LSAimComponent.h"
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Core/LSFarmingGameMode.h"
@@ -66,6 +67,7 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	PlayerSkillComponent = CreateDefaultSubobject<ULSPlayerSkillComponent>(TEXT("PlayerSkillComponent"));
 	PlayerAttributeSet = CreateDefaultSubobject<ULSCharacterAttributeSet>(TEXT("PlayerAttributeSet"));
 	ChipStatComponent = CreateDefaultSubobject<ULSChipStatComponent>(TEXT("ChipStatComponent"));
+	EquipmentStatComponent = CreateDefaultSubobject<ULSEquipmentStatComponent>(TEXT("EquipmentStatComponent"));
 	StaminaChangeEffectClass = ULSGE_StaminaChange::StaticClass();
 	SurvivalOverheadWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("SurvivalOverheadWidgetComponent"));
 	SurvivalOverheadWidgetComponent->SetupAttachment(RootComponent);
@@ -94,6 +96,12 @@ void ALSPlayerCharacter::BeginPlay()
 	if (ChipStatComponent)
 	{
 		ChipStatComponent->RefreshChipStats();
+	}
+
+	// 칩 적용 후 장비(무기/방어구) 전투 스탯을 얹는다. (장비 체력 보정까지 반영한 뒤 현재 체력을 최대치로 맞춘다)
+	if (EquipmentStatComponent)
+	{
+		EquipmentStatComponent->RefreshEquipmentStats();
 	}
 }
 

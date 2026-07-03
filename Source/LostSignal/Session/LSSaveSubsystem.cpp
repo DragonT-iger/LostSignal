@@ -417,6 +417,8 @@ bool ULSSaveSubsystem::MoveEquipmentSlot(const ELSInventorySlotArea FromArea, co
 	if (bMoved)
 	{
 		Save();
+		// 장착 구성이 바뀌었으니 장비 전투 스탯을 다시 적용하도록 알린다.
+		OnEquipmentChanged.Broadcast();
 	}
 	return bMoved;
 }
@@ -833,6 +835,11 @@ void ULSSaveSubsystem::ApplyLowestGradeChipStarterItems()
 		return;
 	}
 
+	EnsureChipEquipmentSlots();
+
+	// 기본 지급 Supply 칩은 하드웨어 장착칸 10·9·8·7번(인덱스 9·8·7·6)에 뒤에서부터 채운다.
+	int32 TargetEquipmentIndex = ChipEquipmentSlotCount - 1;
+
 	constexpr TCHAR LowestChipGrade[] = TEXT("Supply");
 	for (const TPair<FName, uint8*>& Pair : ChipTable->GetRowMap())
 	{
@@ -841,12 +848,17 @@ void ULSSaveSubsystem::ApplyLowestGradeChipStarterItems()
 			continue;
 		}
 
-		AddStarterItemToArea(
-			Pair.Key,
-			1,
-			SaveSettings->LowestGradeChipsStarterTargetArea,
-			LSChipStats::RollChipStats(Pair.Key),
-			TEXT("LowestGradeChips"));
+		if (TargetEquipmentIndex < 0)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Save] Starter chip '%s' skipped because hardware slots are full."), *Pair.Key.ToString());
+			break;
+		}
+
+		FLSSessionItem& EquipmentSlot = SaveData->ChipEquipmentSlots[TargetEquipmentIndex];
+		EquipmentSlot.ItemRowName = Pair.Key;
+		EquipmentSlot.Amount = 1;
+		EquipmentSlot.ChipStats = LSChipStats::RollChipStats(Pair.Key);
+		--TargetEquipmentIndex;
 	}
 }
 

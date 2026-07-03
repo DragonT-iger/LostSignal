@@ -29,14 +29,11 @@ public:
 	ULSSaveSettings()
 	{
 		bGrantLowestGradeChipsOnNewGame = true;
-		LowestGradeChipsStarterTargetArea = ELSInventorySlotArea::Warehouse;
 	}
 
+	// 켜지면 새 게임 시작 시 가장 낮은 등급(Supply) 칩을 하드웨어 장착칸 10·9·8·7번에 기본 장착한다.
 	UPROPERTY(config, EditAnywhere, Category="LS/Save")
 	bool bGrantLowestGradeChipsOnNewGame = true;
-
-	UPROPERTY(config, EditAnywhere, Category="LS/Save", meta=(EditCondition="bGrantLowestGradeChipsOnNewGame"))
-	ELSInventorySlotArea LowestGradeChipsStarterTargetArea = ELSInventorySlotArea::Warehouse;
 
 	UPROPERTY(config, EditAnywhere, Category="LS/Save")
 	TArray<FLSStarterItemConfig> StarterItems;

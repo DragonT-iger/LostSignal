@@ -58,4 +58,14 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_MoveSpeed, "LS.Data.Chip.MoveSpeed")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_CritDamage, "LS.Data.Chip.CritDamage")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_CritRate, "LS.Data.Chip.CritRate")
+
+	UE_DEFINE_GAMEPLAY_TAG(Data_Equip_Attack, "LS.Data.Equip.Attack")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Equip_Health, "LS.Data.Equip.Health")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Equip_Defense, "LS.Data.Equip.Defense")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Equip_Recovery, "LS.Data.Equip.Recovery")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Equip_AttackSpeed, "LS.Data.Equip.AttackSpeed")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Equip_SkillHaste, "LS.Data.Equip.SkillHaste")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Equip_CritDamage, "LS.Data.Equip.CritDamage")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Equip_CritRate, "LS.Data.Equip.CritRate")
+	UE_DEFINE_GAMEPLAY_TAG(Data_Equip_ArmorPenetration, "LS.Data.Equip.ArmorPenetration")
 }

@@ -1,13 +1,51 @@
 #include "UI/Lobby/LSLoadoutPreparationWidget.h"
 
+#include "Blueprint/WidgetTree.h"
+#include "Components/PanelWidget.h"
 #include "Components/WidgetSwitcher.h"
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
+#include "UI/ChipSystem/LSChipStationWidget.h"
 #include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/LSUILayer.h"
 #include "UI/Lobby/LSLobbyTabWidget.h"
 
 #define LOCTEXT_NAMESPACE "LSLoadoutPreparation"
+
+namespace
+{
+// 스위처 페이지(아트가 WBP에 배치) 아래에서 칩 스테이션 위젯을 찾는다. UserWidget 내부 트리까지 재귀 탐색.
+ULSChipStationWidget* FindLoadoutChipStationWidget(UWidget* Widget)
+{
+	if (!Widget)
+	{
+		return nullptr;
+	}
+
+	if (ULSChipStationWidget* ChipStation = Cast<ULSChipStationWidget>(Widget))
+	{
+		return ChipStation;
+	}
+
+	if (const UUserWidget* UserWidget = Cast<UUserWidget>(Widget))
+	{
+		return UserWidget->WidgetTree ? FindLoadoutChipStationWidget(UserWidget->WidgetTree->RootWidget) : nullptr;
+	}
+
+	if (const UPanelWidget* Panel = Cast<UPanelWidget>(Widget))
+	{
+		for (int32 ChildIndex = 0; ChildIndex < Panel->GetChildrenCount(); ++ChildIndex)
+		{
+			if (ULSChipStationWidget* ChipStation = FindLoadoutChipStationWidget(Panel->GetChildAt(ChildIndex)))
+			{
+				return ChipStation;
+			}
+		}
+	}
+
+	return nullptr;
+}
+}
 
 void ULSLoadoutPreparationWidget::NativeConstruct()
 {
@@ -136,6 +174,20 @@ void ULSLoadoutPreparationWidget::ShowTab(const ELSLoadoutTab Tab) const
 	ContentSwitcher->SetActiveWidgetIndex(static_cast<int32>(Tab));
 	ContentSwitcher->SetVisibility(ESlateVisibility::Visible);
 	SetTabBarVisible(false);
+
+	// 칩 스테이션 페이지는 열 때마다 최신 데이터로 리빌드한다. 다른 탭(창고 정렬/이동 등)에서 인벤토리·창고
+	// 인덱스가 바뀌어도 칩 리스트가 stale 인덱스를 들고 있지 않도록 한다(장착이 조용히 실패하던 원인).
+	if (Tab == ELSLoadoutTab::Chip)
+	{
+		if (ULSChipStationWidget* ChipStation = FindLoadoutChipStationWidget(ContentSwitcher->GetActiveWidget()))
+		{
+			ChipStation->RefreshChipStation();
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Loadout] Chip station widget not found under chip tab page on %s."), *GetNameSafe(this));
+		}
+	}
 }
 
 void ULSLoadoutPreparationWidget::ShowNotImplementedNotice()

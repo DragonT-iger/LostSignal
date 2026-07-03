@@ -76,4 +76,15 @@ namespace LSGameplayTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_MoveSpeed)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_CritDamage)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_CritRate)
+
+	// SetByCaller equipment stat data (장착 무기/방어구 합산값을 캐릭터 어트리뷰트로 적용할 때 사용)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Equip_Attack)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Equip_Health)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Equip_Defense)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Equip_Recovery)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Equip_AttackSpeed)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Equip_SkillHaste)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Equip_CritDamage)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Equip_CritRate)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Equip_ArmorPenetration)
 }

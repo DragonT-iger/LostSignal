@@ -85,7 +85,8 @@ Source/LostSignal/Inventory/LSInventorySlotUtils.cpp
 - **슬롯 타입 매핑:** 슬롯 인덱스가 곧 타입이다. `Weapon`=무기(`Weapon_*`), `Processor`=머리, `Core`=몸, `Actuator`=손, `Frame`=발. 방어구 타입은 `Item_Equipment`(Processor/Core/Actuator/Frame)가 단일 출처이며, 판정은 `LSInventorySlotUtils::ResolveEquipmentSlotType`가 담당한다. 무기는 현재 캐릭터 구분 없이(`Weapon_1/2/3`) 무기 슬롯에 장착 가능하다.
 - **처리 경로:** 장비 슬롯이 원본/대상에 걸린 드롭은 `ULSInventoryWidget::HandleInventorySlotDrop`이 `HandleEquipmentSlotDrop`으로 분기해 `ULSSaveSubsystem::MoveEquipmentSlot`으로 확정한다(레이드면 거부). `MoveEquipmentSlot`은 타입 검증 후 기존 `LSInventorySlotUtils::DropSlot`(배치/스왑)을 재사용한다. 장비는 `Item_Max=1`이라 병합 없이 배치/스왑으로만 동작한다.
 - **타입 검증:** 장비 슬롯에 최종적으로 들어가는 아이템은 그 슬롯 타입과 일치해야 한다. 장착(인벤토리→장비)은 소스 타입을, 해제 시 교환(장비↔점유된 인벤토리 슬롯)은 인벤토리 쪽 아이템 타입을 검증한다. 타입이 안 맞으면 드롭이 실패한다(장비끼리 서로 다른 타입 슬롯 교환도 불가). 장착된 장비는 창 밖으로 드래그해도 월드에 버리지 않는다.
-- **미연동:** 무기/방어구 전투 스탯(`Item_Attack`/`Item_Health`/`Item_Defense` 등)의 GAS 어트리뷰트 적용은 아직 없다(후속). 현재는 장착 UI·저장·드래그·타입 검증까지만 연결돼 있다.
+- **GAS 스탯 적용:** 장착 무기/방어구의 전투 스탯은 칩과 같은 패턴으로 GAS 어트리뷰트에 적용된다. `ULSEquipmentStatComponent`(`ALSPlayerCharacter`에 부착)가 `SaveSubsystem->GetEquipmentSlots()`를 읽어 `LSEquipmentStats::ComputeEquipmentStatTotals`로 합산하고, 무한 지속 GE(`ULSGE_EquipmentStats`, SetByCaller `LS.Data.Equip.*`)를 remove & reapply로 적용한다(서버 권한 전용). 초기 적용은 캐릭터 BeginPlay에서 칩 적용 뒤, 갱신 트리거는 `ULSSaveSubsystem::OnEquipmentChanged`(`MoveEquipmentSlot` 성공 시 브로드캐스트)다. 스탯→어트리뷰트 매핑: 무기 `Item_Attack`→Attack, `Item_Attack_Speed`→AttackSpeed, `Item_Skill_Haste`→CooldownReduction, `Item_Critical_Rate`→CritChance, `Item_Critical_Damage`→CritDamage, `Item_Defense_Penetration`→ArmorPenetration / 방어구 `Item_Health`→MaxHealth, `Item_Defense`→Defence, `Item_Recovery`→Recovery. 비율 스탯(공속/스킬가속/치확/치피/방관)은 칩과 동일하게 ÷100 환산해 가산한다.
+- **미연동(후속):** 레이드(인게임) 중 장비 장착/교체는 아직 막혀 있다(아래 처리 경로 참고). 즉 GAS 스탯은 레이드 중에도 로비에서 고정된 loadout 기준으로 적용되며, 레이드 중 *변경*은 지원하지 않는다.
 
 ```text
 RebuildInventorySlots
@@ -347,6 +348,6 @@ Raid End
 
 타이틀의 New 버튼으로 새 게임을 시작할 때만 기본 아이템을 지급한다. 적용 경로는 `ULSTitleMenuWidget::HandleNewConfirmed()` -> `ULSSaveSubsystem::StartNewGame()`이다.
 
-칩 기본 지급은 `ULSSaveSettings.bGrantLowestGradeChipsOnNewGame`과 `LowestGradeChipsStarterTargetArea`가 제어한다. 기본값은 켜짐이며 대상은 `Warehouse`다. `ChipTable`에서 가장 낮은 등급인 `Supply` RowName만 읽어 칩 종류별로 1개씩 지급하고, 칩 스탯은 지급 시점에 `LSChipStats::RollChipStats`로 확정한다.
+칩 기본 지급은 `ULSSaveSettings.bGrantLowestGradeChipsOnNewGame`이 제어한다(기본값 켜짐). `ChipTable`에서 가장 낮은 등급인 `Supply` RowName만 읽어 칩 종류별로 1개씩, **하드웨어 장착칸 10·9·8·7번(인덱스 9·8·7·6)에 뒤에서부터 직접 장착**한다(창고가 아님). 칩 스탯은 지급 시점에 `LSChipStats::RollChipStats`로 확정한다.
 
 추가 기본 아이템 목록은 `ULSSaveSettings.StarterItems`가 단일 출처다. 에디터에서는 `Project Settings > LS Save Settings`에서 `ItemRowName`, `Amount`, `TargetArea`를 설정한다. 수량/대상 영역이 잘못됐거나 슬롯 제한 때문에 전부 들어가지 못하면 `UE_LOG(LogLS, Warning, ...)`를 남긴다.
