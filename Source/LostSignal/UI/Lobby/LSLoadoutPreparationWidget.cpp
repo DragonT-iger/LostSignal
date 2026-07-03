@@ -141,6 +141,11 @@ bool ULSLoadoutPreparationWidget::IsContentOpen() const
 	return ContentSwitcher && ContentSwitcher->GetVisibility() == ESlateVisibility::Visible;
 }
 
+bool ULSLoadoutPreparationWidget::HasActiveConfirmDialog() const
+{
+	return ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport();
+}
+
 void ULSLoadoutPreparationWidget::HandleSupplyTabClicked()
 {
 	// 에이베리 보급소(상점/제작)는 아직 안 만들어서 나중에 구현할 예정입니다. 그때까지 탭 목록을 유지한다.

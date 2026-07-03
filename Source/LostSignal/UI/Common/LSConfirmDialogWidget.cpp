@@ -63,9 +63,9 @@ void ULSConfirmDialogWidget::SetMessage(const FText& InMessage) const
 
 FReply ULSConfirmDialogWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (InKeyEvent.GetKey() == EKeys::Escape)
+	if (InKeyEvent.GetKey() == EKeys::Escape || InKeyEvent.GetKey() == EKeys::Tab)
 	{
-		// ESC는 취소로 처리한다.
+		// ESC/TAB은 취소(닫기)로 처리한다. TAB을 흘리면 Slate 포커스 이동으로 새서 다이얼로그가 키를 잃는다.
 		HandleCancelClicked();
 		return FReply::Handled();
 	}

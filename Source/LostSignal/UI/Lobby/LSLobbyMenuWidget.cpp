@@ -248,7 +248,8 @@ void ULSLobbyMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	// 추적한다 — 새 외부 모달을 추가하면 이 가드에 합류시켜야 포커스를 뺏지 않는다.
 	const bool bExternalFocusWidgetOpen =
 		(ActiveSettingsWidget && ActiveSettingsWidget->IsInViewport()) ||
-		(ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport());
+		(ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport()) ||
+		(WBP_LoadoutPreparation && WBP_LoadoutPreparation->HasActiveConfirmDialog());
 	if (!bExternalFocusWidgetOpen && !HasKeyboardFocus() && !HasFocusedDescendants())
 	{
 		SetKeyboardFocus();

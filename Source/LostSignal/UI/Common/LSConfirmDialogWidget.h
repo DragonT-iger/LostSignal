@@ -21,7 +21,8 @@ public:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	// ESC로 취소(닫기). 다이얼로그가 키보드 포커스를 쥐고 있어, 뒤의 세팅 화면으로 ESC가 새지 않는다.
+	// ESC/TAB으로 취소(닫기). 다이얼로그가 키보드 포커스를 쥐고 있어, 뒤의 세팅 화면으로 ESC가 새지 않는다.
+	// TAB은 Slate 기본 포커스 이동으로 새지 않게 여기서 소비한다.
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 	UPROPERTY(BlueprintAssignable, Category="LS/UI|Common")

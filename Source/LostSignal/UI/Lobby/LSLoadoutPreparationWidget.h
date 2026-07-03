@@ -42,6 +42,9 @@ public:
 	// 내부 콘텐츠(ContentSwitcher)가 열려 있는지. TAB/ESC 단계별 뒤로가기 판단용.
 	bool IsContentOpen() const;
 
+	// 미구현 안내창이 떠 있는지. 로비 루트의 포커스 회수 가드가 안내창의 키 입력(ESC/TAB)을 뺏지 않게 참조한다.
+	bool HasActiveConfirmDialog() const;
+
 protected:
 	// 내부 탭 콘텐츠 전환. 인덱스는 ELSLoadoutTab 순서를 따른다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")
