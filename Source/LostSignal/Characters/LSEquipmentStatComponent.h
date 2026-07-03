@@ -23,7 +23,9 @@ public:
 	ULSEquipmentStatComponent();
 
 	// 현재 장비 장착 상태를 읽어 전투 스탯 GE를 다시 적용한다.
-	void RefreshEquipmentStats();
+	// bRestoreFullHealth: true면 현재 체력을 새 최대 체력으로 채운다(캐릭터 스폰 직후 초기 적용 전용).
+	// false면 기존 체력을 보존하되 새 최대 체력으로 클램프만 한다(레이드 중 장비 교체 등).
+	void RefreshEquipmentStats(bool bRestoreFullHealth);
 
 protected:
 	virtual void BeginPlay() override;

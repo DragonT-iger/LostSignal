@@ -22,7 +22,8 @@ void ULSEquipmentStatComponent::BeginPlay()
 	// 장비 장착 변경 시 자동 재적용하도록 구독. (초기 적용은 캐릭터 BeginPlay에서 ASC 준비 후 호출)
 	if (ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem())
 	{
-		EquipmentChangedHandle = SaveSubsystem->OnEquipmentChanged.AddUObject(this, &ULSEquipmentStatComponent::RefreshEquipmentStats);
+		// 델리게이트 경유 갱신(장비 교체)은 체력을 회복시키지 않는다 — 레이드 중 교체가 회복 수단이 되지 않게.
+		EquipmentChangedHandle = SaveSubsystem->OnEquipmentChanged.AddUObject(this, &ULSEquipmentStatComponent::RefreshEquipmentStats, false);
 	}
 }
 
@@ -40,7 +41,7 @@ void ULSEquipmentStatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 	Super::EndPlay(EndPlayReason);
 }
 
-void ULSEquipmentStatComponent::RefreshEquipmentStats()
+void ULSEquipmentStatComponent::RefreshEquipmentStats(bool bRestoreFullHealth)
 {
 	const AActor* OwnerActor = GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority())
@@ -92,6 +93,8 @@ void ULSEquipmentStatComponent::RefreshEquipmentStats()
 	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Equip_CritRate, Totals.CritRate / 100.0f);
 	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Equip_ArmorPenetration, Totals.DefensePenetration / 100.0f);
 
+	const float PreviousHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
+
 	if (EquipmentStatEffectHandle.IsValid())
 	{
 		ASC->RemoveActiveGameplayEffect(EquipmentStatEffectHandle);
@@ -99,9 +102,11 @@ void ULSEquipmentStatComponent::RefreshEquipmentStats()
 	}
 	EquipmentStatEffectHandle = ASC->ApplyGameplayEffectSpecToSelf(Spec);
 
-	// 장비는 (현재) 로비에서만 변경되므로, 적용/갱신 때마다 현재 체력을 (장비 보정된) 최대 체력으로 맞춘다.
+	// 초기 적용(스폰 직후)만 풀피로 시작한다. 이후 갱신(장비 교체)은 기존 체력을 보존하고
+	// 새 최대 체력으로 클램프만 해서, 교체가 회복 수단이 되지 않게 한다.
 	const float NewMaxHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute());
-	ASC->SetNumericAttributeBase(ULSCombatAttributeSet::GetCurrentHealthAttribute(), NewMaxHealth);
+	const float NewHealth = bRestoreFullHealth ? NewMaxHealth : FMath::Min(PreviousHealth, NewMaxHealth);
+	ASC->SetNumericAttributeBase(ULSCombatAttributeSet::GetCurrentHealthAttribute(), NewHealth);
 }
 
 UAbilitySystemComponent* ULSEquipmentStatComponent::GetOwnerAbilitySystemComponent() const

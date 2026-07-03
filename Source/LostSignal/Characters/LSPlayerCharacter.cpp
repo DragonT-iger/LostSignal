@@ -95,13 +95,13 @@ void ALSPlayerCharacter::BeginPlay()
 	// Super::BeginPlay에서 ASC(InitAbilityActorInfo)가 준비된 뒤 칩 전투 스탯을 최초 적용한다.
 	if (ChipStatComponent)
 	{
-		ChipStatComponent->RefreshChipStats();
+		ChipStatComponent->RefreshChipStats(/*bRestoreFullHealth=*/true);
 	}
 
 	// 칩 적용 후 장비(무기/방어구) 전투 스탯을 얹는다. (장비 체력 보정까지 반영한 뒤 현재 체력을 최대치로 맞춘다)
 	if (EquipmentStatComponent)
 	{
-		EquipmentStatComponent->RefreshEquipmentStats();
+		EquipmentStatComponent->RefreshEquipmentStats(/*bRestoreFullHealth=*/true);
 	}
 }
 

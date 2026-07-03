@@ -23,7 +23,8 @@ void ULSChipStatComponent::BeginPlay()
 	// 칩 장착/신호 게이지 변경 시 자동 재적용하도록 구독. (초기 적용은 캐릭터 BeginPlay에서 ASC 준비 후 호출)
 	if (ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem())
 	{
-		ChipLoadoutChangedHandle = SaveSubsystem->OnChipLoadoutChanged.AddUObject(this, &ULSChipStatComponent::RefreshChipStats);
+		// 델리게이트 경유 갱신(장착 변경·신호 게이지 감소)은 체력을 회복시키지 않는다 — 레이드 중 풀피 방지.
+		ChipLoadoutChangedHandle = SaveSubsystem->OnChipLoadoutChanged.AddUObject(this, &ULSChipStatComponent::RefreshChipStats, false);
 	}
 }
 
@@ -41,7 +42,7 @@ void ULSChipStatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-void ULSChipStatComponent::RefreshChipStats()
+void ULSChipStatComponent::RefreshChipStats(bool bRestoreFullHealth)
 {
 	const AActor* OwnerActor = GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority())
@@ -104,6 +105,8 @@ void ULSChipStatComponent::RefreshChipStats()
 	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Chip_CritDamage, PercentValue(TEXT("Chip_Critical_Damage")));
 	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Chip_CritRate, PercentValue(TEXT("Chip_Critical_Rate")));
 
+	const float PreviousHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
+
 	if (ChipStatEffectHandle.IsValid())
 	{
 		ASC->RemoveActiveGameplayEffect(ChipStatEffectHandle);
@@ -111,9 +114,11 @@ void ULSChipStatComponent::RefreshChipStats()
 	}
 	ChipStatEffectHandle = ASC->ApplyGameplayEffectSpecToSelf(Spec);
 
-	// 칩은 로비에서만 변경되므로, 칩 적용/갱신 때마다 현재 체력을 (칩 보정된) 최대 체력으로 맞춘다.
+	// 초기 적용(스폰 직후)만 풀피로 시작한다. 이후 갱신(레이드 중 신호 게이지 감소 등)은
+	// 기존 체력을 보존하고 새 최대 체력으로 클램프만 해서, 칩 비활성화가 회복 수단이 되지 않게 한다.
 	const float NewMaxHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute());
-	ASC->SetNumericAttributeBase(ULSCombatAttributeSet::GetCurrentHealthAttribute(), NewMaxHealth);
+	const float NewHealth = bRestoreFullHealth ? NewMaxHealth : FMath::Min(PreviousHealth, NewMaxHealth);
+	ASC->SetNumericAttributeBase(ULSCombatAttributeSet::GetCurrentHealthAttribute(), NewHealth);
 }
 
 UAbilitySystemComponent* ULSChipStatComponent::GetOwnerAbilitySystemComponent() const

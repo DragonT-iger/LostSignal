@@ -77,7 +77,7 @@
 - 적용 시점: 캐릭터 `BeginPlay`(ASC 초기화 후) 1회 + `ULSSaveSubsystem::OnChipLoadoutChanged`(장착/이동/해제/신호 게이지 변경) 시 remove & reapply.
 - **순서 의존(중요):** 칩은 베이스 어트리뷰트 위에 얹는 GE 모디파이어이므로, 베이스 캐릭터 스탯 초기화(`Init*`로 직접 세팅) 뒤에 칩을 적용해야 한다. `ALSPlayerCharacter::BeginPlay`는 `InitializeBaseAttributes()`(파생 클래스가 DataTable 베이스 스탯을 채우는 가상 훅) 호출 **뒤에** `RefreshChipStats()`를 부른다. 순서가 뒤바뀌면 `Init*`가 애그리게이터를 우회해 직접 값을 써서 칩 보정과 풀피를 덮어쓴다.
 - 데이터 소스: `ULSSaveSubsystem`의 `GetChipEquipmentSlots()` / `GetChipSignalGaugePercent()` (GameInstance 서브시스템이라 레벨 전환에도 유지 — 프로토콜 적용 패턴과 동일).
-- 칩은 로비에서만 변경되므로, 칩 적용/갱신 때마다 `CurrentHealth`를 칩 보정된 `MaxHealth`로 맞춘다(현재 체력 = 최대 체력).
+- 체력 처리: **초기 적용(캐릭터 스폰 직후, `bRestoreFullHealth=true`)만** `CurrentHealth`를 칩 보정된 `MaxHealth`로 채운다. 이후 델리게이트 경유 갱신(레이드 중 신호 게이지 감소, 장착 변경)은 기존 체력을 보존하고 새 `MaxHealth`로 클램프만 한다 — 칩 비활성화/재적용이 회복 수단이 되지 않게. (장비 `ULSEquipmentStatComponent`도 동일 규칙)
 
 **스탯 키 → 어트리뷰트 매핑 원장**
 
