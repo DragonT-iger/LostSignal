@@ -42,6 +42,9 @@ public:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
+	// 포커스가 메뉴 트리 밖(게임 뷰포트 등)으로 새면 TAB/ESC가 죽으므로 매 틱 회수한다.
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
 	// TAB 키로 개인정비의 물품창고를 토글한다. 포커스 이동에 먹히지 않게 터널링 단계에서 가로챈다.
 	virtual FReply NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 

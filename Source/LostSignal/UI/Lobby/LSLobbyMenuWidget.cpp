@@ -238,6 +238,23 @@ void ULSLobbyMenuWidget::HandleInventoryButtonClicked()
 	ToggleStoragePage();
 }
 
+void ULSLobbyMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	// TAB/ESC는 이 위젯의 키보드 포커스에 의존하는데, PlayerControllerBase::BeginPlay의
+	// SetFocusToGameViewport 등 포커스가 뷰포트로 새는 경로가 여럿이라 매 틱 회수한다.
+	// 계약: 로비에서 메뉴 트리 밖에 뜨는 포커스 위젯은 ActiveSettingsWidget/ActiveConfirmDialog로
+	// 추적한다 — 새 외부 모달을 추가하면 이 가드에 합류시켜야 포커스를 뺏지 않는다.
+	const bool bExternalFocusWidgetOpen =
+		(ActiveSettingsWidget && ActiveSettingsWidget->IsInViewport()) ||
+		(ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport());
+	if (!bExternalFocusWidgetOpen && !HasKeyboardFocus() && !HasFocusedDescendants())
+	{
+		SetKeyboardFocus();
+	}
+}
+
 FReply ULSLobbyMenuWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	// 포커스가 버튼으로 넘어가도 터널링 단계라 루트가 먼저 받는다. TAB은 여기서 소비해 포커스 이동을 막는다.
