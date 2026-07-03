@@ -121,22 +121,10 @@ void ALSShortCircuitProjectile::InitializeProjectile(
 	SetLifeSpan(FMath::Max(ProjectileLifeSeconds, MovementDurationSeconds + 0.5f));
 	SetActorTickEnabled(HasAuthority());
 
-	if (HasAuthority() && SkillData && SkillData->bEnableDebugVisualization)
+	if (HasAuthority() && SkillData /*&& SkillData->bEnableDebugVisualization*/)
 	{
 		bShowDebugProjectileMesh = true;
 		SetDebugProjectileMeshVisible(true);
-
-		UE_LOG(LogLS, Log, TEXT("[ShortCircuit] Projectile initialized: Projectile=%s Source=%s Skill=%s Start=%s Target=%s VisualTarget=%s Speed=%.2f ArcHeight=%.2f Duration=%.2f Life=%.2f"),
-			*GetNameSafe(this),
-			*GetNameSafe(SourceActor),
-			*GetNameSafe(SkillData),
-			*MovementStartLocation.ToCompactString(),
-			*TargetLocation.ToCompactString(),
-			*MovementVisualTargetLocation.ToCompactString(),
-			FVector::Dist2D(MovementStartLocation, TargetLocation) / MovementDurationSeconds,
-			RuntimeProjectileArcHeight,
-			MovementDurationSeconds,
-			GetLifeSpan());
 	}
 }
 

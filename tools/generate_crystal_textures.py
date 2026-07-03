@@ -100,16 +100,18 @@ def smoothstep(edge0, edge1, x):
 
 
 def make_crack(size, seed):
-    # 셀 경계(F2-F1이 0에 가까운 곳)가 균열 선. 큰 균열 + 잔균열 두 스케일 합성.
+    # 셀 경계 거리(F2-F1) 기반 균열. 중심이 1.0, 가장자리로 갈수록 부드럽게 감쇠.
     warp_u = fbm(size, 9, 4, seed + 50)
     warp_v = fbm(size, 9, 4, seed + 51)
-    f1a, f2a = worley(size, 6, seed, warp_u, warp_v, 0.12)
-    width_var = 0.7 + 0.6 * fbm(size, 12, 3, seed + 5)  # 선 굵기 흔들림
-    crack_big = 1.0 - smoothstep(0.0, 0.07, (f2a - f1a) * width_var)
-    f1b, f2b = worley(size, 14, seed + 9, warp_u, warp_v, 0.08)
-    crack_small = 1.0 - smoothstep(0.0, 0.055, f2b - f1b)
-    region = smoothstep(0.3, 0.75, fbm(size, 4, 4, seed + 3))  # 지역별 밀도 차이
-    crack = np.clip(crack_big + 0.45 * crack_small, 0.0, 1.0) * (0.35 + 0.65 * region)
+    f1a, f2a = worley(size, 4, seed, warp_u, warp_v, 0.15)  # 셀 수 축소 → 균열 수 감소
+    w = (f2a - f1a) * (0.75 + 0.5 * fbm(size, 10, 3, seed + 5))  # 폭 흔들림
+    glow = (1.0 - smoothstep(0.0, 0.30, w)) ** 1.8  # 넓고 부드러운 폭 감쇠
+    core = 1.0 - smoothstep(0.0, 0.09, w)           # 중심 코어
+    crack_big = 0.6 * glow + 0.4 * core
+    f1b, f2b = worley(size, 9, seed + 9, warp_u, warp_v, 0.10)
+    crack_small = (1.0 - smoothstep(0.0, 0.16, f2b - f1b)) ** 2.0
+    region = smoothstep(0.45, 0.8, fbm(size, 3, 4, seed + 3))  # 지역 컬링 강화
+    crack = np.clip(crack_big + 0.3 * crack_small, 0.0, 1.0) * (0.25 + 0.75 * region)
     return np.clip(crack, 0.0, 1.0)
 
 
