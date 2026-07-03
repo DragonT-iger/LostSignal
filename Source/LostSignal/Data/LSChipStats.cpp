@@ -192,7 +192,8 @@ TMap<FName, int32> ComputeEffectiveChipStatTotals(const TArray<FLSSessionItem>& 
 {
 	const TMap<FName, int32> AllTotals = AggregateChipStatTotals(Items);
 
-	// 비활성 슬롯(앞에서부터 InactiveSlotCount개)만 따로 합산해 절반을 차감한다.
+	// 신호 유실은 프로토콜만 깎는다. 비활성 슬롯(앞에서부터 InactiveSlotCount개) 칩 스탯의 절반은
+	// 전체 합산 위에 보너스로 가산한다 (UI의 SignalLossText 표시값과 동일 규칙).
 	TArray<FLSSessionItem> InactiveItems;
 	InactiveItems.Reserve(FMath::Min(Items.Num(), InactiveSlotCount));
 	for (int32 SlotIndex = 0; SlotIndex < Items.Num() && SlotIndex < InactiveSlotCount; ++SlotIndex)
@@ -206,8 +207,8 @@ TMap<FName, int32> ComputeEffectiveChipStatTotals(const TArray<FLSSessionItem>& 
 	for (const TPair<FName, int32>& Pair : AllTotals)
 	{
 		const int32* InactivePtr = InactiveTotals.Find(Pair.Key);
-		const int32 HalfLoss = InactivePtr ? FMath::RoundToInt(static_cast<float>(*InactivePtr) * 0.5f) : 0;
-		Effective.Add(Pair.Key, Pair.Value - HalfLoss);
+		const int32 HalfBonus = InactivePtr ? FMath::RoundToInt(static_cast<float>(*InactivePtr) * 0.5f) : 0;
+		Effective.Add(Pair.Key, Pair.Value + HalfBonus);
 	}
 
 	return Effective;

@@ -106,6 +106,7 @@ void ULSChipStatComponent::RefreshChipStats(bool bRestoreFullHealth)
 	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Chip_CritRate, PercentValue(TEXT("Chip_Critical_Rate")));
 
 	const float PreviousHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
+	const float PreviousMaxHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute());
 
 	if (ChipStatEffectHandle.IsValid())
 	{
@@ -114,10 +115,12 @@ void ULSChipStatComponent::RefreshChipStats(bool bRestoreFullHealth)
 	}
 	ChipStatEffectHandle = ASC->ApplyGameplayEffectSpecToSelf(Spec);
 
-	// 초기 적용(스폰 직후)만 풀피로 시작한다. 이후 갱신(레이드 중 신호 게이지 감소 등)은
-	// 기존 체력을 보존하고 새 최대 체력으로 클램프만 해서, 칩 비활성화가 회복 수단이 되지 않게 한다.
+	// 초기 적용(스폰 직후)만 풀피로 시작한다. 이후 갱신은 잃은 체력량을 보존한다 —
+	// 최대 체력이 늘면 그 증가분만큼 현재 체력도 같이 올리고(신호 유실 보너스 반영),
+	// 줄면 새 최대 체력으로 클램프만 해서 재적용이 회복 수단이 되지 않게 한다.
 	const float NewMaxHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute());
-	const float NewHealth = bRestoreFullHealth ? NewMaxHealth : FMath::Min(PreviousHealth, NewMaxHealth);
+	const float MaxHealthGain = FMath::Max(0.0f, NewMaxHealth - PreviousMaxHealth);
+	const float NewHealth = bRestoreFullHealth ? NewMaxHealth : FMath::Min(PreviousHealth + MaxHealthGain, NewMaxHealth);
 	ASC->SetNumericAttributeBase(ULSCombatAttributeSet::GetCurrentHealthAttribute(), NewHealth);
 }
 

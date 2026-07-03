@@ -71,13 +71,13 @@
 
 ### ✅ 칩 전투 스탯 → 캐릭터 GAS 연동
 
-장착 칩 합산 전투 스탯을 캐릭터 GAS 어트리뷰트에 적용한다. 적용값은 **활성 칩 100% + 비활성 칩 50%**(신호 유실 규칙)이며, UI 표시 로직과 동일한 단일 출처 `LSChipStats::ComputeEffectiveChipStatTotals`를 쓴다. 수치 변경은 무한 지속 GE `ULSGE_ChipStats`의 가산 모디파이어(SetByCaller)로만 적용한다(직접 SetAttribute 금지).
+장착 칩 합산 전투 스탯을 캐릭터 GAS 어트리뷰트에 적용한다. 적용값은 **전체 장착 칩 100% + 신호 유실(비활성) 칩 50% 보너스 가산**이다 — 신호 게이지 감소로 깎이는 것은 프로토콜 수치뿐이고, 비활성 칩 스탯 절반은 오히려 보너스로 얹힌다(UI의 `SignalLossText` 표시값과 동일 규칙). 계산은 UI 표시 로직과 동일한 단일 출처 `LSChipStats::ComputeEffectiveChipStatTotals`를 쓴다. 수치 변경은 무한 지속 GE `ULSGE_ChipStats`의 가산 모디파이어(SetByCaller)로만 적용한다(직접 SetAttribute 금지).
 
 - 적용 주체: `ULSChipStatComponent` (`Source/LostSignal/Characters/LSChipStatComponent.*`) — `ALSPlayerCharacter`에 부착. 서버 권한에서만 동작.
 - 적용 시점: 캐릭터 `BeginPlay`(ASC 초기화 후) 1회 + `ULSSaveSubsystem::OnChipLoadoutChanged`(장착/이동/해제/신호 게이지 변경) 시 remove & reapply.
 - **순서 의존(중요):** 칩은 베이스 어트리뷰트 위에 얹는 GE 모디파이어이므로, 베이스 캐릭터 스탯 초기화(`Init*`로 직접 세팅) 뒤에 칩을 적용해야 한다. `ALSPlayerCharacter::BeginPlay`는 `InitializeBaseAttributes()`(파생 클래스가 DataTable 베이스 스탯을 채우는 가상 훅) 호출 **뒤에** `RefreshChipStats()`를 부른다. 순서가 뒤바뀌면 `Init*`가 애그리게이터를 우회해 직접 값을 써서 칩 보정과 풀피를 덮어쓴다.
 - 데이터 소스: `ULSSaveSubsystem`의 `GetChipEquipmentSlots()` / `GetChipSignalGaugePercent()` (GameInstance 서브시스템이라 레벨 전환에도 유지 — 프로토콜 적용 패턴과 동일).
-- 체력 처리: **초기 적용(캐릭터 스폰 직후, `bRestoreFullHealth=true`)만** `CurrentHealth`를 칩 보정된 `MaxHealth`로 채운다. 이후 델리게이트 경유 갱신(레이드 중 신호 게이지 감소, 장착 변경)은 기존 체력을 보존하고 새 `MaxHealth`로 클램프만 한다 — 칩 비활성화/재적용이 회복 수단이 되지 않게. (장비 `ULSEquipmentStatComponent`도 동일 규칙)
+- 체력 처리: **초기 적용(캐릭터 스폰 직후, `bRestoreFullHealth=true`)만** `CurrentHealth`를 칩 보정된 `MaxHealth`로 채운다. 이후 델리게이트 경유 갱신(레이드 중 신호 게이지 감소, 장착 변경)은 **잃은 체력량을 보존**한다 — `MaxHealth`가 늘면 증가분만큼 `CurrentHealth`도 같이 올리고(신호 유실 보너스 반영), 줄면 새 `MaxHealth`로 클램프만 해서 재적용이 회복 수단이 되지 않게 한다. (장비 `ULSEquipmentStatComponent`는 기존 체력 보존 + 클램프 규칙)
 
 **스탯 키 → 어트리뷰트 매핑 원장**
 
