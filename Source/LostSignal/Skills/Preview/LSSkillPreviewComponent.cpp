@@ -168,8 +168,6 @@ void ULSSkillPreviewComponent::ApplyMaterialParameters(float WorldYaw)
 	}
 
 	ActivePreviewMaterial->SetScalarParameterValue(TEXT("Fill Amount"), ActivePreviewSpec.FillAmount);
-	ActivePreviewMaterial->SetScalarParameterValue(TEXT("Fade Intensity"), ActivePreviewSpec.FadeIntensity);
-	ActivePreviewMaterial->SetScalarParameterValue(TEXT("Outline Thickness"), ActivePreviewSpec.OutlineThickness);
 }
 
 float ULSSkillPreviewComponent::ResolveOwnerFootZ(float FallbackZ) const
