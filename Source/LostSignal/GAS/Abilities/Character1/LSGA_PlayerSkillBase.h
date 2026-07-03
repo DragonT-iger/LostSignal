@@ -52,8 +52,9 @@ protected:
 	// 실제 스킬 효과(판정/데미지/CC/버프). 노티파이 시점 또는 즉발 fallback 시점에 한 번 호출된다.
 	virtual void ExecuteSkillEffect() {}
 
-	// 몽타주 재생 playRate. 이동 스킬은 override해 몽타주 길이를 이동 Duration에 맞춘다.
-	virtual float GetSkillMontagePlayRate() const { return 1.0f; }
+	// 몽타주 재생 playRate. 기본은 row Skill_Time(시전시간)이 있으면 몽타주 전체를 그 길이에 맞춰 스케일한다.
+	// 이동/다구간 스킬은 override해 자체 이동 Duration 기준으로 스케일한다.
+	virtual float GetSkillMontagePlayRate() const;
 
 	// 몽타주 재생 직후(전 클라 멀티캐스트 후) 호출. 다구간 스킬이 섹션 링크를 세팅하는 확장점. 기본 없음.
 	virtual void OnSkillMontagePlaying() {}

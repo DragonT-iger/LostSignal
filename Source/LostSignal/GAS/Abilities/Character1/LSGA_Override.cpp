@@ -166,9 +166,8 @@ void ULSGA_Override::ExecuteSkillEffect()
 		OverrideData ? OverrideData->FallbackAttackCoefficient : 0.0f,
 		FallbackAttackCoefficient);
 	const ELSBreakPowerTier ResolvedBreakPower = Row ? ToOverrideAbilityBreakPowerTier(Row->Skill_Impact, BreakPower) : BreakPower;
-	const float ResolvedKnockbackDuration = Row && Row->Skill_Time > 0.0f
-		? Row->Skill_Time
-		: OverrideData ? OverrideData->FallbackKnockbackDuration : FallbackKnockbackDuration;
+	// 넉백 지속시간은 DataAsset이 단일 출처. (DataTable Skill_Time은 시전시간 전용)
+	const float ResolvedKnockbackDuration = OverrideData ? OverrideData->FallbackKnockbackDuration : FallbackKnockbackDuration;
 	const float ResolvedKnockbackSpeed = Row && Row->CC_Value > 0.0f
 		? Row->CC_Value
 		: OverrideData && OverrideData->FallbackKnockbackSpeed > 0.0f ? OverrideData->FallbackKnockbackSpeed : KnockbackSpeed;

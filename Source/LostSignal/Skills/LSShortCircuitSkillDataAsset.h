@@ -31,6 +31,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|ShortCircuit", meta=(ClampMin="0.0"))
 	float ProjectileSpeed = 1200.0f;
 
+	// 투사체 비행시간(초). 0이면 거리 ÷ ProjectileSpeed로 계산한다. (DataTable Skill_Time은 시전시간 전용)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|ShortCircuit", meta=(ClampMin="0.0"))
+	float ProjectileFlightDuration = 0.0f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|ShortCircuit", meta=(ClampMin="0.0"))
 	float ProjectileArcHeight = 220.0f;
 

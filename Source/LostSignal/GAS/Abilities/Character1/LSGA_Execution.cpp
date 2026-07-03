@@ -57,9 +57,8 @@ bool ULSGA_Execution::ResolveMovementParams(const ULSSkillDataAsset* InSkillData
 	OutDistance = SkillRow && SkillRow->Range_X > 0.0f
 		? SkillRow->Range_X
 		: InExecutionData ? InExecutionData->FallbackDashDistance : 650.0f;
-	OutDuration = SkillRow && SkillRow->Skill_Time > 0.0f
-		? SkillRow->Skill_Time
-		: InExecutionData ? InExecutionData->FallbackDashDuration : 0.25f;
+	// 대시 Duration은 DataAsset이 단일 출처. (DataTable Skill_Time은 시전시간 전용 — 다구간 스킬이라 몽타주 전체 스케일에도 쓰지 않는다)
+	OutDuration = InExecutionData ? InExecutionData->FallbackDashDuration : 0.25f;
 
 	return OutDistance > 0.0f && OutDuration > 0.0f;
 }

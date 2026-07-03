@@ -40,6 +40,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Override")
 	float FallbackKnockbackUpSpeed = 80.0f;
 
+	// 넉백 지속시간 단일 출처. (DataTable Skill_Time은 시전시간 전용)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Override", meta=(ClampMin="0.0"))
 	float FallbackKnockbackDuration = 0.2f;
 

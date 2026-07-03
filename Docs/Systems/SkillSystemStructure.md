@@ -98,6 +98,7 @@ AbilityClass
 
 SkillMontage
 - 확정 입력 시 재생할 스킬 몽타주
+- DataTable Skill_Time(시전시간)이 있으면 몽타주 전체가 그 길이에 맞게 자동 스케일된다(playRate 0.25~3.0 클램프, 초과 시 LogLS 경고). 없으면 원본 길이로 재생.
 - 실제 효과는 몽타주의 LSAN_SkillEffect 노티파이 시점에 발동한다
 - 미할당이면 발동 즉시 효과가 나가는 즉발로 동작한다(애니메이션 미적용 스킬 호환)
 
@@ -211,7 +212,7 @@ PassiveSkill_ID
 -> 서버에서 AbilityClass 활성화
 -> Ability(ULSGA_PlayerSkillBase)가 PendingAbilityContext 소비
 -> PrepareSkillExecution 검증 후 커밋 + 쿨타임 GE 적용
--> SkillMontage 재생 (전 클라 멀티캐스트)
+-> SkillMontage 재생 (전 클라 멀티캐스트, Skill_Time 시전시간에 맞게 자동 스케일)
 -> [임팩트 프레임] LSAN_SkillEffect 노티파이 -> LS.Event.Skill.Hit 이벤트
 -> Ability의 WaitGameplayEvent 수신 -> ExecuteSkillEffect (데미지/CC/버프)
 -> 몽타주 종료 -> EndAbility
@@ -329,6 +330,8 @@ Status_ID / Effect_Target / Skill_Effect_Duration
 Status_ID_2 / Effect_Target_2 / Skill_Effect_Duration_2
 ```
 
+`Skill_Time`은 **시전시간(캐스팅 시간)** 전용이다. `ULSGA_PlayerSkillBase`가 기본으로 스킬 몽타주 전체를 이 길이에 맞춰 스케일한다. 과거처럼 다른 시간 용도로 전용하지 않는다 — 넉백 지속시간(Override)·투사체 비행시간(ShortCircuit)·대시 시간(Execution)은 각 스킬 DataAsset(`FallbackKnockbackDuration` / `ProjectileFlightDuration` / `FallbackDashDuration`)이, Bypass 스푸핑 풀 지속시간은 `PullDuration`이 단일 출처다. Bypass 슬라이드는 이동시간이 곧 시전시간이므로 `Skill_Time`을 그대로 쓴다.
+
 UE DataTable CSV import에서는 첫 컬럼이 RowName으로 소비된다. 액티브 스킬 테이블은 `Skill_ID`를 첫 컬럼 RowName으로 사용하되, `FLSCharacterSkillRow`가 import/change 시 RowName 숫자를 `Skill_ID` 프로퍼티에도 보정한다.
 
 `FLSCharacterPassiveSkillRow`는 패시브 스킬 기획 수치의 기준이다. 패시브 테이블은 `Name`을 첫 컬럼 RowName으로 사용하되, import/change 시 RowName 숫자를 `PassiveSkill_ID`에도 보정한다.
@@ -363,6 +366,10 @@ Combo Attack row의 시간 값은 기본 공격 Ability에서 사용한다. `Com
 공통 우선순위 예시:
 
 ```text
+시전시간(몽타주 길이)
+-> DataTable Skill_Time 우선 (몽타주 전체 자동 스케일)
+-> 없으면 몽타주 원본 길이로 재생
+
 쿨타임
 -> DataTable Skill_Cooldown 우선
 -> 없으면 FallbackCooldown
@@ -535,7 +542,7 @@ TryPredictFastMovementSkill
 
 - **종료 권위는 몽타주 끝이 아니라 서버 타이머(이동 Duration)** 다. `ULSGA_PlayerSkillBase::ShouldMontageDriveEnd`를 `false`로 override하면 베이스는 몽타주를 재생만 하고 종료 델리게이트를 바인딩하지 않는다. 데디케이티드 서버에서 서버 메시 애니가 tick되지 않아도 능력이 결정적으로 종료된다.
 - **몽타주는 비주얼 전용이고 루트모션 트랙을 넣지 않는다.** 이동은 `FRootMotionSource`(클라 예측 + 서버 권위)만 담당한다. 몽타주가 루트모션을 가지면 소유 클라에서 예측 루트모션과 이중 적용되어 튄다.
-- **몽타주 길이는 이동 Duration에 자동으로 맞춘다.** `GetSkillMontagePlayRate`에서 `ComputeMontagePlayRateForDuration(몽타주, None, 이동Duration)`를 반환하면 베이스가 그 playRate로 재생한다. DataTable `Skill_Time`을 바꿔도 몽타주 재오써링 없이 길이가 따라간다. (`ResolveComboPlayRate`와 같은 원리, [CombatImplementationFlow.md](../Systems/CombatImplementationFlow.md))
+- **몽타주 길이는 이동 Duration에 자동으로 맞춘다.** `GetSkillMontagePlayRate`에서 `ComputeMontagePlayRateForDuration(몽타주, None, 이동Duration)`를 반환하면 베이스가 그 playRate로 재생한다. 이동 Duration의 출처는 Bypass는 DataTable `Skill_Time`(슬라이드가 곧 시전시간), Execution 대시는 DataAsset `FallbackDashDuration`이다. (`ResolveComboPlayRate`와 같은 원리, [CombatImplementationFlow.md](../Systems/CombatImplementationFlow.md))
 
 새 전방 이동 스킬을 추가할 때:
 

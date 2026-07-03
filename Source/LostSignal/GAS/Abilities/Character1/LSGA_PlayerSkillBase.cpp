@@ -72,6 +72,13 @@ float ULSGA_PlayerSkillBase::ComputeMontagePlayRateForDuration(const UAnimMontag
 	return ClampedPlayRate;
 }
 
+float ULSGA_PlayerSkillBase::GetSkillMontagePlayRate() const
+{
+	// Skill_Time은 시전시간. 값이 없으면(0 이하) 몽타주 원본 길이로 재생한다.
+	const float CastTime = SkillContext.bHasSkillRow ? SkillContext.SkillRow.Skill_Time : 0.0f;
+	return ComputeMontagePlayRateForDuration(GetSkillMontage(), NAME_None, CastTime);
+}
+
 void ULSGA_PlayerSkillBase::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,

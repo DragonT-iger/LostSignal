@@ -401,7 +401,8 @@ void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLo
 	}
 
 	const float PullSpeed = Row && Row->CC_Value > 0.0f ? Row->CC_Value : BypassData->PullSpeed;
-	const float PullDuration = Row && Row->Skill_Time > 0.0f ? Row->Skill_Time : BypassData->PullDuration;
+	// 풀 지속시간은 DataAsset이 단일 출처. (DataTable Skill_Time은 시전시간 전용)
+	const float PullDuration = BypassData->PullDuration;
 	const ELSBreakPowerTier PullBreakPower = Row
 		? static_cast<ELSBreakPowerTier>(FMath::Clamp(
 			Row->Skill_Impact,

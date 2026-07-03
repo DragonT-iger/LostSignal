@@ -9,11 +9,12 @@
 
 namespace
 {
-	float ResolveShortCircuitProjectileDuration(const FLSCharacterSkillRow* Row, const ULSShortCircuitSkillDataAsset* SkillData, const FVector& StartLocation, const FVector& TargetLocation)
+	float ResolveShortCircuitProjectileDuration(const ULSShortCircuitSkillDataAsset* SkillData, const FVector& StartLocation, const FVector& TargetLocation)
 	{
-		if (Row && Row->Skill_Time > 0.0f)
+		// 비행시간은 DataAsset이 단일 출처. (DataTable Skill_Time은 시전시간 전용)
+		if (SkillData && SkillData->ProjectileFlightDuration > 0.0f)
 		{
-			return Row->Skill_Time;
+			return SkillData->ProjectileFlightDuration;
 		}
 
 		const float FallbackSpeed = SkillData ? FMath::Max(SkillData->ProjectileSpeed, 1.0f) : 1200.0f;
@@ -138,7 +139,7 @@ void ULSGA_ShortCircuit::ExecuteSkillEffect()
 		return;
 	}
 
-	const float ProjectileDuration = ResolveShortCircuitProjectileDuration(Row, ShortCircuitData, SpawnLocation, SkillCtx.TargetLocation);
+	const float ProjectileDuration = ResolveShortCircuitProjectileDuration(ShortCircuitData, SpawnLocation, SkillCtx.TargetLocation);
 	const float ProjectileArcHeight = ResolveShortCircuitArcHeight(Row, ShortCircuitData);
 	const float ProjectileLifeSeconds = ResolveShortCircuitLifeSeconds(ProjectileDuration, ShortCircuitData);
 	Projectile->InitializeProjectile(SourceActor, ShortCircuitData, SkillCtx.TargetLocation, ProjectileDuration, ProjectileArcHeight, ProjectileLifeSeconds);

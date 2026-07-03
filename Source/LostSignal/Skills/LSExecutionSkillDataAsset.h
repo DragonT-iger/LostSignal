@@ -19,6 +19,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Execution", meta=(ClampMin="0.0"))
 	float FallbackDashDistance = 650.0f;
 
+	// 대시 Duration 단일 출처. (DataTable Skill_Time은 시전시간 전용)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Execution", meta=(ClampMin="0.0"))
 	float FallbackDashDuration = 0.25f;
 
