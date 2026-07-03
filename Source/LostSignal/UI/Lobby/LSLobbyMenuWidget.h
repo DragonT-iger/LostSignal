@@ -185,6 +185,10 @@ private:
 	// "아직 구현되지 않았습니다" 안내창을 띄운다. 이미 떠 있으면 중복 생성하지 않는다.
 	void ShowNotImplementedNotice();
 
+	// 로비/개인정비 어느 쪽에서 띄운 미구현 안내창이든 떠 있으면 닫는다. 닫은 게 있으면 true.
+	// 탭 클릭 시 먼저 호출해 탭 전환으로도 안내창이 닫히게 한다.
+	bool CloseNotImplementedNotice();
+
 	UPROPERTY(Transient)
 	TObjectPtr<ULSSettingsWidget> ActiveSettingsWidget;
 

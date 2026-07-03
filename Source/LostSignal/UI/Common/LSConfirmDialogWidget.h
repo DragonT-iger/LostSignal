@@ -31,6 +31,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="LS/UI|Common")
 	FLSConfirmDialogCancelled OnCancelled;
 
+	// 외부 코드에서 취소와 동일하게 닫는다(OnCancelled 브로드캐스트 후 제거). 탭 전환 등으로 강제로 닫을 때 사용.
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Common")
+	void Cancel();
+
 	// 다이얼로그 본문 메시지를 설정한다.
 	// RichTextBlock이라 스타일 세트 행 이름 마크업으로 부분 강조가 가능하다. 예: "아직 <Emph>구현</>되지 않았습니다."
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Common")

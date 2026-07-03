@@ -45,6 +45,9 @@ public:
 	// 미구현 안내창이 떠 있는지. 로비 루트의 포커스 회수 가드가 안내창의 키 입력(ESC/TAB)을 뺏지 않게 참조한다.
 	bool HasActiveConfirmDialog() const;
 
+	// 미구현 안내창이 떠 있으면 취소와 동일하게 닫는다. 탭 전환 시 로비/내부 탭 핸들러가 호출한다.
+	void CloseActiveConfirmDialog();
+
 protected:
 	// 내부 탭 콘텐츠 전환. 인덱스는 ELSLoadoutTab 순서를 따른다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")

@@ -73,6 +73,11 @@ FReply ULSConfirmDialogWidget::NativeOnKeyDown(const FGeometry& InGeometry, cons
 	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
 
+void ULSConfirmDialogWidget::Cancel()
+{
+	HandleCancelClicked();
+}
+
 void ULSConfirmDialogWidget::HandleConfirmClicked()
 {
 	OnConfirmed.Broadcast();

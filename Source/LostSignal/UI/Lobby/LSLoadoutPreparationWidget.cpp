@@ -146,25 +146,48 @@ bool ULSLoadoutPreparationWidget::HasActiveConfirmDialog() const
 	return ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport();
 }
 
+void ULSLoadoutPreparationWidget::CloseActiveConfirmDialog()
+{
+	if (HasActiveConfirmDialog())
+	{
+		// Cancel이 OnCancelled를 브로드캐스트해 HandleNotImplementedDialogClosed에서 참조 정리까지 이어진다.
+		ActiveConfirmDialog->Cancel();
+	}
+}
+
 void ULSLoadoutPreparationWidget::HandleSupplyTabClicked()
 {
+	// 안내창이 이미 떠 있으면 닫기만 한다(토글).
 	// 에이베리 보급소(상점/제작)는 아직 안 만들어서 나중에 구현할 예정입니다. 그때까지 탭 목록을 유지한다.
+	if (HasActiveConfirmDialog())
+	{
+		CloseActiveConfirmDialog();
+		return;
+	}
 	ShowNotImplementedNotice();
 }
 
 void ULSLoadoutPreparationWidget::HandleStorageTabClicked()
 {
+	CloseActiveConfirmDialog();
 	ShowTab(ELSLoadoutTab::Storage);
 }
 
 void ULSLoadoutPreparationWidget::HandleUpgradeTabClicked()
 {
+	// 안내창이 이미 떠 있으면 닫기만 한다(토글).
 	// 업그레이드(캐릭터/기지 강화)는 아직 안 만들어서 나중에 구현할 예정입니다. 그때까지 탭 목록을 유지한다.
+	if (HasActiveConfirmDialog())
+	{
+		CloseActiveConfirmDialog();
+		return;
+	}
 	ShowNotImplementedNotice();
 }
 
 void ULSLoadoutPreparationWidget::HandleChipTabClicked()
 {
+	CloseActiveConfirmDialog();
 	ShowTab(ELSLoadoutTab::Chip);
 }
 

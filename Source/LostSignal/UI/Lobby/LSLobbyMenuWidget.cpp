@@ -206,11 +206,13 @@ void ULSLobbyMenuWidget::SetPlayerName(const FText& NewPlayerName) const
 
 void ULSLobbyMenuWidget::HandlePlayTabClicked()
 {
+	CloseNotImplementedNotice();
 	ShowTab(ELSLobbyTab::Play);
 }
 
 void ULSLobbyMenuWidget::HandleLoadoutPreparationClicked()
 {
+	CloseNotImplementedNotice();
 	// 상단 탭으로 진입할 때는 항상 내부 탭 목록부터 보여준다.
 	if (WBP_LoadoutPreparation)
 	{
@@ -221,14 +223,22 @@ void ULSLobbyMenuWidget::HandleLoadoutPreparationClicked()
 
 void ULSLobbyMenuWidget::HandleQuestTabClicked()
 {
-	// 퀘스트 페이지는 아직 스위쳐에 없다. 플레이 페이지를 유지한 채 미구현 안내창만 띄운다.
+	// 안내창이 이미 떠 있으면 닫기만 한다(토글). 없을 때만 플레이 페이지를 유지한 채 미구현 안내창을 띄운다.
+	if (CloseNotImplementedNotice())
+	{
+		return;
+	}
 	ShowTab(ELSLobbyTab::Play);
 	ShowNotImplementedNotice();
 }
 
 void ULSLobbyMenuWidget::HandleCharacterTabClicked()
 {
-	// 캐릭터변경 페이지는 아직 스위쳐에 없다. 플레이 페이지를 유지한 채 미구현 안내창만 띄운다.
+	// 안내창이 이미 떠 있으면 닫기만 한다(토글). 없을 때만 플레이 페이지를 유지한 채 미구현 안내창을 띄운다.
+	if (CloseNotImplementedNotice())
+	{
+		return;
+	}
 	ShowTab(ELSLobbyTab::Play);
 	ShowNotImplementedNotice();
 }
@@ -432,6 +442,26 @@ void ULSLobbyMenuWidget::ShowNotImplementedNotice()
 	Dialog->OnCancelled.AddDynamic(this, &ULSLobbyMenuWidget::HandleNotImplementedDialogClosed);
 	Dialog->AddToViewport(LSUILayer::ModalPanel);
 	ActiveConfirmDialog = Dialog;
+}
+
+bool ULSLobbyMenuWidget::CloseNotImplementedNotice()
+{
+	bool bClosedAny = false;
+
+	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
+	{
+		// Cancel이 OnCancelled를 브로드캐스트해 HandleNotImplementedDialogClosed에서 참조 정리까지 이어진다.
+		ActiveConfirmDialog->Cancel();
+		bClosedAny = true;
+	}
+
+	if (WBP_LoadoutPreparation && WBP_LoadoutPreparation->HasActiveConfirmDialog())
+	{
+		WBP_LoadoutPreparation->CloseActiveConfirmDialog();
+		bClosedAny = true;
+	}
+
+	return bClosedAny;
 }
 
 void ULSLobbyMenuWidget::HandleNotImplementedDialogClosed()
