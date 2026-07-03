@@ -6,6 +6,7 @@
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Gameplay/LSWorldDroppedItem.h"
+#include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "Layout/WidgetPath.h"
 #include "Session/LSSaveSubsystem.h"
@@ -579,6 +580,34 @@ void ULSInventoryWidget::RebuildEquipmentSlots()
 		else
 		{
 			SlotWidget->ClearItem();
+		}
+	}
+}
+
+void ULSInventoryWidget::SetEquipmentDragHighlight(const FName DraggedItemRowName)
+{
+	// 장착 대상 슬롯 타입(=슬롯 인덱스)을 결정한다. 장착 불가면 Count가 나와 어느 칸도 매칭되지 않는다.
+	const ELSEquipmentSlot TargetType = LSInventorySlotUtils::ResolveEquipmentSlotType(DraggedItemRowName);
+
+	// ELSEquipmentSlot 순서와 일치해야 한다(인덱스 = 슬롯 타입). RebuildEquipmentSlots와 동일 배열.
+	ULSItemSlotWidget* SlotWidgets[] = { WeaponSlot, ProcessorSlot, CoreSlot, ActuatorSlot, FrameSlot };
+	for (int32 SlotIndex = 0; SlotIndex < UE_ARRAY_COUNT(SlotWidgets); ++SlotIndex)
+	{
+		if (ULSItemSlotWidget* SlotWidget = SlotWidgets[SlotIndex])
+		{
+			SlotWidget->SetEquipCandidateHighlight(TargetType == static_cast<ELSEquipmentSlot>(SlotIndex));
+		}
+	}
+}
+
+void ULSInventoryWidget::ClearEquipmentDragHighlight()
+{
+	ULSItemSlotWidget* SlotWidgets[] = { WeaponSlot, ProcessorSlot, CoreSlot, ActuatorSlot, FrameSlot };
+	for (ULSItemSlotWidget* SlotWidget : SlotWidgets)
+	{
+		if (SlotWidget)
+		{
+			SlotWidget->SetEquipCandidateHighlight(false);
 		}
 	}
 }

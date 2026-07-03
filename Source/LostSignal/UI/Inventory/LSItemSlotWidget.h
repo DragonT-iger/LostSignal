@@ -30,6 +30,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void SetSlotLocked(bool bInLocked);
 
+	// 드래그 중 이 슬롯이 "지금 끌고 있는 아이템이 장착될 장비칸"임을 알리는 후보 하이라이트를 켜고 끈다.
+	// 켜면 후보 색 틴트 + 스케일 펄스(NativeTick)로 강조한다. 장비 슬롯에만 쓴다.
+	void SetEquipCandidateHighlight(bool bInIsCandidate);
+
 	void SetDisplayOnlySlotContext();
 	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem, bool bInLocked = false);
 	void SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, int32 InSlotIndex, bool bInHasItem);
@@ -119,6 +123,19 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	FVector2D HoveredRenderScale = FVector2D(1.1f, 1.1f);
 
+	// 장착 후보 하이라이트(드래그 중 대상 장비칸) 색·펄스. 아트/기획이 WBP 기본값에서 조정.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipCandidate")
+	FLinearColor EquipCandidateTint = FLinearColor(0.35f, 1.0f, 0.55f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipCandidate")
+	float EquipCandidatePulseSpeed = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipCandidate")
+	float EquipCandidatePulseMinScale = 1.05f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipCandidate")
+	float EquipCandidatePulseMaxScale = 1.18f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTexture2D> DefaultSlotTexture;
 
@@ -160,6 +177,8 @@ private:
 	bool bIsLocked = false;
 	bool bIsHovered = false;
 	bool bIsDragTarget = false;
+	// 드래그 중 이 슬롯이 대상 장비칸일 때 켜지는 후보 하이라이트 상태(NativeTick이 펄스 구동).
+	bool bIsEquipCandidate = false;
 	// 드래그 중 커서를 따라가는 비주얼 인스턴스 표시. 이 슬롯은 아이템 아이콘만 보이고 배경 프레임은 숨긴다.
 	bool bIsDragVisual = false;
 	// 현재 표시 중인 아이템 등급에 해당하는 배경색. 빈 슬롯·등급 없는 아이템은 DefaultGradeColor.

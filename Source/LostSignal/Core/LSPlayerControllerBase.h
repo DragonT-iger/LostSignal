@@ -69,6 +69,9 @@ public:
 	// 폰에 묶여 있던 갱신/열림 판정이 폰이 없을 때 이 위젯들로 우회된다. 위젯이 스스로 생성/소멸 시 호출한다.
 	void RegisterLobbyInventoryWidget(ULSInventoryWidget* InWidget);
 	void UnregisterLobbyInventoryWidget(const ULSInventoryWidget* InWidget);
+
+	// 로비에서 오버레이로 띄운 인벤토리 위젯(장비 장착칸 소유). 없으면 nullptr. 장비칸 드래그 하이라이트 등에 쓴다.
+	ULSInventoryWidget* GetLobbyInventoryWidget() const { return LobbyInventoryWidgetInstance; }
 	void RegisterLobbyStorageWidget(ULSLobbyStorageWidget* InWidget);
 	void UnregisterLobbyStorageWidget(const ULSLobbyStorageWidget* InWidget);
 

@@ -1166,6 +1166,13 @@ void ALSPlayerControllerBase::ToggleRaidSettingsWidget()
 		return;
 	}
 
+	// 루트박스가 떠 있으면 설정을 열지 않고 루트박스를 먼저 닫는다.
+	if (LootDropWidgetInstance && LootDropWidgetInstance->IsVisible())
+	{
+		HideLootDropWidget();
+		return;
+	}
+
 	if (!RaidSettingsWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("RaidSettingsWidgetClass is not set on %s."), *GetNameSafe(this));

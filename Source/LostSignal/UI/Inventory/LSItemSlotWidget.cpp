@@ -184,6 +184,23 @@ void ULSItemSlotWidget::SetSlotLocked(const bool bInLocked)
 	ApplyHoverVisual();
 }
 
+void ULSItemSlotWidget::SetEquipCandidateHighlight(const bool bInIsCandidate)
+{
+	if (bIsEquipCandidate == bInIsCandidate)
+	{
+		return;
+	}
+
+	bIsEquipCandidate = bInIsCandidate;
+	// 후보 해제 시 펄스로 늘어난 스케일을 즉시 원복한다(NativeTick이 더 이상 돌지 않으므로).
+	// 호버 중이면 이어지는 ApplyHoverVisual이 호버 강조 스케일로 다시 맞춘다.
+	if (!bIsEquipCandidate)
+	{
+		SetRenderScale(FVector2D::UnitVector);
+	}
+	ApplyHoverVisual();
+}
+
 void ULSItemSlotWidget::SetDisplayOnlySlotContext()
 {
 	InventoryWidget.Reset();
@@ -214,8 +231,8 @@ void ULSItemSlotWidget::NativeTick(const FGeometry& MyGeometry, const float InDe
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	// 루트 단계 공개 연출 외에는 비용이 들지 않도록 조기 종료한다(모든 슬롯이 공유하는 클래스).
-	if (!bIsPopInAnimating && !bIsPlaceholder)
+	// 연출이 없는 평상시 슬롯은 비용이 들지 않도록 조기 종료한다(모든 슬롯이 공유하는 클래스).
+	if (!bIsPopInAnimating && !bIsPlaceholder && !bIsEquipCandidate)
 	{
 		return;
 	}
@@ -242,12 +259,23 @@ void ULSItemSlotWidget::NativeTick(const FGeometry& MyGeometry, const float InDe
 	}
 
 	// 미공개 placeholder 펄스: 미확인 아이콘 알파만 sin으로 진동(슬롯 프레임 배경은 또렷하게 유지).
-	if (ItemIconImage)
+	if (bIsPlaceholder && ItemIconImage)
 	{
 		const float Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 		const float PulseT = (FMath::Sin(Time * PlaceholderPulseSpeed * 2.f * PI) + 1.f) * 0.5f;
 		const float PulseAlpha = FMath::Lerp(PlaceholderPulseMinAlpha, PlaceholderPulseMaxAlpha, PulseT);
 		ItemIconImage->SetColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, PulseAlpha));
+		return;
+	}
+
+	// 장착 후보 펄스: 드래그 중 이 아이템이 들어갈 장비칸을 스케일 진동으로 강조한다.
+	// 커서가 슬롯 위에 있으면(호버/드래그 타겟) 그쪽 강조가 우선이라 펄스는 양보한다.
+	if (bIsEquipCandidate && !bIsHovered && !bIsDragTarget)
+	{
+		const float Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+		const float PulseT = (FMath::Sin(Time * EquipCandidatePulseSpeed * 2.f * PI) + 1.f) * 0.5f;
+		const float Scale = FMath::Lerp(EquipCandidatePulseMinScale, EquipCandidatePulseMaxScale, PulseT);
+		SetRenderScale(FVector2D(Scale, Scale));
 	}
 }
 
@@ -459,6 +487,15 @@ void ULSItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const 
 	SetVisibility(ESlateVisibility::HitTestInvisible);
 	SetRenderOpacity(0.25f);
 	OutOperation = DragOperation;
+
+	// 이 아이템이 장착될 장비칸을 강조한다(로비 장비 편집 전용). 드래그 종료 시 RestoreDragSourceVisual이 끈다.
+	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		if (ULSInventoryWidget* LobbyInventory = LSPlayerController->GetLobbyInventoryWidget())
+		{
+			LobbyInventory->SetEquipmentDragHighlight(DragItemRowName);
+		}
+	}
 }
 
 bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
@@ -578,6 +615,16 @@ void ULSItemSlotWidget::RestoreDragSourceVisual()
 {
 	SetVisibility(ESlateVisibility::Visible);
 	SetRenderOpacity(1.0f);
+
+	// 드래그 종료(성공/취소 공용)마다 장비칸 후보 하이라이트를 끈다.
+	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		if (ULSInventoryWidget* LobbyInventory = LSPlayerController->GetLobbyInventoryWidget())
+		{
+			LobbyInventory->ClearEquipmentDragHighlight();
+		}
+	}
+
 	ApplyHoverVisual();
 }
 
@@ -585,6 +632,7 @@ void ULSItemSlotWidget::ResetTransientSlotState()
 {
 	bIsHovered = false;
 	bIsDragTarget = false;
+	bIsEquipCandidate = false;
 	SetVisibility(ESlateVisibility::Visible);
 	SetRenderOpacity(1.0f);
 	SetRenderScale(FVector2D::UnitVector);
@@ -624,16 +672,20 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 	{
 		Tint = DragTargetIconTint;
 	}
+	else if (bIsEquipCandidate)
+	{
+		Tint = EquipCandidateTint;
+	}
 	else
 	{
 		Tint = bIsHovered ? HoveredIconTint : NormalIconTint;
 	}
 
-	// 호버/드래그 대상은 피드백 틴트를 우선한다. 잠긴 슬롯은 아이콘만 흐리게 하고,
+	// 호버/드래그 대상/장착 후보는 피드백 틴트를 우선한다. 잠긴 슬롯은 아이콘만 흐리게 하고,
 	// 아이템이 있는 배경은 등급색을 유지해 장비 등급을 계속 구분할 수 있게 한다.
 	if (SlotBackgroundImage)
 	{
-		const bool bSpecialState = bIsDragTarget || bIsHovered || (bIsLocked && !bHasItem);
+		const bool bSpecialState = bIsDragTarget || bIsHovered || bIsEquipCandidate || (bIsLocked && !bHasItem);
 		SlotBackgroundImage->SetColorAndOpacity(bSpecialState ? Tint : CurrentGradeBackgroundColor);
 	}
 
@@ -643,8 +695,12 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 	}
 
 	// 틴트에 더해 호버/드래그 타겟 시 슬롯을 살짝 키워 강조한다(잠금·드래그 비주얼 제외).
-	const bool bShouldEmphasize = !bIsLocked && !bIsDragVisual && (bIsHovered || bIsDragTarget);
-	SetRenderScale(bShouldEmphasize ? HoveredRenderScale : FVector2D::UnitVector);
+	// 장착 후보의 스케일은 NativeTick 펄스가 소유하므로 여기서는 건드리지 않는다(호버 시엔 호버 강조가 우선).
+	if (!bIsEquipCandidate || bIsHovered || bIsDragTarget)
+	{
+		const bool bShouldEmphasize = !bIsLocked && !bIsDragVisual && (bIsHovered || bIsDragTarget);
+		SetRenderScale(bShouldEmphasize ? HoveredRenderScale : FVector2D::UnitVector);
+	}
 }
 
 void ULSItemSlotWidget::ApplySlotBackground()

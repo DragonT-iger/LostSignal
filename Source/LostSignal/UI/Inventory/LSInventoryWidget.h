@@ -37,6 +37,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void RebuildEquipmentSlots();
 
+	// 드래그 중인 아이템이 장착될 장비칸 1개에 후보 하이라이트를 켜고 나머지는 끈다.
+	// 장착 불가 아이템이면 어느 칸도 켜지지 않는다. 드래그 종료 시 ClearEquipmentDragHighlight로 전부 끈다.
+	void SetEquipmentDragHighlight(FName DraggedItemRowName);
+	void ClearEquipmentDragHighlight();
+
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void SetStoreAllButtonVisible(bool bVisible);
 
