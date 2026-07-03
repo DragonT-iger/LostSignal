@@ -6,6 +6,7 @@
 #include "Components/TextBlock.h"
 #include "Components/WidgetSwitcher.h"
 #include "Core/LSLobbyGameMode.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "InputCoreTypes.h"
@@ -272,6 +273,17 @@ FReply ULSLobbyMenuWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, c
 	if (InKeyEvent.GetKey() == EKeys::Tab)
 	{
 		ToggleStoragePage();
+		return FReply::Handled();
+	}
+
+	// 로비는 InputModeUIOnly라 PlayerController의 BindKey(Insert)까지 입력이 내려오지 않는다.
+	// 여기서 직접 프로토콜 디버그 패널을 토글한다.
+	if (InKeyEvent.GetKey() == EKeys::Insert)
+	{
+		if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+		{
+			LSPlayerController->ToggleProtocolDebugWidget();
+		}
 		return FReply::Handled();
 	}
 
