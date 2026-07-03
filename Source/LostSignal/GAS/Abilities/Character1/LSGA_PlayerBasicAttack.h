@@ -25,7 +25,7 @@ public:
 	int32 GetCurrentComboIndex() const { return CurrentSectionIndex; }
 	int32 GetCurrentComboTag() const { return CurrentComboTag; }
 
-	void QueueComboInput();
+	void QueueComboInput(bool bFromHold = false);
 	void OpenComboWindow();
 	void CloseComboWindow();
 
@@ -52,6 +52,8 @@ private:
 	void SetComboWindowTagActive(bool bActive);
 	float ResolveComboPlayRate(const FLSComboAttackRow* ComboRow, int32 SectionIndex, float AttackSpeed) const;
 	float GetCurrentComboInputWindowSeconds() const;
+	bool IsBasicAttackHeld() const;
+	int32 ResolveNextComboSectionIndex() const;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TArray<FName> ComboSections;
@@ -65,11 +67,15 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveAttackMontage = nullptr;
 
+	UPROPERTY(Transient)
+	TWeakObjectPtr<ULSPlayerCombatComponent> CachedPlayerCombatComponent;
+
 	FTimerHandle PostComboInputWindowTimerHandle;
 	int32 CurrentSectionIndex = INDEX_NONE;
 	int32 CurrentComboTag = 0;
 	float CurrentComboInputWindowSeconds = 0.0f;
 	bool bComboInputBuffered = false;
+	bool bComboInputFromHold = false;
 	bool bComboWindowOpen = false;
 	bool bWaitingForPostComboInput = false;
 	bool bComboWindowTagActive = false;

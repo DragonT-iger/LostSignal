@@ -25,6 +25,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	bool RequestBasicAttack();
 
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void SetBasicAttackHeld(bool bHeld);
+
+	UFUNCTION(BlueprintPure, Category="LS/Combat")
+	bool IsBasicAttackHeld() const { return bBasicAttackHeld; }
+
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	UAnimMontage* GetBasicAttackMontage() const { return AttackMontage; }
 
@@ -106,6 +112,7 @@ private:
 	FTimerHandle PredictedDashCooldownTimerHandle;
 	FTimerHandle PendingComboIndexOverrideTimerHandle;
 	bool bAttackHitConsumed = false;
+	bool bBasicAttackHeld = false;
 	bool bPredictedDashInProgress = false;
 	bool bPredictedDashCooldownActive = false;
 	uint16 PredictedDashRootMotionSourceID = 0;
@@ -133,4 +140,7 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerRequestBasicAttack();
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetBasicAttackHeld(bool bHeld);
 };

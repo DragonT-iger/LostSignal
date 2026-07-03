@@ -115,12 +115,21 @@ Enhanced Input
 공격 입력:
 
 ```text
-ALSPlayerCharacter::OnAttack
+IA_Attack Started
+-> ALSPlayerCharacter::OnAttack
 -> 스킬 프리뷰 중이면 ConfirmAnyActiveSkillPreview
--> 아니면 ULSPlayerCombatComponent::RequestBasicAttack
+-> 아니면 SetBasicAttackHeld(true) 후 ULSPlayerCombatComponent::RequestBasicAttack
+
+IA_Attack Completed / Canceled
+-> ALSPlayerCharacter::OnAttackReleased
+-> ULSPlayerCombatComponent::SetBasicAttackHeld(false)
 ```
 
-스킬 프리뷰 중 좌클릭은 스킬 확정 입력으로 소비한다. 확정이 실패하더라도 같은 입력으로 기본 공격을 실행하지 않는다.
+`SetBasicAttackHeld`는 같은 값이면 no-op(dedup)라 홀드 상태 RPC(`ServerSetBasicAttackHeld`)는 press/release 각 1회만 나간다. Canceled도 바인딩해 매핑 컨텍스트 제거 등으로 Completed가 누락돼도 홀드가 눌린 채 남지 않는다. 해제(`OnAttackReleased`)는 입력 블록 상태와 무관하게 항상 전달한다.
+
+스킬 프리뷰 중 좌클릭은 스킬 확정 입력으로 소비한다. 확정이 실패하더라도 같은 입력으로 기본 공격을 실행하지 않으며, 홀드 상태도 올리지 않는다.
+
+달리기 중 기본 공격 입력이 들어오면 걷기로 전환한다(`OnAttack`에서 `OnRunEnd()` 재사용). 공격이 끝나도 자동으로 달리기로 복귀하지 않으며, 달리기 키를 다시 눌러야 한다. 스킬 프리뷰 확정으로 소비된 입력은 달리기를 해제하지 않는다.
 
 기본 공격 콤보 진행 중에 스킬을 확정하면 기본 공격이 즉시 캔슬되고 스킬이 발동한다. (스킬 시전 중 다른 스킬은 차단) 차단/캔슬 태그 계약은 [SkillSystemStructure.md](SkillSystemStructure.md)의 `기본 공격 캔슬과 스킬 차단 태그`가 단일 출처다.
 
@@ -154,6 +163,22 @@ ALSPlayerCharacter::OnAttack
 -> 서버에서 RequestBasicAttack 재실행
 -> BasicAttackAbilityClass를 ASC로 활성화
 ```
+
+콤보 진행 (연타/홀드):
+
+```text
+섹션 몽타주 종료
+-> ULSGA_PlayerBasicAttack::HandleAttackMontageEnded
+-> 다음 섹션이 있으면 OpenPostComboInputWindow (입력 윈도우 오픈)
+-> [연타] 윈도우 중 공격 입력 -> QueueComboInput -> 다음 틱 ConsumePostComboInput -> 다음 섹션 재생
+-> [홀드] 윈도우가 열리자마자 QueueComboInput(true) 자동 버퍼링 -> 연타 최속과 동일 타이밍으로 다음 섹션 재생
+```
+
+홀드 규칙:
+
+- 홀드 중에는 마지막 콤보 섹션 후에도 1타(섹션 0)로 래핑해 무한 반복한다. 연타(탭)는 기존대로 마지막 섹션 후 종료.
+- 홀드 유래 버퍼는 소비 직전에 홀드를 재확인한다. 해제됐으면 버퍼를 취소하고 입력 윈도우를 복원해 이후 탭 입력을 기존 방식으로 받는다.
+- 대시/스킬/스턴/사망으로 Ability가 캔슬되면 홀드 루프도 함께 끝난다. 홀드를 유지해도 자동 재개는 없다 (재입력 필요).
 
 콤보 row 조회:
 

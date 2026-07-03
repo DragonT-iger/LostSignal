@@ -296,6 +296,7 @@ private:
 	void Move(const FInputActionValue& Value);
 	void FaceMovementDirection(float DeltaSeconds);
 	void OnAttack();
+	void OnAttackReleased();
 	void OnDash();
 	void OnSkillPreviewCancelInput();
 	void OnRunStart();

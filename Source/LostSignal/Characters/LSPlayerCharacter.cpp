@@ -214,7 +214,13 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 		EnhancedInput->BindAction(RunAction, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnRunEnd);
 	}
 
-	if (AttackAction) { EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnAttack); }
+	if (AttackAction)
+	{
+		EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnAttack);
+		EnhancedInput->BindAction(AttackAction, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnAttackReleased);
+		// 매핑 컨텍스트 제거 등으로 Completed 대신 Canceled가 올 수 있어 홀드가 눌린 채 남지 않도록 함께 바인딩.
+		EnhancedInput->BindAction(AttackAction, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnAttackReleased);
+	}
 	if (DashAction) { EnhancedInput->BindAction(DashAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnDash); }
 	if (SkillCancelAction) { EnhancedInput->BindAction(SkillCancelAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkillPreviewCancelInput); }
 	if (Skill1Action)
@@ -291,7 +297,23 @@ void ALSPlayerCharacter::OnAttack()
 		return;
 	}
 
+	// 달리기 중 기본 공격이 들어오면 걷기로 전환한다. 공격 후 자동 복귀는 없다(달리기 키 재입력 필요).
+	if (bIsRunning)
+	{
+		OnRunEnd();
+	}
+
+	PlayerCombatComponent->SetBasicAttackHeld(true);
 	PlayerCombatComponent->RequestBasicAttack();
+}
+
+void ALSPlayerCharacter::OnAttackReleased()
+{
+	// 홀드 해제는 입력 블록 상태(모달 UI 등)와 무관하게 항상 서버에 전달한다. 눌린 적 없으면 dedup으로 no-op.
+	if (PlayerCombatComponent)
+	{
+		PlayerCombatComponent->SetBasicAttackHeld(false);
+	}
 }
 
 void ALSPlayerCharacter::OnDash()

@@ -49,7 +49,7 @@ ULSGA_PlayerBasicAttack* ULSGA_PlayerBasicAttack::FindActiveBasicAttackAbility(U
 	return nullptr;
 }
 
-void ULSGA_PlayerBasicAttack::QueueComboInput()
+void ULSGA_PlayerBasicAttack::QueueComboInput(bool bFromHold)
 {
 	if (!IsActive() || !bWaitingForPostComboInput)
 	{
@@ -61,13 +61,13 @@ void ULSGA_PlayerBasicAttack::QueueComboInput()
 		return;
 	}
 
-	const int32 NextSectionIndex = CurrentSectionIndex + 1;
-	if (!ComboSections.IsValidIndex(NextSectionIndex))
+	if (ResolveNextComboSectionIndex() == INDEX_NONE)
 	{
 		return;
 	}
 
 	bComboInputBuffered = true;
+	bComboInputFromHold = bFromHold;
 	bWaitingForPostComboInput = false;
 	SetComboWindowTagActive(false);
 
@@ -111,6 +111,7 @@ void ULSGA_PlayerBasicAttack::ActivateAbility(
 
 	bEndingAbility = false;
 	bComboInputBuffered = false;
+	bComboInputFromHold = false;
 	bComboWindowOpen = false;
 	bWaitingForPostComboInput = false;
 	bComboWindowTagActive = false;
@@ -125,6 +126,8 @@ void ULSGA_PlayerBasicAttack::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+
+	CachedPlayerCombatComponent = PlayerCombatComponent;
 
 	ActiveAttackMontage = PlayerCombatComponent->GetBasicAttackMontage();
 	if (!ActiveAttackMontage || ComboSections.Num() == 0)
@@ -206,10 +209,12 @@ void ULSGA_PlayerBasicAttack::EndAbility(
 	}
 
 	ActiveAttackMontage = nullptr;
+	CachedPlayerCombatComponent = nullptr;
 	CurrentSectionIndex = INDEX_NONE;
 	CurrentComboTag = 0;
 	CurrentComboInputWindowSeconds = 0.0f;
 	bComboInputBuffered = false;
+	bComboInputFromHold = false;
 	bComboWindowOpen = false;
 	bWaitingForPostComboInput = false;
 
@@ -295,6 +300,11 @@ void ULSGA_PlayerBasicAttack::OpenPostComboInputWindow()
 			false);
 	}
 
+	// 공격 버튼 홀드 중이면 윈도우가 열리자마자 자동 버퍼링 — 연타 최속과 동일한 타이밍으로 콤보가 이어진다.
+	if (IsBasicAttackHeld())
+	{
+		QueueComboInput(true);
+	}
 }
 
 void ULSGA_PlayerBasicAttack::ClosePostComboInputWindow()
@@ -316,11 +326,21 @@ void ULSGA_PlayerBasicAttack::ConsumePostComboInput()
 		return;
 	}
 
+	// 홀드 유래 버퍼는 소비 직전에 홀드를 재확인한다. 해제됐으면 취소하고 윈도우를 복원해 이후 탭 입력을 기존 방식으로 받는다.
+	if (bComboInputFromHold && !IsBasicAttackHeld())
+	{
+		bComboInputBuffered = false;
+		bComboInputFromHold = false;
+		OpenPostComboInputWindow();
+		return;
+	}
+
 	bComboInputBuffered = false;
+	bComboInputFromHold = false;
 	CurrentComboTag = 0;
 
-	const int32 NextSectionIndex = CurrentSectionIndex + 1;
-	if (!ComboSections.IsValidIndex(NextSectionIndex))
+	const int32 NextSectionIndex = ResolveNextComboSectionIndex();
+	if (NextSectionIndex == INDEX_NONE)
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
@@ -338,8 +358,7 @@ void ULSGA_PlayerBasicAttack::HandleAttackMontageEnded(UAnimMontage* Montage, bo
 
 	if (IsActive())
 	{
-		const int32 NextSectionIndex = CurrentSectionIndex + 1;
-		if (!bInterrupted && ComboSections.IsValidIndex(NextSectionIndex) && GetCurrentComboInputWindowSeconds() > 0.0f)
+		if (!bInterrupted && ResolveNextComboSectionIndex() != INDEX_NONE && GetCurrentComboInputWindowSeconds() > 0.0f)
 		{
 			OpenPostComboInputWindow();
 			return;
@@ -378,6 +397,28 @@ float ULSGA_PlayerBasicAttack::ResolveComboPlayRate(const FLSComboAttackRow* Com
 float ULSGA_PlayerBasicAttack::GetCurrentComboInputWindowSeconds() const
 {
 	return CurrentComboInputWindowSeconds > 0.0f ? CurrentComboInputWindowSeconds : PostComboInputWindowSeconds;
+}
+
+bool ULSGA_PlayerBasicAttack::IsBasicAttackHeld() const
+{
+	return CachedPlayerCombatComponent.IsValid() && CachedPlayerCombatComponent->IsBasicAttackHeld();
+}
+
+int32 ULSGA_PlayerBasicAttack::ResolveNextComboSectionIndex() const
+{
+	const int32 NextSectionIndex = CurrentSectionIndex + 1;
+	if (ComboSections.IsValidIndex(NextSectionIndex))
+	{
+		return NextSectionIndex;
+	}
+
+	// 마지막 섹션 이후에도 홀드 중이면 1타부터 무한 반복. 탭 방식은 기존대로 종료.
+	if (IsBasicAttackHeld() && ComboSections.Num() > 0)
+	{
+		return 0;
+	}
+
+	return INDEX_NONE;
 }
 
 void ULSGA_PlayerBasicAttack::SetComboWindowTagActive(bool bActive)

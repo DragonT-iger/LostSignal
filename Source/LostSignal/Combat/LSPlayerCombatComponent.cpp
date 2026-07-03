@@ -109,6 +109,33 @@ void ULSPlayerCombatComponent::ServerRequestBasicAttack_Implementation()
 	RequestBasicAttack();
 }
 
+void ULSPlayerCombatComponent::SetBasicAttackHeld(bool bHeld)
+{
+	// 같은 값이면 no-op — press/release 각 1회만 서버 RPC를 보내기 위한 dedup.
+	if (bBasicAttackHeld == bHeld)
+	{
+		return;
+	}
+
+	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
+	if (!OwnerCharacter || OwnerCharacter->IsTemplate())
+	{
+		return;
+	}
+
+	bBasicAttackHeld = bHeld;
+
+	if (!OwnerCharacter->HasAuthority())
+	{
+		ServerSetBasicAttackHeld(bHeld);
+	}
+}
+
+void ULSPlayerCombatComponent::ServerSetBasicAttackHeld_Implementation(bool bHeld)
+{
+	bBasicAttackHeld = bHeld;
+}
+
 bool ULSPlayerCombatComponent::RequestDash()
 {
 	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
