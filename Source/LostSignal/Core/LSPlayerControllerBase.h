@@ -332,6 +332,10 @@ private:
 	void HideLobbyStorageWidgetLocal();
 	void ShowChipStationWidgetLocal(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass);
 	void HideChipStationWidgetLocal();
+
+	// 칩 스테이션 소멸 연출이 끝나 위젯이 Collapsed된 뒤 공유 블러를 재계산한다.
+	UFUNCTION()
+	void HandleChipStationDissolveFinished();
 	void CreatePlayerHUDWidgetLocal();
 	void CreateBackgroundBlurWidgetLocal();
 	void InitializeRaidInventoryFromSessionSubsystem();

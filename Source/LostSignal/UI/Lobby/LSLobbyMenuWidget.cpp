@@ -10,6 +10,7 @@
 #include "GameFramework/PlayerController.h"
 #include "InputCoreTypes.h"
 #include "LostSignal.h"
+#include "TimerManager.h"
 #include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/LSUILayer.h"
 #include "UI/Lobby/LSLoadoutPreparationWidget.h"
@@ -210,10 +211,10 @@ void ULSLobbyMenuWidget::HandlePlayTabClicked()
 
 void ULSLobbyMenuWidget::HandleLoadoutPreparationClicked()
 {
-	// 상단 탭으로 진입할 때는 항상 내부 탭 목록부터 보여준다.
+	// 상단 탭으로 진입할 때는 항상 내부 탭 목록부터 보여준다(진입이라 연출 없이 즉시 정리).
 	if (WBP_LoadoutPreparation)
 	{
-		WBP_LoadoutPreparation->ResetToTabs();
+		WBP_LoadoutPreparation->CollapseContentToTabs();
 	}
 	ShowTab(ELSLobbyTab::LoadoutPreparation);
 }
@@ -246,20 +247,31 @@ FReply ULSLobbyMenuWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, c
 		return FReply::Handled();
 	}
 
-	if (InKeyEvent.GetKey() == EKeys::Escape && TabSwitcher
-		&& TabSwitcher->GetActiveWidgetIndex() != static_cast<int32>(ELSLobbyTab::Play))
+	if (InKeyEvent.GetKey() == EKeys::Escape)
 	{
-		// 개인정비에서 콘텐츠가 열려 있으면 먼저 내부 탭 목록으로, 그 외에는 플레이 페이지로 돌아온다.
-		const bool bLoadoutActive =
-			TabSwitcher->GetActiveWidgetIndex() == static_cast<int32>(ELSLobbyTab::LoadoutPreparation);
-		if (bLoadoutActive && WBP_LoadoutPreparation && WBP_LoadoutPreparation->IsContentOpen())
+		if (TabSwitcher && TabSwitcher->GetActiveWidgetIndex() != static_cast<int32>(ELSLobbyTab::Play))
 		{
-			WBP_LoadoutPreparation->ResetToTabs();
+			// 개인정비에서 콘텐츠가 열려 있으면 먼저 내부 탭 목록으로, 그 외에는 플레이 페이지로 돌아온다.
+			const bool bLoadoutActive =
+				TabSwitcher->GetActiveWidgetIndex() == static_cast<int32>(ELSLobbyTab::LoadoutPreparation);
+			if (bLoadoutActive && WBP_LoadoutPreparation && WBP_LoadoutPreparation->IsContentOpen())
+			{
+				WBP_LoadoutPreparation->ResetToTabs();
+			}
+			else
+			{
+				ShowTab(ELSLobbyTab::Play);
+			}
+			return FReply::Handled();
 		}
-		else
+
+		if (ActiveSettingsWidget && ActiveSettingsWidget->IsInViewport())
 		{
-			ShowTab(ELSLobbyTab::Play);
+			ActiveSettingsWidget->SetKeyboardFocus();
+			return FReply::Handled();
 		}
+
+		ShowSettingsWidget();
 		return FReply::Handled();
 	}
 
@@ -325,6 +337,21 @@ void ULSLobbyMenuWidget::HandleSettingsClicked()
 void ULSLobbyMenuWidget::HandleSettingsBackToMenu()
 {
 	ActiveSettingsWidget = nullptr;
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		SetKeyboardFocus();
+		return;
+	}
+
+	World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		if (IsInViewport())
+		{
+			SetKeyboardFocus();
+		}
+	}));
 }
 
 ULSSettingsWidget* ULSLobbyMenuWidget::ShowSettingsWidget()

@@ -35,5 +35,5 @@ protected:
 	FSlateColor HighlightColor = FSlateColor(FLinearColor(1.0f, 0.82f, 0.15f, 1.0f));
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
-	FSlateColor LockedColor = FSlateColor(FLinearColor(0.45f, 0.45f, 0.45f, 1.0f));
+	FSlateColor LockedColor = FSlateColor(FLinearColor(0.22f, 0.22f, 0.22f, 0.55f));
 };

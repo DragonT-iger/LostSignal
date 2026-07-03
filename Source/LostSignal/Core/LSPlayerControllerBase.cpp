@@ -690,6 +690,9 @@ void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStat
 			UE_LOG(LogLS, Warning, TEXT("Failed to create chip station widget on %s."), *GetNameSafe(this));
 			return;
 		}
+
+		// 소멸 연출이 끝나(Collapsed) 나서야 블러를 끄도록 완료 콜백을 건다.
+		ChipStationWidgetInstance->OnDissolveFinished.AddUniqueDynamic(this, &ALSPlayerControllerBase::HandleChipStationDissolveFinished);
 	}
 
 	if (!ChipStationWidgetInstance->IsInViewport())
@@ -697,6 +700,8 @@ void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStat
 		ChipStationWidgetInstance->AddToViewport(LSUILayer::ModalPanel);
 	}
 
+	// 이전에 소멸 연출로 사라졌다면 노이즈량을 되돌리고 진행 상태를 초기화한다.
+	ChipStationWidgetInstance->ResetDissolve();
 	ChipStationWidgetInstance->RefreshChipStation();
 	ChipStationWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	UpdateBackgroundBlurVisibility();
@@ -706,9 +711,16 @@ void ALSPlayerControllerBase::HideChipStationWidgetLocal()
 {
 	if (ChipStationWidgetInstance)
 	{
-		ChipStationWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
+		// 즉시 Collapsed 대신 좌우 노이즈 소멸 연출을 재생한다. 연출 완료 시
+		// HandleChipStationDissolveFinished가 블러를 재계산한다(연출 중에는 위젯이 계속 보여 블러 유지).
+		ChipStationWidgetInstance->StartDissolveOut();
 	}
 
+	UpdateBackgroundBlurVisibility();
+}
+
+void ALSPlayerControllerBase::HandleChipStationDissolveFinished()
+{
 	UpdateBackgroundBlurVisibility();
 }
 

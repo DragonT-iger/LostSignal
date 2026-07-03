@@ -35,8 +35,13 @@ public:
 	// HUD 생존 링이 자체 추정 대신 실제 잔여시간을 읽도록 노출한다(서버 권한에서만 유효).
 	float GetSignalGaugeDrainRemainingSeconds() const;
 
-	// 드레인 한 주기 길이(초). 신호 링 카운트다운의 분모로 쓰여 60초 값을 단일 출처화한다.
+	// 드레인 한 주기 길이(초). 신호 링 카운트다운의 분모로 쓰인다. 배속이 걸리면 짧아진 실제 주기를 돌려준다.
 	float GetSignalGaugeDrainInterval() const;
+
+	// [디버그] 신호 게이지 드레인 배속. 1분 주기를 이 배수만큼 짧게 돌려 칩 프로토콜이 사라지는 걸 빨리 확인한다.
+	// 프로토콜 디버그 콘솔에서 조정. 진행 중이면 새 배속 주기로 타이머를 다시 건다.
+	void SetSignalGaugeDrainDebugSpeed(float Speed);
+	float GetSignalGaugeDrainDebugSpeed() const { return SignalGaugeDrainDebugSpeed; }
 
 private:
 	void EndRaid(ELSRaidResult Result);

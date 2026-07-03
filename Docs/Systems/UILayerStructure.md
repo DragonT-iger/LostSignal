@@ -38,6 +38,7 @@ HUD  <  BackgroundBlur  <  ModalPanel  <  ModalPanelInventory  <  ProtocolDebug 
 - 생성: 로컬 컨트롤러 `BeginPlay`에서 1회 생성해 `BackgroundBlur` 레이어에 상주시키고, 시작 상태는 `Collapsed`.
 - 토글: `ALSPlayerControllerBase::UpdateBackgroundBlurVisibility()`가 **매번 현재 상태를 재계산**한다. 인벤토리/창고/칩스테이션/루트드랍 중 하나라도 표시 중이면 `HitTestInvisible`로 켜고(입력은 위 패널이 받음), 전부 닫히면 `Collapsed`로 끈다.
 - 호출 지점: 각 패널 show/hide 직후. 컨트롤러 소유 패널은 `Show/Hide*Local`에서, 인벤토리는 Pawn(`ALSPlayerCharacter`)의 show/hide에서 컨트롤러로 호출한다.
+- 예외 — 칩 스테이션 소멸 연출: 칩 스테이션은 hide 시 즉시 Collapsed 되지 않고 좌우 노이즈 소멸 연출(`ULSNoiseDissolveWidget`)을 재생한다. 연출 중에는 위젯이 `HitTestInvisible`로 계속 보이므로 `IsVisible()`가 true라 블러가 유지되고, 연출이 끝나 위젯이 스스로 `Collapsed`된 뒤 `OnDissolveFinished` → `HandleChipStationDissolveFinished`에서 블러를 재계산해 끈다.
 
 재계산 방식이라 중복 show / 이미 닫힌 hide에도 상태가 어긋나지 않는다(단순 증감 카운터의 drift 회피).
 

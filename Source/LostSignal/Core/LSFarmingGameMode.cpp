@@ -305,11 +305,13 @@ void ALSFarmingGameMode::ClearRaidResultSaveWait()
 
 void ALSFarmingGameMode::StartSignalGaugeDrain()
 {
+	const float Speed = FMath::Max(SignalGaugeDrainDebugSpeed, KINDA_SMALL_NUMBER);
+	const float Interval = FMath::Max(SignalGaugeDrainIntervalSeconds / Speed, 0.01f);
 	GetWorldTimerManager().SetTimer(
 		SignalGaugeDrainTimerHandle,
 		this,
 		&ALSFarmingGameMode::TickSignalGaugeDrain,
-		SignalGaugeDrainIntervalSeconds,
+		Interval,
 		true);
 }
 
@@ -354,7 +356,20 @@ float ALSFarmingGameMode::GetSignalGaugeDrainRemainingSeconds() const
 
 float ALSFarmingGameMode::GetSignalGaugeDrainInterval() const
 {
-	return SignalGaugeDrainIntervalSeconds;
+	// 배속이 걸리면 실제 타이머 주기도 짧아지므로, 링 카운트다운 분모도 같은 값을 써야 비율이 맞다.
+	const float Speed = FMath::Max(SignalGaugeDrainDebugSpeed, KINDA_SMALL_NUMBER);
+	return SignalGaugeDrainIntervalSeconds / Speed;
+}
+
+void ALSFarmingGameMode::SetSignalGaugeDrainDebugSpeed(const float Speed)
+{
+	SignalGaugeDrainDebugSpeed = FMath::Clamp(Speed, 0.01f, 100.0f);
+
+	// 드레인이 진행 중이면 새 배속 주기로 타이머를 다시 건다(남은 시간은 새 주기 기준으로 리셋).
+	if (GetWorldTimerManager().IsTimerActive(SignalGaugeDrainTimerHandle))
+	{
+		StartSignalGaugeDrain();
+	}
 }
 
 ULSSaveSubsystem* ALSFarmingGameMode::GetSaveSubsystem() const

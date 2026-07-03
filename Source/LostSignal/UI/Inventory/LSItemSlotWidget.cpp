@@ -263,6 +263,7 @@ void ULSItemSlotWidget::SetSlotContext(ULSInventoryWidget* InInventoryWidget, co
 	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = bInHasItem;
 	bIsLocked = bInLocked;
+	ApplyHoverVisual();
 }
 
 void ULSItemSlotWidget::SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, const int32 InSlotIndex, const bool bInHasItem)
@@ -277,6 +278,7 @@ void ULSItemSlotWidget::SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, 
 	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = bInHasItem;
 	bIsLocked = false;
+	ApplyHoverVisual();
 }
 
 void ULSItemSlotWidget::SetWarehouseSlotContext(ULSLobbyStorageWidget* InStorageWidget, const ELSInventorySlotArea InSlotArea, const int32 InSlotIndex, const bool bInHasItem)
@@ -291,6 +293,7 @@ void ULSItemSlotWidget::SetWarehouseSlotContext(ULSLobbyStorageWidget* InStorage
 	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = bInHasItem;
 	bIsLocked = false;
+	ApplyHoverVisual();
 }
 
 void ULSItemSlotWidget::SetChipStationSlotContext(ULSChipStationWidget* InChipStationWidget, const ELSInventorySlotArea InSourceArea, const int32 InSourceSlotIndex, const FName InItemRowName, const int32 InAmount, const TArray<FLSChipResolvedStat>& InChipStats)
@@ -308,6 +311,7 @@ void ULSItemSlotWidget::SetChipStationSlotContext(ULSChipStationWidget* InChipSt
 	DragChipStats = InChipStats;
 	bHasItem = !InItemRowName.IsNone() && InAmount > 0;
 	bIsLocked = false;
+	ApplyHoverVisual();
 }
 
 void ULSItemSlotWidget::SetChipEquipmentSlotContext(ULSChipEquipmentSlotWidget* InChipEquipmentSlotWidget, ULSChipStationWidget* InChipStationWidget, const int32 InEquipmentSlotIndex)
@@ -321,6 +325,7 @@ void ULSItemSlotWidget::SetChipEquipmentSlotContext(ULSChipEquipmentSlotWidget* 
 	SlotIndex = INDEX_NONE;
 	EquipmentSlotIndex = InEquipmentSlotIndex;
 	bIsLocked = false;
+	ApplyHoverVisual();
 }
 
 void ULSItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -624,11 +629,11 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 		Tint = bIsHovered ? HoveredIconTint : NormalIconTint;
 	}
 
-	// 배경은 특수 상태(잠금/드래그타겟/호버)에서는 피드백 틴트를, 평상시에는 아이템 등급색을 쓴다.
-	// (빈 슬롯·등급 없는 아이템은 CurrentGradeBackgroundColor가 흰색이라 기존과 동일하게 보인다.)
+	// 호버/드래그 대상은 피드백 틴트를 우선한다. 잠긴 슬롯은 아이콘만 흐리게 하고,
+	// 아이템이 있는 배경은 등급색을 유지해 장비 등급을 계속 구분할 수 있게 한다.
 	if (SlotBackgroundImage)
 	{
-		const bool bSpecialState = bIsLocked || bIsDragTarget || bIsHovered;
+		const bool bSpecialState = bIsDragTarget || bIsHovered || (bIsLocked && !bHasItem);
 		SlotBackgroundImage->SetColorAndOpacity(bSpecialState ? Tint : CurrentGradeBackgroundColor);
 	}
 

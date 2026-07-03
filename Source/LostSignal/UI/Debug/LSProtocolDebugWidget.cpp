@@ -99,6 +99,9 @@ void ULSProtocolDebugWidget::BuildPanel()
 		EndRaidSlot->SetHorizontalAlignment(HAlign_Center);
 	}
 
+	// 배속 행 — 신호 게이지 60초 드레인만 빠르게 돌려 칩 프로토콜이 사라지는 걸 바로 확인.
+	BuildTimeScaleRow(VBox);
+
 	// 프로토콜 4행
 	BuildProtocolRow(VBox, ELSProtocolType::Survival, TEXT("Survival (생존)"));
 	BuildProtocolRow(VBox, ELSProtocolType::Carrying, TEXT("Carrying (수송)"));
@@ -180,6 +183,73 @@ void ULSProtocolDebugWidget::BuildProtocolRow(UVerticalBox* Parent, const ELSPro
 	if (UVerticalBoxSlot* RowSlot = Parent->AddChildToVerticalBox(Row))
 	{
 		RowSlot->SetPadding(FMargin(0.f, 3.f));
+	}
+}
+
+void ULSProtocolDebugWidget::BuildTimeScaleRow(UVerticalBox* Parent)
+{
+	UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
+
+	UTextBlock* Label = MakeText(TEXT("배속"), 16);
+	Label->SetMinDesiredWidth(60.f);
+	if (UHorizontalBoxSlot* LabelSlot = Row->AddChildToHorizontalBox(Label))
+	{
+		LabelSlot->SetPadding(FMargin(4.f, 2.f));
+		LabelSlot->SetVerticalAlignment(VAlign_Center);
+	}
+
+	auto AddButton = [&](const FString& InLabel) -> UButton*
+	{
+		UButton* Button = MakeButton(InLabel, 16);
+		if (UHorizontalBoxSlot* Slot = Row->AddChildToHorizontalBox(Button))
+		{
+			Slot->SetPadding(FMargin(3.f, 2.f));
+			Slot->SetVerticalAlignment(VAlign_Center);
+		}
+		return Button;
+	};
+
+	AddButton(TEXT("x1"))->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleTimeScale1x);
+	AddButton(TEXT("x2"))->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleTimeScale2x);
+	AddButton(TEXT("x5"))->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleTimeScale5x);
+	AddButton(TEXT("x10"))->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleTimeScale10x);
+	AddButton(TEXT("x20"))->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleTimeScale20x);
+	AddButton(TEXT("x30"))->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleTimeScale30x);
+
+	TimeScaleText = MakeText(TEXT("x1"), 16);
+	TimeScaleText->SetColorAndOpacity(FSlateColor(FLinearColor(0.4f, 0.9f, 0.5f)));
+	if (UHorizontalBoxSlot* ValueSlot = Row->AddChildToHorizontalBox(TimeScaleText))
+	{
+		ValueSlot->SetPadding(FMargin(10.f, 2.f));
+		ValueSlot->SetVerticalAlignment(VAlign_Center);
+	}
+
+	if (UVerticalBoxSlot* RowSlot = Parent->AddChildToVerticalBox(Row))
+	{
+		RowSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 8.f));
+		RowSlot->SetHorizontalAlignment(HAlign_Center);
+	}
+}
+
+void ULSProtocolDebugWidget::ApplyTimeScale(const float Scale)
+{
+	// 게임 전체가 아니라 신호 게이지 드레인(1분 주기)만 배속한다. 레이드(ALSFarmingGameMode)에서만 유효.
+	ALSFarmingGameMode* FarmingGameMode = Cast<ALSFarmingGameMode>(UGameplayStatics::GetGameMode(this));
+	if (!FarmingGameMode)
+	{
+		if (TimeScaleText)
+		{
+			TimeScaleText->SetText(FText::FromString(TEXT("- (레이드 아님)")));
+		}
+		UE_LOG(LogLS, Warning, TEXT("[ProtocolDebug] 배속은 레이드(ALSFarmingGameMode)에서만 적용됩니다."));
+		return;
+	}
+
+	FarmingGameMode->SetSignalGaugeDrainDebugSpeed(Scale);
+	if (TimeScaleText)
+	{
+		const float Applied = FarmingGameMode->GetSignalGaugeDrainDebugSpeed();
+		TimeScaleText->SetText(FText::FromString(FString::Printf(TEXT("x%g"), static_cast<double>(Applied))));
 	}
 }
 
@@ -341,6 +411,36 @@ void ULSProtocolDebugWidget::HandleGoToTestMap()
 	{
 		UE_LOG(LogLS, Warning, TEXT("[ProtocolDebug] 테스트 맵 이동은 로비에서만 가능합니다. (ALSLobbyGameMode 아님)"));
 	}
+}
+
+void ULSProtocolDebugWidget::HandleTimeScale1x()
+{
+	ApplyTimeScale(1.0f);
+}
+
+void ULSProtocolDebugWidget::HandleTimeScale2x()
+{
+	ApplyTimeScale(2.0f);
+}
+
+void ULSProtocolDebugWidget::HandleTimeScale5x()
+{
+	ApplyTimeScale(5.0f);
+}
+
+void ULSProtocolDebugWidget::HandleTimeScale10x()
+{
+	ApplyTimeScale(10.0f);
+}
+
+void ULSProtocolDebugWidget::HandleTimeScale20x()
+{
+	ApplyTimeScale(20.0f);
+}
+
+void ULSProtocolDebugWidget::HandleTimeScale30x()
+{
+	ApplyTimeScale(30.0f);
 }
 
 void ULSProtocolDebugWidget::HandleSurvivalMinus()

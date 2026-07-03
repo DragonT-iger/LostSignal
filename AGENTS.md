@@ -83,6 +83,7 @@
 | 문서 | 담당 내용 |
 |------|-----------|
 | [Docs/Troubleshooting/UIDragDropPackagedBuild.md](Docs/Troubleshooting/UIDragDropPackagedBuild.md) | 패키지 빌드에서 UMG 드래그앤드롭 입력이 죽는 문제(DefaultDragVisual=this) 원인·진단·수정 |
+| [Docs/Troubleshooting/UIEquipDropWidgetSwitcher.md](Docs/Troubleshooting/UIEquipDropWidgetSwitcher.md) | 위젯 스위쳐에서 장착(드롭)이 간헐 실패하는 문제 — 드롭 라우팅 원인 분석·진단 로그 계획(조사 중) |
 
 ### 미니게임 (RatSteal — 몰래몰래팜)
 

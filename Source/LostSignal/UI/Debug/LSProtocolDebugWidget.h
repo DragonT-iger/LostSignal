@@ -50,6 +50,10 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UButton> TestMapButton;
 
+	// 현재 신호 게이지 드레인 배속 표시. 1분 주기를 배속만큼 짧게 돌려 칩 프로토콜이 사라지는 걸 빨리 확인.
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> TimeScaleText;
+
 	// 버튼 클릭 핸들러 (UButton::OnClicked 은 dynamic delegate 이므로 UFUNCTION 필요).
 	UFUNCTION()
 	void HandleSurvivalMinus();
@@ -75,12 +79,28 @@ protected:
 	void HandleEndRaid();
 	UFUNCTION()
 	void HandleGoToTestMap();
+	UFUNCTION()
+	void HandleTimeScale1x();
+	UFUNCTION()
+	void HandleTimeScale2x();
+	UFUNCTION()
+	void HandleTimeScale5x();
+	UFUNCTION()
+	void HandleTimeScale10x();
+	UFUNCTION()
+	void HandleTimeScale20x();
+	UFUNCTION()
+	void HandleTimeScale30x();
 
 private:
 	static constexpr int32 MaxProtocolLevel = 8;
 
 	void BuildPanel();
 	void BuildProtocolRow(UVerticalBox* Parent, ELSProtocolType Type, const FString& DisplayName);
+	// 배속 프리셋 버튼 행(x1/x2/x5/x10/x20)을 만든다.
+	void BuildTimeScaleRow(UVerticalBox* Parent);
+	// 글로벌 타임 딜레이션을 적용하고 표시 텍스트를 갱신한다.
+	void ApplyTimeScale(float Scale);
 	UButton* MakeButton(const FString& Label, int32 FontSize);
 	UTextBlock* MakeText(const FString& InText, int32 FontSize);
 

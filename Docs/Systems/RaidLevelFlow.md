@@ -44,6 +44,7 @@ ULSSessionSubsystem
 
 ULSSettingsWidget
 - 세팅 화면(WBP_Settings). 타이틀/로비/레이드(ESC) 어디서든 동일한 위젯을 재사용한다 — 레이드 전용 별도 메뉴는 없다
+- 로비 기본 Play 화면에서는 ULSLobbyMenuWidget이 ESC 입력을 받아 설정 버튼과 같은 ShowSettingsWidget 경로로 이 위젯을 띄운다
 - 레이드 중에는 ALSPlayerControllerBase가 ESC로 이 위젯을 직접 토글해서 띄운다
 - "메인메뉴로 돌아가기"(MainMenuButton, ULSTitleMenuButtonWidget) 클릭 시: 레이드 여부와 무관하게 항상 타이틀로 나간다.
   - 레이드 중이 아니면(로비): 바로 TitleLevel로 OpenLevel
@@ -51,7 +52,7 @@ ULSSettingsWidget
   - 타이틀에서 열 때는 이미 메인메뉴라 불필요하므로 이 버튼을 숨긴다(SetMainMenuButtonVisible(false), 타이틀 메뉴가 세팅 생성 시 호출)
 - BackButton(일반 UButton)은 세팅 패널만 닫는다(OnBackToMenu 브로드캐스트). ESC 키로도 동일하게 닫힌다
   (ULSSettingsWidget::NativeOnKeyDown → CloseSettings). 레이드 중에는 이 위젯이 스스로 RemoveFromParent 하므로
-  PlayerController가 OnBackToMenu로 캐시를 비워 다음 ESC에 재생성한다
+  PlayerController가 OnBackToMenu로 캐시를 비워 다음 ESC에 재생성한다. 로비에서는 ULSLobbyMenuWidget이 같은 브로드캐스트로 캐시를 비우고 다음 틱에 로비 루트 포커스를 복구한다
 - 레이드 ESC 토글(ALSPlayerControllerBase::ToggleRaidSettingsWidget): 안 떠 있으면 생성, 떠 있으면
   CloseSettings로 닫는다. 위젯에 키보드 포커스가 있으면 위젯의 NativeOnKeyDown이 ESC를 먼저 소비하고,
   포커스가 게임 뷰포트에 있으면 이 토글이 폴백으로 닫는다(중복 처리 없음)
