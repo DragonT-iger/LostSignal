@@ -49,6 +49,10 @@ public:
 	// 풀링 재사용으로 위젯 인스턴스가 그대로라 Slate가 MouseEnter를 다시 쏘지 않기 때문이다.
 	void RefreshHoverStateFromCursor();
 
+	// 칩 스테이션 리스트 슬롯 전용: 이 칸이 가리키는 저장 슬롯(SlotArea/SlotIndex)의 현재 내용으로 제자리 갱신한다.
+	// 채워져 있으면 그 칩을(장착 스왑으로 돌아온 칩 포함), 비어 있으면 hole로. 리스트 정렬/리빌드 없이 이 칸만 바꾼다.
+	void RefreshChipStationSlotFromStored();
+
 	// 이 슬롯에 아이템이 들어 있는지. 빈 슬롯(hole) 재사용 여부 판단 등에 쓴다.
 	bool HasItem() const { return bHasItem; }
 

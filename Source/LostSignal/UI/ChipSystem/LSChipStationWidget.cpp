@@ -573,8 +573,13 @@ bool ULSChipStationWidget::EquipChipToHardwareSlot(const ULSInventoryDragDropOpe
 	if (bEquipped)
 	{
 		PlayChipSound(ChipEquipSound, TEXT("ChipEquipSound"));
-		HandleCarryingSlotCapacityChanged();
-		QueueRefreshChipStation();
+		// 정렬은 스테이션을 다시 열 때만 한다. 드래그한 소스 리스트 칸만 제자리 갱신하고
+		// (장착칸이 비어 있었으면 hole, 차 있어 스왑됐으면 돌아온 칩 표시) 장착칸·요약·용량만 경량 갱신한다.
+		if (ULSItemSlotWidget* SourceSlotWidget = DragOperation.SourceSlotWidget)
+		{
+			SourceSlotWidget->RefreshChipStationSlotFromStored();
+		}
+		QueueRefreshEquippedChipState();
 	}
 
 	return bEquipped;
@@ -607,8 +612,8 @@ bool ULSChipStationWidget::DropEquippedChipToHardwareSlot(const ULSInventoryDrag
 		TargetEquipmentSlotIndex);
 	if (bDropped)
 	{
-		HandleCarryingSlotCapacityChanged();
-		QueueRefreshChipStation();
+		// 장착칸끼리의 이동이라 칩 리스트는 그대로다. 정렬/리빌드 없이 장착칸·요약·용량만 경량 갱신한다.
+		QueueRefreshEquippedChipState();
 	}
 
 	return bDropped;
@@ -631,7 +636,7 @@ bool ULSChipStationWidget::UnequipChipToWarehouse(const ULSInventoryDragDropOper
 	return UnequipChipFromSlotToWarehouse(DragOperation.SourceEquipmentSlotIndex);
 }
 
-bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDragDropOperation& DragOperation, const ELSInventorySlotArea TargetArea, const int32 TargetSlotIndex)
+bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDragDropOperation& DragOperation, ULSItemSlotWidget* TargetStoredSlotWidget, const ELSInventorySlotArea TargetArea, const int32 TargetSlotIndex)
 {
 	if (!DragOperation.SourceChipStationWidget || DragOperation.SourceChipStationWidget != this)
 	{
@@ -660,8 +665,12 @@ bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDrag
 	if (bSwapped)
 	{
 		PlayChipSound(ChipEquipSound, TEXT("ChipEquipSound"));
-		HandleCarryingSlotCapacityChanged();
-		QueueRefreshChipStation();
+		// 정렬은 스테이션을 다시 열 때만 한다. 드롭 대상 리스트 칸만 제자리 갱신한다(스왑으로 이 칸엔 방금 해제된 칩이 들어온다).
+		if (TargetStoredSlotWidget)
+		{
+			TargetStoredSlotWidget->RefreshChipStationSlotFromStored();
+		}
+		QueueRefreshEquippedChipState();
 	}
 
 	return bSwapped;

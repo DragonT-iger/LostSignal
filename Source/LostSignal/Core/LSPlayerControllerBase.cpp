@@ -1129,7 +1129,9 @@ void ALSPlayerControllerBase::ToggleProtocolDebugWidget()
 
 	const bool bCurrentlyVisible = ProtocolDebugWidgetInstance->GetVisibility() != ESlateVisibility::Collapsed;
 	const bool bWillBeVisible = !bCurrentlyVisible;
-	ProtocolDebugWidgetInstance->SetVisibility(bWillBeVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	// Visible 로 켜면 풀스크린 루트 캔버스가 히트테스트를 전부 먹어 아래 UI(루트박스 등) 클릭이 막힌다.
+	// SelfHitTestInvisible 이면 패널 버튼(자식)은 클릭되고 빈 영역은 클릭이 통과한다.
+	ProtocolDebugWidgetInstance->SetVisibility(bWillBeVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	// 다시 켤 때 현재 효과 레벨로 패널 숫자를 갱신한다.
 	if (bWillBeVisible)
 	{

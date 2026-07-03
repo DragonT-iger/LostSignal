@@ -51,7 +51,7 @@ public:
 	bool EquipChipToHardwareSlot(const ULSInventoryDragDropOperation& DragOperation, int32 EquipmentSlotIndex);
 	bool DropEquippedChipToHardwareSlot(const ULSInventoryDragDropOperation& DragOperation, int32 TargetEquipmentSlotIndex);
 	bool UnequipChipToWarehouse(const ULSInventoryDragDropOperation& DragOperation);
-	bool SwapEquippedChipWithStoredSlot(const ULSInventoryDragDropOperation& DragOperation, ELSInventorySlotArea TargetArea, int32 TargetSlotIndex);
+	bool SwapEquippedChipWithStoredSlot(const ULSInventoryDragDropOperation& DragOperation, ULSItemSlotWidget* TargetStoredSlotWidget, ELSInventorySlotArea TargetArea, int32 TargetSlotIndex);
 
 	// Shift+좌클릭 빠른 조작: 칩 목록 슬롯을 첫 빈 장착 슬롯(마지막 인덱스부터 역방향)에 순서대로 장착한다.
 	bool QuickEquipChipToFirstEmptyHardwareSlot(ELSInventorySlotArea SourceArea, int32 SourceSlotIndex);

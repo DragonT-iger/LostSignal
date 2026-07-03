@@ -523,7 +523,7 @@ bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDro
 	{
 		if (DragOperation->SourceChipEquipmentSlotWidget)
 		{
-			return TargetChipStationWidget->SwapEquippedChipWithStoredSlot(*DragOperation, SlotArea, SlotIndex);
+			return TargetChipStationWidget->SwapEquippedChipWithStoredSlot(*DragOperation, this, SlotArea, SlotIndex);
 		}
 
 		return false;
@@ -908,6 +908,42 @@ bool ULSItemSlotWidget::TryHandleChipStationQuickTransfer()
 	// 칩 리스트는 재정렬/리빌드하지 않고 이 소스 슬롯 한 칸만 비운다(정렬은 스테이션을 다시 열 때만).
 	ClearItem();
 	return true;
+}
+
+void ULSItemSlotWidget::RefreshChipStationSlotFromStored()
+{
+	// 칩 스테이션 리스트 슬롯 전용. 장착/스왑으로 바뀐 저장 슬롯 내용을 이 칸에만 반영한다(정렬/리빌드 없음).
+	if (!ChipStationWidget.IsValid() || SlotIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	// 드래그로 낮춘 가시성/투명도/스케일을 먼저 원복한다(빈 칸으로 만들 때도 hole이 정상 표시되도록).
+	ResetTransientSlotState();
+
+	const UGameInstance* GameInstance = GetGameInstance();
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		ClearItem();
+		return;
+	}
+
+	// 칩 리스트 칸의 원본은 인벤토리 또는 창고다(SetChipStationSlotContext에서 지정).
+	const TArray<FLSSessionItem>& Slots = SlotArea == ELSInventorySlotArea::Warehouse
+		? SaveSubsystem->GetWarehouseItems()
+		: SaveSubsystem->GetInventory();
+	const FLSSessionItem* SlotItem = Slots.IsValidIndex(SlotIndex) ? &Slots[SlotIndex] : nullptr;
+	if (SlotItem && LSInventorySlotUtils::IsFilled(*SlotItem))
+	{
+		SetItem(SlotItem->ItemRowName, SlotItem->Amount, SlotItem->ChipStats);
+		SetChipStationSlotContext(ChipStationWidget.Get(), SlotArea, SlotIndex, SlotItem->ItemRowName, SlotItem->Amount, SlotItem->ChipStats);
+		RefreshHoverStateFromCursor();
+		return;
+	}
+
+	// 저장 슬롯이 비었으면(장착으로 빠져나감) 이 칸은 hole로 남긴다. 해제 시 InsertChipListSlot이 재사용한다.
+	ClearItem();
 }
 
 void ULSItemSlotWidget::RefreshStoredSlotVisual()
