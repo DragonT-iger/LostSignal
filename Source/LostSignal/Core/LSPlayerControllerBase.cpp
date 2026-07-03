@@ -690,9 +690,6 @@ void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStat
 			UE_LOG(LogLS, Warning, TEXT("Failed to create chip station widget on %s."), *GetNameSafe(this));
 			return;
 		}
-
-		// 소멸 연출이 끝나(Collapsed) 나서야 블러를 끄도록 완료 콜백을 건다.
-		ChipStationWidgetInstance->OnDissolveFinished.AddUniqueDynamic(this, &ALSPlayerControllerBase::HandleChipStationDissolveFinished);
 	}
 
 	if (!ChipStationWidgetInstance->IsInViewport())
@@ -700,8 +697,6 @@ void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStat
 		ChipStationWidgetInstance->AddToViewport(LSUILayer::ModalPanel);
 	}
 
-	// 이전에 소멸 연출로 사라졌다면 노이즈량을 되돌리고 진행 상태를 초기화한다.
-	ChipStationWidgetInstance->ResetDissolve();
 	ChipStationWidgetInstance->RefreshChipStation();
 	ChipStationWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	UpdateBackgroundBlurVisibility();
@@ -711,16 +706,9 @@ void ALSPlayerControllerBase::HideChipStationWidgetLocal()
 {
 	if (ChipStationWidgetInstance)
 	{
-		// 즉시 Collapsed 대신 좌우 노이즈 소멸 연출을 재생한다. 연출 완료 시
-		// HandleChipStationDissolveFinished가 블러를 재계산한다(연출 중에는 위젯이 계속 보여 블러 유지).
-		ChipStationWidgetInstance->StartDissolveOut();
+		ChipStationWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
-	UpdateBackgroundBlurVisibility();
-}
-
-void ALSPlayerControllerBase::HandleChipStationDissolveFinished()
-{
 	UpdateBackgroundBlurVisibility();
 }
 
@@ -1097,21 +1085,21 @@ void ALSPlayerControllerBase::LSTestSkillCastGauge(const float Duration)
 
 void ALSPlayerControllerBase::LSClearSurvivalProtocolTest()
 {
-	SurvivalProtocolTestLevel = -1;
+	SurvivalProtocolTestLevel = 0;
 	RefreshProtocolTestTargets();
 
-	UE_LOG(LogLS, Log, TEXT("[SurvivalProtocolTest] Override cleared."));
+	UE_LOG(LogLS, Log, TEXT("[SurvivalProtocolTest] OverrideLevel=0"));
 }
 
 void ALSPlayerControllerBase::LSClearProtocolTest()
 {
-	SurvivalProtocolTestLevel = -1;
-	CarryingProtocolTestLevel = -1;
-	BattleProtocolTestLevel = -1;
-	NavigationProtocolTestLevel = -1;
+	SurvivalProtocolTestLevel = 0;
+	CarryingProtocolTestLevel = 0;
+	BattleProtocolTestLevel = 0;
+	NavigationProtocolTestLevel = 0;
 	RefreshProtocolTestTargets();
 
-	UE_LOG(LogLS, Log, TEXT("[ProtocolTest] All overrides cleared."));
+	UE_LOG(LogLS, Log, TEXT("[ProtocolTest] Survival=0 Carrying=0 Battle=0 Navigation=0"));
 }
 
 void ALSPlayerControllerBase::LSToggleProtocolDebug()
@@ -1233,7 +1221,7 @@ int32 ALSPlayerControllerBase::GetEffectiveProtocolLevel(const ELSProtocolType P
 
 bool ALSPlayerControllerBase::HasProtocolTestLevel(const ELSProtocolType ProtocolType) const
 {
-	return GetProtocolTestLevel(ProtocolType) >= 0;
+	return IsProtocolDebugWidgetVisible() && GetProtocolTestLevel(ProtocolType) >= 0;
 }
 
 int32 ALSPlayerControllerBase::GetProtocolTestLevel(const ELSProtocolType ProtocolType) const

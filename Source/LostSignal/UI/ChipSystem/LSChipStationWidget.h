@@ -1,8 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
 #include "Data/LSProtocolTypes.h"
-#include "UI/Common/LSNoiseDissolveWidget.h"
 #include "LSChipStationWidget.generated.h"
 
 enum class ELSInventorySlotArea : uint8;
@@ -28,7 +28,7 @@ class USoundBase;
 class UWrapBox;
 
 UCLASS(BlueprintType, Blueprintable)
-class LOSTSIGNAL_API ULSChipStationWidget : public ULSNoiseDissolveWidget
+class LOSTSIGNAL_API ULSChipStationWidget : public UUserWidget
 {
 	GENERATED_BODY()
 

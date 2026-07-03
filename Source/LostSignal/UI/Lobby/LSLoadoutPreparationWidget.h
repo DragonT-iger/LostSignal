@@ -34,14 +34,10 @@ public:
 	virtual void NativeDestruct() override;
 
 	// 지정한 내부 탭 콘텐츠를 바로 연다. 로비 TAB 키(물품창고 직행) 등 외부 진입용.
-	void OpenTab(ELSLoadoutTab Tab);
+	void OpenTab(ELSLoadoutTab Tab) const;
 
-	// 사용자가 콘텐츠를 닫을 때(ESC/TAB) 사용. 열려 있던 페이지가 디졸브 가능하면 좌우 노이즈로 사라진 뒤
-	// 콘텐츠를 숨기고, 아니면 즉시 숨긴다.
-	void ResetToTabs();
-
-	// 초기화/페이지 진입처럼 연출 없이 즉시 탭 목록만 보이게 한다(디졸브 미재생).
-	void CollapseContentToTabs();
+	// 탭 목록만 보이는 초기 상태로 되돌린다. 콘텐츠는 숨긴다.
+	void ResetToTabs() const;
 
 	// 내부 콘텐츠(ContentSwitcher)가 열려 있는지. TAB/ESC 단계별 뒤로가기 판단용.
 	bool IsContentOpen() const;
@@ -88,16 +84,8 @@ private:
 	UFUNCTION()
 	void HandleNotImplementedDialogClosed();
 
-	// 내부 콘텐츠 전환. 콘텐츠가 이미 열려 있고 다른 페이지로 바꾸면, 현재 페이지를 디졸브로 내보낸 뒤 전환한다.
-	// 닫힌 상태(탭 목록)에서 여는 경우엔 연출 없이 바로 보인다.
-	void ShowTab(ELSLoadoutTab Tab);
-
-	// 실제로 스위처를 해당 인덱스로 전환하고, 디졸브로 사라졌던 페이지의 노이즈/가시성을 복구한다. 탭바는 숨긴다.
-	void ApplyActivePage(int32 PageIndex);
-
-	// 콘텐츠 페이지의 디졸브 연출이 끝나면 호출된다. 대기 중인 전환 인덱스가 있으면 그 페이지로 전환, 없으면 탭 목록으로.
-	UFUNCTION()
-	void HandleContentDissolveFinished();
+	// 내부 콘텐츠 전환을 ELSLoadoutTab 순서(인덱스)대로 적용한다. 탭을 숨기고 콘텐츠를 보인다.
+	void ShowTab(ELSLoadoutTab Tab) const;
 
 	// 탭 4개의 표시 여부를 일괄 적용한다. 콘텐츠가 열리면 탭을 숨긴다.
 	void SetTabBarVisible(bool bVisible) const;
@@ -107,7 +95,4 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULSConfirmDialogWidget> ActiveConfirmDialog;
-
-	// 디졸브 완료 후 전환할 대상 페이지 인덱스. INDEX_NONE이면 전환이 아니라 닫기(탭 목록 복귀)다.
-	int32 PendingSwitchIndex = INDEX_NONE;
 };

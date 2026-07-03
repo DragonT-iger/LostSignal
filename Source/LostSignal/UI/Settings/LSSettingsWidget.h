@@ -20,7 +20,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FLSSettingsBackToMenu);
 //    파밍 성과를 포기하는 행동이라 확인 다이얼로그를 먼저 거치고(아이템 처리는 ALSFarmingGameMode의 Quit 규칙
 //    = 출발 장비 복구), 확인 시 Quit으로 종료해 타이틀로 나간다.
 //  - BackButton: 세팅 패널만 닫고 OnBackToMenu를 브로드캐스트한다(밑에 있던 화면이 다시 보인다).
-//    BackButton 클릭뿐 아니라 ESC 키로도 동일하게 닫힌다(NativeOnKeyDown).
+//    BackButton 클릭뿐 아니라 ESC/TAB 키로도 동일하게 닫힌다(NativeOnKeyDown/NativeOnPreviewKeyDown).
 // 이 위젯 자체는 타이틀/로비/레이드(ESC) 어디서든 동일하게 재사용된다.
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSSettingsWidget : public UUserWidget
@@ -31,11 +31,14 @@ public:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	// ESC로도 세팅 패널을 닫는다. 어떤 버튼에 포커스가 있든 위젯이 직접 키 이벤트를 받아 처리한다.
+	// TAB 포커스 이동보다 먼저 세팅 패널을 닫는다.
+	virtual FReply NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
+	// ESC로도 세팅 패널을 닫는다.
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 	// 세팅 패널을 닫는다(OnBackToMenu 브로드캐스트 + RemoveFromParent).
-	// BackButton / ESC / 외부(레이드 PlayerController)가 공용으로 호출한다.
+	// BackButton / ESC / TAB / 외부(레이드 PlayerController)가 공용으로 호출한다.
 	void CloseSettings();
 
 	// "메인메뉴로 돌아가기" 버튼 표시 여부. 타이틀에서 열 때는 이미 메인메뉴라 불필요하므로 false로 숨긴다.

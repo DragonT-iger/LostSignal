@@ -211,10 +211,10 @@ void ULSLobbyMenuWidget::HandlePlayTabClicked()
 
 void ULSLobbyMenuWidget::HandleLoadoutPreparationClicked()
 {
-	// 상단 탭으로 진입할 때는 항상 내부 탭 목록부터 보여준다(진입이라 연출 없이 즉시 정리).
+	// 상단 탭으로 진입할 때는 항상 내부 탭 목록부터 보여준다.
 	if (WBP_LoadoutPreparation)
 	{
-		WBP_LoadoutPreparation->CollapseContentToTabs();
+		WBP_LoadoutPreparation->ResetToTabs();
 	}
 	ShowTab(ELSLobbyTab::LoadoutPreparation);
 }

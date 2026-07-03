@@ -4,7 +4,6 @@
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
 #include "UI/Common/LSConfirmDialogWidget.h"
-#include "UI/Common/LSNoiseDissolveWidget.h"
 #include "UI/LSUILayer.h"
 #include "UI/Lobby/LSLobbyTabWidget.h"
 
@@ -60,8 +59,7 @@ void ULSLoadoutPreparationWidget::NativeConstruct()
 	}
 
 	// 처음에는 탭만 보이고 콘텐츠는 숨긴다. WBP 디자이너 설정과 무관하게 C++이 초기 상태를 강제한다.
-	// 초기 상태는 연출 없이 즉시 Collapse(디졸브가 시작하자마자 터지는 것 방지).
-	CollapseContentToTabs();
+	ResetToTabs();
 }
 
 void ULSLoadoutPreparationWidget::NativeDestruct()
@@ -86,55 +84,18 @@ void ULSLoadoutPreparationWidget::NativeDestruct()
 	Super::NativeDestruct();
 }
 
-void ULSLoadoutPreparationWidget::OpenTab(const ELSLoadoutTab Tab)
+void ULSLoadoutPreparationWidget::OpenTab(const ELSLoadoutTab Tab) const
 {
 	ShowTab(Tab);
 }
 
-void ULSLoadoutPreparationWidget::ResetToTabs()
-{
-	// 콘텐츠가 열려 있고 현재 페이지가 디졸브 가능하면, 좌우 노이즈로 내보낸 뒤 완료 콜백에서 Collapse한다.
-	// 스위처는 전환 애니메이션이 없어(활성 자식을 즉시 교체) 이렇게 순서를 직접 만들어야 한다.
-	if (ContentSwitcher && ContentSwitcher->GetVisibility() == ESlateVisibility::Visible)
-	{
-		if (ULSNoiseDissolveWidget* ActivePage = Cast<ULSNoiseDissolveWidget>(ContentSwitcher->GetActiveWidget()))
-		{
-			// 대기 인덱스 없음 = 전환이 아니라 닫기. 디졸브 완료 후 탭 목록으로 돌아간다.
-			PendingSwitchIndex = INDEX_NONE;
-			if (!ActivePage->IsDissolvingOut())
-			{
-				ActivePage->OnDissolveFinished.AddUniqueDynamic(this, &ULSLoadoutPreparationWidget::HandleContentDissolveFinished);
-				ActivePage->StartDissolveOut();
-			}
-			return;
-		}
-	}
-
-	// 디졸브 대상이 아니거나(미변환 페이지) 이미 닫힌 상태 → 즉시 탭 목록으로.
-	CollapseContentToTabs();
-}
-
-void ULSLoadoutPreparationWidget::CollapseContentToTabs()
+void ULSLoadoutPreparationWidget::ResetToTabs() const
 {
 	SetTabBarVisible(true);
 	if (ContentSwitcher)
 	{
 		ContentSwitcher->SetVisibility(ESlateVisibility::Collapsed);
 	}
-}
-
-void ULSLoadoutPreparationWidget::HandleContentDissolveFinished()
-{
-	// 전환 대기 인덱스가 있으면 그 페이지로 전환, 없으면 닫기(탭 목록 복귀).
-	const int32 SwitchTo = PendingSwitchIndex;
-	PendingSwitchIndex = INDEX_NONE;
-	if (SwitchTo != INDEX_NONE)
-	{
-		ApplyActivePage(SwitchTo);
-		return;
-	}
-
-	CollapseContentToTabs();
 }
 
 bool ULSLoadoutPreparationWidget::IsContentOpen() const
@@ -164,7 +125,7 @@ void ULSLoadoutPreparationWidget::HandleChipTabClicked()
 	ShowTab(ELSLoadoutTab::Chip);
 }
 
-void ULSLoadoutPreparationWidget::ShowTab(const ELSLoadoutTab Tab)
+void ULSLoadoutPreparationWidget::ShowTab(const ELSLoadoutTab Tab) const
 {
 	if (!ContentSwitcher)
 	{
@@ -172,45 +133,7 @@ void ULSLoadoutPreparationWidget::ShowTab(const ELSLoadoutTab Tab)
 		return;
 	}
 
-	const int32 TargetIndex = static_cast<int32>(Tab);
-
-	// 콘텐츠가 이미 열려 있고 다른 페이지로 바꾸는 경우: 현재 페이지를 디졸브로 내보낸 뒤 완료 콜백에서 전환한다.
-	if (ContentSwitcher->GetVisibility() == ESlateVisibility::Visible
-		&& ContentSwitcher->GetActiveWidgetIndex() != TargetIndex)
-	{
-		if (ULSNoiseDissolveWidget* CurrentPage = Cast<ULSNoiseDissolveWidget>(ContentSwitcher->GetActiveWidget()))
-		{
-			if (!CurrentPage->IsDissolvingOut())
-			{
-				PendingSwitchIndex = TargetIndex;
-				CurrentPage->OnDissolveFinished.AddUniqueDynamic(this, &ULSLoadoutPreparationWidget::HandleContentDissolveFinished);
-				CurrentPage->StartDissolveOut();
-			}
-			return;
-		}
-	}
-
-	// 닫힌 상태에서 열거나(첫 진입) 디졸브 대상이 아니면 바로 전환한다.
-	ApplyActivePage(TargetIndex);
-}
-
-void ULSLoadoutPreparationWidget::ApplyActivePage(const int32 PageIndex)
-{
-	if (!ContentSwitcher)
-	{
-		return;
-	}
-
-	ContentSwitcher->SetActiveWidgetIndex(PageIndex);
-
-	// 이전에 디졸브로 사라진(Collapsed) 페이지라면 노이즈량과 가시성을 복구해 다시 선명히 보이게 한다.
-	// 스위처는 활성 자식의 자체 visibility도 따르므로, 이걸 안 하면 재진입 시 페이지가 안 보인다.
-	if (ULSNoiseDissolveWidget* ActivePage = Cast<ULSNoiseDissolveWidget>(ContentSwitcher->GetActiveWidget()))
-	{
-		ActivePage->ResetDissolve();
-		ActivePage->SetVisibility(ESlateVisibility::Visible);
-	}
-
+	ContentSwitcher->SetActiveWidgetIndex(static_cast<int32>(Tab));
 	ContentSwitcher->SetVisibility(ESlateVisibility::Visible);
 	SetTabBarVisible(false);
 }

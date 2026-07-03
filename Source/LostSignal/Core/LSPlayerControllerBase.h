@@ -134,7 +134,7 @@ public:
 
 	void ToggleProtocolDebugWidget();
 
-	// 프로토콜 디버그 패널이 현재 화면에 떠 있는지. 칩스테이션은 패널이 떠 있을 때만 오버라이드를 따른다.
+	// 프로토콜 디버그 패널이 현재 화면에 떠 있는지. 패널이 떠 있을 때만 오버라이드를 따른다.
 	bool IsProtocolDebugWidgetVisible() const;
 
 	// 레이드 중 ESC로 여는 세팅 화면(WBP_Settings) 토글. 레이드 중이 아니면 무시한다.
@@ -148,7 +148,7 @@ public:
 	int32 GetSurvivalProtocolTestLevel() const { return GetProtocolTestLevel(ELSProtocolType::Survival); }
 	bool HasProtocolTestLevel(ELSProtocolType ProtocolType) const;
 	int32 GetProtocolTestLevel(ELSProtocolType ProtocolType) const;
-	// 현재 적용 중인 프로토콜 레벨: 오버라이드가 있으면 그 값, 없으면 신호 활성 장착 칩의 합산값.
+	// 현재 적용 중인 프로토콜 레벨: 패널 표시 중 오버라이드가 있으면 그 값, 없으면 신호 활성 장착 칩의 합산값.
 	int32 GetEffectiveProtocolLevel(ELSProtocolType ProtocolType) const;
 
 	UFUNCTION(Client, Reliable)
@@ -332,10 +332,6 @@ private:
 	void HideLobbyStorageWidgetLocal();
 	void ShowChipStationWidgetLocal(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass);
 	void HideChipStationWidgetLocal();
-
-	// 칩 스테이션 소멸 연출이 끝나 위젯이 Collapsed된 뒤 공유 블러를 재계산한다.
-	UFUNCTION()
-	void HandleChipStationDissolveFinished();
 	void CreatePlayerHUDWidgetLocal();
 	void CreateBackgroundBlurWidgetLocal();
 	void InitializeRaidInventoryFromSessionSubsystem();
