@@ -228,8 +228,9 @@ PassiveSkill_ID
 - 스킬 Ability는 발동 시 `LS.Combat.Attacking`(공통 "진행 중" 의미)과 `LS.Combat.SkillCasting`(스킬 시전 표식)을 함께 부여한다.
 - 스킬의 `ActivationBlockedTags`는 `LS.Combat.SkillCasting`을 막는다. → 스킬 시전 중에는 다른 스킬을 발동할 수 없다.
 - 스킬의 `CancelAbilitiesWithTag`는 `LS.Ability.Player.BasicAttack`을 캔슬한다. → 기본 공격 모션 중 스킬을 확정하면 기본 공격이 즉시 취소되고(어느 콤보 단계에서든) 스킬이 발동한다. 취소된 기본 공격은 자신의 `EndAbility(bWasCancelled)` 경로에서 몽타주를 멈추고 전투 상태를 정리한다.
+- 공격 계열 Ability(기본 공격·스킬·몬스터 액션)는 `LS.Combat.Attacking`을 **AssetTags에도** 가진다. `ASC->CancelAbilities`가 AssetTags 기준으로 매칭하므로, 스턴 등 외부 시스템이 이 태그 하나로 진행 중인 공격 계열 어빌리티를 일괄 취소하기 위한 분류 태그다. (사망은 터미널 상태라 태그 매칭 없이 `CancelAllAbilities`로 전부 취소한다.)
 
-`LS.Combat.Attacking`은 몬스터 감지/소음, 전투 컴포넌트 등 다른 시스템이 "공격/스킬 진행 중" 의미로 참조하므로 차단/캔슬 판정에는 쓰지 않는다. 차단은 `LS.Combat.SkillCasting`, 캔슬은 `LS.Ability.Player.BasicAttack`으로 분리한다.
+`LS.Combat.Attacking`은 몬스터 감지/소음, 전투 컴포넌트 등 다른 시스템이 "공격/스킬 진행 중" 의미로 참조하므로 스킬 간 차단/캔슬 판정에는 쓰지 않는다. 스킬 차단은 `LS.Combat.SkillCasting`, 기본공격 캔슬은 `LS.Ability.Player.BasicAttack`으로 분리하고, `LS.Combat.Attacking`(AssetTags)은 스턴 같은 외부 강제 취소 매칭에만 쓴다.
 
 ## 스킬 시전 중 입력 차단
 

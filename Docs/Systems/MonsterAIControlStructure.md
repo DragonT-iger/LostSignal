@@ -251,6 +251,7 @@ Dead
 - LS.State.Dead 기반 터미널 상태
 - 죽음 처리 후 AI Brain 정지
 - 사망 진입 시 `ALSEnemyCharacter::OnDeathStateChanged`가 캡슐·메시 콜리전을 해제한다(공용 `ULSCharacterCombatComponent`의 사망 핸들러가 모든 머신에서 호출). 시체는 이동을 막지 않고 추가 타격 대상에서 빠진다.
+- 사망 진입 시 진행 중 어빌리티를 전부 취소(`CancelAllAbilities`)한다. 공격 몽타주가 즉시 끊기고 `LS.Combat.Attacking`이 해제되어 Attack → Dead 전이가 공격 애니메이션 종료를 기다리지 않는다.
 
 ReturnHome / Patrol 복귀
 - HomeLocation으로 복귀

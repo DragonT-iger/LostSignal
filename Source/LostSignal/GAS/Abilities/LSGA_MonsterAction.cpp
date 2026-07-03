@@ -14,6 +14,7 @@ ULSGA_MonsterAction::ULSGA_MonsterAction()
 {
 	FGameplayTagContainer AssetTags;
 	AssetTags.AddTag(LSGameplayTags::Ability_MonsterAction);
+	AssetTags.AddTag(LSGameplayTags::Combat_Attacking); // 스턴·사망 등 외부 CancelAbilities 매칭용 분류 태그(AssetTags 기준 매칭)
 	SetAssetTags(AssetTags);
 
 	ActivationOwnedTags.AddTag(LSGameplayTags::Combat_Attacking);

@@ -14,6 +14,12 @@
 
 ULSGA_PlayerSkillBase::ULSGA_PlayerSkillBase()
 {
+	// 스턴·사망 등 외부 CancelAbilities 매칭용 분류 태그(AssetTags 기준 매칭).
+	// 주의: SetAssetTags는 컨테이너를 통째로 교체한다 — 서브클래스에서 다시 호출하면 이 태그가 사라지므로 반드시 Combat_Attacking을 포함할 것.
+	FGameplayTagContainer AssetTags;
+	AssetTags.AddTag(LSGameplayTags::Combat_Attacking);
+	SetAssetTags(AssetTags);
+
 	// 공통 차단/캔슬 태그 계약(SkillSystemStructure.md "기본 공격 캔슬과 스킬 차단 태그" 단일 출처).
 	ActivationBlockedTags.AddTag(LSGameplayTags::State_Dead);
 	ActivationBlockedTags.AddTag(LSGameplayTags::State_Stunned);

@@ -458,6 +458,13 @@ void ULSCharacterCombatComponent::HandleDeathStateChanged(bool bIsDead)
 
 	ClearKnockback();
 
+	// 진행 중인 어빌리티(공격 등)를 즉시 취소. 몽타주 정지·Combat_Attacking 해제는 각 어빌리티의 EndAbility가 정리한다.
+	// 취소하지 않으면 Combat_Attacking이 남아 StateTree Attack→Dead 전이가 공격 몽타주 종료까지 지연된다.
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+	{
+		ASC->CancelAllAbilities();
+	}
+
 	if (UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement())
 	{
 		MovementComponent->StopMovementImmediately();
