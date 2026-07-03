@@ -184,6 +184,55 @@ int32 ResolveItemMaxStack(const FName ItemRowName, const TCHAR* Context)
 	return MaxStack;
 }
 
+ELSEquipmentSlot ResolveEquipmentSlotType(const FName ItemRowName)
+{
+	if (ItemRowName.IsNone())
+	{
+		return ELSEquipmentSlot::Count;
+	}
+
+	const FString RowNameString = ItemRowName.ToString();
+	if (RowNameString.StartsWith(TEXT("Weapon_")))
+	{
+		return ELSEquipmentSlot::Weapon;
+	}
+
+	// 무기가 아니면 방어구만 장착 가능. 방어구 슬롯 타입은 Item_Equipment 필드가 단일 출처다.
+	if (!RowNameString.StartsWith(TEXT("Armor_")))
+	{
+		return ELSEquipmentSlot::Count;
+	}
+
+	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
+	UDataTable* ArmorTable = Settings ? Settings->ArmorTable.LoadSynchronous() : nullptr;
+	const FLSArmorRow* Row = ArmorTable ? ArmorTable->FindRow<FLSArmorRow>(ItemRowName, TEXT("ResolveEquipmentSlotType")) : nullptr;
+	if (!Row)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Inventory] Armor row missing for equipment type: %s"), *ItemRowName.ToString());
+		return ELSEquipmentSlot::Count;
+	}
+
+	if (Row->Item_Equipment == TEXT("Processor"))
+	{
+		return ELSEquipmentSlot::Processor;
+	}
+	if (Row->Item_Equipment == TEXT("Core"))
+	{
+		return ELSEquipmentSlot::Core;
+	}
+	if (Row->Item_Equipment == TEXT("Actuator"))
+	{
+		return ELSEquipmentSlot::Actuator;
+	}
+	if (Row->Item_Equipment == TEXT("Frame"))
+	{
+		return ELSEquipmentSlot::Frame;
+	}
+
+	UE_LOG(LogLS, Warning, TEXT("[Inventory] Unknown armor Item_Equipment '%s' for %s"), *Row->Item_Equipment, *ItemRowName.ToString());
+	return ELSEquipmentSlot::Count;
+}
+
 FString ResolveItemGradeFromRowName(const FName ItemRowName)
 {
 	if (ItemRowName.IsNone())

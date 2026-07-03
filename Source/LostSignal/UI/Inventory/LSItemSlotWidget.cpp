@@ -728,6 +728,12 @@ bool ULSItemSlotWidget::TryHandleQuickTransfer()
 		return false;
 	}
 
+	// 무기/방어구 장비 슬롯은 드래그 전용이다(Shift 빠른 이동 미지원). false를 반환해 일반 드래그 감지로 넘긴다.
+	if (SlotArea == ELSInventorySlotArea::Equipment)
+	{
+		return false;
+	}
+
 	// 칩 장착 슬롯: Shift+좌클릭 -> 창고로 해제. (장착 슬롯은 SlotIndex가 INDEX_NONE이라 아래 가드보다 먼저 처리한다.)
 	if (ChipEquipmentSlotWidget.IsValid())
 	{

@@ -23,6 +23,9 @@ public:
 	UPROPERTY() TArray<FLSSessionItem> ChipEquipmentSlots;
 	UPROPERTY() float ChipSignalGaugePercent = 1.0f;
 
+	// 무기/방어구 장착 5칸 (ELSEquipmentSlot 순서: Weapon/Processor/Core/Actuator/Frame). 로비 전용.
+	UPROPERTY() TArray<FLSSessionItem> EquipmentSlots;
+
 	UPROPERTY() bool bRaidSaveActive = false;
 	UPROPERTY() TArray<FLSSessionItem> ActiveRaidLoadout;
 	UPROPERTY() TArray<FLSSessionItem> ActiveRaidConsumedItems;

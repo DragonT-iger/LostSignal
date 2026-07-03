@@ -48,14 +48,9 @@ void ULSInventoryWidget::NativeConstruct()
 		SortButton->OnClicked.AddDynamic(this, &ULSInventoryWidget::HandleSortButtonClicked);
 	}
 
-	InitializeDisplayOnlyEquipmentSlot(WeaponSlot, TEXT("WeaponSlot"));
-	InitializeDisplayOnlyEquipmentSlot(HeadphoneSlot, TEXT("HeadphoneSlot"));
-	InitializeDisplayOnlyEquipmentSlot(HeadSlot, TEXT("HeadSlot"));
-	InitializeDisplayOnlyEquipmentSlot(GlovesSlot, TEXT("GlovesSlot"));
-	InitializeDisplayOnlyEquipmentSlot(BodySlot, TEXT("BodySlot"));
-
 	RebuildInventorySlots();
 	RebuildConfirmedStorageSlots();
+	RebuildEquipmentSlots();
 
 	// 폰 없는 로비에서도 창고↔인벤토리 갱신이 동작하도록 PC에 자신을 등록한다(폰이 있으면 PC가 폰을 우선 사용).
 	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
@@ -189,6 +184,12 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 		return false;
 	}
 
+	// 장비 슬롯이 원본/대상에 걸리면 로비 전용 장비 이동 경로로 처리한다(레이드 라우팅 우회).
+	if (FromSlotArea == ELSInventorySlotArea::Equipment || ToSlotArea == ELSInventorySlotArea::Equipment)
+	{
+		return HandleEquipmentSlotDrop(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
+	}
+
 	if (IsSlotLocked(FromSlotArea, FromSlotIndex) || IsSlotLocked(ToSlotArea, ToSlotIndex))
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot handle inventory slot drop because a slot is locked. FromArea=%d From=%d ToArea=%d To=%d"),
@@ -248,6 +249,58 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 	return bChanged;
 }
 
+bool ULSInventoryWidget::HandleEquipmentSlotDrop(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex)
+{
+	if (FromSlotIndex == INDEX_NONE || ToSlotIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	// 장비 장착/해제는 로비 전용이다. 레이드 중에는 인벤토리 원본이 SaveSubsystem이 아니라 세션 상태라 변경을 막는다.
+	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		if (ULSRaidInventoryComponent* RaidInventory = LSPlayerController->GetRaidInventoryComponent())
+		{
+			if (RaidInventory->IsRaidActive())
+			{
+				UE_LOG(LogLS, Warning, TEXT("Cannot change equipment during a raid on %s."), *GetNameSafe(this));
+				return false;
+			}
+		}
+	}
+
+	// 잠긴 보호 슬롯(적재 프로토콜 감소분 등)은 장비 이동 원본/대상으로 쓸 수 없다.
+	if (IsSlotLocked(FromSlotArea, FromSlotIndex) || IsSlotLocked(ToSlotArea, ToSlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle equipment slot drop because a slot is locked. FromArea=%d From=%d ToArea=%d To=%d"),
+			static_cast<int32>(FromSlotArea), FromSlotIndex, static_cast<int32>(ToSlotArea), ToSlotIndex);
+		return false;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle equipment slot drop because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return false;
+	}
+
+	const bool bChanged = SaveSubsystem->MoveEquipmentSlot(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
+	if (bChanged)
+	{
+		RebuildInventorySlots();
+		RebuildConfirmedStorageSlots();
+		RebuildEquipmentSlots();
+		// 장비를 인벤토리에서 뺐거나 넣었으면 열려 있는 창고 위젯도 갱신(인벤토리 인덱스 변화 반영).
+		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+		{
+			PlayerController->RefreshOpenLobbyStorageWidget();
+			PlayerController->RefreshOpenChipStationWidget();
+		}
+	}
+	return bChanged;
+}
+
 bool ULSInventoryWidget::HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, const int32 LootSlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex)
 {
 	if (!LootDropWidget)
@@ -277,6 +330,12 @@ bool ULSInventoryWidget::TryDropInventoryDragToWorld(const ULSInventoryDragDropO
 	if (DragOperation.SourceInventoryWidget != this)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot drop inventory slot to world because source inventory widget does not match."));
+		return false;
+	}
+
+	// 장착된 장비는 창 밖으로 드래그해도 월드에 버리지 않는다(드래그 취소 시 장착 유지).
+	if (DragOperation.SourceSlotArea == ELSInventorySlotArea::Equipment)
+	{
 		return false;
 	}
 
@@ -479,16 +538,49 @@ void ULSInventoryWidget::HandleSortButtonClicked()
 	}
 }
 
-void ULSInventoryWidget::InitializeDisplayOnlyEquipmentSlot(ULSItemSlotWidget* SlotWidget, const TCHAR* SlotName) const
+void ULSInventoryWidget::RebuildEquipmentSlots()
 {
-	if (!SlotWidget)
+	// 장비 장착은 로비 전용이다. 레이드 중에는 표시만 유지하고 잠금 처리해 드래그/변경을 막는다.
+	bool bRaidActive = false;
+	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s is not bound on %s."), SlotName, *GetNameSafe(this));
-		return;
+		if (ULSRaidInventoryComponent* RaidInventory = LSPlayerController->GetRaidInventoryComponent())
+		{
+			bRaidActive = RaidInventory->IsRaidActive();
+		}
 	}
 
-	SlotWidget->SetDisplayOnlySlotContext();
-	SlotWidget->ClearItem();
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	static const TArray<FLSSessionItem> EmptyEquipment;
+	const TArray<FLSSessionItem>& EquipmentItems = SaveSubsystem ? SaveSubsystem->GetEquipmentSlots() : EmptyEquipment;
+
+	// ELSEquipmentSlot 순서와 일치해야 한다(인덱스 = 슬롯 타입).
+	ULSItemSlotWidget* SlotWidgets[] = { WeaponSlot, ProcessorSlot, CoreSlot, ActuatorSlot, FrameSlot };
+	const TCHAR* SlotNames[] = { TEXT("WeaponSlot"), TEXT("ProcessorSlot"), TEXT("CoreSlot"), TEXT("ActuatorSlot"), TEXT("FrameSlot") };
+
+	for (int32 SlotIndex = 0; SlotIndex < UE_ARRAY_COUNT(SlotWidgets); ++SlotIndex)
+	{
+		ULSItemSlotWidget* SlotWidget = SlotWidgets[SlotIndex];
+		if (!SlotWidget)
+		{
+			UE_LOG(LogLS, Warning, TEXT("%s is not bound on %s."), SlotNames[SlotIndex], *GetNameSafe(this));
+			continue;
+		}
+
+		const bool bHasSlotItem = EquipmentItems.IsValidIndex(SlotIndex) &&
+			!EquipmentItems[SlotIndex].ItemRowName.IsNone() &&
+			EquipmentItems[SlotIndex].Amount > 0;
+		SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Equipment, SlotIndex, bHasSlotItem, bRaidActive);
+		if (bHasSlotItem)
+		{
+			SlotWidget->SetItem(EquipmentItems[SlotIndex].ItemRowName, EquipmentItems[SlotIndex].Amount, EquipmentItems[SlotIndex].ChipStats);
+		}
+		else
+		{
+			SlotWidget->ClearItem();
+		}
+	}
 }
 
 bool ULSInventoryWidget::HandleInventoryBackgroundDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)

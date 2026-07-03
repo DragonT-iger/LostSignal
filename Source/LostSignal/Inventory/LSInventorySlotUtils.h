@@ -24,6 +24,11 @@ namespace LSInventorySlotUtils
 	// 칩이 아니거나 알 수 없는 기능이면 행 이름 문자열을 그대로 반환(기존 동작 폴백).
 	FString ResolveIconAssetNameFromRowName(FName ItemRowName);
 
+	// 아이템 Row Name으로 장착 가능한 장비 슬롯 타입을 판정한다.
+	// Weapon_* -> Weapon, Armor_* -> ArmorTable의 Item_Equipment(Processor/Core/Actuator/Frame).
+	// 장착 불가(칩/일반 아이템/미상)면 ELSEquipmentSlot::Count 반환.
+	ELSEquipmentSlot ResolveEquipmentSlotType(FName ItemRowName);
+
 	void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, int32 SlotIndex);
 	void AddItemsToSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount);
 	bool TryAddItemsToSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount, int32 MaxSlotCount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem);

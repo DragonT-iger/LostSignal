@@ -70,6 +70,9 @@ public:
 	const TArray<FLSSessionItem>& GetChipEquipmentSlots() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Save")
+	const TArray<FLSSessionItem>& GetEquipmentSlots() const;
+
+	UFUNCTION(BlueprintPure, Category="LS/Save")
 	int32 GetMaxInventorySlotCount() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Save")
@@ -84,6 +87,9 @@ public:
 	bool EquipChipFromStoredSlot(ELSInventorySlotArea SourceArea, int32 SourceIndex, int32 EquipmentIndex);
 	bool DropChipEquipmentSlot(int32 FromEquipmentIndex, int32 ToEquipmentIndex);
 	bool UnequipChipToWarehouse(int32 EquipmentIndex);
+	// 무기/방어구 장비 슬롯 이동. FromArea/ToArea 중 정확히 하나가 Equipment이며, 로비 전용이다.
+	// 장착(Inventory/Safe -> Equipment)/해제(Equipment -> Inventory/Safe)/교환을 타입 검증과 함께 처리한다.
+	bool MoveEquipmentSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool DropStoredSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool TransferStoredSlotToArea(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea);
 	bool TransferAllInventoryToWarehouse(int32 WarehouseMaxSlotCount, bool& bOutStoppedBecauseFull);
@@ -104,6 +110,7 @@ private:
 	void ResolveInterruptedRaid();
 	void MigrateInventory();
 	void EnsureChipEquipmentSlots();
+	void EnsureEquipmentSlots();
 	void ApplyStarterItems();
 	void ApplyConfiguredStarterItems();
 	void ApplyLowestGradeChipStarterItems();

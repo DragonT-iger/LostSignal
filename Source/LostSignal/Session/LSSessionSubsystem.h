@@ -20,6 +20,20 @@ enum class ELSInventorySlotArea : uint8
 	Inventory,
 	Safe,
 	Warehouse,
+	// 무기/방어구 장착 슬롯. 로비 전용이며 SaveGame.EquipmentSlots를 원본으로 쓴다.
+	Equipment,
+};
+
+// 장비 장착 슬롯 종류. 슬롯 인덱스가 곧 타입이며, EquipmentSlots 배열의 순서와 일치한다.
+UENUM(BlueprintType)
+enum class ELSEquipmentSlot : uint8
+{
+	Weapon,		// 무기 (Weapon_*)
+	Processor,	// 머리 (Armor Item_Equipment=Processor)
+	Core,		// 몸 (Armor Item_Equipment=Core)
+	Actuator,	// 손 (Armor Item_Equipment=Actuator)
+	Frame,		// 발 (Armor Item_Equipment=Frame)
+	Count UMETA(Hidden),	// 슬롯 개수(=5). 장착 불가 판정에도 사용.
 };
 
 USTRUCT(BlueprintType)

@@ -18,6 +18,7 @@
 
 constexpr int32 SaveDefaultMaxInventorySlotCount = 10;
 constexpr int32 ChipEquipmentSlotCount = 10;
+constexpr int32 EquipmentSlotCount = static_cast<int32>(ELSEquipmentSlot::Count);
 
 const FString ULSSaveSubsystem::SlotName = TEXT("LostSignalSave");
 const FString ULSSaveSubsystem::DebugFileName = TEXT("LostSignalSave_Debug.json");
@@ -130,6 +131,12 @@ const TArray<FLSSessionItem>& ULSSaveSubsystem::GetChipEquipmentSlots() const
 {
 	static TArray<FLSSessionItem> Empty;
 	return SaveData ? SaveData->ChipEquipmentSlots : Empty;
+}
+
+const TArray<FLSSessionItem>& ULSSaveSubsystem::GetEquipmentSlots() const
+{
+	static TArray<FLSSessionItem> Empty;
+	return SaveData ? SaveData->EquipmentSlots : Empty;
 }
 
 int32 ULSSaveSubsystem::GetMaxInventorySlotCount() const
@@ -325,6 +332,93 @@ bool ULSSaveSubsystem::UnequipChipToWarehouse(const int32 EquipmentIndex)
 	Save();
 	OnChipLoadoutChanged.Broadcast();
 	return true;
+}
+
+bool ULSSaveSubsystem::MoveEquipmentSlot(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot move equipment slot because SaveData is missing."));
+		return false;
+	}
+
+	const bool bFromEquipment = FromArea == ELSInventorySlotArea::Equipment;
+	const bool bToEquipment = ToArea == ELSInventorySlotArea::Equipment;
+
+	// 이 경로는 장비 슬롯이 원본 또는 대상 중 정확히 하나일 때만 쓴다.
+	// 장비끼리는 슬롯마다 타입이 고정이라 교환이 성립하지 않고, 둘 다 아니면 일반 저장 슬롯 이동을 써야 한다.
+	if (bFromEquipment == bToEquipment)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot move equipment slot with invalid area pair. FromArea=%d ToArea=%d"),
+			static_cast<int32>(FromArea), static_cast<int32>(ToArea));
+		return false;
+	}
+
+	EnsureEquipmentSlots();
+
+	TArray<FLSSessionItem>* FromSlots = GetMutableStoredSlots(FromArea);
+	TArray<FLSSessionItem>* ToSlots = GetMutableStoredSlots(ToArea);
+	if (!FromSlots || !ToSlots || !FromSlots->IsValidIndex(FromIndex) || !LSInventorySlotUtils::IsFilled((*FromSlots)[FromIndex]) || ToIndex < 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot move equipment slot. FromArea=%d From=%d ToArea=%d To=%d"),
+			static_cast<int32>(FromArea), FromIndex, static_cast<int32>(ToArea), ToIndex);
+		return false;
+	}
+
+	// 잠긴 보호 슬롯은 장비 이동의 원본/대상으로 쓸 수 없다.
+	if (FromArea == ELSInventorySlotArea::Safe && FromIndex >= GetMaxSafeStashSlotCount())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot move equipment because source safe slot is locked. Index=%d"), FromIndex);
+		return false;
+	}
+	if (ToArea == ELSInventorySlotArea::Safe && ToIndex >= GetMaxSafeStashSlotCount())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot move equipment because target safe slot is locked. Index=%d"), ToIndex);
+		return false;
+	}
+
+	// 장착: 장비 슬롯에 들어갈 아이템 타입이 그 슬롯 타입(=인덱스)과 일치해야 한다.
+	if (bToEquipment)
+	{
+		if (ToIndex >= EquipmentSlotCount)
+		{
+			return false;
+		}
+
+		const FName SourceRow = (*FromSlots)[FromIndex].ItemRowName;
+		if (LSInventorySlotUtils::ResolveEquipmentSlotType(SourceRow) != static_cast<ELSEquipmentSlot>(ToIndex))
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Save] Cannot equip '%s' into equipment slot %d because type mismatches."),
+				*SourceRow.ToString(), ToIndex);
+			return false;
+		}
+	}
+
+	// 해제(교환): 대상 슬롯에 아이템이 있으면 스왑으로 그 아이템이 장비 슬롯(FromIndex)에 들어간다.
+	// 들어갈 아이템 타입이 장비 슬롯 타입과 맞을 때만 허용한다(엉뚱한 아이템이 장착되는 것을 막는다).
+	if (bFromEquipment && ToSlots->IsValidIndex(ToIndex) && LSInventorySlotUtils::IsFilled((*ToSlots)[ToIndex]))
+	{
+		const FName TargetRow = (*ToSlots)[ToIndex].ItemRowName;
+		if (LSInventorySlotUtils::ResolveEquipmentSlotType(TargetRow) != static_cast<ELSEquipmentSlot>(FromIndex))
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Save] Cannot swap equipment slot %d with '%s' because type mismatches."),
+				FromIndex, *TargetRow.ToString());
+			return false;
+		}
+	}
+
+	const int32 ToMaxSlotCount =
+		ToArea == ELSInventorySlotArea::Inventory ? GetMaxInventorySlotCount() :
+		ToArea == ELSInventorySlotArea::Safe ? GetMaxSafeStashSlotCount() :
+		EquipmentSlotCount;
+
+	// 장비는 Item_Max=1이라 병합 없이 배치/스왑으로만 동작한다.
+	const bool bMoved = LSInventorySlotUtils::DropSlot(*FromSlots, FromIndex, *ToSlots, ToIndex, ToMaxSlotCount);
+	if (bMoved)
+	{
+		Save();
+	}
+	return bMoved;
 }
 
 void ULSSaveSubsystem::SortInventory()
@@ -674,6 +768,7 @@ void ULSSaveSubsystem::StartNewGame()
 
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	EnsureChipEquipmentSlots();
+	EnsureEquipmentSlots();
 	ApplyStarterItems();
 	UE_LOG(LogLS, Log, TEXT("[Save] New game started - all save files deleted for a fresh start"));
 }
@@ -838,6 +933,7 @@ void ULSSaveSubsystem::Load()
 			LSInventorySlotUtils::NormalizeSlotArray(SaveData->WarehouseItems);
 			LSInventorySlotUtils::NormalizeSlotArray(SaveData->SafeStash);
 			EnsureChipEquipmentSlots();
+			EnsureEquipmentSlots();
 			ResolveInterruptedRaid();
 			Save();
 		}
@@ -852,6 +948,7 @@ void ULSSaveSubsystem::Load()
 
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	EnsureChipEquipmentSlots();
+	EnsureEquipmentSlots();
 	UE_LOG(LogLS, Log, TEXT("[Save] Created new save object for slot %s"), *ResolvedSlotName);
 }
 
@@ -937,6 +1034,24 @@ void ULSSaveSubsystem::EnsureChipEquipmentSlots()
 	}
 }
 
+void ULSSaveSubsystem::EnsureEquipmentSlots()
+{
+	if (!SaveData)
+	{
+		return;
+	}
+
+	while (SaveData->EquipmentSlots.Num() < EquipmentSlotCount)
+	{
+		SaveData->EquipmentSlots.Add(LSInventorySlotUtils::MakeEmptyItem());
+	}
+
+	if (SaveData->EquipmentSlots.Num() > EquipmentSlotCount)
+	{
+		SaveData->EquipmentSlots.SetNum(EquipmentSlotCount);
+	}
+}
+
 int32 ULSSaveSubsystem::GetCarryingProtocolSlotBonus(const FName EnableName) const
 {
 	if (!SaveData || EnableName.IsNone())
@@ -983,6 +1098,8 @@ TArray<FLSSessionItem>* ULSSaveSubsystem::GetMutableStoredSlots(const ELSInvento
 		return &SaveData->SafeStash;
 	case ELSInventorySlotArea::Warehouse:
 		return &SaveData->WarehouseItems;
+	case ELSInventorySlotArea::Equipment:
+		return &SaveData->EquipmentSlots;
 	default:
 		return nullptr;
 	}
@@ -1003,6 +1120,8 @@ const TArray<FLSSessionItem>* ULSSaveSubsystem::GetStoredSlots(const ELSInventor
 		return &SaveData->SafeStash;
 	case ELSInventorySlotArea::Warehouse:
 		return &SaveData->WarehouseItems;
+	case ELSInventorySlotArea::Equipment:
+		return &SaveData->EquipmentSlots;
 	default:
 		return nullptr;
 	}

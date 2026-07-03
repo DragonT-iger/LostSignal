@@ -76,7 +76,16 @@ Source/LostSignal/Inventory/LSInventorySlotUtils.cpp
 
 `ULSInventoryWidget`은 인벤토리와 SafeStash 영역을 표시한다.
 
-또한 `WeaponSlot`, `HeadphoneSlot`, `HeadSlot`, `GlovesSlot`, `BodySlot` 장비 슬롯을 `ULSItemSlotWidget`으로 바인딩한다. 슬롯 배경 텍스처는 각 `ULSItemSlotWidget`의 `DefaultSlotTexture`에서 지정하며, 값이 없으면 WBP 디자이너의 배경 브러시를 그대로 쓴다(아래 "UI 표시 흐름" 참고). 현재 이 5개 슬롯은 표시용이라 장착 저장/드래그 장착/장착 타입 검증 로직은 아직 연결하지 않는다.
+또한 `WeaponSlot`, `ProcessorSlot`, `CoreSlot`, `ActuatorSlot`, `FrameSlot` 장비 장착 슬롯을 `ULSItemSlotWidget`으로 바인딩한다. BindWidget 이름은 장비 타입과 일치시킨다(순서는 `ELSEquipmentSlot`: 무기 / 프로세서(머리) / 코어(몸) / 구동계(손) / 프레임(발)). WBP 위젯 인스턴스 이름도 이 5개와 같아야 강제 BindWidget이 붙는다. 슬롯 배경 텍스처는 각 `ULSItemSlotWidget`의 `DefaultSlotTexture`에서 지정하며, 값이 없으면 WBP 디자이너의 배경 브러시를 그대로 쓴다(아래 "UI 표시 흐름" 참고).
+
+### 장비 장착 (무기/방어구)
+
+장비 슬롯은 인벤토리 슬롯과 같은 `ULSItemSlotWidget` 컨텍스트(`ELSInventorySlotArea::Equipment`)를 재사용해 **드래그로만** 장착/해제한다(Shift 빠른 이동은 미지원). 장착 상태는 `ULSSaveGame::EquipmentSlots`(고정 5칸, `ELSEquipmentSlot` 순서)에 저장하며, 로비 전용이다. 레이드 중에는 인벤토리 원본이 세션 상태(`RaidInventoryComponent`)로 바뀌므로 장비 슬롯을 잠가 변경을 막는다(표시는 저장값 유지).
+
+- **슬롯 타입 매핑:** 슬롯 인덱스가 곧 타입이다. `Weapon`=무기(`Weapon_*`), `Processor`=머리, `Core`=몸, `Actuator`=손, `Frame`=발. 방어구 타입은 `Item_Equipment`(Processor/Core/Actuator/Frame)가 단일 출처이며, 판정은 `LSInventorySlotUtils::ResolveEquipmentSlotType`가 담당한다. 무기는 현재 캐릭터 구분 없이(`Weapon_1/2/3`) 무기 슬롯에 장착 가능하다.
+- **처리 경로:** 장비 슬롯이 원본/대상에 걸린 드롭은 `ULSInventoryWidget::HandleInventorySlotDrop`이 `HandleEquipmentSlotDrop`으로 분기해 `ULSSaveSubsystem::MoveEquipmentSlot`으로 확정한다(레이드면 거부). `MoveEquipmentSlot`은 타입 검증 후 기존 `LSInventorySlotUtils::DropSlot`(배치/스왑)을 재사용한다. 장비는 `Item_Max=1`이라 병합 없이 배치/스왑으로만 동작한다.
+- **타입 검증:** 장비 슬롯에 최종적으로 들어가는 아이템은 그 슬롯 타입과 일치해야 한다. 장착(인벤토리→장비)은 소스 타입을, 해제 시 교환(장비↔점유된 인벤토리 슬롯)은 인벤토리 쪽 아이템 타입을 검증한다. 타입이 안 맞으면 드롭이 실패한다(장비끼리 서로 다른 타입 슬롯 교환도 불가). 장착된 장비는 창 밖으로 드래그해도 월드에 버리지 않는다.
+- **미연동:** 무기/방어구 전투 스탯(`Item_Attack`/`Item_Health`/`Item_Defense` 등)의 GAS 어트리뷰트 적용은 아직 없다(후속). 현재는 장착 UI·저장·드래그·타입 검증까지만 연결돼 있다.
 
 ```text
 RebuildInventorySlots
@@ -86,6 +95,9 @@ RebuildInventorySlots
 RebuildConfirmedStorageSlots
 -> 레이드 중이면 RaidInventoryComponent::GetSessionSafeInventory
 -> 레이드가 아니면 SaveSubsystem::GetSafeStash
+
+RebuildEquipmentSlots
+-> SaveSubsystem::GetEquipmentSlots (로비 전용, 레이드 중이면 잠금 표시)
 ```
 
 `ULSLobbyStorageWidget`은 로비 창고를 표시한다.
@@ -152,6 +164,7 @@ Safe <-> Safe
 Inventory/Safe <-> LootBox
 Inventory/Safe <-> Warehouse
 Warehouse <-> Warehouse
+Inventory/Safe <-> Equipment (로비 전용, 장비 장착/해제)
 Inventory/Safe/Warehouse -> WorldDroppedItem
 WorldDroppedItem -> Inventory
 ```

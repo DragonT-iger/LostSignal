@@ -35,6 +35,9 @@ public:
 	void RebuildConfirmedStorageSlots();
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
+	void RebuildEquipmentSlots();
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void SetStoreAllButtonVisible(bool bVisible);
 
 	bool HandleInventorySlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
@@ -61,20 +64,22 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UButton> SortButton;
 
+	// 장비 장착 슬롯. BindWidget 이름은 장비 타입과 일치시킨다(ELSEquipmentSlot 순서).
+	// 무기=Weapon, 프로세서(머리)=Processor, 코어(몸)=Core, 구동계(손)=Actuator, 프레임(발)=Frame.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSItemSlotWidget> WeaponSlot;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSItemSlotWidget> HeadphoneSlot;
+	TObjectPtr<ULSItemSlotWidget> ProcessorSlot;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSItemSlotWidget> HeadSlot;
+	TObjectPtr<ULSItemSlotWidget> CoreSlot;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSItemSlotWidget> GlovesSlot;
+	TObjectPtr<ULSItemSlotWidget> ActuatorSlot;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSItemSlotWidget> BodySlot;
+	TObjectPtr<ULSItemSlotWidget> FrameSlot;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
@@ -95,7 +100,8 @@ private:
 	UFUNCTION()
 	void HandleSortButtonClicked();
 
-	void InitializeDisplayOnlyEquipmentSlot(ULSItemSlotWidget* SlotWidget, const TCHAR* SlotName) const;
+	// 장비 슬롯(무기/방어구) 드롭 처리. 로비 전용이며(레이드 중 거부) SaveSubsystem::MoveEquipmentSlot으로 확정한다.
+	bool HandleEquipmentSlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 	bool HandleInventoryBackgroundDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation);
 	bool DropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation, FVector2D ScreenPosition);
 	bool IsPointerInsideInventoryWindow(FVector2D ScreenPosition) const;
