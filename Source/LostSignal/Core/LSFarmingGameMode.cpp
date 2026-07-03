@@ -29,7 +29,21 @@ void ALSFarmingGameMode::StartPlay()
 
 void ALSFarmingGameMode::OnPlayerDied()
 {
-	EndRaid(ELSRaidResult::Dead);
+	// 이미 종료됐거나 사망 딜레이가 진행 중이면 무시 (중복 사망 가드)
+	if (bRaidEnded || GetWorldTimerManager().IsTimerActive(DeathRaidEndTimerHandle))
+	{
+		return;
+	}
+
+	// 사망 연출을 보여준 뒤 결과 저장·레벨 이동을 시작한다.
+	if (DeathRaidEndDelaySeconds <= 0.0f)
+	{
+		EndRaid(ELSRaidResult::Dead);
+		return;
+	}
+
+	FTimerDelegate DeathRaidEndDelegate = FTimerDelegate::CreateUObject(this, &ALSFarmingGameMode::EndRaid, ELSRaidResult::Dead);
+	GetWorldTimerManager().SetTimer(DeathRaidEndTimerHandle, DeathRaidEndDelegate, DeathRaidEndDelaySeconds, false);
 }
 
 void ALSFarmingGameMode::OnExtraction()
@@ -240,8 +254,8 @@ void ALSFarmingGameMode::TravelToResultLevel()
 
 	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
 
-	// 탈출 성공은 일단 ResultLevel을 건너뛰고 바로 로비로 복귀한다.
-	if (PendingRaidResult == ELSRaidResult::Extracted)
+	// 탈출 성공·사망은 일단 ResultLevel을 건너뛰고 바로 로비로 복귀한다. (결과 레벨이 준비되면 되돌린다)
+	if (PendingRaidResult == ELSRaidResult::Extracted || PendingRaidResult == ELSRaidResult::Dead)
 	{
 		if (Settings && !Settings->LobbyLevel.IsNull())
 		{

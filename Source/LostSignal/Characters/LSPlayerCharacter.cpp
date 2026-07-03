@@ -6,6 +6,7 @@
 #include "Characters/LSChipStatComponent.h"
 #include "Combat/LSAimComponent.h"
 #include "Combat/LSPlayerCombatComponent.h"
+#include "Core/LSFarmingGameMode.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "EnhancedInputComponent.h"
 #include "AbilitySystemComponent.h"
@@ -93,6 +94,23 @@ void ALSPlayerCharacter::BeginPlay()
 	if (ChipStatComponent)
 	{
 		ChipStatComponent->RefreshChipStats();
+	}
+}
+
+void ALSPlayerCharacter::OnDeathStateChanged(bool bIsDead)
+{
+	Super::OnDeathStateChanged(bIsDead);
+
+	// 훅은 모든 머신에서 호출되지만 레이드 종료 판정은 서버 권한에서만 시작한다.
+	if (!bIsDead || !HasAuthority())
+	{
+		return;
+	}
+
+	// 파밍 레벨 판별을 GameMode 캐스트가 겸한다 — 로비 등에서는 캐스트 실패로 무시된다.
+	if (ALSFarmingGameMode* FarmingGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ALSFarmingGameMode>() : nullptr)
+	{
+		FarmingGameMode->OnPlayerDied();
 	}
 }
 

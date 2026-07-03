@@ -54,6 +54,12 @@ private:
 
 	FTimerHandle SignalGaugeDrainTimerHandle;
 
+	// 사망 연출(몽타주 등)을 보여준 뒤 레이드 종료를 시작하기까지의 대기 시간(초)
+	UPROPERTY(EditDefaultsOnly, Category="LS/Farming", meta=(ClampMin="0.0"))
+	float DeathRaidEndDelaySeconds = 3.0f;
+
+	FTimerHandle DeathRaidEndTimerHandle;
+
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Farming")
 	bool bRaidEnded = false;
 

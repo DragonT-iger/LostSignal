@@ -77,9 +77,9 @@ Lobby -> Farming
 - Settings->FarmingLevel
 - World->ServerTravel(FarmingLevelPath)
 
-Farming -> Result
+Farming -> Lobby (Extracted / Dead)
 - ALSFarmingGameMode::TravelToResultLevel
-- Settings->ResultLevel
+- Settings->LobbyLevel
 - UGameplayStatics::OpenLevelBySoftObjectPtr
 
 Farming -> Title (Quit)
@@ -199,11 +199,18 @@ ALSFarmingGameMode::OnExtraction
 -> EndRaid(ELSRaidResult::Extracted)
 
 ALSFarmingGameMode::OnPlayerDied
+-> DeathRaidEndDelaySeconds 타이머 (사망 연출 시간, EditDefaultsOnly)
 -> EndRaid(ELSRaidResult::Dead)
 
 ALSFarmingGameMode::OnQuit
 -> EndRaid(ELSRaidResult::Quit)
 ```
+
+`OnPlayerDied`는 플레이어 캐릭터 사망에서 호출된다. 체력 0 도달 시
+`ULSCharacterCombatComponent`가 `OnDeathStateChanged(true)` 훅을 호출하고,
+`ALSPlayerCharacter::OnDeathStateChanged`가 서버 권한에서만 FarmingGameMode를 찾아 알린다
+(파밍 외 레벨에서는 GameMode 캐스트 실패로 무시). 사망 딜레이 중 중복 호출은
+타이머 활성 검사로 무시된다.
 
 `EndRaid`는 중복 실행을 막기 위해 `bRaidEnded`를 먼저 확인하고, 실제 처리는 `BeginRaidResultSave`로 넘긴다.
 
@@ -271,12 +278,11 @@ ALSFarmingGameMode::TravelToResultLevel
 -> 각 RaidInventoryComponent->EndRaidInventory
 -> 각 PlayerController->ClearSubmittedRaidEntryData
 -> SessionSubsystem->ClearRaidSessionState
--> 종료 결과가 Extracted면 LobbyLevel로 OpenLevel (일단 ResultLevel 건너뜀)
+-> 종료 결과가 Extracted 또는 Dead면 LobbyLevel로 OpenLevel (일단 ResultLevel 건너뜀)
 -> 종료 결과가 Quit이면 TitleLevel로 OpenLevel (ResultLevel 건너뜀)
--> Dead는 ResultLevel로 OpenLevel
 ```
 
-> 현재 탈출(Extracted) 성공은 임시로 ResultLevel을 거치지 않고 바로 `LobbyLevel`로 복귀한다. 결과 레벨(전리품 정산 등)이 준비되면 이 분기를 제거하고 다시 ResultLevel을 거치도록 되돌린다.
+> 현재 탈출(Extracted) 성공과 사망(Dead)은 임시로 ResultLevel을 거치지 않고 바로 `LobbyLevel`로 복귀한다. 결과 레벨(전리품 정산 등)이 준비되면 이 분기를 제거하고 다시 ResultLevel을 거치도록 되돌린다.
 >
 > 중도 포기(Quit)는 레이드 자체를 그만두는 행동이라 결과를 보여줄 필요가 없어 `TitleLevel`로 바로 나간다. 레이드 중 ESC로 띄운 `ULSSettingsWidget`(WBP_Settings, 타이틀/로비와 동일한 위젯)의 "메인메뉴로 돌아가기"(BackButton)가 이 경로를 탄다 — 확인 다이얼로그를 거친 뒤 `ULSSessionSubsystem::bAllowQuitRecovery`를 true로 설정하고 `ALSFarmingGameMode::OnQuit()`을 호출해 출발 장비(SubmittedRaidLoadout)를 복구한다.
 
@@ -373,12 +379,13 @@ Farming Raid
 
 Raid End
   -> FarmingGameMode decides Extracted/Dead/Quit
+     (Dead: 캐릭터 사망 -> OnPlayerDied -> 사망 연출 딜레이 후 확정)
   -> Build result from each RaidInventoryComponent
   -> ClientApplyRaidResult writes local SaveSubsystem
   -> ServerConfirmRaidResultSaved ACK
   -> All ACKed
   -> EndRaidInventory / ClearSubmittedRaidEntryData / ClearRaidSessionState
-  -> OpenLevel(ResultLevel)
+  -> OpenLevel(Extracted/Dead: LobbyLevel, Quit: TitleLevel)
 
 Result
   -> ResultGameMode::ReturnToLobby

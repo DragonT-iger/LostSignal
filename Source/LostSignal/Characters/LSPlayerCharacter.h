@@ -38,6 +38,9 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
+	// 사망 시 서버에서 FarmingGameMode에 레이드 종료(Dead)를 알린다. 파밍 외 레벨에서는 아무것도 하지 않는다.
+	virtual void OnDeathStateChanged(bool bIsDead) override;
+
 	void ApplyFacingRotation(const FRotator& NewRotation);
 	void RebuildInventoryWidgetSlots();
 
