@@ -29,8 +29,15 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 	// 그리드는 반경 전체(MaxRayDistance) 원판을 긁어오지만 폴리곤은 HalfFov 콘만 쓴다.
 	// 콘과 각도 구간이 겹치지 않는 세그먼트는 어떤 콘 레이도 막을 수 없으므로 미리 제거해 레이 루프 N을 줄인다.
 	// 양 끝점의 forward 기준 부호각 [min,max]가 콘 반각을 벗어나면 컬링. 뒤쪽 래핑(±180)은 안전하게 살려두고
-	// 기존 IsPointBehindViewer가 히트를 걸러내므로 결과는 불변, 효율만 얻는다.
-	TArray<const FLSVisionSegment2D*> CulledSegments;
+	// 아래 히트 폐기 규칙(가르는 벽의 평면 뒤 히트만 무시)이 걸러내므로 결과는 불변, 효율만 얻는다.
+	// 컬링을 통과한 세그먼트에는 "그 직선이 캐릭터(OriginPos)와 apex(RayOriginPos)를 서로 반대편으로
+	// 가르는지"를 함께 캐시한다. 가르는 벽 = apex와 캐릭터 사이의 벽으로, 전방 시야를 막으면 안 된다.
+	struct FLSCulledVisionSegment
+	{
+		const FLSVisionSegment2D* Segment = nullptr;
+		bool bSeparatesViewerFromRayOrigin = false;
+	};
+	TArray<FLSCulledVisionSegment> CulledSegments;
 	CulledSegments.Reserve(SolverInfo.Segments.Num());
 	{
 		const float CullHalfFovDeg = SolverInfo.HalfFovDegrees + SolverInfo.AngleEpsilon;
@@ -56,7 +63,14 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 				continue;
 			}
 
-			CulledSegments.Add(Segment);
+			// 캐릭터/apex가 세그먼트 직선의 서로 반대편이면 가름. 어느 한쪽이 직선 위(≈0)면
+			// 가르지 않는 것으로 취급 — 차폐를 유지하는 쪽이 안전하다.
+			const FVector2D SegmentDir = Segment->End - Segment->Start;
+			const float OriginSide = Cross2D(SegmentDir, SolverInfo.OriginPos - Segment->Start);
+			const float RayOriginSide = Cross2D(SegmentDir, SolverInfo.RayOriginPos - Segment->Start);
+			const bool bSeparatesViewer = (OriginSide * RayOriginSide) < -KINDA_SMALL_NUMBER;
+
+			CulledSegments.Add({Segment, bSeparatesViewer});
 		}
 	}
 
@@ -89,9 +103,11 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 	TSet<FIntPoint> SeenVertexKeys;
 	SeenVertexKeys.Reserve(CulledSegments.Num() * 2);
 
-	const auto AddUniqueVertex = [&UniqueVertices, &SeenVertexKeys, &SolverInfo](const FVector2D& Vertex)
+	const auto AddUniqueVertex = [&UniqueVertices, &SeenVertexKeys, &SolverInfo](const FVector2D& Vertex, const bool bSegmentSeparatesViewer)
 	{
-		if (IsPointBehindViewer(SolverInfo.OriginPos, SolverInfo.OriginForward, Vertex))
+		// 가르는 벽(apex-캐릭터 사이)의 평면 뒤 꼭짓점은 히트도 폐기되므로 실루엣 후보에서 제외한다.
+		// 같은 편 벽은 평면 뒤 꼭짓점도 유효한 실루엣이라 살린다(옆 벽 밀착 시 경계 정확도).
+		if (bSegmentSeparatesViewer && IsPointBehindViewer(SolverInfo.OriginPos, SolverInfo.OriginForward, Vertex))
 		{
 			return;
 		}
@@ -108,10 +124,10 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 		}
 	};
 
-	for (const FLSVisionSegment2D* Segment : CulledSegments)
+	for (const FLSCulledVisionSegment& Culled : CulledSegments)
 	{
-		AddUniqueVertex(Segment->Start);
-		AddUniqueVertex(Segment->End);
+		AddUniqueVertex(Culled.Segment->Start, Culled.bSeparatesViewerFromRayOrigin);
+		AddUniqueVertex(Culled.Segment->End, Culled.bSeparatesViewerFromRayOrigin);
 	}
 
 	for (const FVector2D& Vertex : UniqueVertices)
@@ -216,10 +232,18 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 		FLSVisionRayHit ClosestHit;
 		ClosestHit.Distance = SolverInfo.MaxRayDistance;
 
-		for (const FLSVisionSegment2D* Segment : CulledSegments)
+		for (const FLSCulledVisionSegment& Culled : CulledSegments)
 		{
-			const FLSVisionRayHit Hit = CastRay(SolverInfo.RayOriginPos, RayDir, Segment->Start, Segment->End, SolverInfo.MaxRayDistance);
-			if (!Hit.bHit || IsPointBehindViewer(SolverInfo.OriginPos, SolverInfo.OriginForward, Hit.HitPoint))
+			const FLSVisionRayHit Hit = CastRay(SolverInfo.RayOriginPos, RayDir, Culled.Segment->Start, Culled.Segment->End, SolverInfo.MaxRayDistance);
+			if (!Hit.bHit)
+			{
+				continue;
+			}
+
+			// apex가 캐릭터 뒤에 있어 경계 레이는 벽을 캐릭터 평면 뒤에서 히트할 수 있다.
+			// 평면 뒤 히트라도 같은 편 벽(옆 벽 밀착 등)은 실제로 시선을 막으므로 차폐로 인정하고,
+			// apex와 캐릭터를 가르는 벽(등 뒤 벽)의 히트만 무시한다 — 벽 밀착 시 경계 레이 뚫림 수정.
+			if (Culled.bSeparatesViewerFromRayOrigin && IsPointBehindViewer(SolverInfo.OriginPos, SolverInfo.OriginForward, Hit.HitPoint))
 			{
 				continue;
 			}
