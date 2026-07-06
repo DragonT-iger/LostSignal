@@ -77,6 +77,12 @@ public:
 
 	// 폰이 있으면 폰의 인벤토리 위젯을, 없으면 등록된 로비 인벤토리 위젯을 갱신한다.
 	void RefreshActiveInventoryWidget();
+
+	// 열려 있는 모든 인벤토리 계열 패널(인벤토리/Safe/장비/창고/칩스테이션)을 authoritative 데이터에서 통째로 다시 그린다.
+	// 데이터를 바꾼 어떤 경로든 이 함수 하나만 호출하면 화면이 데이터와 정합된다.
+	// 소스 슬롯만 낙관적으로 비우는 부분 갱신은 금지 — 반드시 이 funnel로 전체를 다시 그린다.
+	void RefreshAllInventoryUI();
+
 	// 폰의 인벤토리가 열려 있거나, 등록된 로비 인벤토리 위젯이 보이면 true.
 	bool IsInventoryUIOpen() const;
 

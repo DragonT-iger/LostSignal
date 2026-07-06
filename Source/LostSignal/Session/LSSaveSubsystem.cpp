@@ -1066,6 +1066,11 @@ void ULSSaveSubsystem::EnsureEquipmentSlots()
 
 int32 ULSSaveSubsystem::GetCarryingProtocolSlotBonus(const FName EnableName) const
 {
+	return SaveData ? ComputeCarryingProtocolSlotBonus(SaveData->ChipEquipmentSlots, EnableName) : 0;
+}
+
+int32 ULSSaveSubsystem::ComputeCarryingProtocolSlotBonus(const TArray<FLSSessionItem>& EquipmentSlots, const FName EnableName) const
+{
 	if (!SaveData || EnableName.IsNone())
 	{
 		return 0;
@@ -1079,15 +1084,39 @@ int32 ULSSaveSubsystem::GetCarryingProtocolSlotBonus(const FName EnableName) con
 	}
 
 	const int32 InactiveSlotCount = LSChipStats::ResolveInactiveSignalSlotCount(GetChipSignalGaugePercent());
-	const TArray<FLSSessionItem> ActiveEquipmentItems = LSChipStats::BuildSignalActiveEquipmentItems(SaveData->ChipEquipmentSlots, InactiveSlotCount);
+	const TArray<FLSSessionItem> ActiveEquipmentItems = LSChipStats::BuildSignalActiveEquipmentItems(EquipmentSlots, InactiveSlotCount);
 	const int32 CurrentCarrying = LSChipStats::AggregateChipProtocolTotals(ActiveEquipmentItems, this).Carrying;
-	const int32 PreviousCarrying = LSChipStats::AggregateChipProtocolTotals(SaveData->ChipEquipmentSlots, this).Carrying;
+	const int32 PreviousCarrying = LSChipStats::AggregateChipProtocolTotals(EquipmentSlots, this).Carrying;
 	return GameDataSubsystem->GetVisibleProtocolEnableValueSum(
 		ELSProtocolType::Carrying,
 		EnableName,
 		CurrentCarrying,
 		PreviousCarrying,
 		TEXT("SaveCarryingSlotBonus"));
+}
+
+bool ULSSaveSubsystem::WouldUnequipChipDropInventoryItems(const int32 EquipmentIndex) const
+{
+	if (!SaveData || !SaveData->ChipEquipmentSlots.IsValidIndex(EquipmentIndex))
+	{
+		return false;
+	}
+
+	// 해제 대상 칸을 비운 가정 배열로 "해제 후 예상 최대 인벤토리 슬롯 수"를 구한다.
+	// 이 값은 실제 해제 후 GetMaxInventorySlotCount()와 동일하므로, 초과 드롭 여부를 정확히 예측한다.
+	TArray<FLSSessionItem> HypotheticalSlots = SaveData->ChipEquipmentSlots;
+	HypotheticalSlots[EquipmentIndex] = LSInventorySlotUtils::MakeEmptyItem();
+	const int32 PredictedMaxInventorySlotCount = SaveDefaultMaxInventorySlotCount + ComputeCarryingProtocolSlotBonus(HypotheticalSlots, TEXT("Inventory"));
+
+	// 예상 최대 슬롯 수 이상 인덱스에 채워진 인벤토리 칸이 하나라도 있으면, 해제 시 그 아이템들이 월드로 드롭된다.
+	for (int32 SlotIndex = FMath::Max(0, PredictedMaxInventorySlotCount); SlotIndex < SaveData->Inventory.Num(); ++SlotIndex)
+	{
+		if (LSInventorySlotUtils::IsFilled(SaveData->Inventory[SlotIndex]))
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 TArray<FLSSessionItem>& ULSSaveSubsystem::GetMutableInventory()

@@ -185,6 +185,10 @@ private:
 	bool bIsEquipCandidate = false;
 	// 드래그 중 커서를 따라가는 비주얼 인스턴스 표시. 이 슬롯은 아이템 아이콘만 보이고 배경 프레임은 숨긴다.
 	bool bIsDragVisual = false;
+	// 더블클릭 빠른이동 직후, 첫 Down이 무장했던 드래그가 뒤늦게 발화하는 것을 한 번 억제하는 플래그.
+	// NativeOnMouseButtonDoubleClick에서 세우고 NativeOnDragDetected/다음 NativeOnMouseButtonDown에서 해제한다.
+	// 슬롯 재사용(ResetTransientSlotState)으로 지워지면 안 되므로 그 함수에서 건드리지 않는다.
+	bool bSuppressNextDragDetect = false;
 	// 현재 표시 중인 아이템 등급에 해당하는 배경색. 빈 슬롯·등급 없는 아이템은 DefaultGradeColor.
 	FLinearColor CurrentGradeBackgroundColor = FLinearColor::White;
 
@@ -210,7 +214,6 @@ private:
 	bool TryHandleWarehouseQuickTransfer();
 	bool TryHandleChipEquipmentQuickTransfer();
 	bool TryHandleChipStationQuickTransfer();
-	void RefreshStoredSlotVisual();
 	bool IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidLootDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidWarehouseDropTarget(const UDragDropOperation* InOperation) const;

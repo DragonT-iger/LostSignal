@@ -300,10 +300,18 @@ Item   -> 300000 + DataTable row 순서
 - 레이드 종료 결과 저장은 `ALSFarmingGameMode`가 만든 결과 payload를 클라이언트가 로컬 `SaveGame`에 반영하는 흐름이다.
 - `ULSSessionSubsystem`은 아직 보조/레거시 API가 남아 있지만, 2인 이상 레이드의 플레이어별 원본으로 보지 않는다.
 
+## UI 갱신 규칙 (단일 출처)
+
+데이터↔화면 stale 버그의 근본 원인은 "데이터를 바꾼 곳마다 손으로 여러 리빌드를 골라 부르는" 구조였다. 경로마다 갱신 대상(인벤토리/Safe/장비/창고/칩스테이션)을 일부만 부르면 나머지가 stale로 남고, 소스 슬롯만 낙관적으로 비우면 부분 스택 이동 시 남은 수량이 화면에서 사라졌다.
+
+- **모든 데이터 변경 경로는 갱신을 `ALSPlayerControllerBase::RefreshAllInventoryUI()` 하나로만 한다.** 이 funnel이 열려 있는 인벤토리 계열 패널 전체(인벤토리/Safe/장비 + 열려 있으면 창고·칩스테이션)를 authoritative 데이터에서 통째로 다시 그린다. 개별 `RebuildInventorySlots`/`RebuildConfirmedStorageSlots`/`RefreshOpenLobbyStorageWidget` 등을 mutation 경로에서 직접 흩뿌리지 않는다.
+- **낙관적 부분 갱신 금지.** 소스 슬롯만 `ClearItem()`으로 비우는 최적화는 "전량 이동"을 가정하므로 부분 이동 시 desync를 만든다. 성공하면 funnel로 전체를 다시 그린다. (UI = 데이터의 순수 함수)
+- **예외 — 칩 스테이션 자체 sweep.** 칩 스테이션의 `RefreshChipStation`은 칩 리스트를 재정렬(`SortChipViewItems`)하므로, 칩 스테이션 내부 빠른 장착/해제 sweep 경로(`TryHandleChipStationQuickTransfer`/`TryHandleChipEquipmentQuickTransfer`)는 쓸기 중 재정렬을 피하려고 funnel을 부르지 않고 해당 칸만 in-place로 갱신한다. 창고는 재정렬하지 않는 고정 인덱스 그리드라 funnel 전체 리빌드가 안전하다.
+- authority 여부로 로컬 리빌드를 나누지 않는다. 비-authority에서도 funnel로 로컬 미러를 다시 그리고, 서버 미러 RPC(`ClientSyncRaidSessionAndLoot`)가 오면 funnel이 멱등하게 재적용한다.
+
 ## 현재 주의점
 
 - `ItemRowName` 접두사 규칙에 의존한다. 새 아이템 타입을 추가하면 아이콘 로드, 최대 스택, 정렬 키 처리도 같이 추가해야 한다.
-- 저장 슬롯(`SaveSubsystem`)을 바꾸는 UI(칩스테이션 장착/해제 등)는 인벤토리 위젯을 폰 전용 `RebuildInventoryWidgetSlots`가 아니라 PC의 `RefreshActiveInventoryWidget`로 갱신해야 한다. 로비는 폰이 없어 폰 전용 경로가 무시되며, 그러면 인벤토리에 있던 칩을 장착해 슬롯을 비운 뒤 인벤토리 위젯이 stale로 남아 이후 창고 이동이 `GetInventory()[Index]` 빈 슬롯으로 실패한다.
 - 아이콘과 DataTable은 UI 표시 중 동기 로드될 수 있다. 아이템 수가 많아지면 캐싱을 고려한다.
 - Quit 복구에서 플레이어별 소모품 차감이 필요하면 `ULSRaidInventoryComponent`에 `ConsumedItems` 기록을 추가해야 한다.
 - 로컬/PIE 다중 프로필 테스트가 필요하면 SaveGame을 `PlayerSaves[ProfileId]` 형태로 확장하는 설계는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)를 따른다.
@@ -344,6 +352,7 @@ Raid End
 - 일반 인벤토리: 현재 최대 슬롯 수보다 뒤에 있는 아이템 슬롯은 기존 월드 드랍 흐름을 재사용해 플레이어 주변 바닥에 떨어뜨리고 원본 슬롯을 비운다.
 - 보호 슬롯: 현재 최대 보호 슬롯 수보다 뒤에 있는 아이템은 보존하되 잠긴 슬롯으로 표시한다. 잠긴 보호 슬롯은 드래그, 드롭, Shift-click, 월드 드랍 대상/원본으로 사용할 수 없다.
 - 로비에서 감소 시 초과 아이템을 창고로 넣거나 창 닫을 때 선택하게 하는 UX는 추후 결정한다. 현재 정책은 일반 슬롯 초과분 즉시 월드 드랍이다.
+- **단, 플레이어의 수동 칩 해제는 다르다.** 신호 유실(레이드 중 게이지 자동 감소)로 인한 감소는 위 즉시 월드 드랍 정책을 따르지만, 칩 스테이션에서 **직접 칩을 해제**해 적재 용량이 현재 보유량 아래로 줄어드는 경우에는 해제 자체를 막고 알림을 띄운다(아이템 손실 방지). 판정은 [ChipSystem.md](ChipSystem.md)가 단일 출처다.
 
 ## 새 게임 기본 지급
 

@@ -347,6 +347,23 @@ void ALSPlayerControllerBase::RefreshActiveInventoryWidget()
 	}
 }
 
+void ALSPlayerControllerBase::RefreshAllInventoryUI()
+{
+	// 인벤토리 + Safe (폰/로비 분기)는 기존 단일 경로를 재사용한다.
+	RefreshActiveInventoryWidget();
+
+	// 로비 장비칸은 폰 경로(RebuildInventoryWidgetSlots)가 갱신하지 않는다. 장비 편집은 로비 전용이므로,
+	// 폰이 없는 로비에서만 등록된 로비 인벤토리 위젯의 장비칸을 함께 다시 그린다.
+	if (!Cast<ALSPlayerCharacter>(GetPawn()) && LobbyInventoryWidgetInstance)
+	{
+		LobbyInventoryWidgetInstance->RebuildEquipmentSlots();
+	}
+
+	// 창고·칩 스테이션은 열려 있을 때만 각자 데이터에서 다시 그린다(내부에서 가시성 체크).
+	RefreshOpenLobbyStorageWidget();
+	RefreshOpenChipStationWidget();
+}
+
 bool ALSPlayerControllerBase::IsInventoryUIOpen() const
 {
 	if (const ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetPawn()))
@@ -387,10 +404,8 @@ void ALSPlayerControllerBase::ClientSyncRaidSessionAndLoot_Implementation(ALSLoo
 
 	RaidInventoryComponent->MirrorRaidInventoryState(InventoryItems, SafeItems);
 
-	if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetPawn()))
-	{
-		PlayerCharacter->RebuildInventoryWidgetSlots();
-	}
+	// 미러 데이터가 갱신됐으니 열려 있는 인벤토리 계열 패널 전체를 funnel로 다시 그린다.
+	RefreshAllInventoryUI();
 
 	RefreshLootDropWidgetForSource(SourceLootBox, LootResults);
 }
@@ -1477,10 +1492,8 @@ void ALSPlayerControllerBase::ClientRefreshLobbyLoot_Implementation(ALSLootBox* 
 {
 	RefreshLootDropWidgetForSource(SourceLootBox, LootResults);
 
-	if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetPawn()))
-	{
-		PlayerCharacter->RebuildInventoryWidgetSlots();
-	}
+	// 로비 파밍 중 룻박스 상호작용 결과로 인벤토리가 바뀌었을 수 있으니 계열 패널 전체를 funnel로 다시 그린다.
+	RefreshAllInventoryUI();
 }
 
 bool ALSPlayerControllerBase::IsLobbyLootMode() const

@@ -58,6 +58,12 @@ public:
 	// Shift+좌클릭 빠른 조작: 장착된 칩을 창고로 해제한다.
 	bool QuickUnequipEquippedChipToWarehouse(int32 EquipmentSlotIndex);
 
+	// 적재(Carrying) 용량 부족으로 칩 해제가 차단됐을 때 호출된다(드래그/Shift 해제 공용).
+	// C++가 언제·무슨 메시지로 부를지 소유하고, WBP가 팝업/토스트 연출로 Message를 표시한다(연출은 아트).
+	// 구현하지 않아도 크래시 없음 — 해제 차단 자체는 C++에서 이미 이뤄진다.
+	UFUNCTION(BlueprintImplementableEvent, Category="LS/UI|Chip")
+	void OnUnequipBlockedByCapacity(const FText& Message);
+
 protected:
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 

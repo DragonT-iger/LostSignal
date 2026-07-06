@@ -218,12 +218,8 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 				const bool bChanged = SaveSubsystem->DropStoredSlot(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
 				if (bChanged)
 				{
-					RebuildInventorySlots();
-					RebuildConfirmedStorageSlots();
-					// 창고↔인벤토리 이동이면 열려 있는 창고 위젯도 같이 갱신한다.
-					PlayerController->RefreshOpenLobbyStorageWidget();
-					// 칩이 옮겨졌으면 열려 있는 칩 스테이션 칩 리스트도 다시 그린다(stale 방지).
-					PlayerController->RefreshOpenChipStationWidget();
+					// 인벤토리/Safe/창고/칩스테이션 등 열려 있는 패널 전체를 데이터에서 다시 그린다(부분/누락 갱신 금지).
+					PlayerController->RefreshAllInventoryUI();
 				}
 				return bChanged;
 			}
@@ -241,10 +237,10 @@ bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea From
 		ToSlotIndex,
 		bChanged ? TEXT("true") : TEXT("false"));
 
-	if (bChanged && PlayerController->HasAuthority())
+	if (bChanged)
 	{
-		RebuildInventorySlots();
-		RebuildConfirmedStorageSlots();
+		// authority면 즉시, 비-authority면 로컬 미러를 다시 그린다(서버 미러 RPC가 오면 funnel이 멱등 재적용).
+		PlayerController->RefreshAllInventoryUI();
 	}
 
 	return bChanged;
@@ -289,14 +285,10 @@ bool ULSInventoryWidget::HandleEquipmentSlotDrop(const ELSInventorySlotArea From
 	const bool bChanged = SaveSubsystem->MoveEquipmentSlot(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
 	if (bChanged)
 	{
-		RebuildInventorySlots();
-		RebuildConfirmedStorageSlots();
-		RebuildEquipmentSlots();
-		// 장비를 인벤토리에서 뺐거나 넣었으면 열려 있는 창고 위젯도 갱신(인벤토리 인덱스 변화 반영).
+		// 장비 이동은 인벤토리 인덱스·창고·칩 리스트에 파급되므로, 열려 있는 패널 전체를 funnel로 다시 그린다.
 		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 		{
-			PlayerController->RefreshOpenLobbyStorageWidget();
-			PlayerController->RefreshOpenChipStationWidget();
+			PlayerController->RefreshAllInventoryUI();
 		}
 	}
 	return bChanged;
@@ -310,12 +302,14 @@ bool ULSInventoryWidget::HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, c
 		return false;
 	}
 
+	// 룻박스(소스) 슬롯은 TransferLootSlotToInventorySlot이 내부에서 다시 그린다. 대상(인벤토리 계열)은 funnel로 전체를 다시 그린다.
 	const bool bTransferred = LootDropWidget->TransferLootSlotToInventorySlot(LootSlotIndex, ToSlotArea, ToSlotIndex);
-	APlayerController* OwningPlayer = GetOwningPlayer();
-	if (bTransferred && OwningPlayer && OwningPlayer->HasAuthority())
+	if (bTransferred)
 	{
-		RebuildInventorySlots();
-		RebuildConfirmedStorageSlots();
+		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+		{
+			PlayerController->RefreshAllInventoryUI();
+		}
 	}
 
 	return bTransferred;
@@ -488,10 +482,7 @@ void ULSInventoryWidget::HandleStoreAllButtonClicked()
 
 	if (bChanged)
 	{
-		RebuildInventorySlots();
-		RebuildConfirmedStorageSlots();
-		PlayerController->RefreshOpenLobbyStorageWidget();
-		PlayerController->RefreshOpenChipStationWidget();
+		PlayerController->RefreshAllInventoryUI();
 	}
 
 	if (bStoppedBecauseFull)
@@ -508,10 +499,9 @@ void ULSInventoryWidget::HandleSortButtonClicked()
 		{
 			if (RaidInventory->IsRaidActive())
 			{
-				if (PlayerController->SortRaidInventory() && PlayerController->HasAuthority())
+				if (PlayerController->SortRaidInventory())
 				{
-					RebuildInventorySlots();
-					RebuildConfirmedStorageSlots();
+					PlayerController->RefreshAllInventoryUI();
 				}
 				return;
 			}
@@ -530,12 +520,10 @@ void ULSInventoryWidget::HandleSortButtonClicked()
 		}
 	}
 
-	RebuildInventorySlots();
-	RebuildConfirmedStorageSlots();
-	// 정렬은 인벤토리를 압축해 인덱스를 재배치하므로, 열려 있는 칩 스테이션 칩 리스트도 다시 그린다.
+	// 정렬은 인벤토리를 압축해 인덱스를 재배치하므로, 열려 있는 인벤토리 계열 패널 전체를 funnel로 다시 그린다.
 	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 	{
-		PlayerController->RefreshOpenChipStationWidget();
+		PlayerController->RefreshAllInventoryUI();
 	}
 }
 
@@ -678,9 +666,8 @@ bool ULSInventoryWidget::DropInventoryDragToWorld(const ULSInventoryDragDropOper
 
 	if (bDropped)
 	{
-		RebuildInventorySlots();
-		RebuildConfirmedStorageSlots();
-		PlayerController->RefreshOpenChipStationWidget();
+		// 월드에 버려 슬롯이 비고 인덱스가 재배치되므로, 열려 있는 인벤토리 계열 패널 전체를 funnel로 다시 그린다.
+		PlayerController->RefreshAllInventoryUI();
 	}
 
 	return bDropped;

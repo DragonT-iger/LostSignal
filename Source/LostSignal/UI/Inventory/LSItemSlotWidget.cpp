@@ -1,7 +1,6 @@
 #include "UI/Inventory/LSItemSlotWidget.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
-#include "Characters/LSPlayerCharacter.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Core/LSPlayerControllerBase.h"
@@ -386,6 +385,10 @@ void ULSItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 
 FReply ULSItemSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+	// 새 클릭 제스처 시작. 이전 더블클릭이 남긴 드래그 억제 플래그를 여기서 해제해,
+	// 정상 드래그가 억제된 채로 남는 일이 없게 한다.
+	bSuppressNextDragDetect = false;
+
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && InMouseEvent.IsShiftDown())
 	{
 		// 옮길 대상(룻박스/창고/장착)이 있을 때만 빠른이동으로 클릭을 소비한다.
@@ -408,7 +411,12 @@ FReply ULSItemSlotWidget::NativeOnMouseButtonDoubleClick(const FGeometry& InGeom
 {
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && TryHandleQuickTransfer())
 	{
-		return FReply::Handled();
+		// 더블클릭 첫 Down이 DetectDragIfPressed로 무장한 드래그를 취소한다. 캡처를 놓지 않으면
+		// 빠른이동으로 슬롯 풀이 재구성된 뒤 뒤늦게 NativeOnDragDetected가 발화해, 재사용된 슬롯의
+		// (이미 다른 아이템이 된) 데이터로 드래그가 시작돼 구조가 꼬인다.
+		// ReleaseMouseCapture로 무장을 풀고, 안전망으로 다음 드래그 감지 한 번을 억제한다.
+		bSuppressNextDragDetect = true;
+		return FReply::Handled().ReleaseMouseCapture();
 	}
 
 	return Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
@@ -445,6 +453,14 @@ void ULSItemSlotWidget::NativeOnDragLeave(const FDragDropEvent& InDragDropEvent,
 
 void ULSItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
 {
+	// 더블클릭 빠른이동이 방금 슬롯을 바꿨다면, 첫 Down이 무장했던 드래그가 뒤늦게 여기로 발화한 것이다.
+	// 이 한 번을 억제해 재사용된(다른 아이템이 된) 슬롯을 잡지 않게 한다. (다음 Down에서 플래그 해제)
+	if (bSuppressNextDragDetect)
+	{
+		bSuppressNextDragDetect = false;
+		return;
+	}
+
 	if (!CanStartItemDrag())
 	{
 		return;
@@ -838,14 +854,11 @@ bool ULSItemSlotWidget::TryHandleLootQuickTransfer()
 		return false;
 	}
 
-	bHasItem = false;
-	APlayerController* OwningPlayer = GetOwningPlayer();
-	if (OwningPlayer && OwningPlayer->HasAuthority())
+	// 룻박스(소스) 슬롯은 TransferLootSlotToInventory가 내부에서 다시 그린다.
+	// 대상(인벤토리/Safe 등)은 소스만 낙관적으로 비우지 않고 funnel로 전체를 데이터에서 다시 그린다.
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 	{
-		if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(GetOwningPlayerPawn()))
-		{
-			PlayerCharacter->RebuildInventoryWidgetSlots();
-		}
+		PlayerController->RefreshAllInventoryUI();
 	}
 	return true;
 }
@@ -858,19 +871,9 @@ bool ULSItemSlotWidget::TryHandleInventoryQuickTransfer()
 		return false;
 	}
 
-	if (PlayerController->IsLobbyStorageWidgetOpen())
-	{
-		RefreshStoredSlotVisual();
-	}
-	else if (PlayerController->HasAuthority())
-	{
-		InventoryWidget->RebuildInventorySlots();
-		InventoryWidget->RebuildConfirmedStorageSlots();
-	}
-	else
-	{
-		ClearItem();
-	}
+	// 소스 슬롯만 낙관적으로 비우거나 authority 여부로 갱신을 나누지 않는다.
+	// 성공하면 열려 있는 인벤토리 계열 패널 전체를 데이터에서 다시 그려 정합을 보장한다(부분 이동 포함).
+	PlayerController->RefreshAllInventoryUI();
 	return true;
 }
 
@@ -882,7 +885,12 @@ bool ULSItemSlotWidget::TryHandleWarehouseQuickTransfer()
 		return false;
 	}
 
-	ClearItem();
+	// 인벤토리가 가득 차 일부만 옮겨졌어도 소스(창고) 슬롯을 통째로 비우면 안 된다(남은 수량이 화면에서 사라지는 버그).
+	// funnel로 창고·인벤토리를 데이터에서 다시 그려 남은 수량이 정확히 반영되게 한다.
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		PlayerController->RefreshAllInventoryUI();
+	}
 	return true;
 }
 
@@ -943,36 +951,6 @@ void ULSItemSlotWidget::RefreshChipStationSlotFromStored()
 	}
 
 	// 저장 슬롯이 비었으면(장착으로 빠져나감) 이 칸은 hole로 남긴다. 해제 시 InsertChipListSlot이 재사용한다.
-	ClearItem();
-}
-
-void ULSItemSlotWidget::RefreshStoredSlotVisual()
-{
-	const UGameInstance* GameInstance = GetGameInstance();
-	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-	if (!SaveSubsystem)
-	{
-		ClearItem();
-		return;
-	}
-
-	const TArray<FLSSessionItem>* Slots = nullptr;
-	if (SlotArea == ELSInventorySlotArea::Inventory)
-	{
-		Slots = &SaveSubsystem->GetInventory();
-	}
-	else if (SlotArea == ELSInventorySlotArea::Safe)
-	{
-		Slots = &SaveSubsystem->GetSafeStash();
-	}
-
-	const FLSSessionItem* SlotItem = Slots && Slots->IsValidIndex(SlotIndex) ? &(*Slots)[SlotIndex] : nullptr;
-	if (SlotItem && !SlotItem->ItemRowName.IsNone() && SlotItem->Amount > 0)
-	{
-		SetItem(SlotItem->ItemRowName, SlotItem->Amount, SlotItem->ChipStats);
-		return;
-	}
-
 	ClearItem();
 }
 

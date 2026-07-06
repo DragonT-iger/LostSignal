@@ -731,6 +731,18 @@ bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentS
 		return false;
 	}
 
+	// 이 칩을 해제하면 적재(Carrying) 프로토콜이 낮아져 인벤토리 용량이 줄고, 넘치는 아이템이 월드로 드롭돼 사라진다.
+	// 그 경우 해제 자체를 막고(아이템 손실 방지) 알림을 띄운다. 데이터 반영(UnequipChipToWarehouse) 전에 검사해야 한다.
+	if (SaveSubsystem->WouldUnequipChipDropInventoryItems(EquipmentSlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot unequip chip at slot %d because reduced carrying capacity would drop inventory items on %s."),
+			EquipmentSlotIndex,
+			*GetNameSafe(this));
+		OnUnequipBlockedByCapacity(NSLOCTEXT("LSChipStation", "UnequipBlockedByCapacity",
+			"인벤토리 용량이 부족합니다. 이 칩을 해제하면 아이템이 버려지므로, 먼저 인벤토리를 정리하세요."));
+		return false;
+	}
+
 	// 해제 전 채워진 창고 인덱스를 기록해, 해제 후 새로 채워진 칸(=돌아온 칩의 위치)을 찾는다.
 	const TSet<int32> FilledBeforeUnequip = BuildFilledSlotIndexSet(SaveSubsystem->GetWarehouseItems());
 	if (!SaveSubsystem->UnequipChipToWarehouse(EquipmentSlotIndex))
