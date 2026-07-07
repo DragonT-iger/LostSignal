@@ -328,6 +328,8 @@ bool ULSChipStationWidget::NativeOnDrop(const FGeometry& InGeometry, const FDrag
 
 void ULSChipStationWidget::RefreshChipStation_Implementation()
 {
+	// 풀 리빌드 = 화면 세션 경계. 출처 기억을 비워 이후 해제는 "기억 없음" 규칙(인벤토리 우선)을 따른다.
+	ChipOriginByEquipmentIndex.Reset();
 	RefreshChipSlots();
 	RefreshEquipmentSlots();
 	RefreshEquippedChipSummary();
@@ -583,6 +585,7 @@ bool ULSChipStationWidget::EquipChipToHardwareSlot(const ULSInventoryDragDropOpe
 	if (bEquipped)
 	{
 		PlayChipSound(ChipEquipSound, TEXT("ChipEquipSound"));
+		RecordChipOrigin(EquipmentSlotIndex, DragOperation.SourceSlotArea, DragOperation.SourceSlotIndex);
 		// 정렬은 스테이션을 다시 열 때만 한다. 드래그한 소스 리스트 칸만 제자리 갱신하고
 		// (장착칸이 비어 있었으면 hole, 차 있어 스왑됐으면 돌아온 칩 표시) 장착칸·요약·용량만 경량 갱신한다.
 		if (ULSItemSlotWidget* SourceSlotWidget = DragOperation.SourceSlotWidget)
@@ -622,6 +625,8 @@ bool ULSChipStationWidget::DropEquippedChipToHardwareSlot(const ULSInventoryDrag
 		TargetEquipmentSlotIndex);
 	if (bDropped)
 	{
+		// 장착칸끼리의 이동/교환이므로 출처 기억도 함께 옮긴다.
+		MoveChipOriginRecord(DragOperation.SourceEquipmentSlotIndex, TargetEquipmentSlotIndex);
 		// 장착칸끼리의 이동이라 칩 리스트는 그대로다. 정렬/리빌드 없이 장착칸·요약·용량만 경량 갱신한다.
 		QueueRefreshEquippedChipState();
 	}
@@ -643,7 +648,7 @@ bool ULSChipStationWidget::UnequipChipToWarehouse(const ULSInventoryDragDropOper
 		return false;
 	}
 
-	return UnequipChipFromSlotToWarehouse(DragOperation.SourceEquipmentSlotIndex);
+	return UnequipChipFromSlot(DragOperation.SourceEquipmentSlotIndex);
 }
 
 bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDragDropOperation& DragOperation, ULSItemSlotWidget* TargetStoredSlotWidget, const ELSInventorySlotArea TargetArea, const int32 TargetSlotIndex)
@@ -690,6 +695,8 @@ bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDrag
 	if (bSwapped)
 	{
 		PlayChipSound(ChipEquipSound, TEXT("ChipEquipSound"));
+		// 밀려난 칩은 대상 저장 슬롯으로 갔으므로, 이 장착칸의 출처는 새로 들어온 칩의 저장 슬롯으로 덮어쓴다.
+		RecordChipOrigin(DragOperation.SourceEquipmentSlotIndex, TargetArea, TargetSlotIndex);
 		// 정렬은 스테이션을 다시 열 때만 한다. 드롭 대상 리스트 칸만 제자리 갱신한다(스왑으로 이 칸엔 방금 해제된 칩이 들어온다).
 		if (TargetStoredSlotWidget)
 		{
@@ -733,6 +740,7 @@ bool ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot(const ELSInven
 	if (bEquipped)
 	{
 		PlayChipSound(ChipEquipSound, TEXT("ChipEquipSound"));
+		RecordChipOrigin(TargetEquipmentSlotIndex, SourceArea, SourceSlotIndex);
 		// 칩 리스트는 호출 측(소스 슬롯 위젯)이 ClearItem으로 그 칸만 비운다. 여기선 리스트를 재정렬/리빌드하지 않고
 		// 장착칸·요약·용량만 경량 갱신한다(정렬은 스테이션을 다시 열 때만).
 		QueueRefreshEquippedChipState();
@@ -743,10 +751,10 @@ bool ULSChipStationWidget::QuickEquipChipToFirstEmptyHardwareSlot(const ELSInven
 
 bool ULSChipStationWidget::QuickUnequipEquippedChipToWarehouse(const int32 EquipmentSlotIndex)
 {
-	return UnequipChipFromSlotToWarehouse(EquipmentSlotIndex);
+	return UnequipChipFromSlot(EquipmentSlotIndex);
 }
 
-bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentSlotIndex)
+bool ULSChipStationWidget::UnequipChipFromSlot(const int32 EquipmentSlotIndex)
 {
 	UGameInstance* GameInstance = GetGameInstance();
 	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
@@ -756,26 +764,101 @@ bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentS
 		return false;
 	}
 
+	if (IsUnequipBlockedByCapacity(*SaveSubsystem, EquipmentSlotIndex))
+	{
+		return false;
+	}
+
+	// 출처가 인벤토리거나 기억이 없으면(재오픈 등) 인벤토리 복귀를 먼저 시도하고, 자리가 없으면 창고로 폴백한다.
+	int32 PreferredInventoryIndex = INDEX_NONE;
+	const bool bTryInventory = ShouldTryUnequipToInventory(EquipmentSlotIndex, PreferredInventoryIndex);
+	if (bTryInventory && TryUnequipChipToInventory(*SaveSubsystem, EquipmentSlotIndex, PreferredInventoryIndex))
+	{
+		ChipOriginByEquipmentIndex.Remove(EquipmentSlotIndex);
+		return true;
+	}
+
+	if (!UnequipChipToWarehouseWithListUpdate(*SaveSubsystem, EquipmentSlotIndex))
+	{
+		return false;
+	}
+
+	if (bTryInventory)
+	{
+		// 인벤토리 복귀를 의도했지만 자리가 없어 창고로 폴백했다 — 어디로 갔는지 사용자에게 알린다.
+		ShowCapacityBlockedDialog(NSLOCTEXT("LSChipStation", "UnequipMovedToWarehouse",
+			"인벤토리가 가득 차 해제한 칩을 창고로 보냈습니다."));
+	}
+	ChipOriginByEquipmentIndex.Remove(EquipmentSlotIndex);
+	return true;
+}
+
+bool ULSChipStationWidget::IsUnequipBlockedByCapacity(ULSSaveSubsystem& SaveSubsystem, const int32 EquipmentSlotIndex)
+{
 	// 이 칩을 해제하면 적재(Carrying) 프로토콜이 낮아져 인벤토리 용량이 줄고, 넘치는 아이템(일반 인벤토리)이 월드로 드롭돼 사라진다.
-	// 그 경우 해제 자체를 막고(아이템 손실 방지) 알림을 띄운다. 데이터 반영(UnequipChipToWarehouse) 전에 검사해야 한다.
+	// 그 경우 해제 자체를 막고(아이템 손실 방지) 알림을 띄운다. 데이터 반영 전에 검사해야 한다.
 	// 단, 이 차단은 로비 전용이다. 레이드 중에는 초과분을 그대로 월드에 버리는 기존 정책을 따른다(칩 스테이션은 로비 전용이지만
 	// 규칙을 코드로 명시해 레이드에서 실수로 막히지 않게 한다). 보호 슬롯(Safe)은 드롭이 아니라 잠금이므로 이 판정 대상이 아니다.
 	const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
 	const ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
 	const bool bRaidActive = RaidInventory && RaidInventory->IsRaidActive();
-	if (!bRaidActive && SaveSubsystem->WouldUnequipChipDropInventoryItems(EquipmentSlotIndex))
+	if (!bRaidActive && SaveSubsystem.WouldUnequipChipDropInventoryItems(EquipmentSlotIndex))
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot unequip chip at slot %d because reduced carrying capacity would drop inventory items on %s."),
 			EquipmentSlotIndex,
 			*GetNameSafe(this));
 		ShowCapacityBlockedDialog(NSLOCTEXT("LSChipStation", "UnequipBlockedByCapacity",
 			"인벤토리 용량이 부족합니다. 이 칩을 해제하면 아이템이 버려지므로, 먼저 인벤토리를 정리하세요."));
+		return true;
+	}
+	return false;
+}
+
+bool ULSChipStationWidget::ShouldTryUnequipToInventory(const int32 EquipmentSlotIndex, int32& OutPreferredInventoryIndex) const
+{
+	OutPreferredInventoryIndex = INDEX_NONE;
+	const FLSChipOriginRecord* Origin = ChipOriginByEquipmentIndex.Find(EquipmentSlotIndex);
+	if (!Origin)
+	{
+		// 출처 기억 없음(재오픈·풀 리빌드 후): 인벤토리 첫 빈 칸을 우선 시도한다.
+		return true;
+	}
+
+	if (Origin->Area != ELSInventorySlotArea::Inventory)
+	{
+		// 창고 출신은 기존처럼 창고로 돌아간다(알림 없음).
 		return false;
 	}
 
+	OutPreferredInventoryIndex = Origin->SlotIndex;
+	return true;
+}
+
+bool ULSChipStationWidget::TryUnequipChipToInventory(ULSSaveSubsystem& SaveSubsystem, const int32 EquipmentSlotIndex, const int32 PreferredInventoryIndex)
+{
+	int32 PlacedSlotIndex = INDEX_NONE;
+	if (!SaveSubsystem.UnequipChipToInventory(EquipmentSlotIndex, PreferredInventoryIndex, PlacedSlotIndex))
+	{
+		return false;
+	}
+
+	PlayChipSound(ChipUnequipSound, TEXT("ChipUnequipSound"));
+
+	// 배치 인덱스를 정확히 알므로 창고 경로와 달리 diff 없이 그 칸을 칩 리스트 빈 칸에 바로 표시한다.
+	const TArray<FLSSessionItem>& Inventory = SaveSubsystem.GetInventory();
+	if (Inventory.IsValidIndex(PlacedSlotIndex))
+	{
+		InsertChipListSlot(Inventory[PlacedSlotIndex], ELSInventorySlotArea::Inventory, PlacedSlotIndex);
+	}
+	QueueRefreshEquippedChipState();
+	return true;
+}
+
+bool ULSChipStationWidget::UnequipChipToWarehouseWithListUpdate(ULSSaveSubsystem& SaveSubsystem, const int32 EquipmentSlotIndex)
+{
 	// 해제 전 채워진 창고 인덱스를 기록해, 해제 후 새로 채워진 칸(=돌아온 칩의 위치)을 찾는다.
-	const TSet<int32> FilledBeforeUnequip = BuildFilledSlotIndexSet(SaveSubsystem->GetWarehouseItems());
-	if (!SaveSubsystem->UnequipChipToWarehouse(EquipmentSlotIndex))
+	const TSet<int32> FilledBeforeUnequip = BuildFilledSlotIndexSet(SaveSubsystem.GetWarehouseItems());
+	if (!SaveSubsystem.UnequipChipToWarehouse(EquipmentSlotIndex))
 	{
 		return false;
 	}
@@ -783,7 +866,7 @@ bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentS
 	PlayChipSound(ChipUnequipSound, TEXT("ChipUnequipSound"));
 
 	// 칩 리스트는 재정렬/리빌드하지 않고, 돌아온 칩을 빈 칸(빠른 장착으로 생긴 hole) 또는 맨 뒤에 꽂는다.
-	const TArray<FLSSessionItem>& WarehouseAfter = SaveSubsystem->GetWarehouseItems();
+	const TArray<FLSSessionItem>& WarehouseAfter = SaveSubsystem.GetWarehouseItems();
 	const int32 ReturnedWarehouseIndex = FindFirstNewlyFilledIndex(WarehouseAfter, FilledBeforeUnequip);
 	if (ReturnedWarehouseIndex != INDEX_NONE)
 	{
@@ -798,6 +881,28 @@ bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentS
 	}
 
 	return true;
+}
+
+void ULSChipStationWidget::RecordChipOrigin(const int32 EquipmentSlotIndex, const ELSInventorySlotArea Area, const int32 SlotIndex)
+{
+	ChipOriginByEquipmentIndex.Add(EquipmentSlotIndex, FLSChipOriginRecord{ Area, SlotIndex });
+}
+
+void ULSChipStationWidget::MoveChipOriginRecord(const int32 FromEquipmentSlotIndex, const int32 ToEquipmentSlotIndex)
+{
+	// 장착칸끼리 이동/교환: To에 레코드가 있으면(교환) 서로 바꾸고, 없으면(이동) 옮긴다.
+	FLSChipOriginRecord FromRecord;
+	const bool bHasFrom = ChipOriginByEquipmentIndex.RemoveAndCopyValue(FromEquipmentSlotIndex, FromRecord);
+	FLSChipOriginRecord ToRecord;
+	const bool bHasTo = ChipOriginByEquipmentIndex.RemoveAndCopyValue(ToEquipmentSlotIndex, ToRecord);
+	if (bHasFrom)
+	{
+		ChipOriginByEquipmentIndex.Add(ToEquipmentSlotIndex, FromRecord);
+	}
+	if (bHasTo)
+	{
+		ChipOriginByEquipmentIndex.Add(FromEquipmentSlotIndex, ToRecord);
+	}
 }
 
 void ULSChipStationWidget::ShowCapacityBlockedDialog(const FText& Message)
@@ -1096,20 +1201,10 @@ void ULSChipStationWidget::SetEquippedChipMemoryText(const int32 CurrentMemory)
 
 void ULSChipStationWidget::SetSignalGaugePercent(const float Percent)
 {
+	// 칩 스테이션은 로비 전용 프리뷰다. 신호 게이지는 순수 프리뷰로만 동작하며 실제 저장 게이지/인벤토리 용량/전투 스탯(GAS)을
+	// 바꾸지 않는다. 로비에서 게이지를 내려 적재 프로토콜이 줄면 인벤토리 초과분이 월드로 버려지므로(아이템 손실), 저장/용량 반영을
+	// 하지 않고 칩 스테이션 자체 표시(활성·비활성 칩, 스탯·프로토콜 미리보기)만 갱신한다. 실제 게이지는 레이드에서만 변한다.
 	SynchronizeSignalGauge(Percent);
-
-	UGameInstance* GameInstance = GetGameInstance();
-	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-	if (SaveSubsystem)
-	{
-		SaveSubsystem->SetChipSignalGaugePercent(GetSignalGaugePercent());
-		HandleCarryingSlotCapacityChanged();
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot save chip signal gauge because SaveSubsystem is missing on %s."), *GetNameSafe(this));
-	}
-
 	RefreshEquippedChipSummary();
 	RefreshEquipmentSlots();
 }
@@ -1135,20 +1230,9 @@ void ULSChipStationWidget::SynchronizeSignalGauge(const float Percent)
 
 void ULSChipStationWidget::HandleSignalSliderValueChanged(const float Value)
 {
+	// 슬라이더는 순수 프리뷰다. 저장 게이지/인벤토리 용량/전투 스탯(GAS)에 반영하지 않고(로비 아이템 손실 방지)
+	// 칩 스테이션 자체 표시(활성·비활성 칩, 스탯·프로토콜 미리보기)만 갱신한다. 실제 게이지는 레이드에서만 변한다.
 	SynchronizeSignalGauge(Value);
-
-	UGameInstance* GameInstance = GetGameInstance();
-	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-	if (SaveSubsystem)
-	{
-		SaveSubsystem->SetChipSignalGaugePercent(GetSignalGaugePercent());
-		HandleCarryingSlotCapacityChanged();
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot save chip signal gauge because SaveSubsystem is missing on %s."), *GetNameSafe(this));
-	}
-
 	RefreshEquippedChipSummary();
 	RefreshEquipmentSlots();
 }

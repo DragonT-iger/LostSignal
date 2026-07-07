@@ -21,12 +21,20 @@ class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
 class ULSMinimapWidget;
 class ULSProtocolWidget;
+class ULSSaveSubsystem;
 class ULSSkillBarWidget;
 class ULSSurvivalStatusWidget;
 class ULSSoundDirectionIndicatorWidget;
 class USlider;
 class USoundBase;
 class UWrapBox;
+
+// 이 화면 세션에서 장착한 칩의 출처(영역+슬롯). 저장하지 않는 transient 상태 — 스테이션을 다시 열면(RefreshChipStation) 소멸한다.
+struct FLSChipOriginRecord
+{
+	ELSInventorySlotArea Area = ELSInventorySlotArea{};
+	int32 SlotIndex = INDEX_NONE;
+};
 
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSChipStationWidget : public UUserWidget
@@ -56,7 +64,7 @@ public:
 
 	// Shift+좌클릭 빠른 조작: 칩 목록 슬롯을 첫 빈 장착 슬롯(마지막 인덱스부터 역방향)에 순서대로 장착한다.
 	bool QuickEquipChipToFirstEmptyHardwareSlot(ELSInventorySlotArea SourceArea, int32 SourceSlotIndex);
-	// Shift+좌클릭 빠른 조작: 장착된 칩을 창고로 해제한다.
+	// Shift+좌클릭 빠른 조작: 장착된 칩을 해제한다(출처 기억에 따라 인벤토리 복귀 우선, 자리 없으면 창고 폴백).
 	bool QuickUnequipEquippedChipToWarehouse(int32 EquipmentSlotIndex);
 
 protected:
@@ -72,8 +80,20 @@ protected:
 	void QueueRefreshChipStation();
 	// 빠른 장착 전용 경량 갱신(칩 리스트 정렬/리빌드 제외, 장착칸·요약·용량만 다음 틱에 1회로 합쳐 처리).
 	void QueueRefreshEquippedChipState();
-	// 장착 칩을 창고로 해제하고, 칩 리스트는 재정렬 없이 돌아온 칩을 빈 칸(없으면 맨 뒤)에 꽂는다. 드래그/Shift 해제 공용.
-	bool UnequipChipFromSlotToWarehouse(int32 EquipmentSlotIndex);
+	// 장착 칩을 해제한다(드래그/Shift 해제 공용). 출처 기억이 인벤토리거나 기억이 없으면 인벤토리 복귀를 먼저
+	// 시도하고, 자리가 없으면 창고로 폴백하며 알림을 띄운다. 칩 리스트는 재정렬 없이 돌아온 칩을 빈 칸에 꽂는다.
+	bool UnequipChipFromSlot(int32 EquipmentSlotIndex);
+	// 로비에서 해제로 인벤토리 초과 드롭이 예측되면 차단 다이얼로그를 띄우고 true. (기존 차단 정책, 최우선 검사)
+	bool IsUnequipBlockedByCapacity(ULSSaveSubsystem& SaveSubsystem, int32 EquipmentSlotIndex);
+	// 출처 기억 조회: 인벤토리 출신(선호=기록 슬롯) 또는 기억 없음(선호=INDEX_NONE)이면 true. 창고 출신이면 false.
+	bool ShouldTryUnequipToInventory(int32 EquipmentSlotIndex, int32& OutPreferredInventoryIndex) const;
+	// 인벤토리 복귀 시도. 성공 시 사운드 + 칩 리스트 갱신까지 처리한다.
+	bool TryUnequipChipToInventory(ULSSaveSubsystem& SaveSubsystem, int32 EquipmentSlotIndex, int32 PreferredInventoryIndex);
+	// 창고 해제 + 돌아온 칩 위치 diff 특정 + 칩 리스트 갱신(실패 시 풀 새로고침 폴백).
+	bool UnequipChipToWarehouseWithListUpdate(ULSSaveSubsystem& SaveSubsystem, int32 EquipmentSlotIndex);
+	// 화면 세션 출처 기억 기록/이동(장착칸끼리 이동·교환 시 레코드도 따라간다).
+	void RecordChipOrigin(int32 EquipmentSlotIndex, ELSInventorySlotArea Area, int32 SlotIndex);
+	void MoveChipOriginRecord(int32 FromEquipmentSlotIndex, int32 ToEquipmentSlotIndex);
 	// 적재 용량 부족으로 해제가 차단됐을 때 공용 확인 다이얼로그(WBP_ConfirmDialog)를 코드로 띄운다.
 	// 확인/취소/ESC 어느 쪽이든 그냥 닫힌다(정보 알림 용도). 타이틀/세팅의 알림 팝업과 동일 패턴.
 	// 더블클릭·드래그드롭 제스처의 끝에서 호출되면 그 제스처의 마우스 Down이 이미 소비돼
@@ -223,6 +243,9 @@ protected:
 private:
 	// QueueRefreshEquippedChipState가 같은 틱에 여러 번 예약되지 않도록 막는 코얼레스 가드.
 	bool bPendingEquippedStateRefresh = false;
+
+	// 이 화면 세션에서 장착한 칩의 출처(키=장착칸 인덱스). SaveGame에 저장하지 않으며 RefreshChipStation에서 리셋한다.
+	TMap<int32, FLSChipOriginRecord> ChipOriginByEquipmentIndex;
 
 	// 현재 떠 있는 알림 다이얼로그. 중복 생성 방지 + 스테이션 닫힐 때 정리에 쓴다.
 	UPROPERTY(Transient)

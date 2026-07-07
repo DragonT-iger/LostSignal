@@ -1103,7 +1103,7 @@ bool ULSSaveSubsystem::WouldChipEquipmentDropInventoryItems(const TArray<FLSSess
 	}
 
 	// 가정 장착 배열 기준 "예상 최대 인벤토리 슬롯 수". 실제 반영 후 GetMaxInventorySlotCount()와 동일하므로 초과 드롭 여부를 정확히 예측한다.
-	const int32 PredictedMaxInventorySlotCount = SaveDefaultMaxInventorySlotCount + ComputeCarryingProtocolSlotBonus(HypotheticalSlots, TEXT("Inventory"));
+	const int32 PredictedMaxInventorySlotCount = ComputePredictedMaxInventorySlotCount(HypotheticalSlots);
 
 	// 예상 최대 슬롯 수 이상 인덱스에 채워진 인벤토리 칸이 하나라도 있으면, 반영 시 그 아이템들이 월드로 드롭된다.
 	for (int32 SlotIndex = FMath::Max(0, PredictedMaxInventorySlotCount); SlotIndex < SaveData->Inventory.Num(); ++SlotIndex)
@@ -1114,6 +1114,107 @@ bool ULSSaveSubsystem::WouldChipEquipmentDropInventoryItems(const TArray<FLSSess
 		}
 	}
 	return false;
+}
+
+int32 ULSSaveSubsystem::ComputePredictedMaxInventorySlotCount(const TArray<FLSSessionItem>& HypotheticalSlots) const
+{
+	return SaveDefaultMaxInventorySlotCount + ComputeCarryingProtocolSlotBonus(HypotheticalSlots, TEXT("Inventory"));
+}
+
+int32 ULSSaveSubsystem::FindEmptyInventorySlotForUnequip(const int32 PreferredSlotIndex, const int32 MaxSlotCount) const
+{
+	if (!SaveData || MaxSlotCount <= 0)
+	{
+		return INDEX_NONE;
+	}
+
+	const TArray<FLSSessionItem>& Inventory = SaveData->Inventory;
+	const auto IsSlotEmpty = [&Inventory](const int32 SlotIndex)
+	{
+		return !Inventory.IsValidIndex(SlotIndex) || !LSInventorySlotUtils::IsFilled(Inventory[SlotIndex]);
+	};
+
+	if (PreferredSlotIndex >= 0 && PreferredSlotIndex < MaxSlotCount && IsSlotEmpty(PreferredSlotIndex))
+	{
+		return PreferredSlotIndex;
+	}
+
+	for (int32 SlotIndex = 0; SlotIndex < MaxSlotCount; ++SlotIndex)
+	{
+		if (IsSlotEmpty(SlotIndex))
+		{
+			return SlotIndex;
+		}
+	}
+	return INDEX_NONE;
+}
+
+FLSSessionItem* ULSSaveSubsystem::ResolveFilledChipEquipmentSlot(const int32 EquipmentIndex, const TCHAR* ContextLabel)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot %s because SaveData is missing."), ContextLabel);
+		return nullptr;
+	}
+
+	if (EquipmentIndex < 0 || EquipmentIndex >= ChipEquipmentSlotCount)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot %s because equipment index is invalid. Index=%d"), ContextLabel, EquipmentIndex);
+		return nullptr;
+	}
+
+	EnsureChipEquipmentSlots();
+	FLSSessionItem& EquipmentSlot = SaveData->ChipEquipmentSlots[EquipmentIndex];
+	if (!LSInventorySlotUtils::IsFilled(EquipmentSlot))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot %s because equipment slot is empty. Index=%d"), ContextLabel, EquipmentIndex);
+		return nullptr;
+	}
+
+	if (!EquipmentSlot.ItemRowName.ToString().StartsWith(TEXT("Chip_")))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot %s because item '%s' is not a chip."), ContextLabel, *EquipmentSlot.ItemRowName.ToString());
+		return nullptr;
+	}
+
+	return &EquipmentSlot;
+}
+
+bool ULSSaveSubsystem::UnequipChipToInventory(const int32 EquipmentIndex, const int32 PreferredSlotIndex, int32& OutPlacedSlotIndex)
+{
+	OutPlacedSlotIndex = INDEX_NONE;
+	FLSSessionItem* EquipmentSlotPtr = ResolveFilledChipEquipmentSlot(EquipmentIndex, TEXT("unequip chip to inventory"));
+	if (!EquipmentSlotPtr)
+	{
+		return false;
+	}
+	FLSSessionItem& EquipmentSlot = *EquipmentSlotPtr;
+
+	// 해제하면 적재(Carrying) 보너스가 줄어 최대 인벤토리 슬롯 수가 줄 수 있다. 해제 후 예상 용량 밖 칸에
+	// 넣으면 반영 직후 그 칩이 되드롭되므로, 가정 배열로 계산한 예상 용량 안에서만 자리를 찾는다.
+	TArray<FLSSessionItem> HypotheticalSlots = SaveData->ChipEquipmentSlots;
+	HypotheticalSlots[EquipmentIndex] = LSInventorySlotUtils::MakeEmptyItem();
+	const int32 PredictedMaxSlotCount = ComputePredictedMaxInventorySlotCount(HypotheticalSlots);
+	const int32 TargetSlotIndex = FindEmptyInventorySlotForUnequip(PreferredSlotIndex, PredictedMaxSlotCount);
+	if (TargetSlotIndex == INDEX_NONE)
+	{
+		// 자리 없음 — 상태를 바꾸지 않고 실패를 알린다(호출자가 창고 폴백).
+		return false;
+	}
+
+	// 스택 병합 없이 빈 칸에 그대로 배치한다(칩은 ChipStats를 가진 개별 아이템이고, 배치 인덱스가 항상 정확해야 UI가 diff 없이 갱신 가능).
+	TArray<FLSSessionItem>& Inventory = GetMutableInventory();
+	while (Inventory.Num() <= TargetSlotIndex)
+	{
+		Inventory.Add(LSInventorySlotUtils::MakeEmptyItem());
+	}
+	Inventory[TargetSlotIndex] = EquipmentSlot;
+	EquipmentSlot = LSInventorySlotUtils::MakeEmptyItem();
+
+	Save();
+	OnChipLoadoutChanged.Broadcast();
+	OutPlacedSlotIndex = TargetSlotIndex;
+	return true;
 }
 
 bool ULSSaveSubsystem::WouldUnequipChipDropInventoryItems(const int32 EquipmentIndex) const

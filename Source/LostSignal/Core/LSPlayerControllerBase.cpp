@@ -1613,6 +1613,17 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 	}
 
 	ULSRaidInventoryComponent* InventoryComponent = GetRaidInventoryComponent();
+
+	// 로비에서는 아이템을 월드에 버리지 않는다 — 수동 드래그 드랍(인벤토리/창고를 창 밖으로)과 적재 프로토콜 축소 초과분 드랍이
+	// 모두 이 경로를 통과하므로 여기서 한 번에 막는다(판매 외 로비 아이템 손실 금지 정책). 월드 드랍은 레이드 중에만 허용한다
+	// (익스트렉션 리스크 / 신호 유실 초과분). 서버 권한 단일 관문이라 어떤 UI 경로로 들어와도 동일하게 차단된다.
+	if (!InventoryComponent || !InventoryComponent->IsRaidActive())
+	{
+		UE_LOG(LogLS, Warning, TEXT("Refused to drop slot to world outside a raid (lobby item loss prevented). Area=%d Index=%d"),
+			static_cast<int32>(SlotArea), SlotIndex);
+		return false;
+	}
+
 	const bool bUseRaidInventory = InventoryComponent && InventoryComponent->IsRaidActive() && SlotArea != ELSInventorySlotArea::Warehouse;
 	ULSSaveSubsystem* SaveSubsystem = nullptr;
 

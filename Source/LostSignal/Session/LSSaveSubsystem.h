@@ -93,6 +93,10 @@ public:
 	bool EquipChipFromStoredSlot(ELSInventorySlotArea SourceArea, int32 SourceIndex, int32 EquipmentIndex);
 	bool DropChipEquipmentSlot(int32 FromEquipmentIndex, int32 ToEquipmentIndex);
 	bool UnequipChipToWarehouse(int32 EquipmentIndex);
+	// EquipmentIndex의 칩을 해제해 일반 인벤토리에 넣는다. PreferredSlotIndex가 유효한 빈 칸이면 그 칸,
+	// 아니면 첫 빈 칸. 대상 칸은 "해제 후 예상 최대 슬롯 수"(적재 프로토콜 축소 반영) 미만이어야 한다.
+	// 넣을 자리가 없으면 아무것도 바꾸지 않고 false를 돌려준다(호출자가 창고 폴백 판단).
+	bool UnequipChipToInventory(int32 EquipmentIndex, int32 PreferredSlotIndex, int32& OutPlacedSlotIndex);
 	// EquipmentIndex의 칩을 해제하면 적재(Carrying) 프로토콜이 줄어 인벤토리 최대 용량이 축소되고,
 	// 그 결과 초과분이 월드로 드롭(=손실)되는지 여부. 해제 전에 호출해 해제 자체를 막는 데 쓴다.
 	bool WouldUnequipChipDropInventoryItems(int32 EquipmentIndex) const;
@@ -133,6 +137,12 @@ private:
 	int32 ComputeCarryingProtocolSlotBonus(const TArray<FLSSessionItem>& EquipmentSlots, FName EnableName) const;
 	// 가정 장착 배열로 인벤토리 초과분이 월드 드롭되는지 예측한다(해제/스왑 차단 판정의 공용 코어).
 	bool WouldChipEquipmentDropInventoryItems(const TArray<FLSSessionItem>& HypotheticalSlots) const;
+	// 가정 장착 배열 기준 예상 최대 인벤토리 슬롯 수. 실제 반영 후 GetMaxInventorySlotCount()와 동일값.
+	int32 ComputePredictedMaxInventorySlotCount(const TArray<FLSSessionItem>& HypotheticalSlots) const;
+	// [0, MaxSlotCount) 범위에서 선호 슬롯 우선, 아니면 첫 빈 인벤토리 인덱스. 배열 Num() 밖 인덱스는 빈 칸 취급.
+	int32 FindEmptyInventorySlotForUnequip(int32 PreferredSlotIndex, int32 MaxSlotCount) const;
+	// 칩 해제 공통 검증(SaveData/인덱스/채워짐/Chip_ 접두). 실패 시 경고 후 nullptr.
+	FLSSessionItem* ResolveFilledChipEquipmentSlot(int32 EquipmentIndex, const TCHAR* ContextLabel);
 	TArray<FLSSessionItem>& GetMutableInventory();
 	TArray<FLSSessionItem>* GetMutableStoredSlots(ELSInventorySlotArea SlotArea);
 	const TArray<FLSSessionItem>* GetStoredSlots(ELSInventorySlotArea SlotArea) const;
