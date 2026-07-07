@@ -76,7 +76,11 @@ protected:
 	bool UnequipChipFromSlotToWarehouse(int32 EquipmentSlotIndex);
 	// 적재 용량 부족으로 해제가 차단됐을 때 공용 확인 다이얼로그(WBP_ConfirmDialog)를 코드로 띄운다.
 	// 확인/취소/ESC 어느 쪽이든 그냥 닫힌다(정보 알림 용도). 타이틀/세팅의 알림 팝업과 동일 패턴.
+	// 더블클릭·드래그드롭 제스처의 끝에서 호출되면 그 제스처의 마우스 Down이 이미 소비돼
+	// 다이얼로그 첫 클릭이 씹힌다. 다음 프레임에 실제 생성(PresentCapacityBlockedDialog)을 미뤄 한 번에 닫히게 한다.
 	void ShowCapacityBlockedDialog(const FText& Message);
+	// ShowCapacityBlockedDialog가 다음 틱에 호출하는 실제 다이얼로그 생성부.
+	void PresentCapacityBlockedDialog(const FText& Message);
 	UFUNCTION()
 	void HandleCapacityDialogClosed();
 	// 칩 한 개를 칩 리스트의 첫 빈 슬롯(hole)에 넣거나, 없으면 맨 뒤에 새 슬롯으로 추가한다(정렬/리빌드 없음).

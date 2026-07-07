@@ -13,6 +13,7 @@
 #include "Data/LSDropSettings.h"
 #include "Engine/DataTable.h"
 #include "Inventory/LSInventorySlotUtils.h"
+#include "Inventory/LSRaidInventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
@@ -740,9 +741,14 @@ bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentS
 		return false;
 	}
 
-	// 이 칩을 해제하면 적재(Carrying) 프로토콜이 낮아져 인벤토리 용량이 줄고, 넘치는 아이템이 월드로 드롭돼 사라진다.
+	// 이 칩을 해제하면 적재(Carrying) 프로토콜이 낮아져 인벤토리 용량이 줄고, 넘치는 아이템(일반 인벤토리)이 월드로 드롭돼 사라진다.
 	// 그 경우 해제 자체를 막고(아이템 손실 방지) 알림을 띄운다. 데이터 반영(UnequipChipToWarehouse) 전에 검사해야 한다.
-	if (SaveSubsystem->WouldUnequipChipDropInventoryItems(EquipmentSlotIndex))
+	// 단, 이 차단은 로비 전용이다. 레이드 중에는 초과분을 그대로 월드에 버리는 기존 정책을 따른다(칩 스테이션은 로비 전용이지만
+	// 규칙을 코드로 명시해 레이드에서 실수로 막히지 않게 한다). 보호 슬롯(Safe)은 드롭이 아니라 잠금이므로 이 판정 대상이 아니다.
+	const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	const ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
+	const bool bRaidActive = RaidInventory && RaidInventory->IsRaidActive();
+	if (!bRaidActive && SaveSubsystem->WouldUnequipChipDropInventoryItems(EquipmentSlotIndex))
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot unequip chip at slot %d because reduced carrying capacity would drop inventory items on %s."),
 			EquipmentSlotIndex,
@@ -782,6 +788,41 @@ bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentS
 void ULSChipStationWidget::ShowCapacityBlockedDialog(const FText& Message)
 {
 	// 이미 알림이 떠 있으면 중복 생성하지 않는다. (타이틀/세팅의 확인 다이얼로그와 동일 패턴)
+	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
+	{
+		return;
+	}
+
+	if (!ConfirmDialogClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Chip] ConfirmDialogClass is not set on %s. Check WBP_ChipStation."), *GetNameSafe(this));
+		return;
+	}
+
+	// 더블클릭/드래그드롭 제스처가 이 함수를 호출한다. 그 제스처의 마우스 Down은 이미 아이템 슬롯이 소비했으므로
+	// 지금 다이얼로그를 띄우면 확인 버튼(DownAndUp)이 짝 Down을 못 받아 첫 클릭이 씹힌다.
+	// 제스처가 끝난 다음 프레임에 띄워 첫 클릭이 온전한 Down+Up이 되게 한다.
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		PresentCapacityBlockedDialog(Message);
+		return;
+	}
+
+	TWeakObjectPtr<ULSChipStationWidget> WeakThis(this);
+	const FText CapturedMessage = Message;
+	World->GetTimerManager().SetTimerForNextTick([WeakThis, CapturedMessage]()
+	{
+		if (ULSChipStationWidget* StrongThis = WeakThis.Get())
+		{
+			StrongThis->PresentCapacityBlockedDialog(CapturedMessage);
+		}
+	});
+}
+
+void ULSChipStationWidget::PresentCapacityBlockedDialog(const FText& Message)
+{
+	// 다음 틱 사이에 이미 알림이 떠 있거나 클래스가 사라졌을 수 있어 다시 확인한다.
 	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
 	{
 		return;

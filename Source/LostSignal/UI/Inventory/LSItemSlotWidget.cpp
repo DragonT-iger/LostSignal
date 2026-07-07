@@ -902,7 +902,16 @@ bool ULSItemSlotWidget::TryHandleChipEquipmentQuickTransfer()
 	}
 
 	ULSChipStationWidget* OwningChipStation = ChipStationWidget.Get();
-	return OwningChipStation && OwningChipStation->QuickUnequipEquippedChipToWarehouse(EquipmentSlotIndex);
+	if (!OwningChipStation || !OwningChipStation->QuickUnequipEquippedChipToWarehouse(EquipmentSlotIndex))
+	{
+		return false;
+	}
+
+	// 장착칸 위젯 갱신은 다음 틱(QueueRefreshEquippedChipState)이라, 그때까지 bHasItem이 stale로 남는다.
+	// Shift 쓸기(NativeOnMouseMove)가 같은 제스처에서 재호출해 빈 칸 해제를 반복 시도하지 않도록
+	// 칩 리스트 빠른 장착과 동일하게 소스 칸을 즉시 비운다.
+	ClearItem();
+	return true;
 }
 
 bool ULSItemSlotWidget::TryHandleChipStationQuickTransfer()

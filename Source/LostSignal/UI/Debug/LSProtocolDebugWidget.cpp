@@ -82,6 +82,9 @@ void ULSProtocolDebugWidget::BuildPanel()
 	// "테스트 맵 가기" 버튼 — 정식 레이드 진입을 타되 목적지만 TestRaidLevel 로. (로비에서만 표시)
 	TestMapButton = MakeButton(TEXT("테스트 맵 가기"), 16);
 	TestMapButton->SetBackgroundColor(FLinearColor(0.1f, 0.4f, 0.6f, 1.f));
+	// 게임뷰포트에 포커스가 있는 로비에서 기본(DownAndUp) 방식은 첫 클릭을 포커스 이동에 쓰고
+	// 두 번째 클릭에서야 발동한다. 누르는 즉시 발동하도록 바꿔 한 번 클릭으로 진입시킨다.
+	TestMapButton->SetClickMethod(EButtonClickMethod::MouseDown);
 	TestMapButton->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleGoToTestMap);
 	if (UVerticalBoxSlot* TestMapSlot = VBox->AddChildToVerticalBox(TestMapButton))
 	{
