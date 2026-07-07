@@ -220,6 +220,20 @@ PassiveSkill_ID
 
 `SkillMontage`가 없으면 커밋 직후 `ExecuteSkillEffect`가 바로 실행되는 즉발로 동작한다. 프리뷰 유무는 PreviewSpec을 보여주느냐의 문제로, 즉발/몽타주 분기와는 별개다.
 
+## 슬롯별 캐스트 모드 (발동 방식)
+
+스킬 슬롯(Skill1~4·Ultimate)마다 발동 방식을 플레이어가 지정한다. 위 입력 흐름의 앞단(누름/뗌 입력 → 발동 커밋)만 분기하며, 서버 발동·쿨타임·GAS 경로는 세 방식이 동일하게 공유한다.
+
+- `ELSSkillCastMode`(`LSSkillTypes.h`) 3종:
+  - **PreviewConfirm**(기본): 키를 누르면 프리뷰가 뜨고 **마우스 좌클릭**(`OnAttack`)으로 커서 위치를 확정해 발동. 키를 떼도 발동하지 않는다.
+  - **QuickCastWithIndicator**: 키를 **누르는 동안** 프리뷰 표시, **키를 떼는 순간**(`Completed`/`Canceled`) 커서 위치로 확정 발동.
+  - **QuickCast**: 키를 **누르는 즉시** 커서 위치로 발동(프리뷰/확정 생략).
+- 입력 분기는 `ALSPlayerCharacter`가 담당한다. `OnSkillN`(누름)→`HandleSkillInputPressed`, `OnSkillNReleased`(뗌)→`HandleSkillInputReleased`. 누름 시 QuickCast는 `ActivateSkillInstant`, 나머지는 `BeginSkillPreview`. 뗌 시 QuickCastWithIndicator이고 해당 슬롯 프리뷰 중이면 `ConfirmActiveSkillPreview`.
+- 즉발/릴리즈 발동 목표점은 세 방식 모두 `ResolveMouseWorldPoint()`(커서 월드 좌표)를 재사용한다.
+- 발동 커밋은 `ULSPlayerSkillComponent::ActivateSkillInstant`(즉발) / `ConfirmAnyActiveSkillPreview`(확정)가 공통 헬퍼 `CommitSkillActivation`으로 모인다(사거리 클램프 → 서버 직접 발동 또는 클라 예측+서버 RPC).
+- 모드 저장소는 `ULSSkillCastSettingsSubsystem`(`config=GameUserSettings`, `Session/`)이며 슬롯별 개별 config 필드로 `GameUserSettings.ini`에 저장된다 → New Game으로도 초기화되지 않는다. 값 읽기/쓰기는 `GetSlotCastMode`/`SetSlotCastMode`(BlueprintCallable). 설정 UI(WBP)는 아트/기획이 이 API로 연결한다.
+- 실제 적용 모드 해석은 `ULSPlayerSkillComponent::GetEffectiveCastMode`로 모인다. **디버그 오버라이드**(`bOverrideCastModeForDebug` + `DebugCastModeOverrides` 맵, 컴포넌트 디테일 패널)가 켜져 있으면 맵 값을 우선하고, 맵에 없는 슬롯은 저장소 값을 따른다. 에디터에서 저장소 UI 없이 즉석 테스트용.
+
 ## 기본 공격 캔슬과 스킬 차단 태그
 
 액티브 스킬 Ability는 발동 차단/캔슬을 다음 태그 계약으로 처리한다. (이 문서가 단일 출처)
@@ -236,12 +250,12 @@ PassiveSkill_ID
 
 스킬 몽타주가 재생되는 동안 플레이어의 전투 입력(이동·대시·스킬·기본공격 등)을 무시한다. (이 문서가 단일 출처)
 
-- 단일 게이트 태그: `LS.State.InputBlocked`. 캐릭터의 `ALSPlayerCharacter::IsInputBlocked()`가 ASC에서 이 태그를 확인하고, `Move`/`OnAttack`/`OnDash`/`BeginSkillPreview`(Skill1~4·Ultimate 공통) 상단에서 게이트한다.
+- 단일 게이트 태그: `LS.State.InputBlocked`. 캐릭터의 `ALSPlayerCharacter::IsInputBlocked()`가 ASC에서 이 태그를 확인하고, `Move`/`OnAttack`/`OnDash`/`BeginSkillPreview`·`ActivateSkillInstant`(Skill1~4·Ultimate 공통, 프리뷰·즉발 두 진입 경로) 상단에서 게이트한다.
 - 태그를 켜는 소스는 둘이며 같은 태그를 토글한다.
   - **기본(몽타주 전체)**: `ULSGA_PlayerSkillBase`가 스킬 몽타주를 재생할 때, 그 몽타주에 입력차단 NotifyState가 **없으면** 몽타주 시작~종료(취소 포함) 동안 태그를 부여한다.
   - **구간 지정**: 몽타주에 `ULSANS_BlockInput`(AnimNotifyState)을 배치하면, 베이스는 기본 차단을 걸지 않고 그 **NotifyState 구간에만** 태그를 토글한다. 애니메이터가 프레임 단위로 차단 창을 제어한다.
 - **루트모션 무영향**: 게이트는 입력 이동(`AddMovementInput`)만 막는다. 이동 스킬의 `FRootMotionSource`(Bypass 슬라이드·Execution 대시)는 별도 경로라 그대로 이동한다.
-- **모달 UI 게이트(별도 경로)**: 모달 UI(인벤토리/룻드랍/로비창고/칩스테이션)가 열려 있으면 `ALSPlayerCharacter::IsModalUIBlockingInput()`(컨트롤러 `IsAnyModalPanelOpen()` 기준)이 `OnAttack`/`OnDash`/`BeginSkillPreview`를 추가로 게이트한다. 이동(`Move`)은 허용. GAS 태그를 쓰지 않고 클라 로컬 UI 상태를 매번 재계산하는 폴링 판정이다(닫힘 경로가 여러 곳이라 태그 누수 방지). 모달이 열릴 때 진행 중 스킬 프리뷰는 취소된다(`ShowInventoryWidgetInternal`·`OnInteract`).
+- **모달 UI 게이트(별도 경로)**: 모달 UI(인벤토리/룻드랍/로비창고/칩스테이션)가 열려 있으면 `ALSPlayerCharacter::IsModalUIBlockingInput()`(컨트롤러 `IsAnyModalPanelOpen()` 기준)이 `OnAttack`/`OnDash`/`BeginSkillPreview`·`ActivateSkillInstant`를 추가로 게이트한다. 이동(`Move`)은 허용. GAS 태그를 쓰지 않고 클라 로컬 UI 상태를 매번 재계산하는 폴링 판정이다(닫힘 경로가 여러 곳이라 태그 누수 방지). 모달이 열릴 때 진행 중 스킬 프리뷰는 취소된다(`ShowInventoryWidgetInternal`·`OnInteract`).
 - **회전 잠금(별도 경로)**: 캐릭터 회전(마우스 조준 `ULSAimComponent::UpdateFacing`·달리기 `FaceMovementDirection`)은 `ALSPlayerCharacter::Tick`에서 `IsFacingRotationLocked()`로 게이트한다. 잠금 범위는 둘로 나뉜다.
   - 스킬 시전: `LS.Combat.SkillCasting` 보유 중 전 구간 잠금.
   - 기본공격: 콤보 스윙 시작(`PlayComboSection`→`ResetBasicAttackHit`)부터 히트 판정 프레임(`LSAN_PlayerMeleeHit`→`PerformMeleeHit`, `IsBasicAttackHitConsumed()`)까지만 잠금. 히트 이후엔 다음 콤보 조준을 위해 회전을 허용하며, 다음 섹션 시작 시 다시 잠긴다.

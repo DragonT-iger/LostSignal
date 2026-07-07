@@ -231,25 +231,37 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	}
 	if (DashAction) { EnhancedInput->BindAction(DashAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnDash); }
 	if (SkillCancelAction) { EnhancedInput->BindAction(SkillCancelAction, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkillPreviewCancelInput); }
+	// 스킬은 누름(Started)과 뗌(Completed/Canceled)을 함께 바인딩한다. 홀드-프리뷰 모드는 뗌에서 발동하고,
+	// 매핑 컨텍스트 제거 등으로 Completed 대신 Canceled가 올 수 있어 릴리즈 처리를 함께 건다.
 	if (Skill1Action)
 	{
 		EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill1);
+		EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill1Released);
+		EnhancedInput->BindAction(Skill1Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill1Released);
 	}
 	if (Skill2Action)
 	{
 		EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill2);
+		EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill2Released);
+		EnhancedInput->BindAction(Skill2Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill2Released);
 	}
 	if (Skill3Action)
 	{
 		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill3);
+		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill3Released);
+		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill3Released);
 	}
 	if (Skill4Action)
 	{
 		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill4);
+		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill4Released);
+		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill4Released);
 	}
 	if (Ultimatection)
 	{
 		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnUltimate);
+		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnUltimateReleased);
+		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnUltimateReleased);
 	}
 	if (Item1Action) { EnhancedInput->BindAction(Item1Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem1); }
 	if (Item2Action) { EnhancedInput->BindAction(Item2Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem2); }
@@ -375,11 +387,16 @@ void ALSPlayerCharacter::OnSkillPreviewCancelInput()
 	CancelActiveSkillPreview();
 }
 
-void ALSPlayerCharacter::OnSkill1() { BeginSkillPreview(ELSPlayerSkillSlot::Skill1); }
-void ALSPlayerCharacter::OnSkill2() { BeginSkillPreview(ELSPlayerSkillSlot::Skill2); }
-void ALSPlayerCharacter::OnSkill3() { BeginSkillPreview(ELSPlayerSkillSlot::Skill3); }
-void ALSPlayerCharacter::OnSkill4() { BeginSkillPreview(ELSPlayerSkillSlot::Skill4); }
-void ALSPlayerCharacter::OnUltimate() { BeginSkillPreview(ELSPlayerSkillSlot::Ultimate); }
+void ALSPlayerCharacter::OnSkill1() { HandleSkillInputPressed(ELSPlayerSkillSlot::Skill1); }
+void ALSPlayerCharacter::OnSkill2() { HandleSkillInputPressed(ELSPlayerSkillSlot::Skill2); }
+void ALSPlayerCharacter::OnSkill3() { HandleSkillInputPressed(ELSPlayerSkillSlot::Skill3); }
+void ALSPlayerCharacter::OnSkill4() { HandleSkillInputPressed(ELSPlayerSkillSlot::Skill4); }
+void ALSPlayerCharacter::OnUltimate() { HandleSkillInputPressed(ELSPlayerSkillSlot::Ultimate); }
+void ALSPlayerCharacter::OnSkill1Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill1); }
+void ALSPlayerCharacter::OnSkill2Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill2); }
+void ALSPlayerCharacter::OnSkill3Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill3); }
+void ALSPlayerCharacter::OnSkill4Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill4); }
+void ALSPlayerCharacter::OnUltimateReleased() { HandleSkillInputReleased(ELSPlayerSkillSlot::Ultimate); }
 void ALSPlayerCharacter::OnItem1() {}
 void ALSPlayerCharacter::OnItem2() {}
 void ALSPlayerCharacter::OnItem3() {}
@@ -698,6 +715,40 @@ bool ALSPlayerCharacter::IsInventoryWidgetOpen() const
 	return InventoryWidget && InventoryWidget->IsVisible();
 }
 
+ELSSkillCastMode ALSPlayerCharacter::ResolveSlotCastMode(ELSPlayerSkillSlot Slot) const
+{
+	// 디버그 오버라이드 우선 적용을 위해 컴포넌트로 해석을 위임한다(설정 저장소 조회 포함).
+	return PlayerSkillComponent ? PlayerSkillComponent->GetEffectiveCastMode(Slot) : ELSSkillCastMode::PreviewConfirm;
+}
+
+void ALSPlayerCharacter::HandleSkillInputPressed(ELSPlayerSkillSlot Slot)
+{
+	// 즉시 퀵캐스트는 프리뷰 없이 바로 발동, 그 외 두 모드는 프리뷰 진입(확정 트리거만 다름).
+	if (ResolveSlotCastMode(Slot) == ELSSkillCastMode::QuickCast)
+	{
+		ActivateSkillInstant(Slot);
+		return;
+	}
+
+	BeginSkillPreview(Slot);
+}
+
+void ALSPlayerCharacter::HandleSkillInputReleased(ELSPlayerSkillSlot Slot)
+{
+	// 홀드-프리뷰 모드에서만 키를 뗄 때 커서 위치로 확정 발동한다.
+	if (ResolveSlotCastMode(Slot) != ELSSkillCastMode::QuickCastWithIndicator)
+	{
+		return;
+	}
+
+	if (!IsLocallyControlled() || !PlayerSkillComponent || PlayerSkillComponent->GetActiveSlot() != Slot || !PlayerSkillComponent->IsPreviewingSkill())
+	{
+		return;
+	}
+
+	ConfirmActiveSkillPreview();
+}
+
 void ALSPlayerCharacter::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 {
 	// 스킬 시전(몽타주) 중이거나 모달 UI가 열려 있으면 새 스킬 프리뷰 진입을 막는다(Skill1~4/Ultimate 공통 게이트).
@@ -715,6 +766,35 @@ void ALSPlayerCharacter::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 	{
 		UpdateActiveSkillPreview();
 	}
+}
+
+void ALSPlayerCharacter::ActivateSkillInstant(ELSPlayerSkillSlot Slot)
+{
+	// 프리뷰 진입과 동일한 입력 게이트.
+	if (IsInputBlocked() || IsModalUIBlockingInput())
+	{
+		return;
+	}
+
+	if (!IsLocallyControlled() || !PlayerSkillComponent)
+	{
+		return;
+	}
+
+	FVector MouseWorldPoint = FVector::ZeroVector;
+	if (!ResolveMouseWorldPoint(MouseWorldPoint))
+	{
+		return;
+	}
+
+	FVector AimDirection = MouseWorldPoint - GetActorLocation();
+	AimDirection.Z = 0.0f;
+	if (AimDirection.IsNearlyZero())
+	{
+		AimDirection = GetActorForwardVector();
+	}
+
+	PlayerSkillComponent->ActivateSkillInstant(Slot, MouseWorldPoint, AimDirection.Rotation());
 }
 
 void ALSPlayerCharacter::UpdateActiveSkillPreview()

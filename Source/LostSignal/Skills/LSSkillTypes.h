@@ -58,6 +58,18 @@ enum class ELSPlayerSkillSlot : uint8
 	Ultimate
 };
 
+// 스킬 슬롯별 발동 방식. 플레이어가 슬롯마다 지정하며 GameUserSettings.ini에 저장된다.
+UENUM(BlueprintType)
+enum class ELSSkillCastMode : uint8
+{
+	// 키를 누르면 프리뷰가 뜨고 마우스 클릭으로 위치를 확정해 발동(기존/기본).
+	PreviewConfirm,
+	// 키를 누르는 동안 프리뷰 표시, 키를 떼는 순간 커서 위치로 발동.
+	QuickCastWithIndicator,
+	// 키를 누르는 즉시 커서 위치로 발동(프리뷰/확정 생략).
+	QuickCast
+};
+
 USTRUCT(BlueprintType)
 struct FLSPlayerSkillSlotSpec
 {

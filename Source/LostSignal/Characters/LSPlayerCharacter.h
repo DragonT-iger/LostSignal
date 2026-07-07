@@ -310,6 +310,11 @@ private:
 	void OnSkill3();
 	void OnSkill4();
 	void OnUltimate();
+	void OnSkill1Released();
+	void OnSkill2Released();
+	void OnSkill3Released();
+	void OnSkill4Released();
+	void OnUltimateReleased();
 	void OnItem1();
 	void OnItem2();
 	void OnItem3();
@@ -328,7 +333,12 @@ private:
 	void HideInventoryWidget();
 	void UpdateInventoryWidgetDistance();
 
+	// 슬롯 캐스트 모드에 따라 누름/뗌 입력을 프리뷰 진입·즉발·릴리즈 확정으로 분기한다.
+	ELSSkillCastMode ResolveSlotCastMode(ELSPlayerSkillSlot Slot) const;
+	void HandleSkillInputPressed(ELSPlayerSkillSlot Slot);
+	void HandleSkillInputReleased(ELSPlayerSkillSlot Slot);
 	void BeginSkillPreview(ELSPlayerSkillSlot Slot);
+	void ActivateSkillInstant(ELSPlayerSkillSlot Slot);
 	void UpdateActiveSkillPreview();
 	bool ConfirmActiveSkillPreview();
 	bool CancelActiveSkillPreview();

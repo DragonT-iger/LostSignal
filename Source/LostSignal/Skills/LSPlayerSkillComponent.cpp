@@ -25,6 +25,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
+#include "Session/LSSkillCastSettingsSubsystem.h"
 #include "Skills/LSPassiveSkillDataAsset.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
@@ -163,7 +164,6 @@ bool ULSPlayerSkillComponent::ConfirmAnyActiveSkillPreview(const FVector& Target
 
 	const ELSPlayerSkillSlot SlotToActivate = ActiveSlot;
 	ULSSkillDataAsset* SkillData = ActiveSkillData;
-	const FVector ClampedTargetLocation = ClampTargetLocationToCastRange(SkillData, TargetLocation);
 
 	const bool bConfirmed = ConfirmActiveSkillPreview(SlotToActivate);
 	if (!bConfirmed)
@@ -171,15 +171,55 @@ bool ULSPlayerSkillComponent::ConfirmAnyActiveSkillPreview(const FVector& Target
 		return false;
 	}
 
+	return CommitSkillActivation(SlotToActivate, SkillData, TargetLocation, AimRotation);
+}
+
+bool ULSPlayerSkillComponent::ActivateSkillInstant(ELSPlayerSkillSlot Slot, const FVector& TargetLocation, const FRotator& AimRotation)
+{
+	if (!CanUseLocalPreview())
+	{
+		return false;
+	}
+
+	ULSSkillDataAsset* SkillData = GetSkillData(Slot);
+	if (!SkillData)
+	{
+		return false;
+	}
+
+	if (IsSkillCooldownActive(SkillData))
+	{
+		LogSkillCooldownBlocked(SkillData, TEXT("Instant"));
+		return false;
+	}
+
+	// 다른 슬롯 프리뷰가 진행 중이면 정리하고 즉시 발동한다.
+	if (ActiveSkillData)
+	{
+		CancelAnyActiveSkillPreview();
+	}
+
+	return CommitSkillActivation(Slot, SkillData, TargetLocation, AimRotation);
+}
+
+bool ULSPlayerSkillComponent::CommitSkillActivation(ELSPlayerSkillSlot Slot, ULSSkillDataAsset* SkillData, const FVector& TargetLocation, const FRotator& AimRotation)
+{
+	if (!SkillData)
+	{
+		return false;
+	}
+
+	const FVector ClampedTargetLocation = ClampTargetLocationToCastRange(SkillData, TargetLocation);
+
 	if (const AActor* OwnerActor = GetOwner())
 	{
 		if (OwnerActor->HasAuthority())
 		{
-			return ActivateSkillOnServer(SlotToActivate, ClampedTargetLocation, AimRotation.Yaw);
+			return ActivateSkillOnServer(Slot, ClampedTargetLocation, AimRotation.Yaw);
 		}
 
 		TryPredictFastMovementSkill(SkillData, ClampedTargetLocation, AimRotation.Yaw);
-		ServerRequestActivateSkill(SlotToActivate, ClampedTargetLocation, AimRotation.Yaw);
+		ServerRequestActivateSkill(Slot, ClampedTargetLocation, AimRotation.Yaw);
 	}
 
 	return true;
@@ -203,6 +243,22 @@ void ULSPlayerSkillComponent::CancelAnyActiveSkillPreview()
 	}
 
 	ActiveSkillData = nullptr;
+}
+
+ELSSkillCastMode ULSPlayerSkillComponent::GetEffectiveCastMode(ELSPlayerSkillSlot Slot) const
+{
+	if (bOverrideCastModeForDebug)
+	{
+		if (const ELSSkillCastMode* Override = DebugCastModeOverrides.Find(Slot))
+		{
+			return *Override;
+		}
+	}
+
+	const UWorld* World = GetWorld();
+	const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+	const ULSSkillCastSettingsSubsystem* CastSettings = GameInstance ? GameInstance->GetSubsystem<ULSSkillCastSettingsSubsystem>() : nullptr;
+	return CastSettings ? CastSettings->GetSlotCastMode(Slot) : ELSSkillCastMode::PreviewConfirm;
 }
 
 ULSSkillDataAsset* ULSPlayerSkillComponent::GetSkillData(ELSPlayerSkillSlot Slot) const
@@ -310,9 +366,7 @@ bool ULSPlayerSkillComponent::ApplySkillCooldown(const ULSSkillDataAsset* SkillD
 		return false;
 	}
 
-	const float CooldownReduction = ASC->GetNumericAttribute(ULSCharacterAttributeSet::GetCooldownReductionAttribute());
-	const float ReductionRatio = CooldownReduction > 1.0f ? CooldownReduction * 0.01f : CooldownReduction;
-	const float FinalDuration = BaseDuration * FMath::Clamp(1.0f - ReductionRatio, 0.0f, 1.0f);
+	const float FinalDuration = ResolveReducedSkillCooldownDuration(BaseDuration);
 	if (FinalDuration <= 0.0f)
 	{
 		return false;
@@ -337,7 +391,7 @@ bool ULSPlayerSkillComponent::ApplySkillCooldown(const ULSSkillDataAsset* SkillD
 		*CooldownTag.ToString(),
 		FinalDuration,
 		BaseDuration,
-		CooldownReduction);
+		ASC->GetNumericAttribute(ULSCharacterAttributeSet::GetCooldownReductionAttribute()));
 
 	return true;
 }
@@ -368,6 +422,11 @@ float ULSPlayerSkillComponent::GetSkillCooldownRemaining(const ULSSkillDataAsset
 	}
 
 	return RemainingTime;
+}
+
+float ULSPlayerSkillComponent::GetSkillCooldownTotalDuration(const ULSSkillDataAsset* SkillData) const
+{
+	return ResolveReducedSkillCooldownDuration(ResolveSkillCooldownDuration(SkillData));
 }
 
 void ULSPlayerSkillComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -534,6 +593,19 @@ float ULSPlayerSkillComponent::ResolveSkillCooldownDuration(const ULSSkillDataAs
 	}
 
 	return SkillData ? SkillData->GetCooldownDuration() : 0.0f;
+}
+
+float ULSPlayerSkillComponent::ResolveReducedSkillCooldownDuration(const float BaseDuration) const
+{
+	if (BaseDuration <= 0.0f)
+	{
+		return 0.0f;
+	}
+
+	const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+	const float CooldownReduction = ASC ? ASC->GetNumericAttribute(ULSCharacterAttributeSet::GetCooldownReductionAttribute()) : 0.0f;
+	const float ReductionRatio = CooldownReduction > 1.0f ? CooldownReduction * 0.01f : CooldownReduction;
+	return BaseDuration * FMath::Clamp(1.0f - ReductionRatio, 0.0f, 1.0f);
 }
 
 FVector ULSPlayerSkillComponent::ClampTargetLocationToCastRange(const ULSSkillDataAsset* SkillData, const FVector& TargetLocation) const

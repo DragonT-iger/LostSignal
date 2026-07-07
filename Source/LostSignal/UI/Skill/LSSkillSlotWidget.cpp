@@ -180,7 +180,7 @@ void ULSSkillSlotWidget::RefreshCooldown()
 
 	ULSSkillDataAsset* SkillData = SkillComponent ? SkillComponent->GetSkillData(Slot) : nullptr;
 	const float Remaining = SkillComponent ? SkillComponent->GetSkillCooldownRemaining(SkillData) : 0.0f;
-	const float Total = SkillData ? SkillData->GetCooldownDuration() : 0.0f;
+	const float Total = SkillComponent ? SkillComponent->GetSkillCooldownTotalDuration(SkillData) : 0.0f;
 	if (!SkillData || Remaining <= 0.0f || Total <= 0.0f)
 	{
 		CooldownText->SetVisibility(ESlateVisibility::Collapsed);
