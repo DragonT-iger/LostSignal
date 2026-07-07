@@ -538,6 +538,14 @@ LS.Data.*
 
 대시는 빠른 입력 반응이 중요하므로 클라이언트에서 먼저 RootMotionSource를 적용한다. 서버는 같은 방향으로 권위 실행한다.
 
+### 스킬 바 표시 (표시 전용 슬롯)
+
+대시는 발동/무적/예측/쿨타임 부여 경로를 스킬 시스템과 독립적으로 유지하면서, 스킬 바에는 **표시 전용 슬롯**으로 노출된다. `ELSPlayerSkillSlot::Dash`는 Skill1~Ultimate를 소비하지 않는 전용 슬롯이며, `ULSSkillBarWidget::DashSlot`(`BindWidget`)이 다른 슬롯과 동일하게 `ULSSkillSlotWidget`으로 아이콘/단축키/쿨타임만 그린다.
+
+- 슬롯에 배정하는 `ULSSkillDataAsset`(캐릭터별 `DA_Dash_*`)은 **표시 전용**이다: `AbilityClass`/`CooldownEffectClass`를 비워 발동·쿨타임 부여에 관여하지 않는다. `Skill_ID`로 캐릭터별 대시 스킬 행을 참조해 이름/설명을 얻고, `CooldownTag`는 `LS.Cooldown.Dash`로 둔다.
+- 쿨타임 남은시간은 `GetSkillCooldownRemaining`이 `LS.Cooldown.Dash` 태그로 실제 활성 GE(`ULSGE_DashCooldown`)를 조회해 그대로 표시한다. 총시간은 대시 행 `Skill_Cooldown`이 있으면 그 값을, 없으면 `GetSkillCooldownTotalDuration`이 실제 활성 쿨타임 GE의 지속시간으로 폴백해 진행바 분모가 항상 실제 쿨타임과 일치한다.
+- 노출(바 표시·쿨타임 숫자·게이지)은 다른 스킬 슬롯과 동일하게 전투 프로토콜 잠금(`Skill_Slot`/`Skill_Cooldown`/`Skill_Cooldown_Gauge`)을 따른다. → [CombatProtocolUI.md](CombatProtocolUI.md)
+
 ## 빠른 이동 스킬
 
 전방으로 빠르게 이동하는 스킬은 `ULSPlayerSkillComponent`의 공통 예측 경로를 사용한다.

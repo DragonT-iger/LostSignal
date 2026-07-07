@@ -87,6 +87,12 @@ bool ULSCharacterCombatComponent::CanApplyCrowdControl(ELSBreakPowerTier BreakPo
 	return !ResolveIncomingImpact(BreakPowerTier).bCrowdControlBlocked;
 }
 
+void ULSCharacterCombatComponent::RecordDamageExecutionResult(float DamageAmount, bool bCriticalHit) const
+{
+	LastDamageExecutionAmount = FMath::Max(0.0f, DamageAmount);
+	bLastDamageExecutionCritical = bCriticalHit;
+}
+
 void ULSCharacterCombatComponent::SetCombatTagActive(FGameplayTag Tag, bool bActive)
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
@@ -217,9 +223,13 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 	SpecHandle.Data->SetSetByCallerMagnitude(LSGameplayTags::Data_Damage_CanCrit, bCanCrit ? 1.0f : 0.0f);
 
 	const float BeforeHealth = TargetASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
+	LastDamageExecutionAmount = 0.0f;
+	bLastDamageExecutionCritical = false;
 	SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 	const float AfterHealth = TargetASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
 	const float ActualDamage = FMath::Max(0.0f, BeforeHealth - AfterHealth);
+	const float DisplayDamage = LastDamageExecutionAmount > 0.0f ? LastDamageExecutionAmount : ActualDamage;
+	const bool bCriticalHit = bLastDamageExecutionCritical;
 
 	UE_LOG(
 		LogLS,
@@ -250,12 +260,12 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 		}
 	}
 
-	if (TargetCombatComponent && ActualDamage > 0.0f)
+	if (TargetCombatComponent && DisplayDamage > 0.0f)
 	{
 		FLSDamageNumberPayload Payload;
-		Payload.DamageAmount = ActualDamage;
+		Payload.DamageAmount = DisplayDamage;
 		Payload.WorldLocation = FVector_NetQuantize(TargetActor->GetActorLocation() + TargetCombatComponent->DamageNumberWorldOffset);
-		Payload.bCritical = false;
+		Payload.bCritical = bCriticalHit;
 		TargetCombatComponent->BroadcastDamageNumberToPlayers(Payload);
 	}
 

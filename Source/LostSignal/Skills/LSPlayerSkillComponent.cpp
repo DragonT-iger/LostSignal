@@ -426,7 +426,31 @@ float ULSPlayerSkillComponent::GetSkillCooldownRemaining(const ULSSkillDataAsset
 
 float ULSPlayerSkillComponent::GetSkillCooldownTotalDuration(const ULSSkillDataAsset* SkillData) const
 {
-	return ResolveReducedSkillCooldownDuration(ResolveSkillCooldownDuration(SkillData));
+	const float ConfiguredDuration = ResolveReducedSkillCooldownDuration(ResolveSkillCooldownDuration(SkillData));
+	if (ConfiguredDuration > 0.0f)
+	{
+		return ConfiguredDuration;
+	}
+
+	// 대쉬처럼 설정 총시간(스킬 행/FallbackCooldown)이 없으면, 실제 활성 쿨타임 GE의 지속시간을 사용해
+	// 진행바 분모가 항상 실제 쿨타임과 일치하도록 한다. 기존 스킬(설정 총시간 > 0)은 이 경로를 타지 않는다.
+	const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+	const FGameplayTag CooldownTag = SkillData ? SkillData->GetCooldownTag() : FGameplayTag();
+	if (!ASC || !CooldownTag.IsValid())
+	{
+		return 0.0f;
+	}
+
+	FGameplayTagContainer QueryTags;
+	QueryTags.AddTag(CooldownTag);
+
+	float TotalDuration = 0.0f;
+	for (const TPair<float, float>& TimePair : ASC->GetActiveEffectsTimeRemainingAndDuration(FGameplayEffectQuery::MakeQuery_MatchAllOwningTags(QueryTags)))
+	{
+		TotalDuration = FMath::Max(TotalDuration, TimePair.Value);
+	}
+
+	return TotalDuration;
 }
 
 void ULSPlayerSkillComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)

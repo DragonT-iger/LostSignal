@@ -289,6 +289,8 @@ UInputAction* ALSPlayerCharacter::GetSkillInputAction(const ELSPlayerSkillSlot S
 		return Skill4Action;
 	case ELSPlayerSkillSlot::Ultimate:
 		return Ultimatection;
+	case ELSPlayerSkillSlot::Dash:
+		return DashAction;
 	default:
 		return nullptr;
 	}

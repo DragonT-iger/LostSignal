@@ -181,7 +181,7 @@ Protocol_Required_Level = 5
 
 ## 현재 제한
 
-- 1차 구조에서는 `BeforeHealth - AfterHealth`로 실제 적용 데미지만 표시한다.
-- 치명타 여부는 아직 `ULSDamageExecutionCalculation` 밖으로 전달되지 않으므로 `bCritical=false`로 시작한다.
-- 치명타 색상, 막힘, 회복, 속성별 색상은 이후 단계나 별도 확정 요구가 있을 때 `FLSDamageNumberPayload`를 확장한다.
+- 데미지 숫자는 `BeforeHealth - AfterHealth`가 아니라 `ULSDamageExecutionCalculation`이 산출한 최종 데미지량을 표시한다.
+- 데미지량과 치명타 여부는 `ULSDamageExecutionCalculation`의 판정 결과를 `ULSCharacterCombatComponent`가 받아 `FLSDamageNumberPayload`로 전달한다.
+- 치명타 데미지 색상은 `ULSDamageNumberWidget::CriticalDamageColor`에서 따로 지정한다. 막힘, 회복, 속성별 색상은 이후 단계나 별도 확정 요구가 있을 때 `FLSDamageNumberPayload`를 확장한다.
 - 데미지 숫자 표시 위젯 클래스는 `ALSPlayerControllerBase`가 생성한 `ULSPlayerHUDWidget`의 `DamageNumberWidgetClass`에 BP에서 지정한다.

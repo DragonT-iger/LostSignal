@@ -65,6 +65,8 @@ public:
 		bool bCanCrit = false,
 		ELSBreakPowerTier BreakPowerTier = ELSBreakPowerTier::NormalAttack) const;
 
+	void RecordDamageExecutionResult(float DamageAmount, bool bCriticalHit) const;
+
 	/**
 	 * DataTable row의 상태이상 항목 하나를 Effect_Target에 따라 자신/대상에게 적용한다(서버 전용).
 	 * 스킬/콤보 row가 공통으로 사용하는 진입점. 실제 적용은 대상의 ULSStatusEffectComponent가 담당한다.
@@ -101,6 +103,8 @@ private:
 	bool bKnockbackActive = false;
 
 	bool bCachedIsDead = false;
+	mutable float LastDamageExecutionAmount = 0.0f;
+	mutable bool bLastDamageExecutionCritical = false;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Combat")
 	FVector DamageNumberWorldOffset = FVector(0.0f, 0.0f, 120.0f);

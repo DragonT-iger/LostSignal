@@ -55,7 +55,9 @@ enum class ELSPlayerSkillSlot : uint8
 	Skill2,
 	Skill3,
 	Skill4,
-	Ultimate
+	Ultimate,
+	// 대쉬 전용 표시 슬롯. 발동/쿨타임은 기존 대쉬 경로(ULSGA_Dash)가 담당하고, 스킬 바에는 표시만 한다.
+	Dash
 };
 
 // 스킬 슬롯별 발동 방식. 플레이어가 슬롯마다 지정하며 GameUserSettings.ini에 저장된다.

@@ -1,6 +1,7 @@
 #include "GAS/Calculations/LSDamageExecutionCalculation.h"
 
 #include "AbilitySystemComponent.h"
+#include "Combat/LSCharacterCombatComponent.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
@@ -105,6 +106,11 @@ void ULSDamageExecutionCalculation::Execute_Implementation(
 	}
 
 	FinalDamage = FMath::Max(0.0f, FinalDamage) + 1.0f;
+	if (const ULSCharacterCombatComponent* SourceCombatComponent = Cast<ULSCharacterCombatComponent>(Spec.GetContext().GetSourceObject()))
+	{
+		SourceCombatComponent->RecordDamageExecutionResult(FinalDamage, bCriticalHit);
+	}
+
 	const UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
 	const UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
 	const AActor* SourceActor = SourceASC ? SourceASC->GetAvatarActor() : nullptr;

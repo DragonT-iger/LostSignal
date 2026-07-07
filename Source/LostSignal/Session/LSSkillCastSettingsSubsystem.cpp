@@ -9,6 +9,7 @@ ELSSkillCastMode ULSSkillCastSettingsSubsystem::GetSlotCastMode(ELSPlayerSkillSl
 	case ELSPlayerSkillSlot::Skill3: return Skill3CastMode;
 	case ELSPlayerSkillSlot::Skill4: return Skill4CastMode;
 	case ELSPlayerSkillSlot::Ultimate: return UltimateCastMode;
+	case ELSPlayerSkillSlot::Dash: break; // 대쉬는 캐스트 모드가 없다(표시 전용). 기본값으로 처리.
 	}
 	return ELSSkillCastMode::PreviewConfirm;
 }
@@ -22,6 +23,7 @@ void ULSSkillCastSettingsSubsystem::SetSlotCastMode(ELSPlayerSkillSlot Slot, ELS
 	case ELSPlayerSkillSlot::Skill3: Skill3CastMode = Mode; break;
 	case ELSPlayerSkillSlot::Skill4: Skill4CastMode = Mode; break;
 	case ELSPlayerSkillSlot::Ultimate: UltimateCastMode = Mode; break;
+	case ELSPlayerSkillSlot::Dash: return; // 대쉬는 캐스트 모드가 없다(표시 전용). 저장 없이 무시.
 	}
 
 	SaveConfig();

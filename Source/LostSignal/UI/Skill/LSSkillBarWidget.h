@@ -41,6 +41,9 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
 	TObjectPtr<ULSSkillSlotWidget> UltimateSlot;
 
+	/*UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
+	TObjectPtr<ULSSkillSlotWidget> DashSlot;*/
+
 private:
 	void RefreshProtocolVisibility();
 	bool IsSkillSlotProtocolVisible() const;

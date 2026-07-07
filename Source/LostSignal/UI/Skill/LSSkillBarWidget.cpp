@@ -44,6 +44,11 @@ void ULSSkillBarWidget::InitializeSkillBar(ULSPlayerSkillComponent* InSkillCompo
 	{
 		UltimateSlot->InitializeSlot(SkillComponent, ELSPlayerSkillSlot::Ultimate);
 	}
+
+	/*if (DashSlot)
+	{
+		DashSlot->InitializeSlot(SkillComponent, ELSPlayerSkillSlot::Dash);
+	}*/
 }
 
 void ULSSkillBarWidget::SetPreviewBattleProtocolLevels(const int32 CurrentBattleProtocol, const int32 PreviousBattleProtocol)
@@ -56,6 +61,7 @@ void ULSSkillBarWidget::SetPreviewBattleProtocolLevels(const int32 CurrentBattle
 	if (Skill3Slot) { Skill3Slot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
 	if (Skill4Slot) { Skill4Slot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
 	if (UltimateSlot) { UltimateSlot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
+	//if (DashSlot) { DashSlot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
 	RefreshProtocolVisibility();
 }
 
@@ -69,6 +75,7 @@ void ULSSkillBarWidget::ClearPreviewBattleProtocolLevels()
 	if (Skill3Slot) { Skill3Slot->ClearPreviewBattleProtocolLevels(); }
 	if (Skill4Slot) { Skill4Slot->ClearPreviewBattleProtocolLevels(); }
 	if (UltimateSlot) { UltimateSlot->ClearPreviewBattleProtocolLevels(); }
+	//if (DashSlot) { DashSlot->ClearPreviewBattleProtocolLevels(); }
 	RefreshProtocolVisibility();
 }
 
@@ -77,7 +84,7 @@ void ULSSkillBarWidget::NativeConstruct()
 	Super::NativeConstruct();
 	RefreshProtocolVisibility();
 
-	if (!Skill1Slot || !Skill2Slot || !Skill3Slot || !Skill4Slot || !UltimateSlot)
+	if (!Skill1Slot || !Skill2Slot || !Skill3Slot || !Skill4Slot || !UltimateSlot /*|| !DashSlot*/)
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s is missing required skill bar slot binding. Skill1=%s Skill2=%s Skill3=%s Skill4=%s Ultimate=%s"),
 			*GetNameSafe(this),
@@ -86,6 +93,7 @@ void ULSSkillBarWidget::NativeConstruct()
 			*GetNameSafe(Skill3Slot),
 			*GetNameSafe(Skill4Slot),
 			*GetNameSafe(UltimateSlot));
+			//*GetNameSafe(DashSlot));
 	}
 }
 
