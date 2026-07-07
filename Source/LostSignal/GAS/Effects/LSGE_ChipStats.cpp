@@ -36,4 +36,6 @@ ULSGE_ChipStats::ULSGE_ChipStats(const FObjectInitializer& ObjectInitializer)
 	AddChipModifier(*this, ULSCharacterAttributeSet::GetMoveSpeedAttribute(), LSGameplayTags::Data_Chip_MoveSpeed);
 	AddChipModifier(*this, ULSCharacterAttributeSet::GetCritDamageAttribute(), LSGameplayTags::Data_Chip_CritDamage);
 	AddChipModifier(*this, ULSCharacterAttributeSet::GetCritChanceAttribute(), LSGameplayTags::Data_Chip_CritRate);
+	AddChipModifier(*this, ULSCharacterAttributeSet::GetCooldownReductionAttribute(), LSGameplayTags::Data_Chip_SkillHaste);
+	AddChipModifier(*this, ULSCharacterAttributeSet::GetArmorPenetrationAttribute(), LSGameplayTags::Data_Chip_ArmorPenetration);
 }

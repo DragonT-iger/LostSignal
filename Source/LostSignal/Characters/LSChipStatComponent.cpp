@@ -104,6 +104,8 @@ void ULSChipStatComponent::RefreshChipStats(bool bRestoreFullHealth)
 	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Chip_MoveSpeed, PercentValue(TEXT("Chip_Move_Speed")));
 	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Chip_CritDamage, PercentValue(TEXT("Chip_Critical_Damage")));
 	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Chip_CritRate, PercentValue(TEXT("Chip_Critical_Rate")));
+	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Chip_SkillHaste, PercentValue(TEXT("Chip_Skill_Haste")));
+	Spec.SetSetByCallerMagnitude(LSGameplayTags::Data_Chip_ArmorPenetration, PercentValue(TEXT("Chip_Defense_Penetration")));
 
 	const float PreviousHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
 	const float PreviousMaxHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetMaxHealthAttribute());

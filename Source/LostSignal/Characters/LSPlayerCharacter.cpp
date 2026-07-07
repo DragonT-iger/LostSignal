@@ -6,12 +6,14 @@
 #include "Characters/LSChipStatComponent.h"
 #include "Characters/LSEquipmentStatComponent.h"
 #include "Combat/LSAimComponent.h"
+#include "Combat/LSCharacterCombatComponent.h"
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Core/LSFarmingGameMode.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "EnhancedInputComponent.h"
 #include "AbilitySystemComponent.h"
 #include "GAS/LSCharacterAttributeSet.h"
+#include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "GAS/Effects/LSGE_StaminaChange.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -142,6 +144,7 @@ void ALSPlayerCharacter::Tick(float DeltaSeconds)
 	UpdateActiveSkillPreview();
 	UpdateRunStamina(DeltaSeconds);
 	UpdateStaminaRecovery(DeltaSeconds);
+	UpdateHealthRecovery(DeltaSeconds);
 	UpdateClimbCeiling();
 }
 
@@ -1111,6 +1114,47 @@ void ALSPlayerCharacter::UpdateStaminaRecovery(float DeltaSeconds)
 	}
 
 	ApplyStaminaChange(StaminaRecoveryPerSecond * DeltaSeconds);
+}
+
+void ALSPlayerCharacter::UpdateHealthRecovery(float DeltaSeconds)
+{
+	if (!HasAuthority() || !PlayerAttributeSet)
+	{
+		return;
+	}
+
+	// Recovery 어트리뷰트 = 초당 회복 체력(HP/s). 칩/장비 합산으로 올라간다.
+	const float RecoveryPerSecond = PlayerAttributeSet->GetRecovery();
+	if (RecoveryPerSecond <= 0.0f)
+	{
+		return;
+	}
+
+	const ULSCombatAttributeSet* CombatSet = GetCombatAttributeSet();
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!CombatSet || !ASC)
+	{
+		return;
+	}
+
+	// 사망 상태면 회복하지 않는다(음수/0 체력을 되살리지 않도록).
+	if (const ULSCharacterCombatComponent* CombatComponent = GetCharacterCombatComponent())
+	{
+		if (CombatComponent->IsDead())
+		{
+			return;
+		}
+	}
+
+	const float CurrentHealth = CombatSet->GetCurrentHealth();
+	const float MaxHealth = CombatSet->GetMaxHealth();
+	if (CurrentHealth >= MaxHealth)
+	{
+		return;
+	}
+
+	const float NewHealth = FMath::Min(CurrentHealth + RecoveryPerSecond * DeltaSeconds, MaxHealth);
+	ASC->SetNumericAttributeBase(ULSCombatAttributeSet::GetCurrentHealthAttribute(), NewHealth);
 }
 
 bool ALSPlayerCharacter::HasStamina(float RequiredAmount) const

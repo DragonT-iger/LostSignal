@@ -98,15 +98,15 @@
 | Chip_Attack | Attack | Character | 평탄 가산 | ✅ 연동 |
 | Chip_Health | MaxHealth | Combat | 평탄 가산 | ✅ 연동 |
 | Chip_Defense | Defence | Character | 평탄 가산 | ✅ 연동 |
-| Chip_Recovery | Recovery | Character | 평탄 가산 | ✅ 연동(어트리뷰트만, 다운스트림 소비 미연결) |
-| Chip_Attack_Speed | AttackSpeed | Character | 퍼센트 ÷100 가산 | ✅ 연동(다운스트림 소비 확인 필요) |
-| Chip_Move_Speed | MoveSpeed | Character | 퍼센트 ÷100 가산 | ✅ 연동(다운스트림 소비 확인 필요) |
+| Chip_Recovery | Recovery | Character | 평탄 가산 | ✅ 연동(초당 체력 회복 소비) |
+| Chip_Attack_Speed | AttackSpeed | Character | 퍼센트 ÷100 가산 | ✅ 연동(기본공격 재생속도 소비) |
+| Chip_Move_Speed | MoveSpeed | Character | 퍼센트 ÷100 가산 | ✅ 연동(어트리뷰트만, 이동속도 소비 미연결) |
 | Chip_Critical_Damage | CritDamage | Character | 퍼센트 ÷100 가산 | ✅ 연동(데미지 계산 소비) |
 | Chip_Critical_Rate | CritChance | Character | 퍼센트 ÷100 가산 | ✅ 연동(데미지 계산 소비) |
-| Chip_Defense_Penetration | ArmorPenetration | Character | — | ⬜ 보류 |
-| Chip_Skill_Haste | CooldownReduction | Character | — | ⬜ 보류(LoL식 스킬가속 시스템 조사 후 결정) |
+| Chip_Defense_Penetration | ArmorPenetration | Character | 퍼센트 ÷100 가산 | ✅ 연동(데미지 계산 소비) |
+| Chip_Skill_Haste | CooldownReduction | Character | 퍼센트 ÷100 가산 | ✅ 연동(스킬 쿨다운 소비) |
 
-> Attack / CritDamage / CritChance / Defence는 `LSDamageExecutionCalculation`이 데미지 계산에 소비한다. Recovery는 현재 다운스트림 소비처가 없고, MoveSpeed / AttackSpeed는 실제 이동/공격 속도로의 소비 연결을 후속으로 확인한다(어트리뷰트 값 반영까지는 완료).
+> Attack / CritDamage / CritChance / Defence / ArmorPenetration은 `LSDamageExecutionCalculation`이 데미지 계산에 소비한다. CooldownReduction은 `LSPlayerSkillComponent`가 스킬 쿨다운에, AttackSpeed는 `LSGA_PlayerBasicAttack`이 콤보 몽타주 재생속도에, Recovery는 `ALSPlayerCharacter::UpdateHealthRecovery`가 초당 체력 회복에 소비한다. MoveSpeed만 아직 어트리뷰트 값 반영까지만 되어 있고 실제 플레이어 이동속도(`MaxWalkSpeed`) 소비가 미연결이다.
 
 ### ❌ 미구현
 

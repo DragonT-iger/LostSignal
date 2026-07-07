@@ -348,6 +348,7 @@ private:
 	bool IsMovingForRunStaminaDrain() const;
 	void UpdateRunStamina(float DeltaSeconds);
 	void UpdateStaminaRecovery(float DeltaSeconds);
+	void UpdateHealthRecovery(float DeltaSeconds);
 	void UpdateClimbCeiling();
 	bool HasStamina(float RequiredAmount) const;
 	bool TrySpendStamina(float Amount);
