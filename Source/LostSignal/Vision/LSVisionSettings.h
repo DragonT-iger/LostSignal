@@ -65,10 +65,10 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Edge", meta = (ClampMin = "0.0"))
 	float OccluderFeatherScale = 0.25f;
 
-	// 마스크 샘플 좌표를 픽셀 월드 노멀 방향으로 미는 강도(픽셀 높이에 비례). 솟아오른/기울어진 면에서 시야 경계가
-	// 표면을 일자로 자르는 것을 완화해 경계가 높이를 타고 오르게 한다. 바닥(노멀 ≈+Z, 높이 ≈0)은 사실상 불변.
-	// 머티리얼: offset.xy = WorldNormal.XY × (WorldPos.Z − GroundZ) × 이 값. GroundZ는 MaskOriginWS.Z(플레이어 발 높이).
-	// 높이에 곱해지는 비율이라 단위는 대략 0.1~0.5 범위. 0=보정 없음(기존 동작).
+	// 마스크 샘플 좌표를 픽셀 월드 노멀 XY 방향으로 미는 거리(월드 유닛). 벽 앞면 샘플을 플레이어 쪽(시야 안)으로 밀어,
+	// 오클루더 벽이 자기 발자국 경계를 샘플해 통째로 어두워지는 것을 막는다. 높이와 무관해 플레이어 수직 이동에 불변.
+	// 머티리얼: offset.xy = WorldNormal.XY × 이 값. 바닥(노멀 ≈+Z, XY≈0)은 불변, 수직 벽일수록 크게 밀린다.
+	// 단위는 월드 유닛 — 벽 두께를 넘어 시야 안으로 확실히 들어갈 만큼(대략 20~50). 0=보정 없음(벽이 까매질 수 있음).
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Projection", meta = (ClampMin = "0.0"))
-	float SurfaceNormalPush = 0.0f;
+	float SurfaceNormalPush = 30.0f;
 };

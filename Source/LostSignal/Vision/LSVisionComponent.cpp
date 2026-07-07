@@ -174,6 +174,10 @@ void ULSVisionComponent::UpdateVisionPolygon()
 		VisionSubsystem->SetRuntimeSliceZ(PlayerFootZ + VisionSettings->OccluderSliceHeight);
 	}
 
+	// 마스크 폴리곤이 잘린 슬라이스 평면 Z. 머티리얼 노멀 푸시의 높이 기준(GroundZ)을 이 평면과 동일하게 맞춰
+	// 푸시가 0이 되는 지점이 마스크가 유효한 평면과 일치하게 한다. bSliceHeightFromPlayer=false면 고정 절대 Z라 수직 이동에 불변.
+	const float SliceZ = VisionSubsystem->GetRuntimeSliceZ();
+
 	const FVector ActorForward = GetOwner()->GetActorForwardVector();
 	const FVector2D ActorForward2D = FVector2D(ActorForward.X, ActorForward.Y).GetSafeNormal();
 	const FVector2D RayOrigin2D = ActorLocation2D - (ActorForward2D * (VisionRadius - 50));
@@ -226,13 +230,13 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	if (PostProcessMID != nullptr)
 	{
 		PostProcessMID->SetScalarParameterValue(EnableParamName, bEnableVision ? 1.0f : 0.0f);
-		// Z 슬롯에 플레이어 발 높이를 실어 보낸다. UV는 XY만 쓰므로 Z는 머티리얼의 "바닥 기준 높이(GroundZ)" 입력으로 재활용된다.
-		PostProcessMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, PlayerFootZ, 0.0f));
+		// XY = 시야 폴리곤 원점(마스크 투영 기준). Z 슬롯은 현재 머티리얼에서 미사용(투영은 XY, 노멀 푸시는 높이 무관)이라 슬라이스 평면 높이를 참고용으로만 실어둔다.
+		PostProcessMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, SliceZ, 0.0f));
 		//MaskExtent -> RenderTarget을 World좌표범위로 치환한 값. ex)extent = 2500 -> uv 0 ~ 1 = world -2500 ~ 2500 크기, 원점은 플레이어 기준
 		PostProcessMID->SetScalarParameterValue(MaskExtentParamName, CurrentPolygon.Extent);
 
-		// 솟아오른/기울어진 면에서 시야 경계가 표면을 일자로 자르는 것을 완화하는 노멀 푸시.
-		// 머티리얼: offset.xy = WorldNormal.XY × (WorldPos.Z − MaskOriginWS.Z) × 이 값. (높이에 비례)
+		// 오클루더 벽이 자기 발자국 경계를 샘플해 통째로 어두워지는 것을 막는 노멀 푸시. 앞면 샘플을 시야 안쪽으로 민다.
+		// 머티리얼: offset.xy = WorldNormal.XY × 이 값 (월드 유닛, 높이 무관).
 		if (const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>())
 		{
 			PostProcessMID->SetScalarParameterValue(SurfacePushParamName, VisionSettings->SurfaceNormalPush);
@@ -252,7 +256,7 @@ void ULSVisionComponent::UpdateVisionPolygon()
 		{
 			SurfaceComponent->ApplyVisionParameters(
 				VisionSubsystem->GetVisibilityMaskRenderTarget(),
-				FVector(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, PlayerFootZ),
+				FVector(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, SliceZ),
 				CurrentPolygon.Extent,
 				SolverInfo.OriginForward);
 		}
