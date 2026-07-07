@@ -262,18 +262,6 @@ void ALSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill3Released);
 		EnhancedInput->BindAction(Skill3Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill3Released);
 	}
-	if (Skill4Action)
-	{
-		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnSkill4);
-		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnSkill4Released);
-		EnhancedInput->BindAction(Skill4Action, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnSkill4Released);
-	}
-	if (Ultimatection)
-	{
-		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnUltimate);
-		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Completed, this, &ALSPlayerCharacter::OnUltimateReleased);
-		EnhancedInput->BindAction(Ultimatection, ETriggerEvent::Canceled, this, &ALSPlayerCharacter::OnUltimateReleased);
-	}
 	if (Item1Action) { EnhancedInput->BindAction(Item1Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem1); }
 	if (Item2Action) { EnhancedInput->BindAction(Item2Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem2); }
 	if (Item3Action) { EnhancedInput->BindAction(Item3Action, ETriggerEvent::Started, this, &ALSPlayerCharacter::OnItem3); }
@@ -296,10 +284,6 @@ UInputAction* ALSPlayerCharacter::GetSkillInputAction(const ELSPlayerSkillSlot S
 		return Skill2Action;
 	case ELSPlayerSkillSlot::Skill3:
 		return Skill3Action;
-	case ELSPlayerSkillSlot::Skill4:
-		return Skill4Action;
-	case ELSPlayerSkillSlot::Ultimate:
-		return Ultimatection;
 	case ELSPlayerSkillSlot::Dash:
 		return DashAction;
 	default:
@@ -403,13 +387,9 @@ void ALSPlayerCharacter::OnSkillPreviewCancelInput()
 void ALSPlayerCharacter::OnSkill1() { HandleSkillInputPressed(ELSPlayerSkillSlot::Skill1); }
 void ALSPlayerCharacter::OnSkill2() { HandleSkillInputPressed(ELSPlayerSkillSlot::Skill2); }
 void ALSPlayerCharacter::OnSkill3() { HandleSkillInputPressed(ELSPlayerSkillSlot::Skill3); }
-void ALSPlayerCharacter::OnSkill4() { HandleSkillInputPressed(ELSPlayerSkillSlot::Skill4); }
-void ALSPlayerCharacter::OnUltimate() { HandleSkillInputPressed(ELSPlayerSkillSlot::Ultimate); }
 void ALSPlayerCharacter::OnSkill1Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill1); }
 void ALSPlayerCharacter::OnSkill2Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill2); }
 void ALSPlayerCharacter::OnSkill3Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill3); }
-void ALSPlayerCharacter::OnSkill4Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill4); }
-void ALSPlayerCharacter::OnUltimateReleased() { HandleSkillInputReleased(ELSPlayerSkillSlot::Ultimate); }
 void ALSPlayerCharacter::OnItem1() {}
 void ALSPlayerCharacter::OnItem2() {}
 void ALSPlayerCharacter::OnItem3() {}
@@ -764,7 +744,7 @@ void ALSPlayerCharacter::HandleSkillInputReleased(ELSPlayerSkillSlot Slot)
 
 void ALSPlayerCharacter::BeginSkillPreview(ELSPlayerSkillSlot Slot)
 {
-	// 스킬 시전(몽타주) 중이거나 모달 UI가 열려 있으면 새 스킬 프리뷰 진입을 막는다(Skill1~4/Ultimate 공통 게이트).
+	// 스킬 시전(몽타주) 중이거나 모달 UI가 열려 있으면 새 스킬 프리뷰 진입을 막는다(Skill1~3 공통 게이트).
 	if (IsInputBlocked() || IsModalUIBlockingInput())
 	{
 		return;

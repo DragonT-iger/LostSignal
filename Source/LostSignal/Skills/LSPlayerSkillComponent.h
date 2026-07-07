@@ -7,6 +7,7 @@
 #include "LSPlayerSkillComponent.generated.h"
 
 class ULSSkillDataAsset;
+class ULSSkillPoolDataAsset;
 class ULSPassiveSkillDataAsset;
 class ULSSkillPreviewComponent;
 class UGameplayAbility;
@@ -72,13 +73,26 @@ public:
 	float GetSkillCooldownTotalDuration(const ULSSkillDataAsset* SkillData) const;
 
 protected:
+	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	// 세이브에 저장된 스킬 로드아웃(EquippedSkillIDs)을 SkillPool로 해석해 3칸에 적용한다.
+	// 저장된 선택이 하나도 없으면 BP 기본 SkillSlots를 폴백 기본 로드아웃으로 유지한다.
+	void ApplyEquippedSkillLoadout();
+
+	// 슬롯을 비운다(SetSkillData는 nullptr을 거부하므로 해제 전용 경로).
+	void ClearSkillSlot(ELSPlayerSkillSlot Slot);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TMap<ELSPlayerSkillSlot, FLSPlayerSkillSlotSpec> SkillSlots;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
 	TArray<TObjectPtr<ULSPassiveSkillDataAsset>> PassiveSkills;
+
+	// 이 캐릭터가 로비에서 고를 수 있는 스킬 후보 풀. 세이브에 저장된 Skill_ID를 DataAsset으로 해석할 때 쓴다.
+	// 캐릭터 BP에서 DA_*_SkillPool을 매핑한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill")
+	TObjectPtr<ULSSkillPoolDataAsset> SkillPool;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/Skill|Debug")
 	bool bAlwaysShowSkillPreviewDebug = false;

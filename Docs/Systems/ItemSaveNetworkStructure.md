@@ -56,6 +56,8 @@ ULSSaveGame
 - SafeStash
 - ChipEquipmentSlots
 - ChipSignalGaugePercent
+- EquipmentSlots
+- EquippedSkillIDs
 - bRaidSaveActive
 - ActiveRaidLoadout
 - ActiveRaidConsumedItems
@@ -79,6 +81,14 @@ SafeStash
 ChipEquipmentSlots / ChipSignalGaugePercent
 - 로비 칩 스테이션의 장착 칩 10칸과 신호 게이지 값을 저장함
 - 칩 스테이션을 다시 열 때 이 값을 기준으로 슬롯 활성/비활성, 스탯/프로토콜 합산 UI를 복원함
+
+EquipmentSlots
+- 로비 무기/방어구 장착 5칸(ELSEquipmentSlot 순서)
+
+EquippedSkillIDs
+- 로비에서 고른 스킬 선택 슬롯 3칸(값=Skill_ID, 0=빈 칸). 레이드 진입 시 캐릭터 3칸에 적용됨
+- API: GetEquippedSkillIDs / SetEquippedSkillSlot / ClearEquippedSkillSlot, 변경 시 OnSkillLoadoutChanged 발행
+- 로드아웃 규칙(기본 장착·후보 풀·적용 흐름)은 SkillSystemStructure.md의 `스킬 로드아웃`이 단일 출처
 
 ActiveRaidLoadout / ActiveRaidConsumedItems
 - 레이드 중단, 강제 종료, PIE 중단 같은 상황에서 복구하기 위한 임시 저장 데이터

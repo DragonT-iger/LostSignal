@@ -14,6 +14,7 @@
 #include "Data/LSProtocolUnlockRow.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -28,6 +29,7 @@
 #include "Session/LSSkillCastSettingsSubsystem.h"
 #include "Skills/LSPassiveSkillDataAsset.h"
 #include "Skills/LSSkillDataAsset.h"
+#include "Skills/LSSkillPoolDataAsset.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "TimerManager.h"
 
@@ -451,6 +453,81 @@ float ULSPlayerSkillComponent::GetSkillCooldownTotalDuration(const ULSSkillDataA
 	}
 
 	return TotalDuration;
+}
+
+void ULSPlayerSkillComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	ApplyEquippedSkillLoadout();
+}
+
+void ULSPlayerSkillComponent::ApplyEquippedSkillLoadout()
+{
+	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	// 서버 권한(발동 판정) 또는 로컬 조종 클라(프리뷰/UI)에서 적용한다. 데디 서버의 비소유 캐릭터는 건너뛴다.
+	const bool bShouldApply = OwnerPawn && (OwnerPawn->HasAuthority() || OwnerPawn->IsLocallyControlled());
+	if (!bShouldApply)
+	{
+		return;
+	}
+
+	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot apply equipped skill loadout because SaveSubsystem is missing."), *GetNameSafe(GetOwner()));
+		return;
+	}
+
+	const TArray<int32>& EquippedSkillIDs = SaveSubsystem->GetEquippedSkillIDs();
+	const bool bHasAnyEquipped = EquippedSkillIDs.ContainsByPredicate([](int32 SkillID) { return SkillID != 0; });
+	if (!bHasAnyEquipped)
+	{
+		// 저장된 선택이 하나도 없으면(신규/미선택) BP 기본 SkillSlots를 폴백 기본 로드아웃으로 유지한다.
+		return;
+	}
+
+	if (!SkillPool)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s has an equipped skill loadout but no SkillPool assigned; loadout not applied."), *GetNameSafe(GetOwner()));
+		return;
+	}
+
+	static const ELSPlayerSkillSlot SlotOrder[] = { ELSPlayerSkillSlot::Skill1, ELSPlayerSkillSlot::Skill2, ELSPlayerSkillSlot::Skill3 };
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(SlotOrder); ++Index)
+	{
+		const ELSPlayerSkillSlot Slot = SlotOrder[Index];
+		const int32 SkillID = EquippedSkillIDs.IsValidIndex(Index) ? EquippedSkillIDs[Index] : 0;
+		ULSSkillDataAsset* SkillData = (SkillID != 0) ? SkillPool->FindSkillByID(SkillID) : nullptr;
+
+		if (SkillID != 0 && !SkillData)
+		{
+			UE_LOG(LogLS, Warning, TEXT("%s could not resolve equipped Skill_ID %d from SkillPool for slot %d."),
+				*GetNameSafe(GetOwner()), SkillID, static_cast<int32>(Slot));
+		}
+
+		if (SkillData)
+		{
+			SetSkillData(Slot, SkillData);
+		}
+		else
+		{
+			ClearSkillSlot(Slot);
+		}
+	}
+}
+
+void ULSPlayerSkillComponent::ClearSkillSlot(ELSPlayerSkillSlot Slot)
+{
+	if (ActiveSkillData && ActiveSlot == Slot)
+	{
+		CancelAnyActiveSkillPreview();
+	}
+
+	if (FLSPlayerSkillSlotSpec* SlotSpec = SkillSlots.Find(Slot))
+	{
+		SlotSpec->SkillData = nullptr;
+	}
 }
 
 void ULSPlayerSkillComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)

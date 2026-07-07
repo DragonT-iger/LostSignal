@@ -7,7 +7,7 @@
 class ULSSkillSlotWidget;
 class ULSPlayerSkillComponent;
 
-/** Skill bar widget that binds the five player skill slots. */
+/** Skill bar widget that binds the three player skill slots (Skill1~3). */
 UCLASS()
 class LOSTSIGNAL_API ULSSkillBarWidget : public UUserWidget
 {
@@ -34,12 +34,6 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
 	TObjectPtr<ULSSkillSlotWidget> Skill3Slot;
-
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
-	TObjectPtr<ULSSkillSlotWidget> Skill4Slot;
-
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
-	TObjectPtr<ULSSkillSlotWidget> UltimateSlot;
 
 	/*UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
 	TObjectPtr<ULSSkillSlotWidget> DashSlot;*/

@@ -79,8 +79,9 @@ GameplayEffect
 
 플레이어 스킬 슬롯과 입력 흐름의 중심이다.
 
-- `SkillSlots`에 슬롯별 액티브 `ULSSkillDataAsset`을 가진다.
-- `PassiveSkills`에 패시브 `ULSPassiveSkillDataAsset`을 가진다.
+- `SkillSlots`(`Skill1~3` 3칸)에 슬롯별 액티브/궁극기 `ULSSkillDataAsset`을 가진다. → `스킬 로드아웃` 참고.
+- `PassiveSkills`에 패시브 `ULSPassiveSkillDataAsset`을 가진다(캐릭터 고정 기본 장착, 선택 대상 아님).
+- `SkillPool`(`ULSSkillPoolDataAsset`)에 이 캐릭터가 고를 수 있는 후보 목록을 참조한다. `BeginPlay`에서 세이브 로드아웃을 이 풀로 해석해 슬롯에 적용한다.
 - 프리뷰 시작, 갱신, 확정, 취소를 담당한다.
 - 스킬 쿨타임 태그를 확인해서 프리뷰와 발동을 차단한다.
 - 서버에 스킬 발동 요청을 보낸다.
@@ -195,6 +196,17 @@ PassiveSkill_ID
 
 체력, 공격력, 공격속도 같은 수치는 직접 바꾸지 않고 GE를 거친다.
 
+## 스킬 로드아웃
+
+플레이어가 들고 나가는 스킬 구성이다. (이 문서가 단일 출처)
+
+- **기본 장착(고정, 슬롯 아님):** 일반 공격(`ULSPlayerCombatComponent`), 패시브 스킬(`ULSPlayerSkillComponent::PassiveSkills`), 회피/대시(`ULSGA_Dash`)는 캐릭터마다 고정이며 선택 대상이 아니다. 현재는 캐릭터 BP 기본값으로 부여한다.
+- **선택 슬롯 3칸:** `ELSPlayerSkillSlot::Skill1~3`(궁극기 전용 칸 없음). 각 칸에는 **액티브 또는 궁극기**(`ELSCharacterSkillType::Active`/`Ultimate`)만 넣는다. 궁극기도 3칸 중 아무 곳에나 배치한다.
+- **선택 가능 후보(`ULSSkillPoolDataAsset`):** 캐릭터별로 고를 수 있는 `ULSSkillDataAsset` 목록. 로비 선택 UI와 런타임 `Skill_ID → DataAsset` 해석이 이 풀 하나를 공용으로 쓴다. 후보의 액티브/궁극기 판정은 `Skill_ID`로 DataTable(`Skill_Type`)을 조회한다(타입은 DataTable이 단일 출처). `ULSPlayerSkillComponent::SkillPool`(런타임)과 로비 스킬 UI(WBP)가 같은 DA 자산을 가리킨다.
+- **저장:** 선택 결과는 `ULSSaveGame::EquippedSkillIDs`(3칸, 값=Skill_ID, 0=빈 칸)에 저장된다. 조작 API는 `ULSSaveSubsystem::GetEquippedSkillIDs`/`SetEquippedSkillSlot`/`ClearEquippedSkillSlot`이며, 변경 시 `OnSkillLoadoutChanged`를 발행한다. 저장 구조는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)가 소유한다.
+- **선택 UI(로비):** 개인정비(`ULSLoadoutPreparationWidget`)의 스킬 페이지(`ELSLoadoutTab::Skill`, ContentSwitcher 인덱스 4). 전용 스킬 탭 버튼은 없고 **업그레이드 탭 버튼(`UpgradeTab`)** 을 누르면 이 페이지가 열린다(`HandleUpgradeTabClicked`). `ULSSkillLoadoutWidget`이 풀에서 액티브/궁극기 후보를 나열하고, **클릭 배치**로 첫 빈 칸에 장착·슬롯 클릭으로 해제한다(중복 Skill_ID는 이동 처리). 후보/슬롯 개별 표시는 `ULSSkillLoadoutEntryWidget`·슬롯 아이콘이 담당한다.
+- **런타임 적용:** `ULSPlayerSkillComponent::BeginPlay → ApplyEquippedSkillLoadout`이 세이브의 `EquippedSkillIDs`를 `SkillPool->FindSkillByID`로 해석해 3칸에 `SetSkillData`한다. 저장된 선택이 하나도 없으면(신규/미선택) 캐릭터 BP 기본 `SkillSlots`를 폴백 기본 로드아웃으로 유지한다. 서버 권한 또는 로컬 조종 클라에서만 적용한다(데디 서버 비소유 캐릭터는 건너뜀 — 멀티에서 서버 반영은 추후 복제 과제).
+
 ## 공통 입력 흐름
 
 ## 액티브 스킬
@@ -222,7 +234,7 @@ PassiveSkill_ID
 
 ## 슬롯별 캐스트 모드 (발동 방식)
 
-스킬 슬롯(Skill1~4·Ultimate)마다 발동 방식을 플레이어가 지정한다. 위 입력 흐름의 앞단(누름/뗌 입력 → 발동 커밋)만 분기하며, 서버 발동·쿨타임·GAS 경로는 세 방식이 동일하게 공유한다.
+스킬 슬롯(Skill1~3)마다 발동 방식을 플레이어가 지정한다. 위 입력 흐름의 앞단(누름/뗌 입력 → 발동 커밋)만 분기하며, 서버 발동·쿨타임·GAS 경로는 세 방식이 동일하게 공유한다.
 
 - `ELSSkillCastMode`(`LSSkillTypes.h`) 3종:
   - **PreviewConfirm**(기본): 키를 누르면 프리뷰가 뜨고 **마우스 좌클릭**(`OnAttack`)으로 커서 위치를 확정해 발동. 키를 떼도 발동하지 않는다.
@@ -250,7 +262,7 @@ PassiveSkill_ID
 
 스킬 몽타주가 재생되는 동안 플레이어의 전투 입력(이동·대시·스킬·기본공격 등)을 무시한다. (이 문서가 단일 출처)
 
-- 단일 게이트 태그: `LS.State.InputBlocked`. 캐릭터의 `ALSPlayerCharacter::IsInputBlocked()`가 ASC에서 이 태그를 확인하고, `Move`/`OnAttack`/`OnDash`/`BeginSkillPreview`·`ActivateSkillInstant`(Skill1~4·Ultimate 공통, 프리뷰·즉발 두 진입 경로) 상단에서 게이트한다.
+- 단일 게이트 태그: `LS.State.InputBlocked`. 캐릭터의 `ALSPlayerCharacter::IsInputBlocked()`가 ASC에서 이 태그를 확인하고, `Move`/`OnAttack`/`OnDash`/`BeginSkillPreview`·`ActivateSkillInstant`(Skill1~3 공통, 프리뷰·즉발 두 진입 경로) 상단에서 게이트한다.
 - 태그를 켜는 소스는 둘이며 같은 태그를 토글한다.
   - **기본(몽타주 전체)**: `ULSGA_PlayerSkillBase`가 스킬 몽타주를 재생할 때, 그 몽타주에 입력차단 NotifyState가 **없으면** 몽타주 시작~종료(취소 포함) 동안 태그를 부여한다.
   - **구간 지정**: 몽타주에 `ULSANS_BlockInput`(AnimNotifyState)을 배치하면, 베이스는 기본 차단을 걸지 않고 그 **NotifyState 구간에만** 태그를 토글한다. 애니메이터가 프레임 단위로 차단 창을 제어한다.
@@ -540,7 +552,7 @@ LS.Data.*
 
 ### 스킬 바 표시 (표시 전용 슬롯)
 
-대시는 발동/무적/예측/쿨타임 부여 경로를 스킬 시스템과 독립적으로 유지하면서, 스킬 바에는 **표시 전용 슬롯**으로 노출된다. `ELSPlayerSkillSlot::Dash`는 Skill1~Ultimate를 소비하지 않는 전용 슬롯이며, `ULSSkillBarWidget::DashSlot`(`BindWidget`)이 다른 슬롯과 동일하게 `ULSSkillSlotWidget`으로 아이콘/단축키/쿨타임만 그린다.
+대시는 발동/무적/예측/쿨타임 부여 경로를 스킬 시스템과 독립적으로 유지하면서, 스킬 바에는 **표시 전용 슬롯**으로 노출된다. `ELSPlayerSkillSlot::Dash`는 Skill1~3을 소비하지 않는 전용 슬롯이며, `ULSSkillBarWidget::DashSlot`(`BindWidget`)이 다른 슬롯과 동일하게 `ULSSkillSlotWidget`으로 아이콘/단축키/쿨타임만 그린다.
 
 - 슬롯에 배정하는 `ULSSkillDataAsset`(캐릭터별 `DA_Dash_*`)은 **표시 전용**이다: `AbilityClass`/`CooldownEffectClass`를 비워 발동·쿨타임 부여에 관여하지 않는다. `Skill_ID`로 캐릭터별 대시 스킬 행을 참조해 이름/설명을 얻고, `CooldownTag`는 `LS.Cooldown.Dash`로 둔다.
 - 쿨타임 남은시간은 `GetSkillCooldownRemaining`이 `LS.Cooldown.Dash` 태그로 실제 활성 GE(`ULSGE_DashCooldown`)를 조회해 그대로 표시한다. 총시간은 대시 행 `Skill_Cooldown`이 있으면 그 값을, 없으면 `GetSkillCooldownTotalDuration`이 실제 활성 쿨타임 GE의 지속시간으로 폴백해 진행바 분모가 항상 실제 쿨타임과 일치한다.
@@ -624,7 +636,7 @@ ULSPlayerSkillComponent::ApplySkillEnhancementByIndex
 5. 필요한 GameplayTag를 LSGameplayTags에 추가한다.
 6. DataAsset을 만들고 AbilityClass, Skill_ID, CooldownTag, DamageEffectClass를 연결한다.
 7. 프리뷰가 필요하면 PreviewSpec 또는 DataTable Range 값을 설정한다.
-8. ULSPlayerSkillComponent의 SkillSlots에 DataAsset을 등록한다.
+8. 선택 가능한 스킬이면 캐릭터 `ULSSkillPoolDataAsset`(`SelectableSkills`)에 DataAsset을 등록한다. (로비에서 3칸 중 하나로 고르게 된다. `스킬 로드아웃` 참고.)
 9. UI 아이콘/이름/설명을 DataAsset에 설정한다.
 10. 서버 권한 판정, 쿨타임 차단, 상태 차단 로그를 확인한다.
 ```

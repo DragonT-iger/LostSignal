@@ -26,6 +26,9 @@ public:
 	// 무기/방어구 장착 5칸 (ELSEquipmentSlot 순서: Weapon/Processor/Core/Actuator/Frame). 로비 전용.
 	UPROPERTY() TArray<FLSSessionItem> EquipmentSlots;
 
+	// 스킬 선택 슬롯 3칸. 인덱스 = Skill1/Skill2/Skill3. 값은 액티브/궁극기 Skill_ID(0 = 빈 칸). 로비에서 선택.
+	UPROPERTY() TArray<int32> EquippedSkillIDs;
+
 	UPROPERTY() bool bRaidSaveActive = false;
 	UPROPERTY() TArray<FLSSessionItem> ActiveRaidLoadout;
 	UPROPERTY() TArray<FLSSessionItem> ActiveRaidConsumedItems;

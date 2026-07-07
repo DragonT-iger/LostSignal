@@ -9,6 +9,7 @@
 #include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/LSUILayer.h"
 #include "UI/Lobby/LSLobbyTabWidget.h"
+#include "UI/Skill/LSSkillLoadoutWidget.h"
 
 #define LOCTEXT_NAMESPACE "LSLoadoutPreparation"
 
@@ -39,6 +40,38 @@ ULSChipStationWidget* FindLoadoutChipStationWidget(UWidget* Widget)
 			if (ULSChipStationWidget* ChipStation = FindLoadoutChipStationWidget(Panel->GetChildAt(ChildIndex)))
 			{
 				return ChipStation;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+// 스위처 페이지 아래에서 스킬 로드아웃 위젯을 찾는다. UserWidget 내부 트리까지 재귀 탐색.
+ULSSkillLoadoutWidget* FindLoadoutSkillLoadoutWidget(UWidget* Widget)
+{
+	if (!Widget)
+	{
+		return nullptr;
+	}
+
+	if (ULSSkillLoadoutWidget* SkillLoadout = Cast<ULSSkillLoadoutWidget>(Widget))
+	{
+		return SkillLoadout;
+	}
+
+	if (const UUserWidget* UserWidget = Cast<UUserWidget>(Widget))
+	{
+		return UserWidget->WidgetTree ? FindLoadoutSkillLoadoutWidget(UserWidget->WidgetTree->RootWidget) : nullptr;
+	}
+
+	if (const UPanelWidget* Panel = Cast<UPanelWidget>(Widget))
+	{
+		for (int32 ChildIndex = 0; ChildIndex < Panel->GetChildrenCount(); ++ChildIndex)
+		{
+			if (ULSSkillLoadoutWidget* SkillLoadout = FindLoadoutSkillLoadoutWidget(Panel->GetChildAt(ChildIndex)))
+			{
+				return SkillLoadout;
 			}
 		}
 	}
@@ -191,14 +224,9 @@ void ULSLoadoutPreparationWidget::HandleStorageTabClicked()
 
 void ULSLoadoutPreparationWidget::HandleUpgradeTabClicked()
 {
-	// 안내창이 이미 떠 있으면 닫기만 한다(토글).
-	// 업그레이드(캐릭터/기지 강화)는 아직 안 만들어서 나중에 구현할 예정입니다. 그때까지 탭 목록을 유지한다.
-	if (HasActiveConfirmDialog())
-	{
-		CloseActiveConfirmDialog();
-		return;
-	}
-	ShowNotImplementedNotice();
+	// 전용 스킬 탭 버튼이 없어서, 업그레이드 버튼으로 스킬 로드아웃 페이지를 연다.
+	CloseActiveConfirmDialog();
+	ShowTab(ELSLoadoutTab::Skill);
 }
 
 void ULSLoadoutPreparationWidget::HandleChipTabClicked()
@@ -230,6 +258,18 @@ void ULSLoadoutPreparationWidget::ShowTab(const ELSLoadoutTab Tab) const
 		else
 		{
 			UE_LOG(LogLS, Warning, TEXT("[Loadout] Chip station widget not found under chip tab page on %s."), *GetNameSafe(this));
+		}
+	}
+	// 스킬 로드아웃 페이지도 열 때마다 최신 세이브 기준으로 리빌드한다.
+	else if (Tab == ELSLoadoutTab::Skill)
+	{
+		if (ULSSkillLoadoutWidget* SkillLoadout = FindLoadoutSkillLoadoutWidget(ContentSwitcher->GetActiveWidget()))
+		{
+			SkillLoadout->RefreshSkillLoadout();
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Loadout] Skill loadout widget not found under skill tab page on %s."), *GetNameSafe(this));
 		}
 	}
 }

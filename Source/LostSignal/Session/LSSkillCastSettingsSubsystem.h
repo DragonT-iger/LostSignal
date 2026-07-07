@@ -29,10 +29,4 @@ private:
 
 	UPROPERTY(config)
 	ELSSkillCastMode Skill3CastMode = ELSSkillCastMode::PreviewConfirm;
-
-	UPROPERTY(config)
-	ELSSkillCastMode Skill4CastMode = ELSSkillCastMode::PreviewConfirm;
-
-	UPROPERTY(config)
-	ELSSkillCastMode UltimateCastMode = ELSSkillCastMode::PreviewConfirm;
 };

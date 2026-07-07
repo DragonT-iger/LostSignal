@@ -13,6 +13,9 @@ DECLARE_MULTICAST_DELEGATE(FLSOnChipLoadoutChanged);
 // 무기/방어구 장착 슬롯이 바뀌면 발행된다. (장비 전투 스탯 재적용에 사용)
 DECLARE_MULTICAST_DELEGATE(FLSOnEquipmentChanged);
 
+// 스킬 선택 슬롯이 바뀌면 발행된다. (로비 스킬 UI 갱신에 사용)
+DECLARE_MULTICAST_DELEGATE(FLSOnSkillLoadoutChanged);
+
 UCLASS()
 class LOSTSIGNAL_API ULSSaveSubsystem : public UGameInstanceSubsystem
 {
@@ -26,6 +29,9 @@ public:
 
 	// 무기/방어구 장착 변경 알림. ULSEquipmentStatComponent가 구독한다.
 	FLSOnEquipmentChanged OnEquipmentChanged;
+
+	// 스킬 선택 슬롯 변경 알림. 로비 스킬 로드아웃 UI가 구독한다.
+	FLSOnSkillLoadoutChanged OnSkillLoadoutChanged;
 
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void AddToInventory(const TArray<FLSSessionItem>& Items);
@@ -78,6 +84,19 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	const TArray<FLSSessionItem>& GetEquipmentSlots() const;
 
+	// 스킬 선택 슬롯 3칸(인덱스 = Skill1/2/3, 값 = Skill_ID, 0 = 빈 칸).
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	const TArray<int32>& GetEquippedSkillIDs() const;
+
+	// SlotIndex 칸에 SkillID를 장착한다. 같은 SkillID가 다른 칸에 이미 있으면 그 칸을 비워 중복을 막는다(이동).
+	// 범위 밖이거나 실패하면 false. 성공 시 저장 후 OnSkillLoadoutChanged 발행.
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	bool SetEquippedSkillSlot(int32 SlotIndex, int32 SkillID);
+
+	// SlotIndex 칸을 비운다. 성공 시 저장 후 OnSkillLoadoutChanged 발행.
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	bool ClearEquippedSkillSlot(int32 SlotIndex);
+
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	int32 GetMaxInventorySlotCount() const;
 
@@ -127,6 +146,7 @@ private:
 	void MigrateInventory();
 	void EnsureChipEquipmentSlots();
 	void EnsureEquipmentSlots();
+	void EnsureEquippedSkillSlots();
 	void ApplyStarterItems();
 	void ApplyConfiguredStarterItems();
 	void ApplyLowestGradeChipStarterItems();

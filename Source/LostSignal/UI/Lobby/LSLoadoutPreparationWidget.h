@@ -8,14 +8,15 @@ class UWidgetSwitcher;
 class ULSConfirmDialogWidget;
 class ULSLobbyTabWidget;
 
-// 개인정비 내부 탭/페이지 종류. ContentSwitcher 인덱스와 순서를 맞춘다(Chip=0, Storage=1, Supply=2, Upgrade=3).
+// 개인정비 내부 탭/페이지 종류. ContentSwitcher 인덱스와 순서를 맞춘다(Chip=0, Storage=1, Supply=2, Upgrade=3, Skill=4).
 UENUM(BlueprintType)
 enum class ELSLoadoutTab : uint8
 {
 	Chip,     // 칩 강화/합성/장착 (칩 스테이션)
 	Storage,  // 물품창고 (인벤토리 창고)
 	Supply,   // 에이베리 보급소 (상점/제작) — 아직 안 만들어서 나중에 구현할 예정입니다
-	Upgrade   // 업그레이드 (캐릭터/기지 강화) — 아직 안 만들어서 나중에 구현할 예정입니다
+	Upgrade,  // 업그레이드 (캐릭터/기지 강화) — 아직 안 만들어서 나중에 구현할 예정입니다
+	Skill     // 스킬 로드아웃 (액티브/궁극기 3칸 선택). ContentSwitcher 마지막(인덱스 4)에 배치.
 };
 
 // 개인정비 화면(WBP_LoadoutPreparation)의 부모 클래스. 로비 개인정비 페이지 안에 배치되며, 내부 탭 4개
@@ -65,7 +66,7 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")
 	TObjectPtr<ULSLobbyTabWidget> SupplyTab;
 
-	// 업그레이드(캐릭터/기지 강화) 탭. 콘텐츠 미구현이라 클릭 시 미구현 안내창만 띄운다.
+	// 업그레이드(캐릭터/기지 강화) 탭. 전용 스킬 탭 버튼이 없어서, 이 버튼으로 스킬 로드아웃 페이지(Skill)를 연다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")
 	TObjectPtr<ULSLobbyTabWidget> UpgradeTab;
 

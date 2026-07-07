@@ -35,16 +35,6 @@ void ULSSkillBarWidget::InitializeSkillBar(ULSPlayerSkillComponent* InSkillCompo
 		Skill3Slot->InitializeSlot(SkillComponent, ELSPlayerSkillSlot::Skill3);
 	}
 
-	if (Skill4Slot)
-	{
-		Skill4Slot->InitializeSlot(SkillComponent, ELSPlayerSkillSlot::Skill4);
-	}
-
-	if (UltimateSlot)
-	{
-		UltimateSlot->InitializeSlot(SkillComponent, ELSPlayerSkillSlot::Ultimate);
-	}
-
 	/*if (DashSlot)
 	{
 		DashSlot->InitializeSlot(SkillComponent, ELSPlayerSkillSlot::Dash);
@@ -59,8 +49,6 @@ void ULSSkillBarWidget::SetPreviewBattleProtocolLevels(const int32 CurrentBattle
 	if (Skill1Slot) { Skill1Slot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
 	if (Skill2Slot) { Skill2Slot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
 	if (Skill3Slot) { Skill3Slot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
-	if (Skill4Slot) { Skill4Slot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
-	if (UltimateSlot) { UltimateSlot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
 	//if (DashSlot) { DashSlot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
 	RefreshProtocolVisibility();
 }
@@ -73,8 +61,6 @@ void ULSSkillBarWidget::ClearPreviewBattleProtocolLevels()
 	if (Skill1Slot) { Skill1Slot->ClearPreviewBattleProtocolLevels(); }
 	if (Skill2Slot) { Skill2Slot->ClearPreviewBattleProtocolLevels(); }
 	if (Skill3Slot) { Skill3Slot->ClearPreviewBattleProtocolLevels(); }
-	if (Skill4Slot) { Skill4Slot->ClearPreviewBattleProtocolLevels(); }
-	if (UltimateSlot) { UltimateSlot->ClearPreviewBattleProtocolLevels(); }
 	//if (DashSlot) { DashSlot->ClearPreviewBattleProtocolLevels(); }
 	RefreshProtocolVisibility();
 }
@@ -84,15 +70,13 @@ void ULSSkillBarWidget::NativeConstruct()
 	Super::NativeConstruct();
 	RefreshProtocolVisibility();
 
-	if (!Skill1Slot || !Skill2Slot || !Skill3Slot || !Skill4Slot || !UltimateSlot /*|| !DashSlot*/)
+	if (!Skill1Slot || !Skill2Slot || !Skill3Slot /*|| !DashSlot*/)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s is missing required skill bar slot binding. Skill1=%s Skill2=%s Skill3=%s Skill4=%s Ultimate=%s"),
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required skill bar slot binding. Skill1=%s Skill2=%s Skill3=%s"),
 			*GetNameSafe(this),
 			*GetNameSafe(Skill1Slot),
 			*GetNameSafe(Skill2Slot),
-			*GetNameSafe(Skill3Slot),
-			*GetNameSafe(Skill4Slot),
-			*GetNameSafe(UltimateSlot));
+			*GetNameSafe(Skill3Slot));
 			//*GetNameSafe(DashSlot));
 	}
 }
