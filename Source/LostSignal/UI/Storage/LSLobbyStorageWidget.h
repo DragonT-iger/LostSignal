@@ -1,8 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "Session/LSSessionSubsystem.h"
+#include "UI/Common/LSLayoutRevealWidget.h"
 #include "LSLobbyStorageWidget.generated.h"
 
 class ALSWorldDroppedItem;
@@ -26,7 +26,7 @@ enum class ELSStorageFilter : uint8
 };
 
 UCLASS(BlueprintType, Blueprintable)
-class LOSTSIGNAL_API ULSLobbyStorageWidget : public UUserWidget
+class LOSTSIGNAL_API ULSLobbyStorageWidget : public ULSLayoutRevealWidget
 {
 	GENERATED_BODY()
 

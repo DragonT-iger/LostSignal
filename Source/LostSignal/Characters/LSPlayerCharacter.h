@@ -349,6 +349,8 @@ private:
 	void UpdateRunStamina(float DeltaSeconds);
 	void UpdateStaminaRecovery(float DeltaSeconds);
 	void UpdateHealthRecovery(float DeltaSeconds);
+	void RefreshMaxWalkSpeed();
+	void HandleMoveSpeedChanged(const struct FOnAttributeChangeData& ChangeData);
 	void UpdateClimbCeiling();
 	bool HasStamina(float RequiredAmount) const;
 	bool TrySpendStamina(float Amount);

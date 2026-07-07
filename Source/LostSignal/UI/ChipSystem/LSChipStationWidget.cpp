@@ -968,8 +968,14 @@ void ULSChipStationWidget::PresentCapacityBlockedDialog(const FText& Message)
 	// 정보 알림이라 확인/취소/ESC 어느 쪽이든 그냥 닫힌다.
 	Dialog->OnConfirmed.AddDynamic(this, &ULSChipStationWidget::HandleCapacityDialogClosed);
 	Dialog->OnCancelled.AddDynamic(this, &ULSChipStationWidget::HandleCapacityDialogClosed);
+
 	Dialog->AddToViewport(LSUILayer::ModalPanelDialog);
 	ActiveConfirmDialog = Dialog;
+}
+
+bool ULSChipStationWidget::HasActiveConfirmDialog() const
+{
+	return ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport();
 }
 
 void ULSChipStationWidget::HandleCapacityDialogClosed()

@@ -257,13 +257,18 @@ void ULSLobbyMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	// SetFocusToGameViewport 등 포커스가 뷰포트로 새는 경로가 여럿이라 매 틱 회수한다.
 	// 계약: 로비에서 메뉴 트리 밖에 뜨는 포커스 위젯은 ActiveSettingsWidget/ActiveConfirmDialog로
 	// 추적한다 — 새 외부 모달을 추가하면 이 가드에 합류시켜야 포커스를 뺏지 않는다.
-	const bool bExternalFocusWidgetOpen =
-		(ActiveSettingsWidget && ActiveSettingsWidget->IsInViewport()) ||
-		(ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport()) ||
-		(WBP_LoadoutPreparation && WBP_LoadoutPreparation->HasActiveConfirmDialog());
-	if (!bExternalFocusWidgetOpen && !HasKeyboardFocus() && !HasFocusedDescendants())
+	// (포커스를 이미 쥐고 있으면 회수 자체가 불필요하니, 외부 모달 판정보다 포커스 보유를 먼저 본다 —
+	//  LoadoutPreparation::HasActiveConfirmDialog가 매 틱 위젯 트리를 훑지 않게 하는 최적화.)
+	if (!HasKeyboardFocus() && !HasFocusedDescendants())
 	{
-		SetKeyboardFocus();
+		const bool bExternalFocusWidgetOpen =
+			(ActiveSettingsWidget && ActiveSettingsWidget->IsInViewport()) ||
+			(ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport()) ||
+			(WBP_LoadoutPreparation && WBP_LoadoutPreparation->HasActiveConfirmDialog());
+		if (!bExternalFocusWidgetOpen)
+		{
+			SetKeyboardFocus();
+		}
 	}
 }
 

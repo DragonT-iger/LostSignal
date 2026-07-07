@@ -32,6 +32,7 @@ void ULSConfirmDialogWidget::NativeConstruct()
 	}
 
 	// ESC를 받을 수 있도록, 그리고 뒤의 화면이 ESC를 가로채지 않도록 키보드 포커스를 가져온다.
+	// 첫 프레임 레이아웃 튐 숨김은 부모(ULSLayoutRevealWidget)가 처리한다.
 	SetIsFocusable(true);
 	SetKeyboardFocus();
 }

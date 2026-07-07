@@ -23,4 +23,7 @@ void ULSLocomotionAnimInstance::UpdateLocomotionData()
 
 	Speed = CurrentVelocity.Size();
 	Direction = UKismetAnimationLibrary::CalculateDirection(CurrentVelocity, PawnOwner->GetActorRotation());
+
+	// 이동속도 배수(베이스에서 갱신)로 정규화한 기준 속력. BlendSpace X축에 이 값을 넣고 Play Rate엔 배수를 넣는다.
+	GaitSpeed = MoveSpeedMultiplier > 0.0f ? Speed / MoveSpeedMultiplier : Speed;
 }

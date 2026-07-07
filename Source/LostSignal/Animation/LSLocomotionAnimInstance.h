@@ -19,9 +19,14 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="LS/Animation|Locomotion")
 	FVector CurrentVelocity = FVector::ZeroVector;
 
-	// 속도 크기(BlendSpace 이동 속도용)
+	// 속도 크기(실제 이동 속력)
 	UPROPERTY(BlueprintReadOnly, Category="LS/Animation|Locomotion")
 	float Speed = 0.0f;
+
+	// BlendSpace 이동 속도 축에 넣을 기준(정규) 속력 = Speed ÷ MoveSpeedMultiplier.
+	// 이동속도 배수가 올라도 걷기/뛰기 샘플 범위를 유지해, 재생속도 배수와 함께 발 미끄러짐을 막는다.
+	UPROPERTY(BlueprintReadOnly, Category="LS/Animation|Locomotion")
+	float GaitSpeed = 0.0f;
 
 	// 폰 정면 기준 이동 방향 각도(-180~180, CalculateDirection 결과)
 	UPROPERTY(BlueprintReadOnly, Category="LS/Animation|Locomotion")

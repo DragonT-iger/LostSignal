@@ -1,8 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "Data/LSProtocolTypes.h"
+#include "UI/Common/LSLayoutRevealWidget.h"
 #include "LSChipStationWidget.generated.h"
 
 enum class ELSInventorySlotArea : uint8;
@@ -37,7 +37,7 @@ struct FLSChipOriginRecord
 };
 
 UCLASS(BlueprintType, Blueprintable)
-class LOSTSIGNAL_API ULSChipStationWidget : public UUserWidget
+class LOSTSIGNAL_API ULSChipStationWidget : public ULSLayoutRevealWidget
 {
 	GENERATED_BODY()
 
@@ -66,6 +66,11 @@ public:
 	bool QuickEquipChipToFirstEmptyHardwareSlot(ELSInventorySlotArea SourceArea, int32 SourceSlotIndex);
 	// Shift+좌클릭 빠른 조작: 장착된 칩을 해제한다(출처 기억에 따라 인벤토리 복귀 우선, 자리 없으면 창고 폴백).
 	bool QuickUnequipEquippedChipToWarehouse(int32 EquipmentSlotIndex);
+
+	// 이 스테이션이 띄운 용량 차단 알림 다이얼로그가 화면에 떠 있는지. 로비 메뉴(ULSLobbyMenuWidget)의 매 틱
+	// 포커스 회수 가드가 외부 모달을 예외로 둘 때 참조한다 — 보고하지 않으면 다이얼로그가 매 틱 포커스를 뺏겨
+	// 확인 버튼 첫 클릭이 씹힌다(개인정비 → LoadoutPreparation::HasActiveConfirmDialog 경유로 합류).
+	bool HasActiveConfirmDialog() const;
 
 protected:
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
@@ -96,8 +101,8 @@ protected:
 	void MoveChipOriginRecord(int32 FromEquipmentSlotIndex, int32 ToEquipmentSlotIndex);
 	// 적재 용량 부족으로 해제가 차단됐을 때 공용 확인 다이얼로그(WBP_ConfirmDialog)를 코드로 띄운다.
 	// 확인/취소/ESC 어느 쪽이든 그냥 닫힌다(정보 알림 용도). 타이틀/세팅의 알림 팝업과 동일 패턴.
-	// 더블클릭·드래그드롭 제스처의 끝에서 호출되면 그 제스처의 마우스 Down이 이미 소비돼
-	// 다이얼로그 첫 클릭이 씹힌다. 다음 프레임에 실제 생성(PresentCapacityBlockedDialog)을 미뤄 한 번에 닫히게 한다.
+	// 더블클릭·Shift·드래그드롭 제스처의 끝에서 호출되면 그 제스처의 마우스 Down이 이미 소비돼
+	// 다이얼로그 첫 클릭이 씹힌다. 다음 프레임에 실제 생성(PresentCapacityBlockedDialog)을 미룬다.
 	void ShowCapacityBlockedDialog(const FText& Message);
 	// ShowCapacityBlockedDialog가 다음 틱에 호출하는 실제 다이얼로그 생성부.
 	void PresentCapacityBlockedDialog(const FText& Message);

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "UI/Common/LSLayoutRevealWidget.h"
 #include "LSConfirmDialogWidget.generated.h"
 
 class UButton;
@@ -13,7 +13,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FLSConfirmDialogCancelled);
 // 공용 확인 다이얼로그. 메시지와 확인/취소 버튼을 두고, 클릭 시 결과를 브로드캐스트한 뒤 스스로 닫힌다.
 // WBP_ConfirmDialog의 부모 클래스로 사용한다.
 UCLASS(BlueprintType, Blueprintable)
-class LOSTSIGNAL_API ULSConfirmDialogWidget : public UUserWidget
+class LOSTSIGNAL_API ULSConfirmDialogWidget : public ULSLayoutRevealWidget
 {
 	GENERATED_BODY()
 

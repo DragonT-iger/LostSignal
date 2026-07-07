@@ -1,8 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "Session/LSSessionSubsystem.h"
+#include "UI/Common/LSLayoutRevealWidget.h"
 #include "LSInventoryWidget.generated.h"
 
 class ALSWorldDroppedItem;
@@ -15,7 +15,7 @@ class ULSItemSlotWidget;
 class ULSLootDropWidget;
 
 UCLASS(BlueprintType, Blueprintable)
-class LOSTSIGNAL_API ULSInventoryWidget : public UUserWidget
+class LOSTSIGNAL_API ULSInventoryWidget : public ULSLayoutRevealWidget
 {
 	GENERATED_BODY()
 

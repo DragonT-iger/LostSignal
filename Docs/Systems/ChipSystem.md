@@ -100,13 +100,13 @@
 | Chip_Defense | Defence | Character | 평탄 가산 | ✅ 연동 |
 | Chip_Recovery | Recovery | Character | 평탄 가산 | ✅ 연동(초당 체력 회복 소비) |
 | Chip_Attack_Speed | AttackSpeed | Character | 퍼센트 ÷100 가산 | ✅ 연동(기본공격 재생속도 소비) |
-| Chip_Move_Speed | MoveSpeed | Character | 퍼센트 ÷100 가산 | ✅ 연동(어트리뷰트만, 이동속도 소비 미연결) |
+| Chip_Move_Speed | MoveSpeed | Character | 퍼센트 ÷100 가산 | ✅ 연동(이동속도+애님 재생속도 소비) |
 | Chip_Critical_Damage | CritDamage | Character | 퍼센트 ÷100 가산 | ✅ 연동(데미지 계산 소비) |
 | Chip_Critical_Rate | CritChance | Character | 퍼센트 ÷100 가산 | ✅ 연동(데미지 계산 소비) |
 | Chip_Defense_Penetration | ArmorPenetration | Character | 퍼센트 ÷100 가산 | ✅ 연동(데미지 계산 소비) |
 | Chip_Skill_Haste | CooldownReduction | Character | 퍼센트 ÷100 가산 | ✅ 연동(스킬 쿨다운 소비) |
 
-> Attack / CritDamage / CritChance / Defence / ArmorPenetration은 `LSDamageExecutionCalculation`이 데미지 계산에 소비한다. CooldownReduction은 `LSPlayerSkillComponent`가 스킬 쿨다운에, AttackSpeed는 `LSGA_PlayerBasicAttack`이 콤보 몽타주 재생속도에, Recovery는 `ALSPlayerCharacter::UpdateHealthRecovery`가 초당 체력 회복에 소비한다. MoveSpeed만 아직 어트리뷰트 값 반영까지만 되어 있고 실제 플레이어 이동속도(`MaxWalkSpeed`) 소비가 미연결이다.
+> Attack / CritDamage / CritChance / Defence / ArmorPenetration은 `LSDamageExecutionCalculation`이 데미지 계산에 소비한다. CooldownReduction은 `LSPlayerSkillComponent`가 스킬 쿨다운에, AttackSpeed는 `LSGA_PlayerBasicAttack`이 콤보 몽타주 재생속도에, Recovery는 `ALSPlayerCharacter::UpdateHealthRecovery`가 초당 체력 회복에 소비한다. MoveSpeed는 `ALSPlayerCharacter::RefreshMaxWalkSpeed`가 `MaxWalkSpeed`(걷기/뛰기 × 배수)에 반영하고, 발 미끄러짐 방지를 위해 로코모션 AnimBP가 `ULSAnimInstanceBase::MoveSpeedMultiplier`를 BlendSpace 재생속도(Play Rate)에, `GaitSpeed`(=Speed÷배수)를 속도 축에 연결한다.
 
 ### ❌ 미구현
 
@@ -114,12 +114,10 @@
 |---|---|
 | [2] | 칩 장착/이동 가능한 전용 인벤토리 UI / 칩 오버랩(정보) UI |
 | [3] | 하드웨어 UI — 메모리 초과 검증 |
-| 로직 | 방어 관통(ArmorPenetration), 스킬 가속(CooldownReduction) 칩 스탯 연동 (보류) |
-| 로직 | Recovery / MoveSpeed / AttackSpeed 어트리뷰트의 실제 게임플레이 소비 연결 |
 | [4] | 소프트웨어 UI — 코어 출력 게이지바, 신호 유실 표시, 프로토콜 오버랩 UI |
 | [4] 로직 | 프로토콜 합산값 이후 레벨/단계 산식 확정, 전투지역 편의 UI 활성화 연동 |
 
-**한 줄 요약**: 데이터 레이어와 보관/툴팁/칩 스테이션 목록, 칩 장착/이동/교환, 신호 게이지 기반 장착 칩 비활성화, 장착 칩 스탯·프로토콜 합산 표시와 `DT_Protocol` 기반 단계 표시가 구현되어 있다. 칩 전투 스탯 10종 중 8종을 캐릭터 GAS 어트리뷰트에 적용(활성 100% + 비활성 50%)하며, 방어 관통·스킬 가속 2종과 메모리 검증은 아직 미연동이다.
+**한 줄 요약**: 데이터 레이어와 보관/툴팁/칩 스테이션 목록, 칩 장착/이동/교환, 신호 게이지 기반 장착 칩 비활성화, 장착 칩 스탯·프로토콜 합산 표시와 `DT_Protocol` 기반 단계 표시가 구현되어 있다. 칩 전투 스탯 10종을 모두 캐릭터 GAS 어트리뷰트에 적용(활성 100% + 비활성 50%)하고, 10종 전부 실제 게임플레이(데미지·쿨다운·공격속도·체력 회복·이동속도)에 소비된다. 이동속도는 애니메이션 재생속도까지 동기화해 발 미끄러짐을 막는다(BlendSpace Play Rate·속도 축 연결은 아트 담당). 메모리 초과 검증은 아직 미구현이다.
 
 ---
 

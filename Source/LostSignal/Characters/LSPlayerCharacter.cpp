@@ -105,6 +105,14 @@ void ALSPlayerCharacter::BeginPlay()
 	{
 		EquipmentStatComponent->RefreshEquipmentStats(/*bRestoreFullHealth=*/true);
 	}
+
+	// MoveSpeed 어트리뷰트 변화(칩·장비·신호 게이지)를 구독해 이동속도를 재계산하고, 현재 값으로 최초 반영한다.
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+	{
+		ASC->GetGameplayAttributeValueChangeDelegate(ULSCharacterAttributeSet::GetMoveSpeedAttribute())
+			.AddUObject(this, &ALSPlayerCharacter::HandleMoveSpeedChanged);
+	}
+	RefreshMaxWalkSpeed();
 }
 
 void ALSPlayerCharacter::OnDeathStateChanged(bool bIsDead)
@@ -1051,10 +1059,26 @@ void ALSPlayerCharacter::ApplyRunState(bool bNewIsRunning)
 
 	bIsRunning = bNewIsRunning;
 
-	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	RefreshMaxWalkSpeed();
+}
+
+void ALSPlayerCharacter::RefreshMaxWalkSpeed()
+{
+	UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
+	if (!MovementComponent)
 	{
-		MovementComponent->MaxWalkSpeed = bIsRunning ? RunSpeed : WalkSpeed;
+		return;
 	}
+
+	// MoveSpeed 어트리뷰트 = 이동속도 배수(기본 1.0, 칩/장비로 가산). 0 이하 방지로 하한 클램프.
+	const float Multiplier = PlayerAttributeSet ? FMath::Max(0.01f, PlayerAttributeSet->GetMoveSpeed()) : 1.0f;
+	MovementComponent->MaxWalkSpeed = (bIsRunning ? RunSpeed : WalkSpeed) * Multiplier;
+}
+
+void ALSPlayerCharacter::HandleMoveSpeedChanged(const FOnAttributeChangeData& ChangeData)
+{
+	// 칩 장착·신호 게이지 변화 등으로 MoveSpeed 어트리뷰트가 바뀌면 이동속도를 즉시 재계산한다.
+	RefreshMaxWalkSpeed();
 }
 
 bool ALSPlayerCharacter::CanStartRunning() const

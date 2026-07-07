@@ -143,7 +143,23 @@ bool ULSLoadoutPreparationWidget::IsContentOpen() const
 
 bool ULSLoadoutPreparationWidget::HasActiveConfirmDialog() const
 {
-	return ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport();
+	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
+	{
+		return true;
+	}
+
+	// 개인정비 콘텐츠에 중첩된 칩 스테이션도 자체 확인 다이얼로그를 띄운다. 그 다이얼로그가 떠 있으면
+	// 로비 메뉴(ULSLobbyMenuWidget)의 매 틱 포커스 회수 가드가 예외로 두도록 여기서 함께 보고한다.
+	// (보고하지 않으면 다이얼로그가 매 틱 포커스를 뺏겨 확인 버튼 첫 클릭이 씹힌다.)
+	if (ContentSwitcher)
+	{
+		if (const ULSChipStationWidget* ChipStation = FindLoadoutChipStationWidget(ContentSwitcher->GetActiveWidget()))
+		{
+			return ChipStation->HasActiveConfirmDialog();
+		}
+	}
+
+	return false;
 }
 
 void ULSLoadoutPreparationWidget::CloseActiveConfirmDialog()

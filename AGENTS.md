@@ -85,6 +85,7 @@
 | [Docs/Troubleshooting/UIDragDropPackagedBuild.md](Docs/Troubleshooting/UIDragDropPackagedBuild.md) | 패키지 빌드에서 UMG 드래그앤드롭 입력이 죽는 문제(DefaultDragVisual=this) 원인·진단·수정 |
 | [Docs/Troubleshooting/UIEquipDropWidgetSwitcher.md](Docs/Troubleshooting/UIEquipDropWidgetSwitcher.md) | 위젯 스위쳐에서 장착(드롭)이 간헐 실패하는 문제 — 드롭 라우팅 원인 분석·진단 로그 계획(조사 중) |
 | [Docs/Troubleshooting/UIDoubleClickDragRace.md](Docs/Troubleshooting/UIDoubleClickDragRace.md) | 더블클릭 빠른이동과 무장된 드래그 감지가 한 제스처 안에서 경쟁해 슬롯 구조가 꼬이는 문제 원인·수정(캡처 해제+억제 플래그) |
+| [Docs/Troubleshooting/UILobbyModalFocusReclaim.md](Docs/Troubleshooting/UILobbyModalFocusReclaim.md) | 로비 매 틱 포커스 회수가 외부 모달(칩 스테이션 다이얼로그 등) 첫 클릭을 먹는 문제 — 예외 가드 합류 누락 원인·수정 |
 
 ### 미니게임 (RatSteal — 몰래몰래팜)
 
