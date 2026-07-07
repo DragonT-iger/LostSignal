@@ -16,6 +16,7 @@ class UProgressBar;
 class UTextBlock;
 class ULSChipStatWidget;
 class ULSChipEquipmentSlotWidget;
+class ULSConfirmDialogWidget;
 class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
 class ULSMinimapWidget;
@@ -58,12 +59,6 @@ public:
 	// Shift+좌클릭 빠른 조작: 장착된 칩을 창고로 해제한다.
 	bool QuickUnequipEquippedChipToWarehouse(int32 EquipmentSlotIndex);
 
-	// 적재(Carrying) 용량 부족으로 칩 해제가 차단됐을 때 호출된다(드래그/Shift 해제 공용).
-	// C++가 언제·무슨 메시지로 부를지 소유하고, WBP가 팝업/토스트 연출로 Message를 표시한다(연출은 아트).
-	// 구현하지 않아도 크래시 없음 — 해제 차단 자체는 C++에서 이미 이뤄진다.
-	UFUNCTION(BlueprintImplementableEvent, Category="LS/UI|Chip")
-	void OnUnequipBlockedByCapacity(const FText& Message);
-
 protected:
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
@@ -79,6 +74,11 @@ protected:
 	void QueueRefreshEquippedChipState();
 	// 장착 칩을 창고로 해제하고, 칩 리스트는 재정렬 없이 돌아온 칩을 빈 칸(없으면 맨 뒤)에 꽂는다. 드래그/Shift 해제 공용.
 	bool UnequipChipFromSlotToWarehouse(int32 EquipmentSlotIndex);
+	// 적재 용량 부족으로 해제가 차단됐을 때 공용 확인 다이얼로그(WBP_ConfirmDialog)를 코드로 띄운다.
+	// 확인/취소/ESC 어느 쪽이든 그냥 닫힌다(정보 알림 용도). 타이틀/세팅의 알림 팝업과 동일 패턴.
+	void ShowCapacityBlockedDialog(const FText& Message);
+	UFUNCTION()
+	void HandleCapacityDialogClosed();
 	// 칩 한 개를 칩 리스트의 첫 빈 슬롯(hole)에 넣거나, 없으면 맨 뒤에 새 슬롯으로 추가한다(정렬/리빌드 없음).
 	void InsertChipListSlot(const FLSSessionItem& Chip, ELSInventorySlotArea SourceArea, int32 SourceSlotIndex);
 	void HandleCarryingSlotCapacityChanged();
@@ -212,7 +212,15 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
 	TObjectPtr<ULSChipEquipmentSlotWidget> EquipmentSlot_9;
 
+	// 용량 부족 알림에 쓸 공용 확인 다이얼로그 클래스. WBP_ChipStation 기본값에서 WBP_ConfirmDialog로 매핑한다(에셋 매핑).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip")
+	TSubclassOf<ULSConfirmDialogWidget> ConfirmDialogClass;
+
 private:
 	// QueueRefreshEquippedChipState가 같은 틱에 여러 번 예약되지 않도록 막는 코얼레스 가드.
 	bool bPendingEquippedStateRefresh = false;
+
+	// 현재 떠 있는 알림 다이얼로그. 중복 생성 방지 + 스테이션 닫힐 때 정리에 쓴다.
+	UPROPERTY(Transient)
+	TObjectPtr<ULSConfirmDialogWidget> ActiveConfirmDialog;
 };

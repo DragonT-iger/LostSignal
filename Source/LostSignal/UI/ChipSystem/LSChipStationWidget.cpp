@@ -19,7 +19,9 @@
 #include "TimerManager.h"
 #include "UI/ChipSystem/LSChipEquipmentSlotWidget.h"
 #include "UI/ChipSystem/LSChipStatWidget.h"
+#include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
+#include "UI/LSUILayer.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
 #include "UI/Inventory/LSSlotWidgetSync.h"
 #include "UI/Minimap/LSMinimapWidget.h"
@@ -301,6 +303,13 @@ void ULSChipStationWidget::NativeDestruct()
 	{
 		SignalSlider->OnValueChanged.RemoveDynamic(this, &ULSChipStationWidget::HandleSignalSliderValueChanged);
 	}
+
+	// 스테이션이 강제로 닫힐 때(범위 이탈 등) 떠 있던 용량 알림 다이얼로그가 뷰포트에 남지 않게 정리한다.
+	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
+	{
+		ActiveConfirmDialog->Cancel();
+	}
+	ActiveConfirmDialog = nullptr;
 
 	Super::NativeDestruct();
 }
@@ -738,7 +747,7 @@ bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentS
 		UE_LOG(LogLS, Warning, TEXT("Cannot unequip chip at slot %d because reduced carrying capacity would drop inventory items on %s."),
 			EquipmentSlotIndex,
 			*GetNameSafe(this));
-		OnUnequipBlockedByCapacity(NSLOCTEXT("LSChipStation", "UnequipBlockedByCapacity",
+		ShowCapacityBlockedDialog(NSLOCTEXT("LSChipStation", "UnequipBlockedByCapacity",
 			"인벤토리 용량이 부족합니다. 이 칩을 해제하면 아이템이 버려지므로, 먼저 인벤토리를 정리하세요."));
 		return false;
 	}
@@ -768,6 +777,44 @@ bool ULSChipStationWidget::UnequipChipFromSlotToWarehouse(const int32 EquipmentS
 	}
 
 	return true;
+}
+
+void ULSChipStationWidget::ShowCapacityBlockedDialog(const FText& Message)
+{
+	// 이미 알림이 떠 있으면 중복 생성하지 않는다. (타이틀/세팅의 확인 다이얼로그와 동일 패턴)
+	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
+	{
+		return;
+	}
+
+	if (!ConfirmDialogClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Chip] ConfirmDialogClass is not set on %s. Check WBP_ChipStation."), *GetNameSafe(this));
+		return;
+	}
+
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	ULSConfirmDialogWidget* Dialog = OwningPlayer
+		? CreateWidget<ULSConfirmDialogWidget>(OwningPlayer, ConfirmDialogClass)
+		: CreateWidget<ULSConfirmDialogWidget>(this, ConfirmDialogClass);
+	if (!Dialog)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Chip] Failed to create capacity block dialog on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	Dialog->SetMessage(Message);
+	// 정보 알림이라 확인/취소/ESC 어느 쪽이든 그냥 닫힌다.
+	Dialog->OnConfirmed.AddDynamic(this, &ULSChipStationWidget::HandleCapacityDialogClosed);
+	Dialog->OnCancelled.AddDynamic(this, &ULSChipStationWidget::HandleCapacityDialogClosed);
+	Dialog->AddToViewport(LSUILayer::ModalPanelDialog);
+	ActiveConfirmDialog = Dialog;
+}
+
+void ULSChipStationWidget::HandleCapacityDialogClosed()
+{
+	// 다이얼로그는 스스로 뷰포트에서 제거되므로 참조만 비운다.
+	ActiveConfirmDialog = nullptr;
 }
 
 void ULSChipStationWidget::InsertChipListSlot(const FLSSessionItem& Chip, const ELSInventorySlotArea SourceArea, const int32 SourceSlotIndex)
