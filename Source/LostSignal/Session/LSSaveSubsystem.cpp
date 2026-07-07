@@ -1095,20 +1095,17 @@ int32 ULSSaveSubsystem::ComputeCarryingProtocolSlotBonus(const TArray<FLSSession
 		TEXT("SaveCarryingSlotBonus"));
 }
 
-bool ULSSaveSubsystem::WouldUnequipChipDropInventoryItems(const int32 EquipmentIndex) const
+bool ULSSaveSubsystem::WouldChipEquipmentDropInventoryItems(const TArray<FLSSessionItem>& HypotheticalSlots) const
 {
-	if (!SaveData || !SaveData->ChipEquipmentSlots.IsValidIndex(EquipmentIndex))
+	if (!SaveData)
 	{
 		return false;
 	}
 
-	// 해제 대상 칸을 비운 가정 배열로 "해제 후 예상 최대 인벤토리 슬롯 수"를 구한다.
-	// 이 값은 실제 해제 후 GetMaxInventorySlotCount()와 동일하므로, 초과 드롭 여부를 정확히 예측한다.
-	TArray<FLSSessionItem> HypotheticalSlots = SaveData->ChipEquipmentSlots;
-	HypotheticalSlots[EquipmentIndex] = LSInventorySlotUtils::MakeEmptyItem();
+	// 가정 장착 배열 기준 "예상 최대 인벤토리 슬롯 수". 실제 반영 후 GetMaxInventorySlotCount()와 동일하므로 초과 드롭 여부를 정확히 예측한다.
 	const int32 PredictedMaxInventorySlotCount = SaveDefaultMaxInventorySlotCount + ComputeCarryingProtocolSlotBonus(HypotheticalSlots, TEXT("Inventory"));
 
-	// 예상 최대 슬롯 수 이상 인덱스에 채워진 인벤토리 칸이 하나라도 있으면, 해제 시 그 아이템들이 월드로 드롭된다.
+	// 예상 최대 슬롯 수 이상 인덱스에 채워진 인벤토리 칸이 하나라도 있으면, 반영 시 그 아이템들이 월드로 드롭된다.
 	for (int32 SlotIndex = FMath::Max(0, PredictedMaxInventorySlotCount); SlotIndex < SaveData->Inventory.Num(); ++SlotIndex)
 	{
 		if (LSInventorySlotUtils::IsFilled(SaveData->Inventory[SlotIndex]))
@@ -1117,6 +1114,38 @@ bool ULSSaveSubsystem::WouldUnequipChipDropInventoryItems(const int32 EquipmentI
 		}
 	}
 	return false;
+}
+
+bool ULSSaveSubsystem::WouldUnequipChipDropInventoryItems(const int32 EquipmentIndex) const
+{
+	if (!SaveData || !SaveData->ChipEquipmentSlots.IsValidIndex(EquipmentIndex))
+	{
+		return false;
+	}
+
+	// 해제 대상 칸을 비운 가정 배열로 판정한다.
+	TArray<FLSSessionItem> HypotheticalSlots = SaveData->ChipEquipmentSlots;
+	HypotheticalSlots[EquipmentIndex] = LSInventorySlotUtils::MakeEmptyItem();
+	return WouldChipEquipmentDropInventoryItems(HypotheticalSlots);
+}
+
+bool ULSSaveSubsystem::WouldSwapChipDropInventoryItems(const ELSInventorySlotArea SourceArea, const int32 SourceIndex, const int32 EquipmentIndex) const
+{
+	if (!SaveData || !SaveData->ChipEquipmentSlots.IsValidIndex(EquipmentIndex))
+	{
+		return false;
+	}
+
+	const TArray<FLSSessionItem>* SourceSlots = GetStoredSlots(SourceArea);
+	if (!SourceSlots || !SourceSlots->IsValidIndex(SourceIndex) || !LSInventorySlotUtils::IsFilled((*SourceSlots)[SourceIndex]))
+	{
+		return false;
+	}
+
+	// 스왑 대상 칸에 새(저장) 칩을 얹은 가정 배열로 판정한다. 새 칩의 적재 프로토콜이 기존 장착 칩보다 낮으면 용량이 줄 수 있다.
+	TArray<FLSSessionItem> HypotheticalSlots = SaveData->ChipEquipmentSlots;
+	HypotheticalSlots[EquipmentIndex] = (*SourceSlots)[SourceIndex];
+	return WouldChipEquipmentDropInventoryItems(HypotheticalSlots);
 }
 
 TArray<FLSSessionItem>& ULSSaveSubsystem::GetMutableInventory()

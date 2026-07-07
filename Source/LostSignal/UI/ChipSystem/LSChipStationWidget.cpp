@@ -668,6 +668,21 @@ bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDrag
 		return false;
 	}
 
+	// 칩↔칩 교체(스왑)로 들어오는 칩의 적재(Carrying) 프로토콜이 더 낮으면 인벤토리 용량이 줄어 초과분이 월드로 드롭돼 사라진다.
+	// 해제 차단과 동일한 정책으로, 로비에서만 스왑 자체를 막고 알림을 띄운다(레이드 중에는 기존 즉시 드롭 정책 유지).
+	const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	const ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
+	const bool bRaidActive = RaidInventory && RaidInventory->IsRaidActive();
+	if (!bRaidActive && SaveSubsystem->WouldSwapChipDropInventoryItems(TargetArea, TargetSlotIndex, DragOperation.SourceEquipmentSlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot swap equipped chip at slot %d because reduced carrying capacity would drop inventory items on %s."),
+			DragOperation.SourceEquipmentSlotIndex,
+			*GetNameSafe(this));
+		ShowCapacityBlockedDialog(NSLOCTEXT("LSChipStation", "SwapBlockedByCapacity",
+			"인벤토리 용량이 부족합니다. 이 칩으로 교체하면 아이템이 버려지므로, 먼저 인벤토리를 정리하세요."));
+		return false;
+	}
+
 	const bool bSwapped = SaveSubsystem->EquipChipFromStoredSlot(
 		TargetArea,
 		TargetSlotIndex,

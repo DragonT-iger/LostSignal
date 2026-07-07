@@ -96,6 +96,9 @@ public:
 	// EquipmentIndex의 칩을 해제하면 적재(Carrying) 프로토콜이 줄어 인벤토리 최대 용량이 축소되고,
 	// 그 결과 초과분이 월드로 드롭(=손실)되는지 여부. 해제 전에 호출해 해제 자체를 막는 데 쓴다.
 	bool WouldUnequipChipDropInventoryItems(int32 EquipmentIndex) const;
+	// EquipmentIndex의 장착 칩을 (SourceArea/SourceIndex) 저장 칩과 교체(스왑)하면 적재 프로토콜이 줄어
+	// 인벤토리 초과분이 월드로 드롭(=손실)되는지 여부. 스왑 전에 호출해 스왑 자체를 막는 데 쓴다.
+	bool WouldSwapChipDropInventoryItems(ELSInventorySlotArea SourceArea, int32 SourceIndex, int32 EquipmentIndex) const;
 	// 무기/방어구 장비 슬롯 이동. FromArea/ToArea 중 정확히 하나가 Equipment이며, 로비 전용이다.
 	// 장착(Inventory/Safe -> Equipment)/해제(Equipment -> Inventory/Safe)/교환을 타입 검증과 함께 처리한다.
 	bool MoveEquipmentSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
@@ -128,6 +131,8 @@ private:
 	int32 GetCarryingProtocolSlotBonus(FName EnableName) const;
 	// 주어진 칩 장착 배열 기준으로 적재 프로토콜 슬롯 보너스를 계산한다(현재 저장 상태가 아니라 가정 배열도 넣을 수 있음).
 	int32 ComputeCarryingProtocolSlotBonus(const TArray<FLSSessionItem>& EquipmentSlots, FName EnableName) const;
+	// 가정 장착 배열로 인벤토리 초과분이 월드 드롭되는지 예측한다(해제/스왑 차단 판정의 공용 코어).
+	bool WouldChipEquipmentDropInventoryItems(const TArray<FLSSessionItem>& HypotheticalSlots) const;
 	TArray<FLSSessionItem>& GetMutableInventory();
 	TArray<FLSSessionItem>* GetMutableStoredSlots(ELSInventorySlotArea SlotArea);
 	const TArray<FLSSessionItem>* GetStoredSlots(ELSInventorySlotArea SlotArea) const;
