@@ -27,6 +27,7 @@
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSkillCastSettingsSubsystem.h"
+#include "Skills/LSDashSkillDataAsset.h"
 #include "Skills/LSPassiveSkillDataAsset.h"
 #include "Skills/LSSkillDataAsset.h"
 #include "Skills/LSSkillPoolDataAsset.h"
@@ -479,17 +480,17 @@ void ULSPlayerSkillComponent::ApplyEquippedSkillLoadout()
 		return;
 	}
 
-	const TArray<int32>& EquippedSkillIDs = SaveSubsystem->GetEquippedSkillIDs();
+	if (!SkillPool)
+	{
+		// 풀이 없으면 캐릭터별 로드아웃을 조회할 수 없다 → BP 기본 SkillSlots를 폴백 기본 로드아웃으로 유지한다.
+		return;
+	}
+
+	const TArray<int32>& EquippedSkillIDs = SaveSubsystem->GetEquippedSkillIDs(SkillPool->CharacterID);
 	const bool bHasAnyEquipped = EquippedSkillIDs.ContainsByPredicate([](int32 SkillID) { return SkillID != 0; });
 	if (!bHasAnyEquipped)
 	{
 		// 저장된 선택이 하나도 없으면(신규/미선택) BP 기본 SkillSlots를 폴백 기본 로드아웃으로 유지한다.
-		return;
-	}
-
-	if (!SkillPool)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s has an equipped skill loadout but no SkillPool assigned; loadout not applied."), *GetNameSafe(GetOwner()));
 		return;
 	}
 
@@ -688,6 +689,13 @@ FLSSkillAreaPreviewSpec ULSPlayerSkillComponent::BuildPreviewSpecForSkill(const 
 
 float ULSPlayerSkillComponent::ResolveSkillCooldownDuration(const ULSSkillDataAsset* SkillData) const
 {
+	// 대쉬처럼 쿨타임 소스를 캐릭터 어트리뷰트로 지정한 스킬은 스킬 테이블 대신 그 어트리뷰트에서 읽는다.
+	if (const ULSDashSkillDataAsset* DashData = Cast<ULSDashSkillDataAsset>(SkillData); DashData && DashData->CooldownAttribute.IsValid())
+	{
+		const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+		return ASC ? ASC->GetNumericAttribute(DashData->CooldownAttribute) : 0.0f;
+	}
+
 	if (const FLSCharacterSkillRow* Row = ResolveActiveSkillRow(SkillData, TEXT("ResolveSkillCooldownDuration")); Row && Row->Skill_Cooldown > 0.0f)
 	{
 		return Row->Skill_Cooldown;

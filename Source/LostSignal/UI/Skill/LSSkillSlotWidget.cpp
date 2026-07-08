@@ -190,7 +190,12 @@ void ULSSkillSlotWidget::RefreshCooldown()
 	const bool bShowCooldownGauge = IsCooldownGaugeProtocolVisible();
 	CooldownText->SetVisibility(bShowCooldownNumber ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	CooldownBar->SetVisibility(bShowCooldownGauge ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	CooldownText->SetText(FText::AsNumber(FMath::CeilToInt(Remaining)));
+	// 0.1초 단위로 올림해 소수 첫째 자리까지 표시한다(쿨타임 중엔 0.0으로 떨어지지 않게 올림).
+	const float DisplayRemaining = FMath::CeilToFloat(Remaining * 10.0f) / 10.0f;
+	FNumberFormattingOptions NumberFormat;
+	NumberFormat.MinimumFractionalDigits = 1;
+	NumberFormat.MaximumFractionalDigits = 1;
+	CooldownText->SetText(FText::AsNumber(DisplayRemaining, &NumberFormat));
 	CooldownBar->SetPercent(FMath::Clamp(Remaining / Total, 0.0f, 1.0f));
 }
 

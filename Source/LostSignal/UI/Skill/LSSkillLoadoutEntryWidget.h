@@ -8,6 +8,7 @@ class UButton;
 class UImage;
 class UTextBlock;
 class ULSSkillDataAsset;
+struct FLSCharacterSkillRow;
 
 // 후보 클릭 시 부모(ULSSkillLoadoutWidget)에 Skill_ID를 전달한다. C++ 전용 바인딩.
 DECLARE_DELEGATE_OneParam(FLSOnSkillLoadoutEntryClicked, int32 /*SkillID*/);
@@ -22,8 +23,9 @@ public:
 	// 표시할 후보 스킬 데이터를 지정한다.
 	void SetSkillData(ULSSkillDataAsset* InSkillData);
 
-	// 이미 장착돼 있으면 true. 장착된 후보는 다시 클릭할 수 없도록 버튼을 비활성화한다.
-	void SetEquipped(bool bInEquipped);
+	void SetDisplayOnly(bool bInDisplayOnly);
+	void SetNamePrefix(const FText& InNamePrefix);
+	void SetEmptyDisplayText(const FText& InNameText, const FText& InDescriptionText);
 
 	ULSSkillDataAsset* GetSkillData() const { return SkillData; }
 
@@ -52,9 +54,18 @@ private:
 	void HandleSelectButtonClicked();
 
 	void RefreshDisplay();
+	void RefreshButtonState();
+	void RefreshIcon();
+	const FLSCharacterSkillRow* ResolveSkillRow() const;
+	void RefreshName(const FLSCharacterSkillRow* Row);
+	void RefreshDescription(const FLSCharacterSkillRow* Row);
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULSSkillDataAsset> SkillData;
 
-	bool bEquipped = false;
+	FText NamePrefixText;
+	FText EmptyNameText;
+	FText EmptyDescriptionText;
+
+	bool bDisplayOnly = false;
 };

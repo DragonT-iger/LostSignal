@@ -6,6 +6,7 @@
 #include "LSSaveSubsystem.generated.h"
 
 class ULSSaveGame;
+struct FLSSkillLoadout;
 
 // 칩 장착 슬롯 또는 신호 게이지가 바뀌면 발행된다. (전투 스탯 재적용 등에 사용)
 DECLARE_MULTICAST_DELEGATE(FLSOnChipLoadoutChanged);
@@ -84,18 +85,22 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	const TArray<FLSSessionItem>& GetEquipmentSlots() const;
 
-	// 스킬 선택 슬롯 3칸(인덱스 = Skill1/2/3, 값 = Skill_ID, 0 = 빈 칸).
+	// CharacterID 캐릭터의 스킬 선택 슬롯 3칸(인덱스 = Skill1/2/3, 값 = Skill_ID, 0 = 빈 칸).
 	UFUNCTION(BlueprintPure, Category="LS/Save")
-	const TArray<int32>& GetEquippedSkillIDs() const;
+	const TArray<int32>& GetEquippedSkillIDs(int32 CharacterID) const;
 
-	// SlotIndex 칸에 SkillID를 장착한다. 같은 SkillID가 다른 칸에 이미 있으면 그 칸을 비워 중복을 막는다(이동).
+	// CharacterID 캐릭터의 SlotIndex 칸에 SkillID를 장착한다. 같은 SkillID가 다른 칸에 이미 있으면 그 칸을 비워 중복을 막는다(이동).
 	// 범위 밖이거나 실패하면 false. 성공 시 저장 후 OnSkillLoadoutChanged 발행.
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
-	bool SetEquippedSkillSlot(int32 SlotIndex, int32 SkillID);
+	bool SetEquippedSkillSlot(int32 CharacterID, int32 SlotIndex, int32 SkillID);
 
-	// SlotIndex 칸을 비운다. 성공 시 저장 후 OnSkillLoadoutChanged 발행.
+	// CharacterID 캐릭터의 SlotIndex 칸을 비운다. 성공 시 저장 후 OnSkillLoadoutChanged 발행.
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
-	bool ClearEquippedSkillSlot(int32 SlotIndex);
+	bool ClearEquippedSkillSlot(int32 CharacterID, int32 SlotIndex);
+
+	// CharacterID 캐릭터의 로드아웃을 아직 초기화한 적 없으면(최초 진입/새 게임) DefaultSkillIDs로 3칸을 1회 시딩한다.
+	// 이후엔 사용자가 슬롯을 다 비워도 다시 채우지 않는다. 시딩했으면 true(저장 후 OnSkillLoadoutChanged 발행).
+	bool TrySeedDefaultSkillLoadout(int32 CharacterID, const TArray<int32>& DefaultSkillIDs);
 
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	int32 GetMaxInventorySlotCount() const;
@@ -146,7 +151,8 @@ private:
 	void MigrateInventory();
 	void EnsureChipEquipmentSlots();
 	void EnsureEquipmentSlots();
-	void EnsureEquippedSkillSlots();
+	// CharacterID 로드아웃 항목을 없으면 만들고 SkillIDs를 3칸으로 보정해 참조로 돌려준다. SaveData 유효성은 호출부가 보장.
+	FLSSkillLoadout& EnsureSkillLoadout(int32 CharacterID);
 	void ApplyStarterItems();
 	void ApplyConfiguredStarterItems();
 	void ApplyLowestGradeChipStarterItems();

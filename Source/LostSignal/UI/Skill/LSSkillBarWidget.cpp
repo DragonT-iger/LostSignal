@@ -35,10 +35,10 @@ void ULSSkillBarWidget::InitializeSkillBar(ULSPlayerSkillComponent* InSkillCompo
 		Skill3Slot->InitializeSlot(SkillComponent, ELSPlayerSkillSlot::Skill3);
 	}
 
-	/*if (DashSlot)
+	if (DashSlot)
 	{
 		DashSlot->InitializeSlot(SkillComponent, ELSPlayerSkillSlot::Dash);
-	}*/
+	}
 }
 
 void ULSSkillBarWidget::SetPreviewBattleProtocolLevels(const int32 CurrentBattleProtocol, const int32 PreviousBattleProtocol)
@@ -49,7 +49,7 @@ void ULSSkillBarWidget::SetPreviewBattleProtocolLevels(const int32 CurrentBattle
 	if (Skill1Slot) { Skill1Slot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
 	if (Skill2Slot) { Skill2Slot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
 	if (Skill3Slot) { Skill3Slot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
-	//if (DashSlot) { DashSlot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
+	if (DashSlot) { DashSlot->SetPreviewBattleProtocolLevels(PreviewCurrentBattleProtocol, PreviewPreviousBattleProtocol); }
 	RefreshProtocolVisibility();
 }
 
@@ -61,7 +61,7 @@ void ULSSkillBarWidget::ClearPreviewBattleProtocolLevels()
 	if (Skill1Slot) { Skill1Slot->ClearPreviewBattleProtocolLevels(); }
 	if (Skill2Slot) { Skill2Slot->ClearPreviewBattleProtocolLevels(); }
 	if (Skill3Slot) { Skill3Slot->ClearPreviewBattleProtocolLevels(); }
-	//if (DashSlot) { DashSlot->ClearPreviewBattleProtocolLevels(); }
+	if (DashSlot) { DashSlot->ClearPreviewBattleProtocolLevels(); }
 	RefreshProtocolVisibility();
 }
 
@@ -70,14 +70,14 @@ void ULSSkillBarWidget::NativeConstruct()
 	Super::NativeConstruct();
 	RefreshProtocolVisibility();
 
-	if (!Skill1Slot || !Skill2Slot || !Skill3Slot /*|| !DashSlot*/)
+	if (!Skill1Slot || !Skill2Slot || !Skill3Slot || !DashSlot)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s is missing required skill bar slot binding. Skill1=%s Skill2=%s Skill3=%s"),
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required skill bar slot binding. Skill1=%s Skill2=%s Skill3=%s Dash=%s"),
 			*GetNameSafe(this),
 			*GetNameSafe(Skill1Slot),
 			*GetNameSafe(Skill2Slot),
-			*GetNameSafe(Skill3Slot));
-			//*GetNameSafe(DashSlot));
+			*GetNameSafe(Skill3Slot),
+			*GetNameSafe(DashSlot));
 	}
 }
 

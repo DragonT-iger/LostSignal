@@ -9,6 +9,8 @@
 #include "LostSignal.h"
 #include "Skills/LSSkillDataAsset.h"
 
+#define LOCTEXT_NAMESPACE "LSSkillLoadoutEntryWidget"
+
 void ULSSkillLoadoutEntryWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -23,6 +25,7 @@ void ULSSkillLoadoutEntryWidget::NativeConstruct()
 	}
 
 	RefreshDisplay();
+	RefreshButtonState();
 }
 
 void ULSSkillLoadoutEntryWidget::NativeDestruct()
@@ -39,21 +42,33 @@ void ULSSkillLoadoutEntryWidget::SetSkillData(ULSSkillDataAsset* InSkillData)
 {
 	SkillData = InSkillData;
 	RefreshDisplay();
+	RefreshButtonState();
 }
 
-void ULSSkillLoadoutEntryWidget::SetEquipped(const bool bInEquipped)
+void ULSSkillLoadoutEntryWidget::SetDisplayOnly(const bool bInDisplayOnly)
 {
-	bEquipped = bInEquipped;
-	if (SelectButton)
-	{
-		// 이미 장착된 후보는 다시 클릭하지 못하게 막는다.
-		SelectButton->SetIsEnabled(!bEquipped);
-	}
+	bDisplayOnly = bInDisplayOnly;
+	RefreshButtonState();
+}
+
+void ULSSkillLoadoutEntryWidget::SetNamePrefix(const FText& InNamePrefix)
+{
+	NamePrefixText = InNamePrefix;
+	RefreshDisplay();
+}
+
+void ULSSkillLoadoutEntryWidget::SetEmptyDisplayText(const FText& InNameText, const FText& InDescriptionText)
+{
+	SkillData = nullptr;
+	EmptyNameText = InNameText;
+	EmptyDescriptionText = InDescriptionText;
+	RefreshDisplay();
+	RefreshButtonState();
 }
 
 void ULSSkillLoadoutEntryWidget::HandleSelectButtonClicked()
 {
-	if (!SkillData)
+	if (bDisplayOnly || !SkillData)
 	{
 		return;
 	}
@@ -62,6 +77,25 @@ void ULSSkillLoadoutEntryWidget::HandleSelectButtonClicked()
 }
 
 void ULSSkillLoadoutEntryWidget::RefreshDisplay()
+{
+	RefreshIcon();
+
+	const FLSCharacterSkillRow* Row = ResolveSkillRow();
+	RefreshName(Row);
+	RefreshDescription(Row);
+}
+
+void ULSSkillLoadoutEntryWidget::RefreshButtonState()
+{
+	if (SelectButton)
+	{
+		const bool bCanClick = !bDisplayOnly && SkillData != nullptr;
+		SelectButton->SetIsEnabled(true);
+		SelectButton->SetVisibility(bCanClick ? ESlateVisibility::Visible : ESlateVisibility::HitTestInvisible);
+	}
+}
+
+void ULSSkillLoadoutEntryWidget::RefreshIcon()
 {
 	if (IconImage)
 	{
@@ -75,20 +109,28 @@ void ULSSkillLoadoutEntryWidget::RefreshDisplay()
 			IconImage->SetVisibility(ESlateVisibility::Hidden);
 		}
 	}
+}
 
-	// DataTable(row)이 이름/설명의 단일 출처다. 기획이 DataAsset 대신 DataTable을 채운다. 조회 실패 시 DataAsset로 폴백.
-	const FLSCharacterSkillRow* Row = nullptr;
-	if (SkillData)
+const FLSCharacterSkillRow* ULSSkillLoadoutEntryWidget::ResolveSkillRow() const
+{
+	if (!SkillData)
 	{
-		if (const UGameInstance* GameInstance = GetGameInstance())
+		return nullptr;
+	}
+
+	if (const UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (const ULSGameDataSubsystem* GameDataSubsystem = GameInstance->GetSubsystem<ULSGameDataSubsystem>())
 		{
-			if (const ULSGameDataSubsystem* GameDataSubsystem = GameInstance->GetSubsystem<ULSGameDataSubsystem>())
-			{
-				Row = GameDataSubsystem->FindActiveSkillRowByID(SkillData->GetSkillID(), TEXT("LSSkillLoadoutEntryWidget"));
-			}
+			return GameDataSubsystem->FindActiveSkillRowByID(SkillData->GetSkillID(), TEXT("LSSkillLoadoutEntryWidget"));
 		}
 	}
 
+	return nullptr;
+}
+
+void ULSSkillLoadoutEntryWidget::RefreshName(const FLSCharacterSkillRow* Row)
+{
 	if (NameText)
 	{
 		FText NameValue = FText::GetEmpty();
@@ -100,9 +142,24 @@ void ULSSkillLoadoutEntryWidget::RefreshDisplay()
 		{
 			NameValue = SkillData->DisplayName;
 		}
+		else if (!EmptyNameText.IsEmpty())
+		{
+			NameValue = EmptyNameText;
+		}
+
+		if (!NamePrefixText.IsEmpty())
+		{
+			NameValue = NameValue.IsEmpty()
+				? NamePrefixText
+				: FText::Format(LOCTEXT("PrefixedSkillName", "{0} - {1}"), NamePrefixText, NameValue);
+		}
+
 		NameText->SetText(NameValue);
 	}
+}
 
+void ULSSkillLoadoutEntryWidget::RefreshDescription(const FLSCharacterSkillRow* Row)
+{
 	if (DescriptionText)
 	{
 		FText DescriptionValue = FText::GetEmpty();
@@ -114,6 +171,12 @@ void ULSSkillLoadoutEntryWidget::RefreshDisplay()
 		{
 			DescriptionValue = SkillData->Description;
 		}
+		else if (!EmptyDescriptionText.IsEmpty())
+		{
+			DescriptionValue = EmptyDescriptionText;
+		}
 		DescriptionText->SetText(DescriptionValue);
 	}
 }
+
+#undef LOCTEXT_NAMESPACE

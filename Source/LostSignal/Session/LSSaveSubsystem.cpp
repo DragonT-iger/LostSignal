@@ -134,20 +134,23 @@ const TArray<FLSSessionItem>& ULSSaveSubsystem::GetChipEquipmentSlots() const
 	return SaveData ? SaveData->ChipEquipmentSlots : Empty;
 }
 
-const TArray<int32>& ULSSaveSubsystem::GetEquippedSkillIDs() const
+const TArray<int32>& ULSSaveSubsystem::GetEquippedSkillIDs(const int32 CharacterID) const
 {
-	static TArray<int32> Empty;
-	return SaveData ? SaveData->EquippedSkillIDs : Empty;
+	static const TArray<int32> Empty;
+	if (!SaveData)
+	{
+		return Empty;
+	}
+	const FLSSkillLoadout* Loadout = SaveData->SkillLoadoutsByCharacter.Find(CharacterID);
+	return Loadout ? Loadout->SkillIDs : Empty;
 }
 
-bool ULSSaveSubsystem::SetEquippedSkillSlot(const int32 SlotIndex, const int32 SkillID)
+bool ULSSaveSubsystem::SetEquippedSkillSlot(const int32 CharacterID, const int32 SlotIndex, const int32 SkillID)
 {
 	if (!SaveData)
 	{
 		return false;
 	}
-
-	EnsureEquippedSkillSlots();
 
 	if (SlotIndex < 0 || SlotIndex >= EquippedSkillSlotCount)
 	{
@@ -158,32 +161,32 @@ bool ULSSaveSubsystem::SetEquippedSkillSlot(const int32 SlotIndex, const int32 S
 	// 빈 칸(0) 요청은 해제로 처리한다.
 	if (SkillID == 0)
 	{
-		return ClearEquippedSkillSlot(SlotIndex);
+		return ClearEquippedSkillSlot(CharacterID, SlotIndex);
 	}
+
+	FLSSkillLoadout& Loadout = EnsureSkillLoadout(CharacterID);
 
 	// 같은 스킬이 다른 칸에 이미 있으면 그 칸을 비워 중복 장착을 막는다(이동).
 	for (int32 Index = 0; Index < EquippedSkillSlotCount; ++Index)
 	{
-		if (Index != SlotIndex && SaveData->EquippedSkillIDs[Index] == SkillID)
+		if (Index != SlotIndex && Loadout.SkillIDs[Index] == SkillID)
 		{
-			SaveData->EquippedSkillIDs[Index] = 0;
+			Loadout.SkillIDs[Index] = 0;
 		}
 	}
 
-	SaveData->EquippedSkillIDs[SlotIndex] = SkillID;
+	Loadout.SkillIDs[SlotIndex] = SkillID;
 	Save();
 	OnSkillLoadoutChanged.Broadcast();
 	return true;
 }
 
-bool ULSSaveSubsystem::ClearEquippedSkillSlot(const int32 SlotIndex)
+bool ULSSaveSubsystem::ClearEquippedSkillSlot(const int32 CharacterID, const int32 SlotIndex)
 {
 	if (!SaveData)
 	{
 		return false;
 	}
-
-	EnsureEquippedSkillSlots();
 
 	if (SlotIndex < 0 || SlotIndex >= EquippedSkillSlotCount)
 	{
@@ -191,15 +194,80 @@ bool ULSSaveSubsystem::ClearEquippedSkillSlot(const int32 SlotIndex)
 		return false;
 	}
 
-	if (SaveData->EquippedSkillIDs[SlotIndex] == 0)
+	FLSSkillLoadout& Loadout = EnsureSkillLoadout(CharacterID);
+	if (Loadout.SkillIDs[SlotIndex] == 0)
 	{
 		return false;
 	}
 
-	SaveData->EquippedSkillIDs[SlotIndex] = 0;
+	Loadout.SkillIDs[SlotIndex] = 0;
 	Save();
 	OnSkillLoadoutChanged.Broadcast();
 	return true;
+}
+
+bool ULSSaveSubsystem::TrySeedDefaultSkillLoadout(const int32 CharacterID, const TArray<int32>& DefaultSkillIDs)
+{
+	if (!SaveData)
+	{
+		return false;
+	}
+
+	FLSSkillLoadout& Loadout = EnsureSkillLoadout(CharacterID);
+
+	// 최초 1회만 시딩한다. 이후엔 사용자가 슬롯을 다 비워도 기본값을 다시 채우지 않는다.
+	if (Loadout.bInitialized)
+	{
+		return false;
+	}
+
+	// DefaultSkillIDs를 앞 칸부터 채운다. 0/중복은 건너뛴다. (타입 검증은 로비 UI가 담당 — 여기선 타입 무관.)
+	int32 SeededCount = 0;
+	int32 SlotIndex = 0;
+	for (const int32 SkillID : DefaultSkillIDs)
+	{
+		if (SlotIndex >= EquippedSkillSlotCount)
+		{
+			break;
+		}
+		if (SkillID == 0 || Loadout.SkillIDs.Contains(SkillID))
+		{
+			continue;
+		}
+		Loadout.SkillIDs[SlotIndex] = SkillID;
+		++SlotIndex;
+		++SeededCount;
+	}
+
+	// 실제로 채운 게 없으면(DA의 DefaultEquippedSkillIDs 미설정 등) 초기화 완료로 치지 않는다.
+	// 그래야 DA를 채운 뒤 다시 열었을 때 시딩된다(빈 값으로 플래그가 latch되는 함정 방지).
+	if (SeededCount == 0)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] TrySeedDefaultSkillLoadout(char %d): 시딩할 기본 스킬이 없음. DA의 DefaultEquippedSkillIDs를 확인하세요."), CharacterID);
+		return false;
+	}
+
+	Loadout.bInitialized = true;
+	Save();
+	OnSkillLoadoutChanged.Broadcast();
+	UE_LOG(LogLS, Log, TEXT("[Save] TrySeedDefaultSkillLoadout(char %d): 기본 스킬 %d개 시딩"), CharacterID, SeededCount);
+	return true;
+}
+
+FLSSkillLoadout& ULSSaveSubsystem::EnsureSkillLoadout(const int32 CharacterID)
+{
+	// 호출부가 SaveData 유효성을 보장한다.
+	FLSSkillLoadout& Loadout = SaveData->SkillLoadoutsByCharacter.FindOrAdd(CharacterID);
+
+	while (Loadout.SkillIDs.Num() < EquippedSkillSlotCount)
+	{
+		Loadout.SkillIDs.Add(0);
+	}
+	if (Loadout.SkillIDs.Num() > EquippedSkillSlotCount)
+	{
+		Loadout.SkillIDs.SetNum(EquippedSkillSlotCount);
+	}
+	return Loadout;
 }
 
 const TArray<FLSSessionItem>& ULSSaveSubsystem::GetEquipmentSlots() const
@@ -840,7 +908,6 @@ void ULSSaveSubsystem::StartNewGame()
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	EnsureChipEquipmentSlots();
 	EnsureEquipmentSlots();
-	EnsureEquippedSkillSlots();
 	ApplyStarterItems();
 	UE_LOG(LogLS, Log, TEXT("[Save] New game started - all save files deleted for a fresh start"));
 }
@@ -1016,7 +1083,6 @@ void ULSSaveSubsystem::Load()
 			LSInventorySlotUtils::NormalizeSlotArray(SaveData->SafeStash);
 			EnsureChipEquipmentSlots();
 			EnsureEquipmentSlots();
-			EnsureEquippedSkillSlots();
 			ResolveInterruptedRaid();
 			Save();
 		}
@@ -1032,7 +1098,6 @@ void ULSSaveSubsystem::Load()
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	EnsureChipEquipmentSlots();
 	EnsureEquipmentSlots();
-	EnsureEquippedSkillSlots();
 	UE_LOG(LogLS, Log, TEXT("[Save] Created new save object for slot %s"), *ResolvedSlotName);
 }
 
@@ -1133,24 +1198,6 @@ void ULSSaveSubsystem::EnsureEquipmentSlots()
 	if (SaveData->EquipmentSlots.Num() > EquipmentSlotCount)
 	{
 		SaveData->EquipmentSlots.SetNum(EquipmentSlotCount);
-	}
-}
-
-void ULSSaveSubsystem::EnsureEquippedSkillSlots()
-{
-	if (!SaveData)
-	{
-		return;
-	}
-
-	while (SaveData->EquippedSkillIDs.Num() < EquippedSkillSlotCount)
-	{
-		SaveData->EquippedSkillIDs.Add(0);
-	}
-
-	if (SaveData->EquippedSkillIDs.Num() > EquippedSkillSlotCount)
-	{
-		SaveData->EquippedSkillIDs.SetNum(EquippedSkillSlotCount);
 	}
 }
 
@@ -1440,13 +1487,21 @@ void ULSSaveSubsystem::SaveDebugJson() const
 	AddSlotArrayField(TEXT("safeStash"), SaveData->SafeStash);
 	AddSlotArrayField(TEXT("chipEquipmentSlots"), SaveData->ChipEquipmentSlots);
 
-	TArray<TSharedPtr<FJsonValue>> EquippedSkillArray;
-	EquippedSkillArray.Reserve(SaveData->EquippedSkillIDs.Num());
-	for (const int32 SkillID : SaveData->EquippedSkillIDs)
+	TSharedRef<FJsonObject> SkillLoadoutsObject = MakeShared<FJsonObject>();
+	for (const TPair<int32, FLSSkillLoadout>& Pair : SaveData->SkillLoadoutsByCharacter)
 	{
-		EquippedSkillArray.Add(MakeShared<FJsonValueNumber>(SkillID));
+		TSharedRef<FJsonObject> LoadoutObject = MakeShared<FJsonObject>();
+		TArray<TSharedPtr<FJsonValue>> SkillIDArray;
+		SkillIDArray.Reserve(Pair.Value.SkillIDs.Num());
+		for (const int32 SkillID : Pair.Value.SkillIDs)
+		{
+			SkillIDArray.Add(MakeShared<FJsonValueNumber>(SkillID));
+		}
+		LoadoutObject->SetArrayField(TEXT("skillIDs"), SkillIDArray);
+		LoadoutObject->SetBoolField(TEXT("initialized"), Pair.Value.bInitialized);
+		SkillLoadoutsObject->SetObjectField(FString::FromInt(Pair.Key), LoadoutObject);
 	}
-	RootObject->SetArrayField(TEXT("equippedSkillIDs"), EquippedSkillArray);
+	RootObject->SetObjectField(TEXT("skillLoadoutsByCharacter"), SkillLoadoutsObject);
 
 	TArray<TSharedPtr<FJsonValue>> ActiveRaidLoadoutArray;
 	ActiveRaidLoadoutArray.Reserve(SaveData->ActiveRaidLoadout.Num());

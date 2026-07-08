@@ -202,10 +202,11 @@ PassiveSkill_ID
 
 - **기본 장착(고정, 슬롯 아님):** 일반 공격(`ULSPlayerCombatComponent`), 패시브 스킬(`ULSPlayerSkillComponent::PassiveSkills`), 회피/대시(`ULSGA_Dash`)는 캐릭터마다 고정이며 선택 대상이 아니다. 현재는 캐릭터 BP 기본값으로 부여한다.
 - **선택 슬롯 3칸:** `ELSPlayerSkillSlot::Skill1~3`(궁극기 전용 칸 없음). 각 칸에는 **액티브 또는 궁극기**(`ELSCharacterSkillType::Active`/`Ultimate`)만 넣는다. 궁극기도 3칸 중 아무 곳에나 배치한다.
-- **선택 가능 후보(`ULSSkillPoolDataAsset`):** 캐릭터별로 고를 수 있는 `ULSSkillDataAsset` 목록. 로비 선택 UI와 런타임 `Skill_ID → DataAsset` 해석이 이 풀 하나를 공용으로 쓴다. 후보의 액티브/궁극기 판정은 `Skill_ID`로 DataTable(`Skill_Type`)을 조회한다(타입은 DataTable이 단일 출처). `ULSPlayerSkillComponent::SkillPool`(런타임)과 로비 스킬 UI(WBP)가 같은 DA 자산을 가리킨다.
-- **저장:** 선택 결과는 `ULSSaveGame::EquippedSkillIDs`(3칸, 값=Skill_ID, 0=빈 칸)에 저장된다. 조작 API는 `ULSSaveSubsystem::GetEquippedSkillIDs`/`SetEquippedSkillSlot`/`ClearEquippedSkillSlot`이며, 변경 시 `OnSkillLoadoutChanged`를 발행한다. 저장 구조는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)가 소유한다.
-- **선택 UI(로비):** 개인정비(`ULSLoadoutPreparationWidget`)의 스킬 페이지(`ELSLoadoutTab::Skill`, ContentSwitcher 인덱스 4). 전용 스킬 탭 버튼은 없고 **업그레이드 탭 버튼(`UpgradeTab`)** 을 누르면 이 페이지가 열린다(`HandleUpgradeTabClicked`). `ULSSkillLoadoutWidget`이 풀에서 액티브/궁극기 후보를 나열하고, **클릭 배치**로 첫 빈 칸에 장착·슬롯 클릭으로 해제한다(중복 Skill_ID는 이동 처리). 후보/슬롯 개별 표시는 `ULSSkillLoadoutEntryWidget`·슬롯 아이콘이 담당한다.
-- **런타임 적용:** `ULSPlayerSkillComponent::BeginPlay → ApplyEquippedSkillLoadout`이 세이브의 `EquippedSkillIDs`를 `SkillPool->FindSkillByID`로 해석해 3칸에 `SetSkillData`한다. 저장된 선택이 하나도 없으면(신규/미선택) 캐릭터 BP 기본 `SkillSlots`를 폴백 기본 로드아웃으로 유지한다. 서버 권한 또는 로컬 조종 클라에서만 적용한다(데디 서버 비소유 캐릭터는 건너뜀 — 멀티에서 서버 반영은 추후 복제 과제).
+- **선택 가능 후보(`ULSSkillPoolDataAsset`):** 캐릭터별로 고를 수 있는 `ULSSkillDataAsset` 목록. 로비 선택 UI와 런타임 `Skill_ID → DataAsset` 해석이 이 풀 하나를 공용으로 쓴다. 후보의 액티브/궁극기 판정은 `Skill_ID`로 DataTable(`Skill_Type`)을 조회한다(타입은 DataTable이 단일 출처). `ULSPlayerSkillComponent::SkillPool`(런타임)과 로비 스킬 UI(WBP)가 같은 DA 자산을 가리킨다. 풀은 `CharacterID`를 들고 있어, 세이브의 캐릭터별 로드아웃을 이 키로 조회한다(로비·런타임 공용 캐릭터 식별자).
+- **기본 로드아웃 시딩:** 풀의 `DefaultEquippedSkillIDs`(최대 3, 순서=Skill1/2/3)가 최초 진입 시 채울 기본 스킬이다. 로비 스킬 페이지를 처음 열 때(`RefreshSkillLoadout`) 해당 캐릭터 로드아웃의 `bInitialized`가 false면 `ULSSaveSubsystem::TrySeedDefaultSkillLoadout(CharacterID, ...)`이 이 값으로 3칸을 **1회만** 시딩하고 플래그를 세운다. 이후엔 사용자가 슬롯을 다 비워도 다시 채우지 않는다(새 게임 시 세이브가 새로 만들어져 플래그가 리셋됨). 시딩값·0·중복은 앞 칸부터 채우며 건너뛴다.
+- **저장:** 선택 결과는 `ULSSaveGame::SkillLoadoutsByCharacter`(키=CharacterID, 값=`FLSSkillLoadout{ SkillIDs[3], bInitialized }`)에 캐릭터별로 저장된다. 조작 API는 `ULSSaveSubsystem::GetEquippedSkillIDs(CharacterID)`/`SetEquippedSkillSlot(CharacterID, Slot, ID)`/`ClearEquippedSkillSlot(CharacterID, Slot)`이며, 변경 시 `OnSkillLoadoutChanged`를 발행한다. 저장 구조는 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)가 소유한다.
+- **선택 UI(로비):** 개인정비(`ULSLoadoutPreparationWidget`)의 스킬 페이지(`ELSLoadoutTab::Skill`, ContentSwitcher 인덱스 4). 전용 스킬 탭 버튼은 없고 **업그레이드 탭 버튼(`UpgradeTab`)** 을 누르면 이 페이지가 열린다(`HandleUpgradeTabClicked`). `ULSSkillLoadoutWidget`이 풀에서 액티브/궁극기 후보를 나열한다. 슬롯 클릭은 현재 편집 슬롯만 선택하고, 후보 클릭은 선택 슬롯에 해당 스킬을 장착한다. 같은 Skill_ID가 다른 슬롯에 이미 있으면 기존 슬롯을 비워 중복 장착을 막는다(이동 처리). 후보/슬롯 개별 표시는 `ULSSkillLoadoutEntryWidget`·슬롯 아이콘이 담당한다. 현재 선택/변경 중인 슬롯 상세는 WBP의 `SelectedSlotEntry`가 같은 Entry 클래스를 표시 전용으로 재사용해 보여준다.
+- **런타임 적용:** `ULSPlayerSkillComponent::BeginPlay → ApplyEquippedSkillLoadout`이 세이브에서 `SkillPool->CharacterID`로 캐릭터 로드아웃을 조회해 `SkillPool->FindSkillByID`로 해석하고 3칸에 `SetSkillData`한다. 저장된 선택이 하나도 없으면(신규/미선택) 캐릭터 BP 기본 `SkillSlots`를 폴백 기본 로드아웃으로 유지한다. 서버 권한 또는 로컬 조종 클라에서만 적용한다(데디 서버 비소유 캐릭터는 건너뜀 — 멀티에서 서버 반영은 추후 복제 과제).
 
 ## 공통 입력 흐름
 
@@ -318,9 +319,12 @@ Ability 발동 성공
 쿨타임 시간 우선순위:
 
 ```text
-FLSCharacterSkillRow.Skill_Cooldown > 0
+ULSDashSkillDataAsset.CooldownAttribute 유효 (대쉬 전용)
+-> FLSCharacterSkillRow.Skill_Cooldown > 0
 -> SkillData.FallbackCooldown
 ```
+
+대쉬 표시 전용 DataAsset(`ULSDashSkillDataAsset`)의 `CooldownAttribute`가 유효하면 스킬 테이블/`FallbackCooldown`을 건너뛰고 소유 ASC의 해당 어트리뷰트 값을 총시간으로 쓴다(대쉬 = `DashCooldown`). 어트리뷰트에서 쿨타임을 읽는 스킬은 현재 대쉬뿐이라 이 필드는 대쉬 파생 클래스에만 둔다.
 
 ## DataTable과 DataAsset 우선순위
 
@@ -398,6 +402,7 @@ Combo Attack row의 시간 값은 기본 공격 Ability에서 사용한다. `Com
 -> 없으면 몽타주 원본 길이로 재생
 
 쿨타임
+-> ULSDashSkillDataAsset.CooldownAttribute 유효 시 그 어트리뷰트 값 (대쉬 = DashCooldown)
 -> DataTable Skill_Cooldown 우선
 -> 없으면 FallbackCooldown
 
@@ -554,8 +559,9 @@ LS.Data.*
 
 대시는 발동/무적/예측/쿨타임 부여 경로를 스킬 시스템과 독립적으로 유지하면서, 스킬 바에는 **표시 전용 슬롯**으로 노출된다. `ELSPlayerSkillSlot::Dash`는 Skill1~3을 소비하지 않는 전용 슬롯이며, `ULSSkillBarWidget::DashSlot`(`BindWidget`)이 다른 슬롯과 동일하게 `ULSSkillSlotWidget`으로 아이콘/단축키/쿨타임만 그린다.
 
-- 슬롯에 배정하는 `ULSSkillDataAsset`(캐릭터별 `DA_Dash_*`)은 **표시 전용**이다: `AbilityClass`/`CooldownEffectClass`를 비워 발동·쿨타임 부여에 관여하지 않는다. `Skill_ID`로 캐릭터별 대시 스킬 행을 참조해 이름/설명을 얻고, `CooldownTag`는 `LS.Cooldown.Dash`로 둔다.
-- 쿨타임 남은시간은 `GetSkillCooldownRemaining`이 `LS.Cooldown.Dash` 태그로 실제 활성 GE(`ULSGE_DashCooldown`)를 조회해 그대로 표시한다. 총시간은 대시 행 `Skill_Cooldown`이 있으면 그 값을, 없으면 `GetSkillCooldownTotalDuration`이 실제 활성 쿨타임 GE의 지속시간으로 폴백해 진행바 분모가 항상 실제 쿨타임과 일치한다.
+- 슬롯에 배정하는 DataAsset은 대쉬 전용 `ULSDashSkillDataAsset`(`ULSSkillDataAsset` 파생, 캐릭터별 `DA_Dash_*`)이며 **표시 전용**이다: `AbilityClass`/`CooldownEffectClass`를 비워 발동·쿨타임 부여에 관여하지 않는다. `Skill_ID`로 캐릭터별 대시 스킬 행을 참조해 이름/설명을 얻고, `CooldownTag`는 `LS.Cooldown.Dash`로 둔다. 쿨타임 총시간 출처는 스킬 테이블이 아니라 캐릭터 어트리뷰트다 → `CooldownAttribute`에 `DashCooldown`을 지정한다.
+- 대쉬 쿨타임의 단일 출처는 `DashCooldown` 어트리뷰트(초 단위)다. 서버 GE(`ULSGE_DashCooldown`)는 이 어트리뷰트를 지속시간(=쿨타임)으로 캡처하고, 로컬 예측(`ULSPlayerCombatComponent::GetDashCooldown`)도 같은 어트리뷰트를 읽는다. 스킬 바 표시도 여기에 맞춘다.
+- 쿨타임 남은시간은 `GetSkillCooldownRemaining`이 `LS.Cooldown.Dash` 태그로 실제 활성 GE(`ULSGE_DashCooldown`)를 조회해 그대로 표시한다. 총시간은 `ResolveSkillCooldownDuration`이 `ULSDashSkillDataAsset::CooldownAttribute`(대쉬는 `DashCooldown`)가 지정돼 있으면 그 어트리뷰트 값을, 없으면 스킬 행 `Skill_Cooldown` → `FallbackCooldown` 순으로 읽어 진행바 분모가 실제 쿨타임과 일치한다.
 - 노출(바 표시·쿨타임 숫자·게이지)은 다른 스킬 슬롯과 동일하게 전투 프로토콜 잠금(`Skill_Slot`/`Skill_Cooldown`/`Skill_Cooldown_Gauge`)을 따른다. → [CombatProtocolUI.md](CombatProtocolUI.md)
 
 ## 빠른 이동 스킬

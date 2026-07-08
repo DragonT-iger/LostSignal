@@ -17,6 +17,8 @@ namespace
 constexpr int32 SkillLoadoutSlotCount = 3;
 }
 
+#define LOCTEXT_NAMESPACE "LSSkillLoadoutWidget"
+
 void ULSSkillLoadoutWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -36,6 +38,10 @@ void ULSSkillLoadoutWidget::NativeConstruct()
 	if (!CandidateContainer)
 	{
 		UE_LOG(LogLS, Warning, TEXT("CandidateContainer is not bound on %s."), *GetNameSafe(this));
+	}
+	if (!SelectedSlotEntry)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SelectedSlotEntry is not bound on %s."), *GetNameSafe(this));
 	}
 
 	if (ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem())
@@ -66,43 +72,35 @@ void ULSSkillLoadoutWidget::NativeDestruct()
 
 void ULSSkillLoadoutWidget::RefreshSkillLoadout()
 {
+	// 최초 진입 시 세이브가 비어 있으면 풀의 기본 로드아웃을 1회 시딩한다.
+	// (시딩되면 OnSkillLoadoutChanged로 재진입하지만 세이브 플래그로 1회만 실행되고, 아래에서 갱신된 상태를 그린다.)
+	if (SkillPool)
+	{
+		if (ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem())
+		{
+			SaveSubsystem->TrySeedDefaultSkillLoadout(SkillPool->CharacterID, SkillPool->DefaultEquippedSkillIDs);
+		}
+	}
+
 	RebuildCandidateList();
 	RefreshEquippedSlots();
+	RefreshSelectedSlotEntry();
 }
 
-void ULSSkillLoadoutWidget::HandleSlot1Clicked() { ClearSlotByIndex(0); }
-void ULSSkillLoadoutWidget::HandleSlot2Clicked() { ClearSlotByIndex(1); }
-void ULSSkillLoadoutWidget::HandleSlot3Clicked() { ClearSlotByIndex(2); }
+void ULSSkillLoadoutWidget::HandleSlot1Clicked() { SelectSlotByIndex(0); }
+void ULSSkillLoadoutWidget::HandleSlot2Clicked() { SelectSlotByIndex(1); }
+void ULSSkillLoadoutWidget::HandleSlot3Clicked() { SelectSlotByIndex(2); }
 
 void ULSSkillLoadoutWidget::HandleEntryClicked(const int32 SkillID)
 {
 	ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem();
-	if (!SaveSubsystem || SkillID == 0)
+	if (!SaveSubsystem || !SkillPool || SkillID == 0)
 	{
 		return;
 	}
 
-	const TArray<int32>& EquippedSkillIDs = SaveSubsystem->GetEquippedSkillIDs();
-
-	// 이미 장착돼 있으면 무시(엔트리도 비활성화 상태다).
-	if (EquippedSkillIDs.Contains(SkillID))
-	{
-		return;
-	}
-
-	// 첫 빈 슬롯을 찾아 장착한다.
-	for (int32 SlotIndex = 0; SlotIndex < SkillLoadoutSlotCount; ++SlotIndex)
-	{
-		const bool bEmpty = !EquippedSkillIDs.IsValidIndex(SlotIndex) || EquippedSkillIDs[SlotIndex] == 0;
-		if (bEmpty)
-		{
-			SaveSubsystem->SetEquippedSkillSlot(SlotIndex, SkillID);
-			return;
-		}
-	}
-
-	// 빈 슬롯이 없다: 사용자가 먼저 한 칸을 비워야 한다.
-	UE_LOG(LogLS, Log, TEXT("[SkillLoadout] All %d skill slots are full. Skill %d not equipped."), SkillLoadoutSlotCount, SkillID);
+	const int32 CharacterID = SkillPool->CharacterID;
+	SaveSubsystem->SetEquippedSkillSlot(CharacterID, SelectedSlotIndex, SkillID);
 }
 
 void ULSSkillLoadoutWidget::HandleSkillLoadoutChanged()
@@ -122,9 +120,6 @@ void ULSSkillLoadoutWidget::RebuildCandidateList()
 	{
 		return;
 	}
-
-	const ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem();
-	const TArray<int32> EquippedSkillIDs = SaveSubsystem ? SaveSubsystem->GetEquippedSkillIDs() : TArray<int32>();
 
 	for (const TObjectPtr<ULSSkillDataAsset>& CandidateSkill : SkillPool->SelectableSkills)
 	{
@@ -146,7 +141,6 @@ void ULSSkillLoadoutWidget::RebuildCandidateList()
 		}
 
 		Entry->SetSkillData(CandidateSkill);
-		Entry->SetEquipped(EquippedSkillIDs.Contains(SkillID));
 		Entry->OnEntryClicked.BindUObject(this, &ULSSkillLoadoutWidget::HandleEntryClicked);
 
 		CandidateContainer->AddChild(Entry);
@@ -156,8 +150,7 @@ void ULSSkillLoadoutWidget::RebuildCandidateList()
 
 void ULSSkillLoadoutWidget::RefreshEquippedSlots()
 {
-	const ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem();
-	const TArray<int32> EquippedSkillIDs = SaveSubsystem ? SaveSubsystem->GetEquippedSkillIDs() : TArray<int32>();
+	const int32 CharacterID = SkillPool ? SkillPool->CharacterID : 0;
 
 	for (int32 SlotIndex = 0; SlotIndex < SkillLoadoutSlotCount; ++SlotIndex)
 	{
@@ -167,8 +160,15 @@ void ULSSkillLoadoutWidget::RefreshEquippedSlots()
 			continue;
 		}
 
-		const int32 SkillID = EquippedSkillIDs.IsValidIndex(SlotIndex) ? EquippedSkillIDs[SlotIndex] : 0;
-		ULSSkillDataAsset* SkillData = (SkillID != 0 && SkillPool) ? SkillPool->FindSkillByID(SkillID) : nullptr;
+		int32 SkillID = 0;
+		ULSSkillDataAsset* SkillData = ResolveSkillDataForSlot(SlotIndex, SkillID);
+
+		// 세이브엔 Skill_ID가 있는데 풀에서 못 찾으면(SelectableSkills 누락) 아이콘이 비어 보인다 — 원인 로그.
+		if (SkillID != 0 && !SkillData)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[SkillLoadout] Slot %d의 Skill_ID %d를 SkillPool(char %d)에서 못 찾음. SelectableSkills에 등록됐는지 확인하세요."),
+				SlotIndex, SkillID, CharacterID);
+		}
 
 		if (SkillData && SkillData->Icon)
 		{
@@ -182,12 +182,42 @@ void ULSSkillLoadoutWidget::RefreshEquippedSlots()
 	}
 }
 
-void ULSSkillLoadoutWidget::ClearSlotByIndex(const int32 SlotIndex)
+void ULSSkillLoadoutWidget::RefreshSelectedSlotEntry()
 {
-	if (ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem())
+	if (!SelectedSlotEntry)
 	{
-		SaveSubsystem->ClearEquippedSkillSlot(SlotIndex);
+		return;
 	}
+
+	int32 SkillID = 0;
+	ULSSkillDataAsset* SkillData = ResolveSkillDataForSlot(SelectedSlotIndex, SkillID);
+	const FText SlotLabel = FText::Format(
+		LOCTEXT("SelectedSlotPrefix", "스킬 슬롯 {0}"),
+		FText::AsNumber(SelectedSlotIndex + 1));
+
+	SelectedSlotEntry->SetDisplayOnly(true);
+	SelectedSlotEntry->SetNamePrefix(SlotLabel);
+	if (SkillData)
+	{
+		SelectedSlotEntry->SetSkillData(SkillData);
+	}
+	else
+	{
+		SelectedSlotEntry->SetEmptyDisplayText(
+			FText::GetEmpty(),
+			LOCTEXT("SelectedSlotEmptyDescription", "장착된 스킬이 없습니다."));
+	}
+}
+
+void ULSSkillLoadoutWidget::SelectSlotByIndex(const int32 SlotIndex)
+{
+	if (SlotIndex < 0 || SlotIndex >= SkillLoadoutSlotCount)
+	{
+		return;
+	}
+
+	SelectedSlotIndex = SlotIndex;
+	RefreshSelectedSlotEntry();
 }
 
 ULSSaveSubsystem* ULSSkillLoadoutWidget::ResolveSaveSubsystem() const
@@ -229,3 +259,19 @@ UImage* ULSSkillLoadoutWidget::GetSlotIcon(const int32 SlotIndex) const
 	default: return nullptr;
 	}
 }
+
+ULSSkillDataAsset* ULSSkillLoadoutWidget::ResolveSkillDataForSlot(const int32 SlotIndex, int32& OutSkillID) const
+{
+	OutSkillID = 0;
+	if (!SkillPool)
+	{
+		return nullptr;
+	}
+
+	const ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem();
+	const TArray<int32> EquippedSkillIDs = SaveSubsystem ? SaveSubsystem->GetEquippedSkillIDs(SkillPool->CharacterID) : TArray<int32>();
+	OutSkillID = EquippedSkillIDs.IsValidIndex(SlotIndex) ? EquippedSkillIDs[SlotIndex] : 0;
+	return OutSkillID != 0 ? SkillPool->FindSkillByID(OutSkillID) : nullptr;
+}
+
+#undef LOCTEXT_NAMESPACE

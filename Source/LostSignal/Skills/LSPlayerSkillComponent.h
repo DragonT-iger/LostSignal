@@ -76,7 +76,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	// 세이브에 저장된 스킬 로드아웃(EquippedSkillIDs)을 SkillPool로 해석해 3칸에 적용한다.
+	// 세이브의 캐릭터별 스킬 로드아웃(SkillPool->CharacterID 키)을 SkillPool로 해석해 3칸에 적용한다.
 	// 저장된 선택이 하나도 없으면 BP 기본 SkillSlots를 폴백 기본 로드아웃으로 유지한다.
 	void ApplyEquippedSkillLoadout();
 
