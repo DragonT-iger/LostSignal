@@ -11,6 +11,7 @@
 #include "Session/LSSessionSubsystem.h"
 #include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/LSUILayer.h"
+#include "UI/Settings/LSControlSettingsWidget.h"
 #include "UI/Settings/LSSoundSettingsWidget.h"
 #include "UI/Title/LSTitleMenuButtonWidget.h"
 
@@ -152,8 +153,39 @@ void ULSSettingsWidget::HandleSoundClosed()
 
 void ULSSettingsWidget::HandleControlClicked()
 {
-	// 미구현: Control 화면 준비되면 연결. 그전까지는 안내창만 띄운다.
-	ShowNotImplementedNotice();
+	if (ActiveControlWidget && ActiveControlWidget->IsInViewport())
+	{
+		return;
+	}
+
+	if (!ControlSettingsWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Settings] ControlSettingsWidgetClass is not set on %s. Check WBP_Settings."), *GetNameSafe(this));
+		return;
+	}
+
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	ULSControlSettingsWidget* ControlWidget = OwningPlayer
+		? CreateWidget<ULSControlSettingsWidget>(OwningPlayer, ControlSettingsWidgetClass)
+		: CreateWidget<ULSControlSettingsWidget>(this, ControlSettingsWidgetClass);
+	if (!ControlWidget)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Settings] Failed to create control settings widget on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	ControlWidget->OnClosed.AddDynamic(this, &ULSSettingsWidget::HandleControlClosed);
+	ControlWidget->AddToViewport(LSUILayer::SettingsSubPanel);
+	ActiveControlWidget = ControlWidget;
+
+	SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void ULSSettingsWidget::HandleControlClosed()
+{
+	SetVisibility(ESlateVisibility::Visible);
+	SetKeyboardFocus();
+	ActiveControlWidget = nullptr;
 }
 
 void ULSSettingsWidget::HandleGraphicsClicked()

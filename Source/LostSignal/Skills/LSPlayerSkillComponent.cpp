@@ -261,7 +261,7 @@ ELSSkillCastMode ULSPlayerSkillComponent::GetEffectiveCastMode(ELSPlayerSkillSlo
 	const UWorld* World = GetWorld();
 	const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
 	const ULSSkillCastSettingsSubsystem* CastSettings = GameInstance ? GameInstance->GetSubsystem<ULSSkillCastSettingsSubsystem>() : nullptr;
-	return CastSettings ? CastSettings->GetSlotCastMode(Slot) : ELSSkillCastMode::PreviewConfirm;
+	return CastSettings ? CastSettings->GetSlotCastMode(Slot) : ELSSkillCastMode::QuickCastWithIndicator;
 }
 
 ULSSkillDataAsset* ULSPlayerSkillComponent::GetSkillData(ELSPlayerSkillSlot Slot) const

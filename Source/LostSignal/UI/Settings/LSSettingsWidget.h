@@ -5,6 +5,7 @@
 #include "LSSettingsWidget.generated.h"
 
 class UButton;
+class ULSControlSettingsWidget;
 class ULSConfirmDialogWidget;
 class ULSTitleMenuButtonWidget;
 class ULSSoundSettingsWidget;
@@ -15,7 +16,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FLSSettingsBackToMenu);
 // Sound/Controls/Graphics/Language/MainMenu 5개 항목은 WBP_SettingsButton(ULSTitleMenuButtonWidget 재사용)이고,
 // BackButton은 세팅 패널을 닫는 일반 UButton이다.
 //  - Sound: WBP_Sound를 띄운다.
-//  - Controls/Graphics/Language: 아직 미구현이라 클릭 시 경고 로그만 남긴다.
+//  - Controls: WBP_ControlSettings를 띄운다.
+//  - Graphics/Language: 아직 미구현이라 클릭 시 경고 로그만 남긴다.
 //  - MainMenuButton("메인메뉴로 돌아가기"): 레이드 여부와 무관하게 타이틀 레벨로 나간다. 단, 레이드 중이면
 //    파밍 성과를 포기하는 행동이라 확인 다이얼로그를 먼저 거치고(아이템 처리는 ALSFarmingGameMode의 Quit 규칙
 //    = 출발 장비 복구), 확인 시 Quit으로 종료해 타이틀로 나간다.
@@ -73,6 +75,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Settings")
 	TSubclassOf<ULSSoundSettingsWidget> SoundSettingsWidgetClass;
 
+	// BP(WBP_Settings)에서 WBP_ControlSettings를 매핑한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Settings")
+	TSubclassOf<ULSControlSettingsWidget> ControlSettingsWidgetClass;
+
 	// BP(WBP_Settings)에서 WBP_ConfirmDialog를 매핑한다. 레이드 중 타이틀 복귀 확인용.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Settings")
 	TSubclassOf<ULSConfirmDialogWidget> ConfirmDialogClass;
@@ -87,6 +93,9 @@ private:
 
 	UFUNCTION()
 	void HandleControlClicked();
+
+	UFUNCTION()
+	void HandleControlClosed();
 
 	UFUNCTION()
 	void HandleGraphicsClicked();
@@ -112,7 +121,7 @@ private:
 	// 레이드 중 메인메뉴 클릭 시: 확인 다이얼로그를 띄운다. 이미 떠 있으면 nullptr 반환.
 	ULSConfirmDialogWidget* ShowReturnToTitleConfirmDialog();
 
-	// 아직 구현되지 않은 항목(Control/Graphics/Language) 클릭 시 안내창을 띄운다.
+	// 아직 구현되지 않은 항목(Graphics/Language) 클릭 시 안내창을 띄운다.
 	void ShowNotImplementedNotice();
 
 	// ConfirmDialogClass로 메시지 다이얼로그를 생성해 서브패널에 띄운다. 델리게이트 연결은 호출자가 한다.
@@ -127,6 +136,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULSSoundSettingsWidget> ActiveSoundWidget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ULSControlSettingsWidget> ActiveControlWidget;
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULSConfirmDialogWidget> ActiveConfirmDialog;

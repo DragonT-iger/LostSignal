@@ -238,13 +238,13 @@ PassiveSkill_ID
 스킬 슬롯(Skill1~3)마다 발동 방식을 플레이어가 지정한다. 위 입력 흐름의 앞단(누름/뗌 입력 → 발동 커밋)만 분기하며, 서버 발동·쿨타임·GAS 경로는 세 방식이 동일하게 공유한다.
 
 - `ELSSkillCastMode`(`LSSkillTypes.h`) 3종:
-  - **PreviewConfirm**(기본): 키를 누르면 프리뷰가 뜨고 **마우스 좌클릭**(`OnAttack`)으로 커서 위치를 확정해 발동. 키를 떼도 발동하지 않는다.
-  - **QuickCastWithIndicator**: 키를 **누르는 동안** 프리뷰 표시, **키를 떼는 순간**(`Completed`/`Canceled`) 커서 위치로 확정 발동.
+  - **PreviewConfirm**: 키를 누르면 프리뷰가 뜨고 **마우스 좌클릭**(`OnAttack`)으로 커서 위치를 확정해 발동. 키를 떼도 발동하지 않는다.
+  - **QuickCastWithIndicator**(기본): 키를 **누르는 동안** 프리뷰 표시, **키를 떼는 순간**(`Completed`/`Canceled`) 커서 위치로 확정 발동.
   - **QuickCast**: 키를 **누르는 즉시** 커서 위치로 발동(프리뷰/확정 생략).
 - 입력 분기는 `ALSPlayerCharacter`가 담당한다. `OnSkillN`(누름)→`HandleSkillInputPressed`, `OnSkillNReleased`(뗌)→`HandleSkillInputReleased`. 누름 시 QuickCast는 `ActivateSkillInstant`, 나머지는 `BeginSkillPreview`. 뗌 시 QuickCastWithIndicator이고 해당 슬롯 프리뷰 중이면 `ConfirmActiveSkillPreview`.
 - 즉발/릴리즈 발동 목표점은 세 방식 모두 `ResolveMouseWorldPoint()`(커서 월드 좌표)를 재사용한다.
 - 발동 커밋은 `ULSPlayerSkillComponent::ActivateSkillInstant`(즉발) / `ConfirmAnyActiveSkillPreview`(확정)가 공통 헬퍼 `CommitSkillActivation`으로 모인다(사거리 클램프 → 서버 직접 발동 또는 클라 예측+서버 RPC).
-- 모드 저장소는 `ULSSkillCastSettingsSubsystem`(`config=GameUserSettings`, `Session/`)이며 슬롯별 개별 config 필드로 `GameUserSettings.ini`에 저장된다 → New Game으로도 초기화되지 않는다. 값 읽기/쓰기는 `GetSlotCastMode`/`SetSlotCastMode`(BlueprintCallable). 설정 UI(WBP)는 아트/기획이 이 API로 연결한다.
+- 모드 저장소는 `ULSSkillCastSettingsSubsystem`(`config=GameUserSettings`, `Session/`)이며 슬롯별 스마트키 사용 여부와 스마트키 공통 프리뷰 옵션을 `GameUserSettings.ini`에 저장한다 → New Game으로도 초기화되지 않는다. 슬롯별 스마트키가 꺼져 있으면 `PreviewConfirm`, 켜져 있고 공통 프리뷰 옵션이 켜져 있으면 `QuickCastWithIndicator`, 공통 프리뷰 옵션이 꺼져 있으면 `QuickCast`로 해석한다. 설정 UI(WBP)는 슬롯별 `IsSlotSmartKeyEnabled`/`SetSlotSmartKeyEnabled`, 공통 `IsSmartKeyPreviewOnReleaseEnabled`/`SetSmartKeyPreviewOnReleaseEnabled`를 연결한다.
 - 실제 적용 모드 해석은 `ULSPlayerSkillComponent::GetEffectiveCastMode`로 모인다. **디버그 오버라이드**(`bOverrideCastModeForDebug` + `DebugCastModeOverrides` 맵, 컴포넌트 디테일 패널)가 켜져 있으면 맵 값을 우선하고, 맵에 없는 슬롯은 저장소 값을 따른다. 에디터에서 저장소 UI 없이 즉석 테스트용.
 
 ## 기본 공격 캔슬과 스킬 차단 태그

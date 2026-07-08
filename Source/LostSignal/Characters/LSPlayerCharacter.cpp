@@ -711,7 +711,7 @@ bool ALSPlayerCharacter::IsInventoryWidgetOpen() const
 ELSSkillCastMode ALSPlayerCharacter::ResolveSlotCastMode(ELSPlayerSkillSlot Slot) const
 {
 	// 디버그 오버라이드 우선 적용을 위해 컴포넌트로 해석을 위임한다(설정 저장소 조회 포함).
-	return PlayerSkillComponent ? PlayerSkillComponent->GetEffectiveCastMode(Slot) : ELSSkillCastMode::PreviewConfirm;
+	return PlayerSkillComponent ? PlayerSkillComponent->GetEffectiveCastMode(Slot) : ELSSkillCastMode::QuickCastWithIndicator;
 }
 
 void ALSPlayerCharacter::HandleSkillInputPressed(ELSPlayerSkillSlot Slot)
