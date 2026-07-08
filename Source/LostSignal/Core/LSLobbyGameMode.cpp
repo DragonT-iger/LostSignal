@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
+#include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSettings.h"
 #include "Session/LSSessionSubsystem.h"
 #include "UI/LSBackgroundBlurWidget.h"
@@ -25,8 +26,33 @@ ALSLobbyGameMode::ALSLobbyGameMode()
 void ALSLobbyGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+	RestoreLobbySignalGauge();
 	CreateLobbyBackgroundWidget();
 	CreateLobbyMenuWidget();
+}
+
+void ALSLobbyGameMode::RestoreLobbySignalGauge()
+{
+	// 신호 게이지는 레이드 전용 감소 메커니즘이다(레이드 중 시간에 따라 줄며, 줄면 칩이 비활성→적재 프로토콜 용량 축소).
+	// 값은 매 틱 세이브에 저장되므로, 레이드가 비정상 종료(PIE 강제 종료/크래시)돼 TravelToResultLevel의 1.0 리셋을
+	// 못 타면 줄어든 값이 세이브에 남는다. 그 상태로 로비에 오면 로비 인벤토리 최대 슬롯 수가 실제 아이템 수보다
+	// 작아져, 초과 아이템이 화면에 안 보이는 overflow가 되고 칩 해제 용량 판정이 계속 막힌다.
+	// 로비(=레이드 아님)에서는 신호를 항상 가득으로 되돌려 로비 용량이 신호로 축소되지 않게 한다.
+	// 단, 레이드 복구 대기(bRaidSaveActive) 중이면 재개용 값을 보존한다.
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot restore signal gauge because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	if (SaveSubsystem->IsRaidSaveActive())
+	{
+		return;
+	}
+
+	SaveSubsystem->SetChipSignalGaugePercent(1.0f);
 }
 
 void ALSLobbyGameMode::CreateLobbyBackgroundWidget()
@@ -239,6 +265,7 @@ void ALSLobbyGameMode::TryStartRaidWithSubmittedData()
 
 	TArray<FLSSessionItem> Loadout;
 	TArray<FLSSessionItem> SafeItems;
+	TArray<FLSSessionItem> Equipment;
 	bool bHasLegacySessionLoadout = false;
 
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
@@ -247,26 +274,28 @@ void ALSLobbyGameMode::TryStartRaidWithSubmittedData()
 		{
 			const TArray<FLSSessionItem>& PlayerLoadout = PlayerController->GetSubmittedRaidLoadout();
 			const TArray<FLSSessionItem>& PlayerSafeItems = PlayerController->GetSubmittedRaidSafeItems();
+			const TArray<FLSSessionItem>& PlayerEquipment = PlayerController->GetSubmittedRaidEquipment();
 			if (!bHasLegacySessionLoadout)
 			{
 				Loadout = PlayerLoadout;
 				SafeItems = PlayerSafeItems;
+				Equipment = PlayerEquipment;
 				bHasLegacySessionLoadout = true;
 			}
 
 			// ServerTravel 이후 각 PC가 자신의 데이터를 꺼낼 수 있도록 순서대로 큐에 저장
-			SessionSub->EnqueuePendingRaidEntry(PlayerLoadout, PlayerSafeItems);
+			SessionSub->EnqueuePendingRaidEntry(PlayerLoadout, PlayerSafeItems, PlayerEquipment);
 
 			if (ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
 			{
-				RaidInventory->StartRaidInventory(PlayerLoadout, PlayerSafeItems);
+				RaidInventory->StartRaidInventory(PlayerLoadout, PlayerSafeItems, PlayerEquipment);
 			}
-			PlayerController->ClientStartRaidSession(PlayerLoadout, PlayerSafeItems);
+			PlayerController->ClientStartRaidSession(PlayerLoadout, PlayerSafeItems, PlayerEquipment);
 		}
 	}
 
 	SessionSub->StartRaid(Loadout);
-	SessionSub->MirrorRaidSessionState(Loadout, SafeItems);
+	SessionSub->MirrorRaidSessionState(Loadout, SafeItems, Equipment);
 	ClearRaidEntryDataWait();
 	bRaidStartRequested = true;
 

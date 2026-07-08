@@ -28,6 +28,7 @@
 - **메모리(Memory)**: 칩마다 메모리 비용(`Item_MemoryCost`)이 있고, 장착 UI에는 `현재 사용량 / 최대치` 한도가 있다. 합이 한도를 넘으면 장착 불가.
 - **신호 게이지(Signal Gauge)**: 0~100% 스크롤바. 게이지가 90.0% 이하로 내려갈 때부터 10% 단위로 **칩 번호 순서대로** 비활성화된다. 기본 장착 칩 스탯 합산은 활성·비활성 슬롯을 모두 포함하며, 프로토콜 합산은 비활성 슬롯을 제외한다. 비활성 칩 스탯 값의 50%는 `SignalLossText`에 별도로 표시한다. 최종 전투 스탯은 기본 스탯 표시값과 `SignalLossText` 표시값을 더한 값이다.
   - **레이드 중 시간 감소**: 레이드(파밍 레벨) 진입 시 게이지를 100%로 채우고 **60초마다 10%씩 자동 감소**시키며 0%에서 멈춘다(= 1분에 칩 1칸씩 신호 유실). 레이드 종료(로비 복귀) 시 다시 100%로 복원한다. 감소 주체는 레이드 동안만 존재하는 서버 권한 게임모드 `ALSFarmingGameMode`이며, `ULSSaveSubsystem::SetChipSignalGaugePercent`만 주기적으로 호출해 기존 GAS 재적용(`OnChipLoadoutChanged` → `ULSChipStatComponent::RefreshChipStats`)과 HUD 갱신 경로를 그대로 탄다. (싱글/Listen 서버 기준 — 데디 MO 동기화는 기존 칩 적용 패턴과 함께 후속.)
+  - **로비=항상 100% 불변식 (중요):** 게이지 값은 감소할 때마다 세이브에 저장된다. 정상 종료는 `ALSFarmingGameMode::TravelToResultLevel`이 100%로 되돌리지만, **PIE 강제 종료·크래시로 레이드가 비정상 종료되면 낮은 값이 세이브에 남는다.** 이 상태로 로비에 오면 신호 유실로 적재(Carrying) 칩이 비활성→인벤토리 최대 슬롯 수가 실제 아이템 수보다 작아져, 초과 아이템이 화면에 안 보이는 overflow가 되고 칩 해제 용량 판정(`WouldUnequipChipDropInventoryItems`)이 계속 막히는 버그가 있었다. 이를 막기 위해 `ALSLobbyGameMode::BeginPlay`(→ `RestoreLobbySignalGauge`)가 **로비 진입 시 게이지를 100%로 되돌린다.** 단, 레이드 복구 대기(`IsRaidSaveActive()`) 중이면 재개용 값을 보존한다. 신호 게이지는 레이드 전용 메커니즘이며 로비 인벤토리 용량을 축소해선 안 된다.
 - **프로토콜(Protocol)**: 칩이 보유한 4종 시너지 수치. 장착 칩들의 합산값을 그대로 프로토콜 레벨로 보고, `DT_Protocol`의 해금 row를 기준으로 단계와 표시 항목을 계산한다.
   - 생존(Survival): 체력·스태미나 UI 등 긴장감을 낮추는 편의 UI
   - 적재(Carrying): 인벤토리 개수·보호슬롯·퀵슬롯 등 용량 UI

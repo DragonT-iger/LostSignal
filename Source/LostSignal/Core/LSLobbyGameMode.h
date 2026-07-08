@@ -40,6 +40,10 @@ protected:
 	TSubclassOf<ULSBackgroundBlurWidget> BackgroundBlurWidgetClass;
 
 private:
+	// 로비 진입 시 신호 게이지를 가득으로 되돌린다(레이드 복구 대기 중이면 보존). 레이드 전용 신호 감소가
+	// 로비 적재 프로토콜 용량을 축소해 인벤토리 overflow를 만드는 문제를 막는다.
+	void RestoreLobbySignalGauge();
+
 	// 레벨 진입 즉시 로비 배경 블러와 메뉴 UI를 뷰포트에 올리고 UI 입력 모드로 전환한다.
 	void CreateLobbyBackgroundWidget();
 	void CreateLobbyMenuWidget();
