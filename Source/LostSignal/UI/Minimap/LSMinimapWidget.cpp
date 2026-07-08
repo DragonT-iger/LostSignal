@@ -322,8 +322,10 @@ bool ULSMinimapWidget::ShouldDrawMarker(const FLSMinimapMarkerSnapshot& Marker, 
 	switch (Marker.MarkerType)
 	{
 	case ELSMinimapMarkerType::Enemy:
-		return IsNavigationFeatureVisible(TEXT("Minimap_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyAlwaysVisibleNavigation) ||
-			(IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyVisibleNavigation) && IsMarkerInSight(Marker));
+		// 미니맵 원 영역 밖(반경 초과)의 적은 가장자리에 붙여 표시하지 않고 숨긴다(Loot/DroppedItem과 동일 규칙).
+		return FVector2D::Distance(ProjectedPoint, Center) <= Radius &&
+			(IsNavigationFeatureVisible(TEXT("Minimap_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyAlwaysVisibleNavigation) ||
+				(IsNavigationFeatureVisible(TEXT("Minimap_View_Angle_Enemy"), CurrentNavigationProtocol, PreviousNavigationProtocol, CurrentNavigationProtocol >= RevealPolicy.EnemyVisibleNavigation) && IsMarkerInSight(Marker)));
 	case ELSMinimapMarkerType::Loot:
 	case ELSMinimapMarkerType::DroppedItem:
 		return FVector2D::Distance(ProjectedPoint, Center) <= Radius &&
