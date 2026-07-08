@@ -104,11 +104,12 @@ public:
 	void RefreshLootDropWidgetForSource(ALSLootBox* SourceLootBox, const TArray<FLSDropResult>& Results);
 	void SyncRaidInventoryToClient();
 	void RequestRaidEntryDataForRaidStart();
-	void RequestRaidResultSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
+	void RequestRaidResultSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, bool bSaveInventory, bool bSaveSafeStash, bool bSaveEquipment);
 	void ClearSubmittedRaidEntryData();
 	bool HasSubmittedRaidEntryData() const { return bHasSubmittedRaidEntryData; }
 	const TArray<FLSSessionItem>& GetSubmittedRaidLoadout() const { return SubmittedRaidLoadout; }
 	const TArray<FLSSessionItem>& GetSubmittedRaidSafeItems() const { return SubmittedRaidSafeItems; }
+	const TArray<FLSSessionItem>& GetSubmittedRaidEquipment() const { return SubmittedRaidEquipment; }
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	bool TransferHoveredLootDropItemToInventory();
@@ -161,7 +162,7 @@ public:
 	int32 GetEffectiveProtocolLevel(ELSProtocolType ProtocolType) const;
 
 	UFUNCTION(Client, Reliable)
-	void ClientStartRaidSession(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
+	void ClientStartRaidSession(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);
 
 	bool TransferInventorySlotToLootDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex);
 	bool TransferInventorySlotToOpenContainer(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, bool bRefreshOpenContainer = true);
@@ -249,6 +250,10 @@ protected:
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
 	TArray<FLSSessionItem> SubmittedRaidSafeItems;
 
+	// 레이드 입장 시점 무기/방어구 장착 5칸. 인덱스=슬롯 타입이므로 Normalize 금지.
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
+	TArray<FLSSessionItem> SubmittedRaidEquipment;
+
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug", meta=(ClampMin="-1"))
 	int32 SurvivalProtocolTestLevel = -1;
 
@@ -296,10 +301,10 @@ private:
 	void ClientRequestRaidEntryData();
 
 	UFUNCTION(Server, Reliable)
-	void ServerSubmitRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
+	void ServerSubmitRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);
 
 	UFUNCTION(Client, Reliable)
-	void ClientApplyRaidResult(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
+	void ClientApplyRaidResult(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, bool bSaveInventory, bool bSaveSafeStash, bool bSaveEquipment);
 
 	UFUNCTION(Server, Reliable)
 	void ServerConfirmRaidResultSaved();
@@ -323,7 +328,7 @@ private:
 	void ClientHideChipStationWidget();
 
 	UFUNCTION(Client, Reliable)
-	void ClientSyncRaidSessionAndLoot(ALSLootBox* SourceLootBox, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSDropResult>& LootResults);
+	void ClientSyncRaidSessionAndLoot(ALSLootBox* SourceLootBox, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, const TArray<FLSDropResult>& LootResults);
 
 	// 로비 파밍용: 레이드 세션이 없을 때 룻박스/세이브 기반 인벤토리 UI를 갱신한다.
 	UFUNCTION(Client, Reliable)
@@ -345,8 +350,10 @@ private:
 	void CreateBackgroundBlurWidgetLocal();
 	void InitializeRaidInventoryFromSessionSubsystem();
 	void SubmitLocalRaidEntryData();
-	void StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
-	void ApplyRaidResultToLocalSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, bool bSaveInventory, bool bSaveSafeStash);
+	void StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);
+	void ApplyRaidResultToLocalSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, bool bSaveInventory, bool bSaveSafeStash, bool bSaveEquipment);
+	// 서버 확정 경로에서 장착칸이 관여한 변경이 성공했을 때 소유 폰의 장비 전투 스탯을 재적용한다.
+	void RefreshEquipmentStatsIfEquipmentTouched(ELSInventorySlotArea FromArea, ELSInventorySlotArea ToArea);
 	void SyncRaidSessionAndLootFromServer(ALSLootBox* SourceLootBox);
 	// 로비 파밍용: 레이드 세션이 비활성(=로비)이면 룻박스 아이템을 세이브에 직접 적재한다.
 	bool IsLobbyLootMode() const;

@@ -561,6 +561,9 @@ void ALSPlayerCharacter::RebuildInventoryWidgetSlots()
 	{
 		LSInventoryWidget->RebuildInventorySlots();
 		LSInventoryWidget->RebuildConfirmedStorageSlots();
+		// 레이드 중에는 장비도 세션 정식 영역이라 인벤/Safe와 함께 다시 그려야 한다.
+		// (안 그리면 레이드 중 장착/해제 후 장비칸이 stale로 남아 아이템이 사라진 것처럼 보인다.)
+		LSInventoryWidget->RebuildEquipmentSlots();
 	}
 }
 

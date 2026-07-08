@@ -6,6 +6,7 @@
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "Characters/LSCharacterBase.h"
+#include "Characters/LSEquipmentStatComponent.h"
 #include "Components/InputComponent.h"
 #include "InputCoreTypes.h"
 #include "Characters/LSPlayerCharacter.h"
@@ -164,13 +165,14 @@ void ALSPlayerControllerBase::InitializeRaidInventoryFromSessionSubsystem()
 
 	TArray<FLSSessionItem> PendingInventory;
 	TArray<FLSSessionItem> PendingSafeInventory;
-	if (SessionSub->DequeuePendingRaidEntry(PendingInventory, PendingSafeInventory))
+	TArray<FLSSessionItem> PendingEquipment;
+	if (SessionSub->DequeuePendingRaidEntry(PendingInventory, PendingSafeInventory, PendingEquipment))
 	{
-		RaidInventoryComponent->StartRaidInventory(PendingInventory, PendingSafeInventory);
+		RaidInventoryComponent->StartRaidInventory(PendingInventory, PendingSafeInventory, PendingEquipment);
 	}
 	else
 	{
-		RaidInventoryComponent->MirrorRaidInventoryState(SessionSub->GetSessionInventory(), SessionSub->GetSessionSafeInventory());
+		RaidInventoryComponent->MirrorRaidInventoryState(SessionSub->GetSessionInventory(), SessionSub->GetSessionSafeInventory(), SessionSub->GetSessionEquipmentSlots());
 	}
 	if (HasAuthority())
 	{
@@ -178,7 +180,7 @@ void ALSPlayerControllerBase::InitializeRaidInventoryFromSessionSubsystem()
 	}
 }
 
-void ALSPlayerControllerBase::ClientStartRaidSession_Implementation(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems)
+void ALSPlayerControllerBase::ClientStartRaidSession_Implementation(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems)
 {
 	if (!RaidInventoryComponent)
 	{
@@ -186,7 +188,7 @@ void ALSPlayerControllerBase::ClientStartRaidSession_Implementation(const TArray
 		return;
 	}
 
-	RaidInventoryComponent->StartRaidInventory(Loadout, SafeItems);
+	RaidInventoryComponent->StartRaidInventory(Loadout, SafeItems, EquipmentItems);
 	if (UGameInstance* GameInstance = GetGameInstance())
 	{
 		if (ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>())
@@ -394,7 +396,7 @@ void ALSPlayerControllerBase::ClientHideChipStationWidget_Implementation()
 	HideChipStationWidgetLocal();
 }
 
-void ALSPlayerControllerBase::ClientSyncRaidSessionAndLoot_Implementation(ALSLootBox* SourceLootBox, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSDropResult>& LootResults)
+void ALSPlayerControllerBase::ClientSyncRaidSessionAndLoot_Implementation(ALSLootBox* SourceLootBox, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, const TArray<FLSDropResult>& LootResults)
 {
 	if (!RaidInventoryComponent)
 	{
@@ -402,7 +404,7 @@ void ALSPlayerControllerBase::ClientSyncRaidSessionAndLoot_Implementation(ALSLoo
 		return;
 	}
 
-	RaidInventoryComponent->MirrorRaidInventoryState(InventoryItems, SafeItems);
+	RaidInventoryComponent->MirrorRaidInventoryState(InventoryItems, SafeItems, EquipmentItems);
 
 	// 미러 데이터가 갱신됐으니 열려 있는 인벤토리 계열 패널 전체를 funnel로 다시 그린다.
 	RefreshAllInventoryUI();
@@ -431,6 +433,7 @@ void ALSPlayerControllerBase::SyncRaidInventoryToClient()
 		nullptr,
 		RaidInventoryComponent->GetSessionInventory(),
 		RaidInventoryComponent->GetSessionSafeInventory(),
+		RaidInventoryComponent->GetSessionEquipmentSlots(),
 		TArray<FLSDropResult>());
 }
 
@@ -451,6 +454,7 @@ void ALSPlayerControllerBase::ClearSubmittedRaidEntryData()
 	bHasSubmittedRaidEntryData = false;
 	SubmittedRaidLoadout.Reset();
 	SubmittedRaidSafeItems.Reset();
+	SubmittedRaidEquipment.Reset();
 }
 
 void ALSPlayerControllerBase::ClientRequestRaidEntryData_Implementation()
@@ -458,9 +462,9 @@ void ALSPlayerControllerBase::ClientRequestRaidEntryData_Implementation()
 	SubmitLocalRaidEntryData();
 }
 
-void ALSPlayerControllerBase::ServerSubmitRaidEntryData_Implementation(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems)
+void ALSPlayerControllerBase::ServerSubmitRaidEntryData_Implementation(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems)
 {
-	StoreSubmittedRaidEntryData(Loadout, SafeItems);
+	StoreSubmittedRaidEntryData(Loadout, SafeItems, EquipmentItems);
 
 	if (ALSLobbyGameMode* LobbyGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ALSLobbyGameMode>() : nullptr)
 	{
@@ -472,6 +476,7 @@ void ALSPlayerControllerBase::SubmitLocalRaidEntryData()
 {
 	TArray<FLSSessionItem> Loadout;
 	TArray<FLSSessionItem> SafeItems;
+	TArray<FLSSessionItem> EquipmentItems;
 
 	UGameInstance* GameInstance = GetGameInstance();
 	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
@@ -479,6 +484,7 @@ void ALSPlayerControllerBase::SubmitLocalRaidEntryData()
 	{
 		Loadout = SaveSubsystem->GetInventory();
 		SafeItems = SaveSubsystem->GetSafeStash();
+		EquipmentItems = SaveSubsystem->GetEquipmentSlots();
 	}
 	else
 	{
@@ -487,7 +493,7 @@ void ALSPlayerControllerBase::SubmitLocalRaidEntryData()
 
 	if (HasAuthority())
 	{
-		StoreSubmittedRaidEntryData(Loadout, SafeItems);
+		StoreSubmittedRaidEntryData(Loadout, SafeItems, EquipmentItems);
 		if (ALSLobbyGameMode* LobbyGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ALSLobbyGameMode>() : nullptr)
 		{
 			LobbyGameMode->NotifyRaidEntryDataSubmitted(this);
@@ -495,10 +501,10 @@ void ALSPlayerControllerBase::SubmitLocalRaidEntryData()
 		return;
 	}
 
-	ServerSubmitRaidEntryData(Loadout, SafeItems);
+	ServerSubmitRaidEntryData(Loadout, SafeItems, EquipmentItems);
 }
 
-void ALSPlayerControllerBase::StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems)
+void ALSPlayerControllerBase::StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems)
 {
 	if (!HasAuthority())
 	{
@@ -509,31 +515,35 @@ void ALSPlayerControllerBase::StoreSubmittedRaidEntryData(const TArray<FLSSessio
 	SubmittedRaidSafeItems = SafeItems;
 	LSInventorySlotUtils::NormalizeSlotArray(SubmittedRaidLoadout);
 	LSInventorySlotUtils::NormalizeSlotArray(SubmittedRaidSafeItems);
+	// 장비는 인덱스=슬롯 타입이므로 Normalize(빈 칸 압축) 금지 — 5칸 패딩만 한다.
+	SubmittedRaidEquipment = EquipmentItems;
+	SubmittedRaidEquipment.SetNum(LSInventorySlotUtils::EquipmentSlotCount);
 	bHasSubmittedRaidEntryData = true;
 
-	UE_LOG(LogLS, Log, TEXT("Raid entry data submitted for %s. LoadoutSlots=%d SafeSlots=%d"),
+	UE_LOG(LogLS, Log, TEXT("Raid entry data submitted for %s. LoadoutSlots=%d SafeSlots=%d EquipmentSlots=%d"),
 		*GetNameSafe(this),
 		SubmittedRaidLoadout.Num(),
-		SubmittedRaidSafeItems.Num());
+		SubmittedRaidSafeItems.Num(),
+		SubmittedRaidEquipment.Num());
 }
 
-void ALSPlayerControllerBase::RequestRaidResultSave(const ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const bool bSaveInventory, const bool bSaveSafeStash)
+void ALSPlayerControllerBase::RequestRaidResultSave(const ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, const bool bSaveInventory, const bool bSaveSafeStash, const bool bSaveEquipment)
 {
 	if (IsLocalPlayerController())
 	{
-		ApplyRaidResultToLocalSave(Result, InventoryItems, SafeItems, bSaveInventory, bSaveSafeStash);
+		ApplyRaidResultToLocalSave(Result, InventoryItems, SafeItems, EquipmentItems, bSaveInventory, bSaveSafeStash, bSaveEquipment);
 		return;
 	}
 
-	ClientApplyRaidResult(Result, InventoryItems, SafeItems, bSaveInventory, bSaveSafeStash);
+	ClientApplyRaidResult(Result, InventoryItems, SafeItems, EquipmentItems, bSaveInventory, bSaveSafeStash, bSaveEquipment);
 }
 
-void ALSPlayerControllerBase::ClientApplyRaidResult_Implementation(const ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const bool bSaveInventory, const bool bSaveSafeStash)
+void ALSPlayerControllerBase::ClientApplyRaidResult_Implementation(const ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, const bool bSaveInventory, const bool bSaveSafeStash, const bool bSaveEquipment)
 {
-	ApplyRaidResultToLocalSave(Result, InventoryItems, SafeItems, bSaveInventory, bSaveSafeStash);
+	ApplyRaidResultToLocalSave(Result, InventoryItems, SafeItems, EquipmentItems, bSaveInventory, bSaveSafeStash, bSaveEquipment);
 }
 
-void ALSPlayerControllerBase::ApplyRaidResultToLocalSave(const ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const bool bSaveInventory, const bool bSaveSafeStash)
+void ALSPlayerControllerBase::ApplyRaidResultToLocalSave(const ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, const bool bSaveInventory, const bool bSaveSafeStash, const bool bSaveEquipment)
 {
 	UGameInstance* GameInstance = GetGameInstance();
 	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
@@ -553,13 +563,20 @@ void ALSPlayerControllerBase::ApplyRaidResultToLocalSave(const ELSRaidResult Res
 		SaveSubsystem->ReplaceSafeStash(SafeItems);
 	}
 
+	// bSaveEquipment=false(Quit)면 세이브의 장착 상태가 입장 시점 그대로라 저장 생략이 곧 복구다.
+	if (bSaveEquipment)
+	{
+		SaveSubsystem->ReplaceEquipmentSlots(EquipmentItems);
+	}
+
 	SaveSubsystem->ClearRaidSave();
 
-	UE_LOG(LogLS, Log, TEXT("Raid result applied locally on %s. Result=%d SaveInventory=%s SaveSafe=%s InventorySlots=%d SafeSlots=%d"),
+	UE_LOG(LogLS, Log, TEXT("Raid result applied locally on %s. Result=%d SaveInventory=%s SaveSafe=%s SaveEquipment=%s InventorySlots=%d SafeSlots=%d"),
 		*GetNameSafe(this),
 		static_cast<int32>(Result),
 		bSaveInventory ? TEXT("true") : TEXT("false"),
 		bSaveSafeStash ? TEXT("true") : TEXT("false"),
+		bSaveEquipment ? TEXT("true") : TEXT("false"),
 		InventoryItems.Num(),
 		SafeItems.Num());
 
@@ -971,6 +988,8 @@ bool ALSPlayerControllerBase::TransferLootDropSlotToSessionSlot(ALSLootBox* Sour
 		const bool bTransferred = TransferLootDropSlotToSessionSlotInternal(SourceLootBox, LootSlotIndex, ToSlotArea, ToSlotIndex, OutLootItem);
 		if (bTransferred)
 		{
+			// 룻박스에서 장착칸으로 직접 장착하면 장비 스탯을 재적용한다.
+			RefreshEquipmentStatsIfEquipmentTouched(ToSlotArea, ToSlotArea);
 			SyncRaidSessionAndLootFromServer(SourceLootBox);
 		}
 		return bTransferred;
@@ -984,6 +1003,11 @@ void ALSPlayerControllerBase::ServerTransferLootDropSlotToSessionSlot_Implementa
 {
 	FLSSessionItem IgnoredLootItem;
 	const bool bTransferred = TransferLootDropSlotToSessionSlotInternal(SourceLootBox, LootSlotIndex, ToSlotArea, ToSlotIndex, IgnoredLootItem);
+	if (bTransferred)
+	{
+		// 룻박스에서 장착칸으로 직접 장착하면 장비 스탯을 재적용한다.
+		RefreshEquipmentStatsIfEquipmentTouched(ToSlotArea, ToSlotArea);
+	}
 	if (SourceLootBox || bTransferred)
 	{
 		SyncRaidSessionAndLootFromServer(SourceLootBox);
@@ -1006,6 +1030,8 @@ bool ALSPlayerControllerBase::TransferSessionSlotToLootDropSlot(ALSLootBox* Sour
 		const bool bTransferred = TransferSessionSlotToLootDropSlotInternal(SourceLootBox, FromSlotArea, FromSlotIndex, LootSlotIndex, OutLootItem);
 		if (bTransferred)
 		{
+			// 장착칸을 룻박스로 이송하면 즉시 해제이므로 장비 스탯을 재적용한다.
+			RefreshEquipmentStatsIfEquipmentTouched(FromSlotArea, FromSlotArea);
 			SyncRaidSessionAndLootFromServer(SourceLootBox);
 		}
 		return bTransferred;
@@ -1019,6 +1045,11 @@ void ALSPlayerControllerBase::ServerTransferSessionSlotToLootDropSlot_Implementa
 {
 	FLSSessionItem IgnoredLootItem;
 	const bool bTransferred = TransferSessionSlotToLootDropSlotInternal(SourceLootBox, FromSlotArea, FromSlotIndex, LootSlotIndex, IgnoredLootItem);
+	if (bTransferred)
+	{
+		// 장착칸을 룻박스로 이송하면 즉시 해제이므로 장비 스탯을 재적용한다.
+		RefreshEquipmentStatsIfEquipmentTouched(FromSlotArea, FromSlotArea);
+	}
 	if (SourceLootBox || bTransferred)
 	{
 		SyncRaidSessionAndLootFromServer(SourceLootBox);
@@ -1375,6 +1406,7 @@ bool ALSPlayerControllerBase::DropInventorySlot(const ELSInventorySlotArea FromA
 		const bool bChanged = InventoryComponent && InventoryComponent->IsRaidActive() && InventoryComponent->DropSessionSlot(FromArea, FromIndex, ToArea, ToIndex);
 		if (bChanged)
 		{
+			RefreshEquipmentStatsIfEquipmentTouched(FromArea, ToArea);
 			SyncRaidInventoryToClient();
 		}
 		return bChanged;
@@ -1390,7 +1422,34 @@ void ALSPlayerControllerBase::ServerDropInventorySlot_Implementation(const ELSIn
 	const bool bChanged = InventoryComponent && InventoryComponent->IsRaidActive() && InventoryComponent->DropSessionSlot(FromArea, FromIndex, ToArea, ToIndex);
 	if (bChanged)
 	{
+		RefreshEquipmentStatsIfEquipmentTouched(FromArea, ToArea);
 		SyncRaidInventoryToClient();
+	}
+}
+
+void ALSPlayerControllerBase::RefreshEquipmentStatsIfEquipmentTouched(const ELSInventorySlotArea FromArea, const ELSInventorySlotArea ToArea)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// 장착칸(Equipment)이 관여한 변경만 스탯 재적용 대상이다. 그 외 영역끼리의 이동은 스탯과 무관.
+	if (FromArea != ELSInventorySlotArea::Equipment && ToArea != ELSInventorySlotArea::Equipment)
+	{
+		return;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return;
+	}
+
+	if (ULSEquipmentStatComponent* EquipmentStat = ControlledPawn->FindComponentByClass<ULSEquipmentStatComponent>())
+	{
+		// 레이드 중 장비 교체가 회복 수단이 되지 않도록 체력 클램프만 한다(bRestoreFullHealth=false).
+		EquipmentStat->RefreshEquipmentStats(false);
 	}
 }
 
@@ -1485,6 +1544,7 @@ void ALSPlayerControllerBase::SyncRaidSessionAndLootFromServer(ALSLootBox* Sourc
 		SourceLootBox,
 		InventoryComponent->GetSessionInventory(),
 		InventoryComponent->GetSessionSafeInventory(),
+		InventoryComponent->GetSessionEquipmentSlots(),
 		LootResults);
 }
 
@@ -1689,7 +1749,9 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 
 	if (bUseRaidInventory)
 	{
-		ClientSyncRaidSessionAndLoot(nullptr, InventoryComponent->GetSessionInventory(), InventoryComponent->GetSessionSafeInventory(), TArray<FLSDropResult>());
+		// 장착칸에서 곧바로 월드 드랍하면 즉시 해제이므로 장비 스탯을 재적용한다.
+		RefreshEquipmentStatsIfEquipmentTouched(SlotArea, SlotArea);
+		ClientSyncRaidSessionAndLoot(nullptr, InventoryComponent->GetSessionInventory(), InventoryComponent->GetSessionSafeInventory(), InventoryComponent->GetSessionEquipmentSlots(), TArray<FLSDropResult>());
 	}
 	return true;
 }

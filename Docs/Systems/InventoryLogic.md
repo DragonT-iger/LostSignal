@@ -80,14 +80,15 @@ Source/LostSignal/Inventory/LSInventorySlotUtils.cpp
 
 ### 장비 장착 (무기/방어구)
 
-장비 슬롯은 인벤토리 슬롯과 같은 `ULSItemSlotWidget` 컨텍스트(`ELSInventorySlotArea::Equipment`)를 재사용해 **드래그로만** 장착/해제한다(Shift 빠른 이동은 미지원). 장착 상태는 `ULSSaveGame::EquipmentSlots`(고정 5칸, `ELSEquipmentSlot` 순서)에 저장하며, 로비 전용이다. 레이드 중에는 인벤토리 원본이 세션 상태(`RaidInventoryComponent`)로 바뀌므로 장비 슬롯을 잠가 변경을 막는다(표시는 저장값 유지).
+장비 슬롯은 인벤토리 슬롯과 같은 `ULSItemSlotWidget` 컨텍스트(`ELSInventorySlotArea::Equipment`)를 재사용해 드래그 및 Shift 빠른이동으로 장착/해제한다. 장착 상태는 로비에서는 `ULSSaveGame::EquipmentSlots`(고정 5칸, `ELSEquipmentSlot` 순서)에, 레이드 중에는 세션 영역(`RaidInventoryComponent::SessionEquipmentSlots`)에 있다. 즉 장비는 SafeStash처럼 레이드 세션의 정식 영역으로 승격되어 **레이드 중에도 장착/해제/교환이 가능**하다. 저장/네트워크 경계와 결과별 저장 규칙은 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)·[RaidLevelFlow.md](RaidLevelFlow.md)가 단일 출처다.
 
 - **슬롯 타입 매핑:** 슬롯 인덱스가 곧 타입이다. `Weapon`=무기(`Weapon_*`), `Processor`=머리, `Core`=몸, `Actuator`=손, `Frame`=발. 방어구 타입은 `Item_Equipment`(Processor/Core/Actuator/Frame)가 단일 출처이며, 판정은 `LSInventorySlotUtils::ResolveEquipmentSlotType`가 담당한다. 무기는 현재 캐릭터 구분 없이(`Weapon_1/2/3`) 무기 슬롯에 장착 가능하다.
-- **처리 경로:** 장비 슬롯이 원본/대상에 걸린 드롭은 `ULSInventoryWidget::HandleInventorySlotDrop`이 `HandleEquipmentSlotDrop`으로 분기해 `ULSSaveSubsystem::MoveEquipmentSlot`으로 확정한다(레이드면 거부). `MoveEquipmentSlot`은 타입 검증 후 기존 `LSInventorySlotUtils::DropSlot`(배치/스왑)을 재사용한다. 장비는 `Item_Max=1`이라 병합 없이 배치/스왑으로만 동작한다.
-- **타입 검증:** 장비 슬롯에 최종적으로 들어가는 아이템은 그 슬롯 타입과 일치해야 한다. 장착(인벤토리→장비)은 소스 타입을, 해제 시 교환(장비↔점유된 인벤토리 슬롯)은 인벤토리 쪽 아이템 타입을 검증한다. 타입이 안 맞으면 드롭이 실패한다(장비끼리 서로 다른 타입 슬롯 교환도 불가). 장착된 장비는 창 밖으로 드래그해도 월드에 버리지 않는다.
-- **GAS 스탯 적용:** 장착 무기/방어구의 전투 스탯은 칩과 같은 패턴으로 GAS 어트리뷰트에 적용된다. `ULSEquipmentStatComponent`(`ALSPlayerCharacter`에 부착)가 `SaveSubsystem->GetEquipmentSlots()`를 읽어 `LSEquipmentStats::ComputeEquipmentStatTotals`로 합산하고, 무한 지속 GE(`ULSGE_EquipmentStats`, SetByCaller `LS.Data.Equip.*`)를 remove & reapply로 적용한다(서버 권한 전용). 초기 적용은 캐릭터 BeginPlay에서 칩 적용 뒤, 갱신 트리거는 `ULSSaveSubsystem::OnEquipmentChanged`(`MoveEquipmentSlot` 성공 시 브로드캐스트)다. 스탯→어트리뷰트 매핑: 무기 `Item_Attack`→Attack, `Item_Attack_Speed`→AttackSpeed, `Item_Skill_Haste`→CooldownReduction, `Item_Critical_Rate`→CritChance, `Item_Critical_Damage`→CritDamage, `Item_Defense_Penetration`→ArmorPenetration / 방어구 `Item_Health`→MaxHealth, `Item_Defense`→Defence, `Item_Recovery`→Recovery. 비율 스탯(공속/스킬가속/치확/치피/방관)은 칩과 동일하게 ÷100 환산해 가산한다.
-- **드래그 하이라이트:** 아이템 드래그를 시작하면 그 아이템이 장착될 장비칸 1개에 후보 하이라이트(후보 색 틴트 + 스케일 펄스)를 켜, 어디에 놓아야 할지 보이게 한다. 대상 판정은 타입 매핑(`ResolveEquipmentSlotType`)과 동일하며, 장착 불가 아이템이면 어느 칸도 켜지지 않는다. 시작은 `ULSItemSlotWidget::NativeOnDragDetected`가 PC의 `GetLobbyInventoryWidget()`을 통해 `ULSInventoryWidget::SetEquipmentDragHighlight`를 호출하고, 종료(성공/취소 공용)는 `RestoreDragSourceVisual`이 `ClearEquipmentDragHighlight`로 끈다. 로비 장비 편집 전용이라 레이드 중(로비 인벤토리 위젯 없음)에는 동작하지 않는다.
-- **미연동(후속):** 레이드(인게임) 중 장비 장착/교체는 아직 막혀 있다(아래 처리 경로 참고). 즉 GAS 스탯은 레이드 중에도 로비에서 고정된 loadout 기준으로 적용되며, 레이드 중 *변경*은 지원하지 않는다.
+- **처리 경로:** 장비 슬롯이 원본/대상에 걸린 드롭은 `ULSInventoryWidget::HandleInventorySlotDrop`이 `HandleEquipmentSlotDrop`으로 분기한다. **로비**면 `ULSSaveSubsystem::MoveEquipmentSlot`으로 확정하고, **레이드**면 인벤토리와 동일하게 서버 판정 경로(`PlayerController->DropInventorySlot`)로 라우팅한다(타입 불일치/용량 부족은 서버가 거부, 성공 시 미러 RPC가 UI를 funnel로 다시 그림). `MoveEquipmentSlot`/서버 `DropSessionSlot` 모두 타입 검증 후 공용 `LSInventorySlotUtils`의 장비 이동 코어(`MoveEquipmentSlotBetweenArrays` / `DropSlot`)를 재사용한다. 장비는 `Item_Max=1`이라 병합 없이 배치/스왑으로만 동작한다.
+- **타입 검증:** 장비 슬롯에 최종적으로 들어가는 아이템은 그 슬롯 타입과 일치해야 한다. 장착(인벤토리→장비)은 소스 타입을, 해제 시 교환(장비↔점유된 인벤토리 슬롯)은 인벤토리 쪽 아이템 타입을 검증한다. 타입이 안 맞으면 드롭이 실패한다(장비끼리 서로 다른 타입 슬롯 교환도 불가). 검증 로직은 로비/레이드 공용으로 `LSInventorySlotUtils`에 있다.
+- **레이드 중 월드 드랍 / 룻박스 직행:** 레이드 중에는 장착칸을 창 밖으로 드래그해 월드에 버리거나(익스트렉션 리스크), 룻박스로 이송하거나, 룻박스에서 장착칸으로 직접 장착(타입 일치 시)할 수 있다. 로비에서는 장착 장비를 창 밖으로 드래그해도 월드에 버리지 않는다(장착 유지, 로비 장비 월드 드랍은 범위 밖).
+- **GAS 스탯 적용:** 장착 무기/방어구의 전투 스탯은 칩과 같은 패턴으로 GAS 어트리뷰트에 적용된다. `ULSEquipmentStatComponent`(`ALSPlayerCharacter`에 부착)가 스탯 소스를 `ResolveEquipmentSource()`로 결정하고(**레이드 중이면 `RaidInventoryComponent::GetSessionEquipmentSlots()`, 로비면 `SaveSubsystem->GetEquipmentSlots()`**) `LSEquipmentStats::ComputeEquipmentStatTotals`로 합산해, 무한 지속 GE(`ULSGE_EquipmentStats`, SetByCaller `LS.Data.Equip.*`)를 remove & reapply로 적용한다(서버 권한 전용). 초기 적용은 캐릭터 BeginPlay에서 칩 적용 뒤 풀피로, 이후 갱신은 체력 클램프만 한다(교체가 회복 수단이 되지 않게). 갱신 트리거는 로비=`ULSSaveSubsystem::OnEquipmentChanged`, 레이드=`ALSPlayerControllerBase::RefreshEquipmentStatsIfEquipmentTouched`(장착칸을 건드리는 모든 서버 확정 경로: 인벤↔장착, 월드 드랍, 룻박스 이송, 룻→장착)다. 스탯→어트리뷰트 매핑: 무기 `Item_Attack`→Attack, `Item_Attack_Speed`→AttackSpeed, `Item_Skill_Haste`→CooldownReduction, `Item_Critical_Rate`→CritChance, `Item_Critical_Damage`→CritDamage, `Item_Defense_Penetration`→ArmorPenetration / 방어구 `Item_Health`→MaxHealth, `Item_Defense`→Defence, `Item_Recovery`→Recovery. 비율 스탯(공속/스킬가속/치확/치피/방관)은 칩과 동일하게 ÷100 환산해 가산한다.
+- **드래그 하이라이트:** 아이템 드래그를 시작하면 그 아이템이 장착될 장비칸 1개에 후보 하이라이트(후보 색 틴트 + 스케일 펄스)를 켜, 어디에 놓아야 할지 보이게 한다. 대상 판정은 타입 매핑(`ResolveEquipmentSlotType`)과 동일하며, 장착 불가 아이템이면 어느 칸도 켜지지 않는다. 시작은 `ULSItemSlotWidget::NativeOnDragDetected`가 PC의 `GetLobbyInventoryWidget()`을 통해 `ULSInventoryWidget::SetEquipmentDragHighlight`를 호출하고, 종료(성공/취소 공용)는 `RestoreDragSourceVisual`이 `ClearEquipmentDragHighlight`로 끈다. 이 하이라이트는 로비 장비 편집 전용이다.
+- **호버 힌트:** 인벤토리의 장착 가능한 아이템에 마우스를 올리기만 해도(드래그 전) 대상 장비칸이 **비어 있으면** 같은 후보 하이라이트를 켠다. `NativeOnMouseEnter`가 `UpdateEquipHoverHint`로 켜고 `NativeOnMouseLeave`가 `ClearEquipHoverHint`로 끈다. 대상 칸이 이미 차 있으면 켜지 않는다(Shift 빠른이동이 빈 칸에만 장착하는 규칙과 일치). 호버 상태에서 그대로 드래그를 시작하면 `NativeOnDragDetected`가 드래그 하이라이트로 소유권을 넘겨(`bShowingEquipHoverHint` 해제), 드래그 시작 직후 오는 `NativeOnMouseLeave`가 하이라이트를 지우지 않게 한다. 드래그 하이라이트와 동일 경로(`GetLobbyInventoryWidget`)를 쓰므로 로비 전용이다.
 
 ```text
 RebuildInventorySlots
@@ -99,7 +100,9 @@ RebuildConfirmedStorageSlots
 -> 레이드가 아니면 SaveSubsystem::GetSafeStash
 
 RebuildEquipmentSlots
--> SaveSubsystem::GetEquipmentSlots (로비 전용, 레이드 중이면 잠금 표시)
+-> 레이드 중이면 RaidInventoryComponent::GetSessionEquipmentSlots
+-> 레이드가 아니면 SaveSubsystem::GetEquipmentSlots
+   (레이드/로비 모두 잠그지 않고 장착/해제/교환 허용)
 ```
 
 `ULSLobbyStorageWidget`은 로비 창고를 표시한다.
@@ -166,7 +169,8 @@ Safe <-> Safe
 Inventory/Safe <-> LootBox
 Inventory/Safe <-> Warehouse
 Warehouse <-> Warehouse
-Inventory/Safe <-> Equipment (로비 전용, 장비 장착/해제)
+Inventory/Safe <-> Equipment (장비 장착/해제/교환. 로비=SaveSubsystem, 레이드=서버 세션)
+Equipment -> WorldDroppedItem / Equipment <-> LootBox (레이드 전용, 장착칸 직행 허용)
 Inventory/Safe/Warehouse -> WorldDroppedItem
 WorldDroppedItem -> Inventory
 ```
@@ -209,6 +213,23 @@ Warehouse 슬롯 Shift+좌클릭 또는 더블 클릭
 ```
 
 장착 슬롯 수의 단일 출처는 `ULSSaveSubsystem`이며, 첫 빈 칸 탐색은 `GetChipEquipmentSlots()`를 스캔한다. 모든 장착 칸이 차 있으면 장착하지 않고 `UE_LOG(LogLS, Warning, ...)`만 남긴다.
+
+무기/방어구 장비도 Shift 빠른이동을 지원한다(칩과 별개 경로).
+
+```text
+인벤토리 슬롯의 장착 가능 아이템 Shift+좌클릭 또는 더블 클릭
+-> 대상 장비칸(타입=인덱스)이 비어 있으면 "먼저" 그 칸에 장착
+-> ULSItemSlotWidget::TryHandleEquipFromInventoryQuickTransfer
+-> 장착 불가 아이템이거나 대상 장비칸이 차 있으면 false → 기존 컨테이너(룻박스/창고) 이동으로 넘어감
+
+무기/방어구 장착칸 Shift+좌클릭 또는 더블 클릭
+-> 인벤토리 첫 빈 칸으로 해제 (로비=SaveSubsystem::MoveEquipmentSlot, 레이드=PlayerController::DropInventorySlot)
+-> ULSItemSlotWidget::TryHandleEquipmentQuickTransfer
+```
+
+즉 인벤토리 아이템 Shift 빠른이동의 우선순위는 **빈 장비칸 장착 > 컨테이너(룻박스/창고) 이동**이다. 장착 가능하고 대상 장비칸이 비어 있으면 컨테이너가 열려 있어도 장착이 먼저다. 대상 장비칸이 이미 차 있거나 장착 불가 아이템이면 빠른이동으로 교체하지 않고 컨테이너 이동으로 넘긴다(교체는 드래그로).
+
+인벤토리 첫 빈 칸 탐색은 공용 `LSInventorySlotUtils::FindFirstEmptySlotIndex`로, 레이드=클라 세션 미러(`GetSessionInventory`)·로비=세이브(`GetInventory`)를 최대 슬롯 수 안에서 스캔한다. **빈 칸이 없으면 이동하지 않고 "인벤토리가 가득 찼습니다" 알림 다이얼로그**(`ULSInventoryWidget::ShowInventoryFullNotification`, `ULSConfirmDialogWidget` 기반, 칩 스테이션 용량 알림과 동일 패턴)를 띄운다. 다이얼로그 클래스는 `WBP_Inventory`에서 `WBP_ConfirmDialog`를 매핑해야 하며(아트 매핑 필요), 미할당 시 알림 없이 `UE_LOG(LogLS, Warning, ...)`만 남는다. Shift 쓸기 재호출로 알림이 중복되지 않게 이미 떠 있으면 재생성하지 않고, 이동 성공 시 소스 칸을 즉시 `ClearItem()`한다(칩 장착칸 패턴).
 
 Shift+좌클릭 상태를 유지한 채 마우스를 다른 슬롯으로 이동하면, 마우스가 지나가는 아이템 슬롯은 같은 빠른 이동 규칙으로 차례대로 이동한다. 빈 슬롯, 잠긴 슬롯, 대상 컨테이너가 없는 상태는 기존 Shift-click과 같이 무시한다.
 

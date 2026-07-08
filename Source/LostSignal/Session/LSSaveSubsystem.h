@@ -48,6 +48,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void ReplaceSafeStash(const TArray<FLSSessionItem>& Items);
 
+	// 레이드 결과(탈출/사망)의 최종 장착 상태를 세이브에 반영한다.
+	// 장비 배열은 인덱스=슬롯타입 불변식이므로 Normalize 금지, SetNum(5) 패딩만 한다.
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	void ReplaceEquipmentSlots(const TArray<FLSSessionItem>& Items);
+
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void SortInventory();
 

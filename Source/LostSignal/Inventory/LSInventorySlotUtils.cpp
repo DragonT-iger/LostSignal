@@ -107,6 +107,18 @@ bool IsFilled(const FLSDropResult& Item)
 	return !Item.ItemRowName.IsNone() && Item.Amount > 0;
 }
 
+int32 FindFirstEmptySlotIndex(const TArray<FLSSessionItem>& Slots, const int32 MaxSlotCount)
+{
+	for (int32 SlotIndex = 0; SlotIndex < MaxSlotCount; ++SlotIndex)
+	{
+		if (!Slots.IsValidIndex(SlotIndex) || !IsFilled(Slots[SlotIndex]))
+		{
+			return SlotIndex;
+		}
+	}
+	return INDEX_NONE;
+}
+
 FLSSessionItem MakeEmptyItem()
 {
 	return FLSSessionItem();
@@ -498,6 +510,55 @@ void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots)
 	{
 		Slots.Add(MakeEmptyItem());
 	}
+}
+
+bool MoveEquipmentSlotBetweenArrays(TArray<FLSSessionItem>& FromSlots, const int32 FromIndex, const bool bFromEquipment, TArray<FLSSessionItem>& ToSlots, const int32 ToIndex, const bool bToEquipment, const int32 ToMaxSlotCount)
+{
+	// 장비끼리는 슬롯마다 타입이 고정이라 교환이 성립하지 않고, 둘 다 아니면 일반 슬롯 이동을 써야 한다.
+	if (bFromEquipment == bToEquipment)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Inventory] Cannot move equipment slot with invalid area pair. FromEquipment=%d ToEquipment=%d"),
+			bFromEquipment ? 1 : 0, bToEquipment ? 1 : 0);
+		return false;
+	}
+
+	if (!FromSlots.IsValidIndex(FromIndex) || !IsFilled(FromSlots[FromIndex]) || ToIndex < 0)
+	{
+		return false;
+	}
+
+	// 장착: 장비 슬롯에 들어갈 아이템 타입이 그 슬롯 타입(=인덱스)과 일치해야 한다.
+	if (bToEquipment)
+	{
+		if (ToIndex >= EquipmentSlotCount)
+		{
+			return false;
+		}
+
+		const FName SourceRow = FromSlots[FromIndex].ItemRowName;
+		if (ResolveEquipmentSlotType(SourceRow) != static_cast<ELSEquipmentSlot>(ToIndex))
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Inventory] Cannot equip '%s' into equipment slot %d because type mismatches."),
+				*SourceRow.ToString(), ToIndex);
+			return false;
+		}
+	}
+
+	// 해제(교환): 대상 슬롯에 아이템이 있으면 스왑으로 그 아이템이 장비 슬롯(FromIndex)에 들어간다.
+	// 들어갈 아이템 타입이 장비 슬롯 타입과 맞을 때만 허용한다(엉뚱한 아이템이 장착되는 것을 막는다).
+	if (bFromEquipment && ToSlots.IsValidIndex(ToIndex) && IsFilled(ToSlots[ToIndex]))
+	{
+		const FName TargetRow = ToSlots[ToIndex].ItemRowName;
+		if (ResolveEquipmentSlotType(TargetRow) != static_cast<ELSEquipmentSlot>(FromIndex))
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Inventory] Cannot swap equipment slot %d with '%s' because type mismatches."),
+				FromIndex, *TargetRow.ToString());
+			return false;
+		}
+	}
+
+	// 장비는 Item_Max=1이라 병합 없이 배치/스왑으로만 동작한다.
+	return DropSlot(FromSlots, FromIndex, ToSlots, ToIndex, ToMaxSlotCount);
 }
 
 bool SwapSlots(TArray<FLSSessionItem>& FromSlots, const int32 FromIndex, TArray<FLSSessionItem>& ToSlots, const int32 ToIndex, const int32 ToMaxSlotCount)

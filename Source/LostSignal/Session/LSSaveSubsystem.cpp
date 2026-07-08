@@ -18,7 +18,8 @@
 
 constexpr int32 SaveDefaultMaxInventorySlotCount = 10;
 constexpr int32 ChipEquipmentSlotCount = 10;
-constexpr int32 EquipmentSlotCount = static_cast<int32>(ELSEquipmentSlot::Count);
+// 무기/방어구 장착칸 수는 공용 상수 LSInventorySlotUtils::EquipmentSlotCount를 쓴다.
+constexpr int32 EquipmentSlotCount = LSInventorySlotUtils::EquipmentSlotCount;
 constexpr int32 EquippedSkillSlotCount = 3;
 
 const FString ULSSaveSubsystem::SlotName = TEXT("LostSignalSave");
@@ -108,6 +109,23 @@ void ULSSaveSubsystem::ReplaceSafeStash(const TArray<FLSSessionItem>& Items)
 
 	UE_LOG(LogLS, Log, TEXT("[Save] Safe stash replaced. Total slots: %d"), SaveData->SafeStash.Num());
 	Save();
+}
+
+void ULSSaveSubsystem::ReplaceEquipmentSlots(const TArray<FLSSessionItem>& Items)
+{
+	if (!SaveData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace equipment slots because SaveData is missing."));
+		return;
+	}
+
+	// 장비 배열은 인덱스=슬롯타입 불변식이라 Normalize/Sort/Compact 금지. SetNum(5) 패딩만 한다.
+	SaveData->EquipmentSlots = Items;
+	EnsureEquipmentSlots();
+
+	UE_LOG(LogLS, Log, TEXT("[Save] Equipment slots replaced. Total slots: %d"), SaveData->EquipmentSlots.Num());
+	Save();
+	OnEquipmentChanged.Broadcast();
 }
 
 const TArray<FLSSessionItem>& ULSSaveSubsystem::GetInventory() const
@@ -482,20 +500,11 @@ bool ULSSaveSubsystem::MoveEquipmentSlot(const ELSInventorySlotArea FromArea, co
 	const bool bFromEquipment = FromArea == ELSInventorySlotArea::Equipment;
 	const bool bToEquipment = ToArea == ELSInventorySlotArea::Equipment;
 
-	// 이 경로는 장비 슬롯이 원본 또는 대상 중 정확히 하나일 때만 쓴다.
-	// 장비끼리는 슬롯마다 타입이 고정이라 교환이 성립하지 않고, 둘 다 아니면 일반 저장 슬롯 이동을 써야 한다.
-	if (bFromEquipment == bToEquipment)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot move equipment slot with invalid area pair. FromArea=%d ToArea=%d"),
-			static_cast<int32>(FromArea), static_cast<int32>(ToArea));
-		return false;
-	}
-
 	EnsureEquipmentSlots();
 
 	TArray<FLSSessionItem>* FromSlots = GetMutableStoredSlots(FromArea);
 	TArray<FLSSessionItem>* ToSlots = GetMutableStoredSlots(ToArea);
-	if (!FromSlots || !ToSlots || !FromSlots->IsValidIndex(FromIndex) || !LSInventorySlotUtils::IsFilled((*FromSlots)[FromIndex]) || ToIndex < 0)
+	if (!FromSlots || !ToSlots)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot move equipment slot. FromArea=%d From=%d ToArea=%d To=%d"),
 			static_cast<int32>(FromArea), FromIndex, static_cast<int32>(ToArea), ToIndex);
@@ -514,43 +523,13 @@ bool ULSSaveSubsystem::MoveEquipmentSlot(const ELSInventorySlotArea FromArea, co
 		return false;
 	}
 
-	// 장착: 장비 슬롯에 들어갈 아이템 타입이 그 슬롯 타입(=인덱스)과 일치해야 한다.
-	if (bToEquipment)
-	{
-		if (ToIndex >= EquipmentSlotCount)
-		{
-			return false;
-		}
-
-		const FName SourceRow = (*FromSlots)[FromIndex].ItemRowName;
-		if (LSInventorySlotUtils::ResolveEquipmentSlotType(SourceRow) != static_cast<ELSEquipmentSlot>(ToIndex))
-		{
-			UE_LOG(LogLS, Warning, TEXT("[Save] Cannot equip '%s' into equipment slot %d because type mismatches."),
-				*SourceRow.ToString(), ToIndex);
-			return false;
-		}
-	}
-
-	// 해제(교환): 대상 슬롯에 아이템이 있으면 스왑으로 그 아이템이 장비 슬롯(FromIndex)에 들어간다.
-	// 들어갈 아이템 타입이 장비 슬롯 타입과 맞을 때만 허용한다(엉뚱한 아이템이 장착되는 것을 막는다).
-	if (bFromEquipment && ToSlots->IsValidIndex(ToIndex) && LSInventorySlotUtils::IsFilled((*ToSlots)[ToIndex]))
-	{
-		const FName TargetRow = (*ToSlots)[ToIndex].ItemRowName;
-		if (LSInventorySlotUtils::ResolveEquipmentSlotType(TargetRow) != static_cast<ELSEquipmentSlot>(FromIndex))
-		{
-			UE_LOG(LogLS, Warning, TEXT("[Save] Cannot swap equipment slot %d with '%s' because type mismatches."),
-				FromIndex, *TargetRow.ToString());
-			return false;
-		}
-	}
-
 	const int32 ToMaxSlotCount =
 		ToArea == ELSInventorySlotArea::Inventory ? GetMaxInventorySlotCount() :
 		ToArea == ELSInventorySlotArea::Safe ? GetMaxSafeStashSlotCount() :
 		EquipmentSlotCount;
 
-	// 장비는 Item_Max=1이라 병합 없이 배치/스왑으로만 동작한다.
-	const bool bMoved = LSInventorySlotUtils::DropSlot(*FromSlots, FromIndex, *ToSlots, ToIndex, ToMaxSlotCount);
+	// 영역 쌍/타입 검증과 배치/스왑은 레이드 세션과 공유하는 공용 코어가 처리한다.
+	const bool bMoved = LSInventorySlotUtils::MoveEquipmentSlotBetweenArrays(*FromSlots, FromIndex, bFromEquipment, *ToSlots, ToIndex, bToEquipment, ToMaxSlotCount);
 	if (bMoved)
 	{
 		Save();

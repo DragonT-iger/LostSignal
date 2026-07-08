@@ -54,6 +54,7 @@ ULSSaveGame
 - Inventory
 - WarehouseItems
 - SafeStash
+- EquipmentSlots
 - ChipEquipmentSlots
 - ChipSignalGaugePercent
 - EquipmentSlots
@@ -77,6 +78,11 @@ WarehouseItems
 SafeStash
 - 레이드 중에도 보이는 안전 보관 슬롯
 - 로비 인벤토리 UI의 ConfirmedStorageSlot 영역이 이 데이터를 표시함
+
+EquipmentSlots
+- 무기/방어구 장착 5칸. 인덱스 = 슬롯 타입(ELSEquipmentSlot: Weapon/Processor/Core/Actuator/Frame)
+- 인덱스=타입 불변식이므로 Normalize/Sort/Compact 금지. 항상 SetNum(5) 패딩만 (ULSSaveSubsystem::EnsureEquipmentSlots)
+- 로비: SaveSubsystem이 원본. 레이드: 세션 영역으로 승격되어 RaidInventoryComponent가 원본(아래 참조)
 
 ChipEquipmentSlots / ChipSignalGaugePercent
 - 로비 칩 스테이션의 장착 칩 10칸과 신호 게이지 값을 저장함
@@ -200,10 +206,13 @@ LootBox <-> Inventory/Safe (로비 파밍, 테스트용)
 ULSRaidInventoryComponent
 - SessionInventory
 - SessionSafeInventory
+- SessionEquipmentSlots
 - bRaidActive
 - LoadoutSnapshot
 - ConsumedItems
 ```
+
+무기/방어구 장착 5칸(`SessionEquipmentSlots`)도 레이드 세션의 정식 영역이다(SafeStash와 같은 승격 패턴). 입장 시 클라 `SaveGame.EquipmentSlots`를 복사해 채우고, 레이드 중 장착/해제/교환·월드 드랍·룻박스 이송은 모두 서버 `RaidInventoryComponent`에서 확정한다. `ELSInventorySlotArea::Equipment` 영역으로 기존 `DropInventorySlot`/월드 드랍/룻박스 RPC 경로를 그대로 재사용한다. 세션 장비 배열도 인덱스=타입 불변식이라 Normalize 금지, SetNum(5) 패딩만 한다.
 
 레이드 시작 시 입장 데이터 제출·주입의 단계별 흐름은 [RaidLevelFlow.md](RaidLevelFlow.md)가 단일 출처다. 저장 관점의 핵심만 적으면, 각 클라이언트가 자기 로컬 `SaveSubsystem`의 Inventory/SafeStash를 제출하고, 서버가 이를 플레이어별 `RaidInventoryComponent`로 복사한 뒤부터는 클라이언트 인벤토리 값을 다시 신뢰하지 않는다.
 
@@ -219,9 +228,14 @@ ULSRaidInventoryComponent
 LootBox -> RaidInventory
 RaidInventory -> LootBox
 RaidInventory Inventory <-> Safe
+RaidInventory Inventory/Safe <-> Equipment   (장착/해제/교환)
+Equipment -> WorldDroppedItem                (장착칸 월드 드랍 직행: 허용)
+Equipment -> LootBox / LootBox -> Equipment  (룻박스 이송 및 직접 장착: 타입 일치 시)
 RaidInventory -> WorldDroppedItem
 WorldDroppedItem -> RaidInventory
 ```
+
+장착칸을 건드리는 서버 확정 경로(인벤↔장착 이동, 월드 드랍, 룻박스 이송, 룻→장착 직행)는 모두 `ALSPlayerControllerBase::RefreshEquipmentStatsIfEquipmentTouched`로 `ULSEquipmentStatComponent`의 장비 스탯 GE를 재적용한다(체력 클램프만, 교체가 회복 수단이 되지 않게). 스탯 소스는 레이드 중이면 `RaidInventoryComponent::GetSessionEquipmentSlots()`, 로비면 `SaveSubsystem::GetEquipmentSlots()`다.
 
 이 조작들은 서버의 `ALSPlayerControllerBase`를 통해 확정되고, 결과는 `ClientSyncRaidSessionAndLoot`로 클라이언트에 미러링된다.
 
@@ -245,6 +259,7 @@ ALSFarmingGameMode::EndRaid
 저장 관점에서 알아둘 점:
 
 - 현재 Quit 복구는 제출된 출발 Loadout 기준이다. 플레이어별 소모품 차감은 아직 별도 기록이 없으므로 추후 확장 지점이다.
+- **장비(EquipmentSlots) 불변식:** 레이드 중 클라의 `SaveGame.EquipmentSlots`는 아무도 쓰지 않는다(입장 시 세션으로 복사, 결과 저장 전까지 불변). 따라서 **Quit/강제종료 복구 = "장비를 저장하지 않기"로 자동 성립**한다 — 입장 payload(`ActiveRaidLoadout`)에 장비를 포함하지 않는다. 결과 저장은 Extracted면 세션 장비 저장(`ReplaceEquipmentSlots`), Dead면 빈 5칸 저장(소멸), Quit이면 저장하지 않음. 이 규칙은 인벤토리의 `bAllowQuitRecovery`와 다르다(장비는 저장 생략이 곧 복구).
 
 ## UI/드래그 앤 드롭 / 월드 드랍 흐름
 

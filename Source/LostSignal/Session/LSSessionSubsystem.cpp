@@ -21,10 +21,11 @@ void ULSSessionSubsystem::StartRaidClientMirror(const TArray<FLSSessionItem>& Lo
 	StartRaidInternal(Loadout, false);
 }
 
-void ULSSessionSubsystem::MirrorRaidSessionState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems)
+void ULSSessionSubsystem::MirrorRaidSessionState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems)
 {
 	SessionInventory = InventoryItems;
 	SessionSafeInventory = SafeItems;
+	SessionEquipmentSlots = EquipmentItems;
 	bRaidActive = true;
 }
 
@@ -33,6 +34,7 @@ void ULSSessionSubsystem::ClearRaidSessionState()
 	LoadoutSnapshot.Items.Reset();
 	SessionInventory.Reset();
 	SessionSafeInventory.Reset();
+	SessionEquipmentSlots.Reset();
 	ConsumedItems.Reset();
 	ResolvedItems.Reset();
 	bRaidActive = false;
@@ -42,16 +44,19 @@ void ULSSessionSubsystem::ClearRaidSessionState()
 
 void ULSSessionSubsystem::EnqueuePendingRaidEntry(
 	const TArray<FLSSessionItem>& Inventory,
-	const TArray<FLSSessionItem>& SafeInventory)
+	const TArray<FLSSessionItem>& SafeInventory,
+	const TArray<FLSSessionItem>& EquipmentItems)
 {
 	FLSPendingRaidEntry& Entry = PendingRaidEntries.AddDefaulted_GetRef();
 	Entry.Inventory = Inventory;
 	Entry.SafeInventory = SafeInventory;
+	Entry.EquipmentSlots = EquipmentItems;
 }
 
 bool ULSSessionSubsystem::DequeuePendingRaidEntry(
 	TArray<FLSSessionItem>& OutInventory,
-	TArray<FLSSessionItem>& OutSafeInventory)
+	TArray<FLSSessionItem>& OutSafeInventory,
+	TArray<FLSSessionItem>& OutEquipmentItems)
 {
 	if (PendingRaidEntryIndex >= PendingRaidEntries.Num())
 	{
@@ -60,6 +65,7 @@ bool ULSSessionSubsystem::DequeuePendingRaidEntry(
 	const FLSPendingRaidEntry& Entry = PendingRaidEntries[PendingRaidEntryIndex++];
 	OutInventory = Entry.Inventory;
 	OutSafeInventory = Entry.SafeInventory;
+	OutEquipmentItems = Entry.EquipmentSlots;
 	return true;
 }
 

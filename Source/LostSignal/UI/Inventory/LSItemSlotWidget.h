@@ -183,6 +183,8 @@ private:
 	bool bIsDragTarget = false;
 	// 드래그 중 이 슬롯이 대상 장비칸일 때 켜지는 후보 하이라이트 상태(NativeTick이 펄스 구동).
 	bool bIsEquipCandidate = false;
+	// 이 인벤토리 슬롯을 호버해 장비칸 후보 하이라이트를 켠 상태. 호버 해제 시 끄고, 드래그 시작 시 드래그 하이라이트로 넘긴다.
+	bool bShowingEquipHoverHint = false;
 	// 드래그 중 커서를 따라가는 비주얼 인스턴스 표시. 이 슬롯은 아이템 아이콘만 보이고 배경 프레임은 숨긴다.
 	bool bIsDragVisual = false;
 	// 더블클릭 빠른이동 직후, 첫 Down이 무장했던 드래그가 뒤늦게 발화하는 것을 한 번 억제하는 플래그.
@@ -214,6 +216,17 @@ private:
 	bool TryHandleWarehouseQuickTransfer();
 	bool TryHandleChipEquipmentQuickTransfer();
 	bool TryHandleChipStationQuickTransfer();
+	// 무기/방어구 장착칸 Shift 빠른이동: 인벤토리 첫 빈 칸으로 해제(로비=세이브, 레이드=서버). 빈 칸이 없으면 알림만 띄운다.
+	bool TryHandleEquipmentQuickTransfer();
+	// 인벤토리 슬롯 Shift 빠른이동: 장착 가능하고 대상 장비칸이 비어 있으면 먼저 장착한다. 아니면 false(컨테이너 이동으로 넘어감).
+	bool TryHandleEquipFromInventoryQuickTransfer();
+	// 인벤토리 아이템 호버 시, 장착 가능하고 대상 장비칸이 비어 있으면 후보 하이라이트를 켠다(드래그 없이도 힌트). 호버 해제 시 끈다.
+	void UpdateEquipHoverHint();
+	void ClearEquipHoverHint();
+	// 지정 장비칸(인덱스=타입)이 비어 있는지. 레이드=세션 미러, 로비=세이브 기준.
+	bool IsEquipmentSlotEmpty(int32 EquipmentSlotIndex) const;
+	// 장비칸 후보 하이라이트를 표시할 인벤토리 위젯(드래그 하이라이트와 동일 경로 = 로비 인벤토리 위젯).
+	ULSInventoryWidget* ResolveEquipHighlightWidget() const;
 	bool IsValidInventoryDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidLootDropTarget(const UDragDropOperation* InOperation) const;
 	bool IsValidWarehouseDropTarget(const UDragDropOperation* InOperation) const;

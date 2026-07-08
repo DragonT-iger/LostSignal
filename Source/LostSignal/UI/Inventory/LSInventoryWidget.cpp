@@ -10,10 +10,12 @@
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "Layout/WidgetPath.h"
 #include "Session/LSSaveSubsystem.h"
+#include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
 #include "UI/Inventory/LSSlotWidgetSync.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
+#include "UI/LSUILayer.h"
 
 namespace
 {
@@ -253,17 +255,11 @@ bool ULSInventoryWidget::HandleEquipmentSlotDrop(const ELSInventorySlotArea From
 		return false;
 	}
 
-	// 장비 장착/해제는 로비 전용이다. 레이드 중에는 인벤토리 원본이 SaveSubsystem이 아니라 세션 상태라 변경을 막는다.
-	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
 	{
-		if (ULSRaidInventoryComponent* RaidInventory = LSPlayerController->GetRaidInventoryComponent())
-		{
-			if (RaidInventory->IsRaidActive())
-			{
-				UE_LOG(LogLS, Warning, TEXT("Cannot change equipment during a raid on %s."), *GetNameSafe(this));
-				return false;
-			}
-		}
+		UE_LOG(LogLS, Warning, TEXT("Cannot handle equipment slot drop because owning player controller is invalid on %s."), *GetNameSafe(this));
+		return false;
 	}
 
 	// 잠긴 보호 슬롯(적재 프로토콜 감소분 등)은 장비 이동 원본/대상으로 쓸 수 없다.
@@ -274,6 +270,20 @@ bool ULSInventoryWidget::HandleEquipmentSlotDrop(const ELSInventorySlotArea From
 		return false;
 	}
 
+	// 레이드 중에는 장비도 세션 정식 영역이다. 인벤토리와 동일하게 서버 판정(DropInventorySlot)으로 라우팅한다.
+	// (타입 불일치/용량 부족 등은 서버가 거부하고, 성공 시 미러 RPC가 UI를 funnel로 다시 그린다.)
+	ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent();
+	if (RaidInventory && RaidInventory->IsRaidActive())
+	{
+		const bool bChanged = PlayerController->DropInventorySlot(FromSlotArea, FromSlotIndex, ToSlotArea, ToSlotIndex);
+		if (bChanged)
+		{
+			PlayerController->RefreshAllInventoryUI();
+		}
+		return bChanged;
+	}
+
+	// 로비: 클라 세이브(SaveSubsystem) 기반 장비 이동.
 	UGameInstance* GameInstance = GetGameInstance();
 	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
 	if (!SaveSubsystem)
@@ -286,10 +296,7 @@ bool ULSInventoryWidget::HandleEquipmentSlotDrop(const ELSInventorySlotArea From
 	if (bChanged)
 	{
 		// 장비 이동은 인벤토리 인덱스·창고·칩 리스트에 파급되므로, 열려 있는 패널 전체를 funnel로 다시 그린다.
-		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
-		{
-			PlayerController->RefreshAllInventoryUI();
-		}
+		PlayerController->RefreshAllInventoryUI();
 	}
 	return bChanged;
 }
@@ -328,10 +335,16 @@ bool ULSInventoryWidget::TryDropInventoryDragToWorld(const ULSInventoryDragDropO
 		return false;
 	}
 
-	// 장착된 장비는 창 밖으로 드래그해도 월드에 버리지 않는다(드래그 취소 시 장착 유지).
+	// 장착된 장비를 창 밖으로 드래그: 레이드 중에는 월드 드랍을 허용한다(익스트렉션 리스크 / 장착칸 직행 허용).
+	// 로비에서는 드랍하지 않는다(드래그 취소 시 장착 유지 — 로비 장비 월드 드랍은 범위 밖).
 	if (DragOperation.SourceSlotArea == ELSInventorySlotArea::Equipment)
 	{
-		return false;
+		const ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+		const ULSRaidInventoryComponent* RaidInventory = LSPlayerController ? LSPlayerController->GetRaidInventoryComponent() : nullptr;
+		if (!RaidInventory || !RaidInventory->IsRaidActive())
+		{
+			return false;
+		}
 	}
 
 	if (DragOperation.SourceSlotIndex == INDEX_NONE)
@@ -529,20 +542,30 @@ void ULSInventoryWidget::HandleSortButtonClicked()
 
 void ULSInventoryWidget::RebuildEquipmentSlots()
 {
-	// 장비 장착은 로비 전용이다. 레이드 중에는 표시만 유지하고 잠금 처리해 드래그/변경을 막는다.
-	bool bRaidActive = false;
+	// 장비는 레이드 세션의 정식 영역이다. 레이드 중에는 서버가 미러링한 세션 장비를,
+	// 로비에서는 클라 세이브 장비를 표시한다. 두 경우 모두 잠그지 않고 드래그/변경을 허용한다.
+	static const TArray<FLSSessionItem> EmptyEquipment;
+	const TArray<FLSSessionItem>* EquipmentSource = nullptr;
+
 	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 	{
 		if (ULSRaidInventoryComponent* RaidInventory = LSPlayerController->GetRaidInventoryComponent())
 		{
-			bRaidActive = RaidInventory->IsRaidActive();
+			if (RaidInventory->IsRaidActive())
+			{
+				EquipmentSource = &RaidInventory->GetSessionEquipmentSlots();
+			}
 		}
 	}
 
-	UGameInstance* GameInstance = GetGameInstance();
-	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-	static const TArray<FLSSessionItem> EmptyEquipment;
-	const TArray<FLSSessionItem>& EquipmentItems = SaveSubsystem ? SaveSubsystem->GetEquipmentSlots() : EmptyEquipment;
+	if (!EquipmentSource)
+	{
+		UGameInstance* GameInstance = GetGameInstance();
+		ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+		EquipmentSource = SaveSubsystem ? &SaveSubsystem->GetEquipmentSlots() : &EmptyEquipment;
+	}
+
+	const TArray<FLSSessionItem>& EquipmentItems = *EquipmentSource;
 
 	// ELSEquipmentSlot 순서와 일치해야 한다(인덱스 = 슬롯 타입).
 	ULSItemSlotWidget* SlotWidgets[] = { WeaponSlot, ProcessorSlot, CoreSlot, ActuatorSlot, FrameSlot };
@@ -560,7 +583,7 @@ void ULSInventoryWidget::RebuildEquipmentSlots()
 		const bool bHasSlotItem = EquipmentItems.IsValidIndex(SlotIndex) &&
 			!EquipmentItems[SlotIndex].ItemRowName.IsNone() &&
 			EquipmentItems[SlotIndex].Amount > 0;
-		SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Equipment, SlotIndex, bHasSlotItem, bRaidActive);
+		SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Equipment, SlotIndex, bHasSlotItem);
 		if (bHasSlotItem)
 		{
 			SlotWidget->SetItem(EquipmentItems[SlotIndex].ItemRowName, EquipmentItems[SlotIndex].Amount, EquipmentItems[SlotIndex].ChipStats);
@@ -570,6 +593,78 @@ void ULSInventoryWidget::RebuildEquipmentSlots()
 			SlotWidget->ClearItem();
 		}
 	}
+}
+
+void ULSInventoryWidget::ShowInventoryFullNotification()
+{
+	// 이미 알림이 떠 있으면 중복 생성하지 않는다(Shift 쓸기로 재호출돼도 무해).
+	if (ActiveNotificationDialog && ActiveNotificationDialog->IsInViewport())
+	{
+		return;
+	}
+
+	if (!ConfirmDialogClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Inventory] ConfirmDialogClass is not set on %s. Check WBP_Inventory."), *GetNameSafe(this));
+		return;
+	}
+
+	// Shift 빠른이동 제스처의 마우스 Down은 이미 슬롯이 소비했다. 지금 다이얼로그를 띄우면 확인 버튼이
+	// 짝 Down을 못 받아 첫 클릭이 씹히므로, 제스처가 끝난 다음 틱에 생성한다(칩 스테이션과 동일 패턴).
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		PresentInventoryFullNotification();
+		return;
+	}
+
+	TWeakObjectPtr<ULSInventoryWidget> WeakThis(this);
+	World->GetTimerManager().SetTimerForNextTick([WeakThis]()
+	{
+		if (ULSInventoryWidget* StrongThis = WeakThis.Get())
+		{
+			StrongThis->PresentInventoryFullNotification();
+		}
+	});
+}
+
+void ULSInventoryWidget::PresentInventoryFullNotification()
+{
+	// 다음 틱 사이에 이미 알림이 떠 있거나 클래스가 사라졌을 수 있어 다시 확인한다.
+	if (ActiveNotificationDialog && ActiveNotificationDialog->IsInViewport())
+	{
+		return;
+	}
+
+	if (!ConfirmDialogClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Inventory] ConfirmDialogClass is not set on %s. Check WBP_Inventory."), *GetNameSafe(this));
+		return;
+	}
+
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	ULSConfirmDialogWidget* Dialog = OwningPlayer
+		? CreateWidget<ULSConfirmDialogWidget>(OwningPlayer, ConfirmDialogClass)
+		: CreateWidget<ULSConfirmDialogWidget>(this, ConfirmDialogClass);
+	if (!Dialog)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Inventory] Failed to create inventory-full notification dialog on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	Dialog->SetMessage(NSLOCTEXT("LSInventory", "InventoryFull", "인벤토리가 가득 찼습니다."));
+	// 정보 알림이라 확인/취소/ESC 어느 쪽이든 그냥 닫힌다.
+	Dialog->OnConfirmed.AddDynamic(this, &ULSInventoryWidget::HandleNotificationDialogClosed);
+	Dialog->OnCancelled.AddDynamic(this, &ULSInventoryWidget::HandleNotificationDialogClosed);
+
+	Dialog->AddToViewport(LSUILayer::ModalPanelDialog);
+	ActiveNotificationDialog = Dialog;
+}
+
+void ULSInventoryWidget::HandleNotificationDialogClosed()
+{
+	// 다이얼로그는 스스로 뷰포트에서 제거되므로 참조만 비운다.
+	ActiveNotificationDialog = nullptr;
 }
 
 void ULSInventoryWidget::SetEquipmentDragHighlight(const FName DraggedItemRowName)

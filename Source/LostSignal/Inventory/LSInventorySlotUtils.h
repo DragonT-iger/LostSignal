@@ -6,8 +6,15 @@
 
 namespace LSInventorySlotUtils
 {
+	// 무기/방어구 장착칸 수. 인덱스가 곧 슬롯 타입(ELSEquipmentSlot)이다.
+	constexpr int32 EquipmentSlotCount = static_cast<int32>(ELSEquipmentSlot::Count);
+
 	bool IsFilled(const FLSSessionItem& Item);
 	bool IsFilled(const FLSDropResult& Item);
+
+	// 슬롯 배열에서 MaxSlotCount 범위 안의 첫 빈(미충전) 슬롯 인덱스를 돌려준다. 없으면 INDEX_NONE.
+	// 배열이 MaxSlotCount보다 짧으면 그 뒤의 아직 없는 인덱스도 빈 칸으로 간주한다.
+	int32 FindFirstEmptySlotIndex(const TArray<FLSSessionItem>& Slots, int32 MaxSlotCount);
 
 	FLSSessionItem MakeEmptyItem();
 	FLSSessionItem ToSessionItem(const FLSDropResult& Item);
@@ -35,6 +42,11 @@ namespace LSInventorySlotUtils
 	void NormalizeSlotArray(TArray<FLSSessionItem>& Slots);
 	void RemoveItemsFromSlotArray(TArray<FLSSessionItem>& Slots, FName ItemRowName, int32 Amount);
 	void SortAndCompactSlotArray(TArray<FLSSessionItem>& Slots);
+
+	// 장비 장착/해제/교환의 공용 코어. From/To 중 정확히 하나가 장비 배열이어야 하며,
+	// 장착 아이템 타입이 장비 슬롯 타입(=인덱스)과 일치할 때만 이동/스왑한다.
+	// 저장(SaveSubsystem)과 레이드 세션(RaidInventoryComponent)이 같은 검증을 공유한다.
+	bool MoveEquipmentSlotBetweenArrays(TArray<FLSSessionItem>& FromSlots, int32 FromIndex, bool bFromEquipment, TArray<FLSSessionItem>& ToSlots, int32 ToIndex, bool bToEquipment, int32 ToMaxSlotCount);
 
 	bool SwapSlots(TArray<FLSSessionItem>& FromSlots, int32 FromIndex, TArray<FLSSessionItem>& ToSlots, int32 ToIndex, int32 ToMaxSlotCount = INDEX_NONE);
 	bool MoveSlotWithinArray(TArray<FLSSessionItem>& Slots, int32 FromIndex, int32 ToIndex);

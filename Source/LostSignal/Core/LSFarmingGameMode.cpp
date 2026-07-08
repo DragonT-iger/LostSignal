@@ -135,16 +135,18 @@ void ALSFarmingGameMode::BeginRaidResultSave(const ELSRaidResult Result)
 	{
 		TArray<FLSSessionItem> InventoryItems;
 		TArray<FLSSessionItem> SafeItems;
+		TArray<FLSSessionItem> EquipmentItems;
 		bool bSaveInventory = false;
 		bool bSaveSafeStash = false;
+		bool bSaveEquipment = false;
 
-		if (!BuildRaidResultForPlayer(PlayerController, Result, InventoryItems, SafeItems, bSaveInventory, bSaveSafeStash))
+		if (!BuildRaidResultForPlayer(PlayerController, Result, InventoryItems, SafeItems, EquipmentItems, bSaveInventory, bSaveSafeStash, bSaveEquipment))
 		{
 			UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] Failed to build raid result for %s."), *GetNameSafe(PlayerController));
 			continue;
 		}
 
-		PlayerController->RequestRaidResultSave(Result, InventoryItems, SafeItems, bSaveInventory, bSaveSafeStash);
+		PlayerController->RequestRaidResultSave(Result, InventoryItems, SafeItems, EquipmentItems, bSaveInventory, bSaveSafeStash, bSaveEquipment);
 	}
 }
 
@@ -153,13 +155,17 @@ bool ALSFarmingGameMode::BuildRaidResultForPlayer(
 	const ELSRaidResult Result,
 	TArray<FLSSessionItem>& OutInventoryItems,
 	TArray<FLSSessionItem>& OutSafeItems,
+	TArray<FLSSessionItem>& OutEquipmentItems,
 	bool& bOutSaveInventory,
-	bool& bOutSaveSafeStash) const
+	bool& bOutSaveSafeStash,
+	bool& bOutSaveEquipment) const
 {
 	OutInventoryItems.Reset();
 	OutSafeItems.Reset();
+	OutEquipmentItems.Reset();
 	bOutSaveInventory = false;
 	bOutSaveSafeStash = false;
+	bOutSaveEquipment = false;
 
 	if (!PlayerController)
 	{
@@ -178,14 +184,19 @@ bool ALSFarmingGameMode::BuildRaidResultForPlayer(
 	case ELSRaidResult::Extracted:
 		OutInventoryItems = RaidInventory->GetSessionInventory();
 		OutSafeItems = RaidInventory->GetSessionSafeInventory();
+		// 탈출: 레이드 최종 장착 상태를 세이브에 저장한다.
+		OutEquipmentItems = RaidInventory->GetSessionEquipmentSlots();
 		bOutSaveInventory = true;
 		bOutSaveSafeStash = true;
+		bOutSaveEquipment = true;
 		break;
 
 	case ELSRaidResult::Dead:
 		OutSafeItems = RaidInventory->GetSessionSafeInventory();
 		bOutSaveInventory = true;
 		bOutSaveSafeStash = true;
+		// 사망: 장비 소멸. 빈 배열을 저장하면 ReplaceEquipmentSlots가 빈 5칸으로 패딩한다(바닥 드랍 없음).
+		bOutSaveEquipment = true;
 		break;
 
 	case ELSRaidResult::Quit:
@@ -195,6 +206,9 @@ bool ALSFarmingGameMode::BuildRaidResultForPlayer(
 		}
 		bOutSaveInventory = true;
 		bOutSaveSafeStash = false;
+		// Quit/강제종료: 장비는 저장하지 않는다. 레이드 중 클라 SaveGame.EquipmentSlots는 아무도 건드리지 않으므로
+		// "저장 생략 = 입장 시점 장착 상태로 자동 복구"가 성립한다. (인벤의 bAllowQuitRecovery와 규칙이 다름)
+		bOutSaveEquipment = false;
 		break;
 
 	default:

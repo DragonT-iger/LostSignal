@@ -7,6 +7,7 @@
 #include "Engine/Texture2D.h"
 #include "InputCoreTypes.h"
 #include "Inventory/LSInventorySlotUtils.h"
+#include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "UI/ChipSystem/LSChipEquipmentSlotWidget.h"
@@ -368,6 +369,8 @@ void ULSItemSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FP
 	{
 		TryHandleQuickTransfer();
 	}
+	// 드래그 없이 호버만 해도 장착 가능 아이템이면 빈 장비칸에 후보 하이라이트를 켠다.
+	UpdateEquipHoverHint();
 	ApplyHoverVisual();
 }
 
@@ -380,6 +383,8 @@ void ULSItemSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 	{
 		OwningLootDropWidget->NotifyLootSlotUnhovered(SlotIndex);
 	}
+	// 호버로 켠 장비칸 후보 하이라이트를 끈다(드래그로 이어진 경우는 아래 handoff로 이 플래그가 꺼져 건드리지 않음).
+	ClearEquipHoverHint();
 	ApplyHoverVisual();
 }
 
@@ -505,6 +510,9 @@ void ULSItemSlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const 
 	OutOperation = DragOperation;
 
 	// 이 아이템이 장착될 장비칸을 강조한다(로비 장비 편집 전용). 드래그 종료 시 RestoreDragSourceVisual이 끈다.
+	// 호버 힌트로 이미 켜져 있었다면 드래그 하이라이트로 소유권을 넘긴다 — 플래그를 끄면 드래그 시작 직후 오는
+	// NativeOnMouseLeave가 이 하이라이트를 지우지 않는다(드래그 종료 시 RestoreDragSourceVisual이 정리).
+	bShowingEquipHoverHint = false;
 	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 	{
 		if (ULSInventoryWidget* LobbyInventory = LSPlayerController->GetLobbyInventoryWidget())
@@ -805,10 +813,10 @@ bool ULSItemSlotWidget::TryHandleQuickTransfer()
 		return false;
 	}
 
-	// 무기/방어구 장비 슬롯은 드래그 전용이다(Shift 빠른 이동 미지원). false를 반환해 일반 드래그 감지로 넘긴다.
+	// 무기/방어구 장착칸: Shift+좌클릭 -> 인벤토리 첫 빈 칸으로 해제. (SlotIndex가 유효하므로 아래 가드보다 먼저 처리)
 	if (SlotArea == ELSInventorySlotArea::Equipment)
 	{
-		return false;
+		return TryHandleEquipmentQuickTransfer();
 	}
 
 	// 칩 장착 슬롯: Shift+좌클릭 -> 창고로 해제. (장착 슬롯은 SlotIndex가 INDEX_NONE이라 아래 가드보다 먼저 처리한다.)
@@ -831,6 +839,13 @@ bool ULSItemSlotWidget::TryHandleQuickTransfer()
 	if (LootDropWidget.IsValid())
 	{
 		return TryHandleLootQuickTransfer();
+	}
+
+	// 인벤토리의 장착 가능한 아이템은 Shift 빠른이동 시 빈 장비칸으로 "먼저" 장착한다.
+	// 장착 불가 아이템이거나 대상 장비칸이 이미 차 있으면 false를 돌려주고 아래 컨테이너 이동으로 넘어간다.
+	if (InventoryWidget.IsValid() && !bIsLocked && SlotArea == ELSInventorySlotArea::Inventory && TryHandleEquipFromInventoryQuickTransfer())
+	{
+		return true;
 	}
 
 	if (InventoryWidget.IsValid() && !bIsLocked)
@@ -912,6 +927,212 @@ bool ULSItemSlotWidget::TryHandleChipEquipmentQuickTransfer()
 	// 칩 리스트 빠른 장착과 동일하게 소스 칸을 즉시 비운다.
 	ClearItem();
 	return true;
+}
+
+bool ULSItemSlotWidget::TryHandleEquipmentQuickTransfer()
+{
+	if (!bHasItem || SlotIndex == INDEX_NONE || SlotArea != ELSInventorySlotArea::Equipment)
+	{
+		return false;
+	}
+
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
+	{
+		return false;
+	}
+
+	// 인벤토리 첫 빈 칸을 찾는다. 레이드=서버가 미러링한 세션 인벤토리, 로비=클라 세이브. 최대 슬롯 수 내에서만.
+	ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent();
+	const bool bRaidActive = RaidInventory && RaidInventory->IsRaidActive();
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+
+	int32 EmptyInventoryIndex = INDEX_NONE;
+	if (bRaidActive)
+	{
+		EmptyInventoryIndex = LSInventorySlotUtils::FindFirstEmptySlotIndex(
+			RaidInventory->GetSessionInventory(), RaidInventory->GetMaxInventorySlotCount());
+	}
+	else if (SaveSubsystem)
+	{
+		EmptyInventoryIndex = LSInventorySlotUtils::FindFirstEmptySlotIndex(
+			SaveSubsystem->GetInventory(), SaveSubsystem->GetMaxInventorySlotCount());
+	}
+	else
+	{
+		return false;
+	}
+
+	if (EmptyInventoryIndex == INDEX_NONE)
+	{
+		// 빈 칸이 없으면 이동하지 않고 "인벤토리가 가득 찼습니다" 알림만 띄운다. 클릭은 소비한다(드래그로 넘기지 않음).
+		if (ULSInventoryWidget* OwningInventory = InventoryWidget.Get())
+		{
+			OwningInventory->ShowInventoryFullNotification();
+		}
+		return true;
+	}
+
+	bool bChanged = false;
+	if (bRaidActive)
+	{
+		bChanged = PlayerController->DropInventorySlot(ELSInventorySlotArea::Equipment, SlotIndex, ELSInventorySlotArea::Inventory, EmptyInventoryIndex);
+	}
+	else
+	{
+		bChanged = SaveSubsystem->MoveEquipmentSlot(ELSInventorySlotArea::Equipment, SlotIndex, ELSInventorySlotArea::Inventory, EmptyInventoryIndex);
+	}
+
+	if (!bChanged)
+	{
+		return false;
+	}
+
+	// 열려 있는 인벤토리 계열 패널 전체를 데이터에서 다시 그린다(부분/누락 갱신 금지).
+	PlayerController->RefreshAllInventoryUI();
+
+	// 장착칸 갱신은 다음 틱(미러 RPC/RefreshAll)이라 그때까지 bHasItem이 stale로 남는다.
+	// Shift 쓸기(NativeOnMouseMove)가 같은 제스처에서 재호출해 빈 칸 해제를 반복 시도하지 않도록 소스 칸을 즉시 비운다(칩 장착칸 패턴).
+	ClearItem();
+	return true;
+}
+
+bool ULSItemSlotWidget::TryHandleEquipFromInventoryQuickTransfer()
+{
+	if (SlotArea != ELSInventorySlotArea::Inventory || SlotIndex == INDEX_NONE || DragItemRowName.IsNone())
+	{
+		return false;
+	}
+
+	// 장착 불가 아이템이면 기존 컨테이너 이동으로 넘긴다.
+	const ELSEquipmentSlot EquipType = LSInventorySlotUtils::ResolveEquipmentSlotType(DragItemRowName);
+	if (EquipType == ELSEquipmentSlot::Count)
+	{
+		return false;
+	}
+	const int32 EquipmentSlotIdx = static_cast<int32>(EquipType);
+
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
+	{
+		return false;
+	}
+
+	ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent();
+	const bool bRaidActive = RaidInventory && RaidInventory->IsRaidActive();
+
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!bRaidActive && !SaveSubsystem)
+	{
+		return false;
+	}
+
+	// 대상 장비칸이 비어 있을 때만 "먼저 장착"한다. 차 있으면(교체 필요) false로 넘겨 컨테이너 이동에 맡긴다.
+	if (!IsEquipmentSlotEmpty(EquipmentSlotIdx))
+	{
+		return false;
+	}
+
+	bool bChanged = false;
+	if (bRaidActive)
+	{
+		bChanged = PlayerController->DropInventorySlot(ELSInventorySlotArea::Inventory, SlotIndex, ELSInventorySlotArea::Equipment, EquipmentSlotIdx);
+	}
+	else
+	{
+		bChanged = SaveSubsystem->MoveEquipmentSlot(ELSInventorySlotArea::Inventory, SlotIndex, ELSInventorySlotArea::Equipment, EquipmentSlotIdx);
+	}
+
+	if (!bChanged)
+	{
+		return false;
+	}
+
+	// 열려 있는 인벤토리 계열 패널 전체를 데이터에서 다시 그린다(부분/누락 갱신 금지).
+	PlayerController->RefreshAllInventoryUI();
+
+	// Shift 쓸기 재호출로 이미 옮긴 칸을 다시 건드리지 않도록 소스 칸을 즉시 비운다(칩 장착칸 패턴).
+	ClearItem();
+	return true;
+}
+
+bool ULSItemSlotWidget::IsEquipmentSlotEmpty(const int32 EquipmentSlotIdx) const
+{
+	const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	if (!PlayerController)
+	{
+		return false;
+	}
+
+	if (const ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
+	{
+		if (RaidInventory->IsRaidActive())
+		{
+			FLSSessionItem EquipmentSlotItem;
+			return !RaidInventory->GetSessionSlotItem(ELSInventorySlotArea::Equipment, EquipmentSlotIdx, EquipmentSlotItem)
+				|| !LSInventorySlotUtils::IsFilled(EquipmentSlotItem);
+		}
+	}
+
+	const UGameInstance* GameInstance = GetGameInstance();
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		return false;
+	}
+	const TArray<FLSSessionItem>& Equipment = SaveSubsystem->GetEquipmentSlots();
+	return !Equipment.IsValidIndex(EquipmentSlotIdx) || !LSInventorySlotUtils::IsFilled(Equipment[EquipmentSlotIdx]);
+}
+
+ULSInventoryWidget* ULSItemSlotWidget::ResolveEquipHighlightWidget() const
+{
+	// 드래그 하이라이트와 동일하게 로비 인벤토리 위젯을 쓴다(로비 장비 편집 전용 하이라이트).
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	return PlayerController ? PlayerController->GetLobbyInventoryWidget() : nullptr;
+}
+
+void ULSItemSlotWidget::UpdateEquipHoverHint()
+{
+	// 인벤토리의 장착 가능한 아이템을 호버하면, 대상 장비칸이 비어 있을 때만 후보 하이라이트를 켠다.
+	// (드래그 없이도 "여기에 장착됨"을 알려주는 힌트. 이미 장착된 칸이면 켜지 않는다.)
+	if (!InventoryWidget.IsValid() || SlotArea != ELSInventorySlotArea::Inventory || !bHasItem || DragItemRowName.IsNone())
+	{
+		return;
+	}
+
+	const ELSEquipmentSlot EquipType = LSInventorySlotUtils::ResolveEquipmentSlotType(DragItemRowName);
+	if (EquipType == ELSEquipmentSlot::Count)
+	{
+		return;
+	}
+
+	if (!IsEquipmentSlotEmpty(static_cast<int32>(EquipType)))
+	{
+		return;
+	}
+
+	if (ULSInventoryWidget* HighlightWidget = ResolveEquipHighlightWidget())
+	{
+		HighlightWidget->SetEquipmentDragHighlight(DragItemRowName);
+		bShowingEquipHoverHint = true;
+	}
+}
+
+void ULSItemSlotWidget::ClearEquipHoverHint()
+{
+	if (!bShowingEquipHoverHint)
+	{
+		return;
+	}
+
+	bShowingEquipHoverHint = false;
+	if (ULSInventoryWidget* HighlightWidget = ResolveEquipHighlightWidget())
+	{
+		HighlightWidget->ClearEquipmentDragHighlight();
+	}
 }
 
 bool ULSItemSlotWidget::TryHandleChipStationQuickTransfer()

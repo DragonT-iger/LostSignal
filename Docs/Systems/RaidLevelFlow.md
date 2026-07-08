@@ -122,6 +122,7 @@ ALSPlayerControllerBase::RequestRaidEntryDataForRaidStart
 ALSPlayerControllerBase::SubmitLocalRaidEntryData
 -> ULSSaveSubsystem::GetInventory
 -> ULSSaveSubsystem::GetSafeStash
+-> ULSSaveSubsystem::GetEquipmentSlots
 -> 서버면 StoreSubmittedRaidEntryData 후 LobbyGameMode 알림
 -> 클라이언트면 ServerSubmitRaidEntryData RPC
 
@@ -130,7 +131,7 @@ ALSPlayerControllerBase::ServerSubmitRaidEntryData
 -> ALSLobbyGameMode::NotifyRaidEntryDataSubmitted
 ```
 
-서버는 각 `PlayerController`가 제출한 `Inventory`와 `SafeStash`를 `SubmittedRaidLoadout`, `SubmittedRaidSafeItems`에 저장한다. 저장 전에 `LSInventorySlotUtils::NormalizeSlotArray`로 슬롯 배열을 정규화한다.
+서버는 각 `PlayerController`가 제출한 `Inventory`와 `SafeStash`를 `SubmittedRaidLoadout`, `SubmittedRaidSafeItems`에 저장한다. 저장 전에 `LSInventorySlotUtils::NormalizeSlotArray`로 슬롯 배열을 정규화한다. 무기/방어구 장비도 함께 제출해 `SubmittedRaidEquipment`에 저장하지만, 장비는 인덱스=슬롯타입 불변식이라 **Normalize하지 않고 SetNum(5) 패딩만** 한다. 이 3종(Inventory/SafeStash/Equipment)이 `EnqueuePendingRaidEntry`→`StartRaidInventory`→`ClientStartRaidSession` 체인을 타고 세션에 주입된다.
 
 모든 플레이어가 제출을 완료하면:
 
@@ -234,21 +235,28 @@ ALSFarmingGameMode::BeginRaidResultSave
 Extracted
 - Inventory = RaidInventoryComponent.SessionInventory
 - SafeStash = RaidInventoryComponent.SessionSafeInventory
+- Equipment = RaidInventoryComponent.SessionEquipmentSlots
 - SaveInventory = true
 - SaveSafeStash = true
+- SaveEquipment = true                (레이드 최종 장착 상태 저장)
 
 Dead
 - Inventory = empty
 - SafeStash = RaidInventoryComponent.SessionSafeInventory
+- Equipment = empty                   (빈 5칸 저장 = 장비 소멸, 바닥 드랍 없음)
 - SaveInventory = true
 - SaveSafeStash = true
+- SaveEquipment = true
 
 Quit
 - bAllowQuitRecovery가 true면 Inventory = SubmittedRaidLoadout
 - bAllowQuitRecovery가 false면 Inventory = empty
 - SaveInventory = true
 - SaveSafeStash = false
+- SaveEquipment = false                (저장 생략 = 입장 시점 장착 상태로 자동 복구)
 ```
+
+장비 결과 규칙은 인벤토리와 다르다. 레이드 중 클라 `SaveGame.EquipmentSlots`는 불변이므로 **Quit/강제종료는 "저장하지 않기"가 곧 입장 시점 복구**다(인벤의 `bAllowQuitRecovery`처럼 출발 payload를 되쓰지 않는다). 자세한 불변식은 [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)가 단일 출처다.
 
 결과 payload를 받은 `PlayerController`는 로컬 `ULSSaveSubsystem`에 반영한다.
 
@@ -260,6 +268,7 @@ ALSPlayerControllerBase::RequestRaidResultSave
 ALSPlayerControllerBase::ApplyRaidResultToLocalSave
 -> bSaveInventory면 SaveSubsystem->ReplaceInventory
 -> bSaveSafeStash면 SaveSubsystem->ReplaceSafeStash
+-> bSaveEquipment면 SaveSubsystem->ReplaceEquipmentSlots
 -> SaveSubsystem->ClearRaidSave
 -> 서버 컨트롤러면 FarmingGameMode->NotifyRaidResultSaved
 -> 클라이언트면 ServerConfirmRaidResultSaved RPC
@@ -342,9 +351,9 @@ ALSFarmingGameMode::EndRaid
 - Lobby에서 StartRaid 호출 시 FarmingLevel로 이동하는지
 - Inventory와 SafeStash가 RaidInventoryComponent에 복사되는지
 - 레이드 중 루팅/드랍 후 UI가 서버 상태로 다시 동기화되는지
-- Extracted 결과에서 Inventory/SafeStash가 모두 저장되는지
-- Dead 결과에서 Inventory는 비고 SafeStash는 유지되는지
-- Quit 결과에서 bAllowQuitRecovery 값에 따라 Inventory 저장 결과가 달라지는지
+- Extracted 결과에서 Inventory/SafeStash/Equipment가 모두 저장되는지
+- Dead 결과에서 Inventory/Equipment는 비고 SafeStash는 유지되는지
+- Quit 결과에서 bAllowQuitRecovery 값에 따라 Inventory 저장 결과가 달라지는지 / 장비는 입장 시점으로 복구되는지
 - ResultLevel 이동 후 RaidInventoryComponent와 SubmittedRaidEntryData가 정리되는지
 - ResultLevel에서 LobbyLevel 복귀가 되는지
 ```

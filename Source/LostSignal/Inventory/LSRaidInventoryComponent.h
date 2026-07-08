@@ -13,8 +13,8 @@ class LOSTSIGNAL_API ULSRaidInventoryComponent : public UActorComponent
 public:
 	ULSRaidInventoryComponent();
 
-	void StartRaidInventory(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems);
-	void MirrorRaidInventoryState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems);
+	void StartRaidInventory(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);
+	void MirrorRaidInventoryState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);
 	void EndRaidInventory();
 
 	bool IsRaidActive() const { return bRaidActive; }
@@ -23,6 +23,7 @@ public:
 
 	const TArray<FLSSessionItem>& GetSessionInventory() const { return SessionInventory; }
 	const TArray<FLSSessionItem>& GetSessionSafeInventory() const { return SessionSafeInventory; }
+	const TArray<FLSSessionItem>& GetSessionEquipmentSlots() const { return SessionEquipmentSlots; }
 
 	bool TryAddSessionItem(FName ItemRowName, int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem);
 	void SortSessionInventory();
@@ -33,9 +34,16 @@ public:
 	bool ReplaceSessionSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem);
 
 private:
+	// 슬롯 영역에 대응하는 세션 배열을 돌려준다. Warehouse처럼 레이드가 다루지 않는 영역이면 nullptr.
+	TArray<FLSSessionItem>* ResolveSessionSlots(ELSInventorySlotArea SlotArea);
+	const TArray<FLSSessionItem>* ResolveSessionSlots(ELSInventorySlotArea SlotArea) const;
+	int32 ResolveMaxSlotCount(ELSInventorySlotArea SlotArea) const;
+
 	bool bRaidActive = false;
 	TArray<FLSSessionItem> SessionInventory;
 	TArray<FLSSessionItem> SessionSafeInventory;
+	// 무기/방어구 장착 5칸. 인덱스=슬롯 타입(ELSEquipmentSlot)이므로 정렬/압축 금지, 항상 5칸 패딩 유지.
+	TArray<FLSSessionItem> SessionEquipmentSlots;
 	TArray<FLSSessionItem> ConsumedItems;
 	FLSLoadoutSnapshot LoadoutSnapshot;
 };

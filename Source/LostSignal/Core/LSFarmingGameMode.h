@@ -46,7 +46,7 @@ public:
 private:
 	void EndRaid(ELSRaidResult Result);
 	void BeginRaidResultSave(ELSRaidResult Result);
-	bool BuildRaidResultForPlayer(const ALSPlayerControllerBase* PlayerController, ELSRaidResult Result, TArray<FLSSessionItem>& OutInventoryItems, TArray<FLSSessionItem>& OutSafeItems, bool& bOutSaveInventory, bool& bOutSaveSafeStash) const;
+	bool BuildRaidResultForPlayer(const ALSPlayerControllerBase* PlayerController, ELSRaidResult Result, TArray<FLSSessionItem>& OutInventoryItems, TArray<FLSSessionItem>& OutSafeItems, TArray<FLSSessionItem>& OutEquipmentItems, bool& bOutSaveInventory, bool& bOutSaveSafeStash, bool& bOutSaveEquipment) const;
 	void HandleRaidResultSaveTimeout();
 	void TravelToResultLevel();
 	void ClearRaidResultSaveWait();

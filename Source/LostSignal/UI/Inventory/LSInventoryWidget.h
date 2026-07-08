@@ -10,6 +10,7 @@ class UBorder;
 class UButton;
 class UDragDropOperation;
 class UWrapBox;
+class ULSConfirmDialogWidget;
 class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
 class ULSLootDropWidget;
@@ -49,6 +50,10 @@ public:
 	bool HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 	bool TryDropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FPointerEvent& PointerEvent);
 	bool IsSlotLocked(ELSInventorySlotArea SlotArea, int32 SlotIndex) const;
+
+	// 장착칸 Shift 빠른이동 시 인벤토리에 빈 칸이 없을 때 "인벤토리가 가득 찼습니다" 알림을 띄운다.
+	// (칩 스테이션의 용량 차단 알림과 동일 패턴 — 다음 틱 생성 + 중복 방지)
+	void ShowInventoryFullNotification();
 
 protected:
 	virtual void NativeDestruct() override;
@@ -98,6 +103,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TSubclassOf<ALSWorldDroppedItem> DroppedItemActorClass;
 
+	// 인벤토리 가득참 알림에 쓰는 확인 다이얼로그. WBP_Inventory에서 WBP_ConfirmDialog를 매핑한다(아트 매핑 필요).
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
+	TSubclassOf<ULSConfirmDialogWidget> ConfirmDialogClass;
+
 private:
 	UFUNCTION()
 	void HandleStoreAllButtonClicked();
@@ -105,10 +114,21 @@ private:
 	UFUNCTION()
 	void HandleSortButtonClicked();
 
-	// 장비 슬롯(무기/방어구) 드롭 처리. 로비 전용이며(레이드 중 거부) SaveSubsystem::MoveEquipmentSlot으로 확정한다.
+	// 알림 다이얼로그 닫힘 콜백(확인/취소/ESC 공통). 참조만 비운다.
+	UFUNCTION()
+	void HandleNotificationDialogClosed();
+
+	// ShowInventoryFullNotification이 다음 틱에 호출하는 실제 다이얼로그 생성부.
+	void PresentInventoryFullNotification();
+
+	// 장비 슬롯(무기/방어구) 드롭 처리. 로비=SaveSubsystem::MoveEquipmentSlot, 레이드=서버 DropInventorySlot 라우팅.
 	bool HandleEquipmentSlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 	bool HandleInventoryBackgroundDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation);
 	bool DropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation, FVector2D ScreenPosition);
 	bool IsPointerInsideInventoryWindow(FVector2D ScreenPosition) const;
 	bool IsPointerOverUserWidget(const FPointerEvent& PointerEvent) const;
+
+	// 현재 떠 있는 알림 다이얼로그. 중복 생성을 막는 데 쓴다.
+	UPROPERTY(Transient)
+	TObjectPtr<ULSConfirmDialogWidget> ActiveNotificationDialog;
 };

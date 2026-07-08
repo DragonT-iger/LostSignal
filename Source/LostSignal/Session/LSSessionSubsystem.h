@@ -67,6 +67,8 @@ struct FLSPendingRaidEntry
 
 	TArray<FLSSessionItem> Inventory;
 	TArray<FLSSessionItem> SafeInventory;
+	// 무기/방어구 장착 5칸. 인덱스=슬롯 타입이므로 정렬/압축 금지.
+	TArray<FLSSessionItem> EquipmentSlots;
 };
 
 UCLASS()
@@ -84,12 +86,12 @@ public:
 	void StartRaid(const TArray<FLSSessionItem>& Loadout);
 
 	void StartRaidClientMirror(const TArray<FLSSessionItem>& Loadout);
-	void MirrorRaidSessionState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems);
+	void MirrorRaidSessionState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);
 	void ClearRaidSessionState();
 
 	// MO 레이드 입장 시 플레이어별 데이터를 큐에 저장. ServerTravel 후 각 PC가 순서대로 꺼내 씀.
-	void EnqueuePendingRaidEntry(const TArray<FLSSessionItem>& Inventory, const TArray<FLSSessionItem>& SafeInventory);
-	bool DequeuePendingRaidEntry(TArray<FLSSessionItem>& OutInventory, TArray<FLSSessionItem>& OutSafeInventory);
+	void EnqueuePendingRaidEntry(const TArray<FLSSessionItem>& Inventory, const TArray<FLSSessionItem>& SafeInventory, const TArray<FLSSessionItem>& EquipmentItems);
+	bool DequeuePendingRaidEntry(TArray<FLSSessionItem>& OutInventory, TArray<FLSSessionItem>& OutSafeInventory, TArray<FLSSessionItem>& OutEquipmentItems);
 	bool HasPendingRaidEntries() const;
 
 	// 레이드 종료 - 결과 처리 후 결과 레벨로 전환
@@ -132,6 +134,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Session")
 	const TArray<FLSSessionItem>& GetSessionSafeInventory() const { return SessionSafeInventory; }
 
+	// 레거시/보조 미러의 장착 장비. RaidInventoryComponent 폴백 초기화에서만 읽는다.
+	const TArray<FLSSessionItem>& GetSessionEquipmentSlots() const { return SessionEquipmentSlots; }
+
 	UFUNCTION(BlueprintPure, Category="LS/Session")
 	bool IsRaidActive() const { return bRaidActive; }
 
@@ -150,6 +155,7 @@ private:
 	FLSLoadoutSnapshot LoadoutSnapshot;
 	TArray<FLSSessionItem> SessionInventory;
 	TArray<FLSSessionItem> SessionSafeInventory;
+	TArray<FLSSessionItem> SessionEquipmentSlots;
 	TArray<FLSSessionItem> ConsumedItems;
 	TArray<FLSSessionItem> ResolvedItems;
 	ELSRaidResult LastRaidResult = ELSRaidResult::Dead;

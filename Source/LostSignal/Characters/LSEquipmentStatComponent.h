@@ -8,6 +8,7 @@
 class UAbilitySystemComponent;
 class UGameplayEffect;
 class ULSSaveSubsystem;
+struct FLSSessionItem;
 
 /**
  * 장착 무기/방어구 합산 전투 스탯을 소유 캐릭터의 GAS 어트리뷰트에 적용/갱신하는 컴포넌트.
@@ -38,6 +39,10 @@ protected:
 private:
 	UAbilitySystemComponent* GetOwnerAbilitySystemComponent() const;
 	ULSSaveSubsystem* GetSaveSubsystem() const;
+
+	// 장비 스탯의 소스 배열을 결정한다. 레이드 중(서버 권한, 소유 PC의 RaidInventory 활성)에는
+	// 서버 세션 장비(GetSessionEquipmentSlots)를, 그 외(로비)에는 클라 세이브 장비를 돌려준다.
+	const TArray<FLSSessionItem>& ResolveEquipmentSource(ULSSaveSubsystem& SaveSubsystem) const;
 
 	// 현재 적용 중인 장비 스탯 GE 핸들. 갱신 시 제거 후 재적용한다.
 	FActiveGameplayEffectHandle EquipmentStatEffectHandle;

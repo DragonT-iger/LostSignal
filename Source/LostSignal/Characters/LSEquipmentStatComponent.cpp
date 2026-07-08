@@ -2,10 +2,13 @@
 
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Data/LSEquipmentStats.h"
+#include "GameFramework/Pawn.h"
 #include "GAS/Effects/LSGE_EquipmentStats.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
+#include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 
@@ -69,7 +72,7 @@ void ULSEquipmentStatComponent::RefreshEquipmentStats(bool bRestoreFullHealth)
 		return;
 	}
 
-	const FLSEquipmentStatTotals Totals = LSEquipmentStats::ComputeEquipmentStatTotals(SaveSubsystem->GetEquipmentSlots());
+	const FLSEquipmentStatTotals Totals = LSEquipmentStats::ComputeEquipmentStatTotals(ResolveEquipmentSource(*SaveSubsystem));
 
 	FGameplayEffectContextHandle ContextHandle = ASC->MakeEffectContext();
 	ContextHandle.AddSourceObject(this);
@@ -120,4 +123,25 @@ ULSSaveSubsystem* ULSEquipmentStatComponent::GetSaveSubsystem() const
 	const UWorld* World = GetWorld();
 	UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
 	return GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+}
+
+const TArray<FLSSessionItem>& ULSEquipmentStatComponent::ResolveEquipmentSource(ULSSaveSubsystem& SaveSubsystem) const
+{
+	// 레이드 중에는 서버의 세션 장비가 진짜 소스다(클라 세이브는 입장 시점 그대로라 불신).
+	if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+	{
+		if (const ALSPlayerControllerBase* PC = Cast<ALSPlayerControllerBase>(OwnerPawn->GetController()))
+		{
+			if (const ULSRaidInventoryComponent* RaidInventory = PC->GetRaidInventoryComponent())
+			{
+				if (RaidInventory->IsRaidActive())
+				{
+					return RaidInventory->GetSessionEquipmentSlots();
+				}
+			}
+		}
+	}
+
+	// 로비(또는 레이드 비활성): 기존대로 클라 세이브 장비를 쓴다.
+	return SaveSubsystem.GetEquipmentSlots();
 }
