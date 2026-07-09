@@ -158,6 +158,9 @@ protected:
 	TObjectPtr<UInputAction> Skill3Action;
 
 	UPROPERTY(EditAnywhere, Category="LS/Input")
+	TObjectPtr<UInputAction> Skill4Action;
+
+	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TObjectPtr<UInputAction> Item1Action;
 
 	UPROPERTY(EditAnywhere, Category="LS/Input")
@@ -302,9 +305,11 @@ private:
 	void OnSkill1();
 	void OnSkill2();
 	void OnSkill3();
+	void OnSkill4();
 	void OnSkill1Released();
 	void OnSkill2Released();
 	void OnSkill3Released();
+	void OnSkill4Released();
 	void OnItem1();
 	void OnItem2();
 	void OnItem3();

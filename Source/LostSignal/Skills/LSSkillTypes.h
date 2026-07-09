@@ -48,7 +48,7 @@ struct FLSBasicAttackHitContext
 	int32 ValidHitCount = 0;
 };
 
-// 스킬 선택 슬롯. 3칸(Skill1~3)에 액티브/궁극기를 자유 배치한다(궁극기 전용 칸 없음).
+// 스킬 선택 슬롯. 4칸(Skill1~4)에 액티브/궁극기를 자유 배치한다(궁극기 전용 칸 없음).
 // 일반 공격/패시브/대쉬는 슬롯이 아니라 캐릭터 고정 기본 장착이다.
 UENUM(BlueprintType)
 enum class ELSPlayerSkillSlot : uint8
@@ -56,6 +56,7 @@ enum class ELSPlayerSkillSlot : uint8
 	Skill1,
 	Skill2,
 	Skill3,
+	Skill4,
 	// 대쉬 전용 표시 슬롯. 발동/쿨타임은 기존 대쉬 경로(ULSGA_Dash)가 담당하고, 스킬 바에는 표시만 한다.
 	Dash
 };

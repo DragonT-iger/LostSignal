@@ -44,6 +44,9 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Settings")
 	TObjectPtr<ULSControlSkillRowWidget> Skill3Row;
 
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Settings")
+	TObjectPtr<ULSControlSkillRowWidget> Skill4Row;
+
 private:
 	UFUNCTION()
 	void HandleBackClicked();

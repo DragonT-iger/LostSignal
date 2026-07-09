@@ -29,10 +29,6 @@ enum class ELSCombatCommandType : uint8
 {
 	BasicAttack,
 	Dash,
-	Skill1,
-	Skill2,
-	Skill3,
-	Ultimate,
 	Interact
 };
 

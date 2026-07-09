@@ -113,17 +113,6 @@ bool ULSCombatStateComponent::CanCancelCurrentActionWith(ELSCombatCommandType Co
 			(CurrentPhase == ELSCombatActionPhase::Startup || CurrentPhase == ELSCombatActionPhase::Recovery);
 	}
 
-	const bool bIsSkillCommand =
-		CommandType == ELSCombatCommandType::Skill1 ||
-		CommandType == ELSCombatCommandType::Skill2 ||
-		CommandType == ELSCombatCommandType::Skill3 ||
-		CommandType == ELSCombatCommandType::Ultimate;
-
-	if (bIsSkillCommand)
-	{
-		return CurrentState == ELSCombatActionState::BasicAttack && CurrentPhase == ELSCombatActionPhase::Recovery;
-	}
-
 	return false;
 }
 

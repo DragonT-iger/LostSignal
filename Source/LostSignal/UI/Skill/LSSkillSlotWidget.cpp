@@ -174,6 +174,8 @@ FText ULSSkillSlotWidget::GetShortcutTextForSlot(const ELSPlayerSkillSlot InSlot
 		return LOCTEXT("Skill2Shortcut", "2");
 	case ELSPlayerSkillSlot::Skill3:
 		return LOCTEXT("Skill3Shortcut", "3");
+	case ELSPlayerSkillSlot::Skill4:
+		return LOCTEXT("Skill4Shortcut", "4");
 	default:
 		// 대쉬 등은 실제 입력 매핑(DashAction)에서 키를 조회한다. 조회 실패 시에만 빈 텍스트.
 		return FText::GetEmpty();

@@ -13,7 +13,7 @@ class ULSSkillPoolDataAsset;
 class ULSSaveSubsystem;
 
 // 로비 개인정비 스킬 탭의 콘텐츠. 캐릭터 스킬 풀에서 액티브/궁극기 후보를 나열하고,
-// 슬롯 선택 후 후보 클릭으로 3칸(Skill1~3)에 장착한다. 데이터는 ULSSaveSubsystem의 캐릭터별 스킬 로드아웃(SkillPool->CharacterID 키)이 단일 출처.
+// 슬롯 선택 후 후보 클릭으로 4칸(Skill1~4)에 장착한다. 데이터는 ULSSaveSubsystem의 캐릭터별 스킬 로드아웃(SkillPool->CharacterID 키)이 단일 출처.
 UCLASS()
 class LOSTSIGNAL_API ULSSkillLoadoutWidget : public UUserWidget
 {
@@ -42,6 +42,9 @@ protected:
 	TObjectPtr<UButton> Slot3Button;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
+	TObjectPtr<UButton> Slot4Button;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
 	TObjectPtr<UImage> Slot1Icon;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
@@ -49,6 +52,9 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
 	TObjectPtr<UImage> Slot3Icon;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
+	TObjectPtr<UImage> Slot4Icon;
 
 	// 현재 선택/변경 중인 슬롯의 스킬 정보를 표시하는 전용 엔트리. WBP에 WBP_SkillLoadoutEntry 인스턴스를 배치한다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
@@ -71,6 +77,9 @@ private:
 
 	UFUNCTION()
 	void HandleSlot3Clicked();
+
+	UFUNCTION()
+	void HandleSlot4Clicked();
 
 	// 후보 클릭: 현재 선택 슬롯에 장착한다. 같은 스킬이 다른 슬롯에 있으면 저장 계층에서 기존 슬롯을 비운다.
 	void HandleEntryClicked(int32 SkillID);

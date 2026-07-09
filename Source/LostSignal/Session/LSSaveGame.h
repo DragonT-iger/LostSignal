@@ -11,7 +11,7 @@ struct FLSSkillLoadout
 {
 	GENERATED_BODY()
 
-	// 스킬 선택 슬롯 3칸(인덱스 = Skill1/Skill2/Skill3, 값 = 액티브/궁극기 Skill_ID, 0 = 빈 칸).
+	// 스킬 선택 슬롯 4칸(인덱스 = Skill1~4, 값 = 액티브/궁극기 Skill_ID, 0 = 빈 칸).
 	UPROPERTY() TArray<int32> SkillIDs;
 
 	// 기본 로드아웃을 1회 시딩했는지. true면 사용자가 슬롯을 다 비워도 기본값을 다시 채우지 않는다.

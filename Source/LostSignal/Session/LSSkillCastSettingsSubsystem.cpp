@@ -14,6 +14,7 @@ bool ULSSkillCastSettingsSubsystem::IsSlotSmartKeyEnabled(ELSPlayerSkillSlot Slo
 	case ELSPlayerSkillSlot::Skill1: return bSkill1SmartKeyEnabled;
 	case ELSPlayerSkillSlot::Skill2: return bSkill2SmartKeyEnabled;
 	case ELSPlayerSkillSlot::Skill3: return bSkill3SmartKeyEnabled;
+	case ELSPlayerSkillSlot::Skill4: return bSkill4SmartKeyEnabled;
 	case ELSPlayerSkillSlot::Dash: break;
 	}
 
@@ -27,6 +28,7 @@ void ULSSkillCastSettingsSubsystem::SetSlotSmartKeyEnabled(ELSPlayerSkillSlot Sl
 	case ELSPlayerSkillSlot::Skill1: bSkill1SmartKeyEnabled = bEnabled; break;
 	case ELSPlayerSkillSlot::Skill2: bSkill2SmartKeyEnabled = bEnabled; break;
 	case ELSPlayerSkillSlot::Skill3: bSkill3SmartKeyEnabled = bEnabled; break;
+	case ELSPlayerSkillSlot::Skill4: bSkill4SmartKeyEnabled = bEnabled; break;
 	case ELSPlayerSkillSlot::Dash: return;
 	}
 

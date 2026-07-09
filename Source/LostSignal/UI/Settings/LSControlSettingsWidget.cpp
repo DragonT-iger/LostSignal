@@ -78,6 +78,10 @@ void ULSControlSettingsWidget::InitializeSkillRows()
 	{
 		Skill3Row->InitializeRow(ELSPlayerSkillSlot::Skill3, LOCTEXT("Skill3", "스킬 3"));
 	}
+	if (Skill4Row)
+	{
+		Skill4Row->InitializeRow(ELSPlayerSkillSlot::Skill4, LOCTEXT("Skill4", "스킬 4"));
+	}
 }
 
 void ULSControlSettingsWidget::InitializeCommonSettings()
@@ -140,6 +144,10 @@ void ULSControlSettingsWidget::LogMissingBindings() const
 	if (!Skill3Row)
 	{
 		UE_LOG(LogLS, Warning, TEXT("Skill3Row is not bound on %s."), *GetNameSafe(this));
+	}
+	if (!Skill4Row)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Skill4Row is not bound on %s."), *GetNameSafe(this));
 	}
 }
 

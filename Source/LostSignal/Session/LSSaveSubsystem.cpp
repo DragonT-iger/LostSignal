@@ -20,7 +20,7 @@ constexpr int32 SaveDefaultMaxInventorySlotCount = 10;
 constexpr int32 ChipEquipmentSlotCount = 10;
 // 무기/방어구 장착칸 수는 공용 상수 LSInventorySlotUtils::EquipmentSlotCount를 쓴다.
 constexpr int32 EquipmentSlotCount = LSInventorySlotUtils::EquipmentSlotCount;
-constexpr int32 EquippedSkillSlotCount = 3;
+constexpr int32 EquippedSkillSlotCount = 4;
 
 const FString ULSSaveSubsystem::SlotName = TEXT("LostSignalSave");
 const FString ULSSaveSubsystem::DebugFileName = TEXT("LostSignalSave_Debug.json");

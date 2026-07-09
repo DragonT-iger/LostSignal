@@ -45,5 +45,8 @@ private:
 	bool bSkill3SmartKeyEnabled = true;
 
 	UPROPERTY(config, VisibleAnywhere, BlueprintReadOnly, Category="LS/Skill", meta=(AllowPrivateAccess="true"))
+	bool bSkill4SmartKeyEnabled = true;
+
+	UPROPERTY(config, VisibleAnywhere, BlueprintReadOnly, Category="LS/Skill", meta=(AllowPrivateAccess="true"))
 	bool bSmartKeyPreviewOnRelease = true;
 };

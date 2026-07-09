@@ -8,7 +8,7 @@
 class ULSSkillSlotWidget;
 class ULSPlayerSkillComponent;
 
-/** Skill bar widget that binds the player skill slots (Skill1~3) and the dash display slot. */
+/** Skill bar widget that binds the player skill slots (Skill1~4) and the dash display slot. */
 UCLASS()
 class LOSTSIGNAL_API ULSSkillBarWidget : public UUserWidget
 {
@@ -47,6 +47,9 @@ protected:
 	FText Skill3TextOverride;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI|Skill|Text", meta=(EditCondition="bTextOverride"))
+	FText Skill4TextOverride;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI|Skill|Text", meta=(EditCondition="bTextOverride"))
 	FText DashTextOverride;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
@@ -57,6 +60,9 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
 	TObjectPtr<ULSSkillSlotWidget> Skill3Slot;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
+	TObjectPtr<ULSSkillSlotWidget> Skill4Slot;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
 	TObjectPtr<ULSSkillSlotWidget> DashSlot;

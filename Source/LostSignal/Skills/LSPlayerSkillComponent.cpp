@@ -494,7 +494,7 @@ void ULSPlayerSkillComponent::ApplyEquippedSkillLoadout()
 		return;
 	}
 
-	static const ELSPlayerSkillSlot SlotOrder[] = { ELSPlayerSkillSlot::Skill1, ELSPlayerSkillSlot::Skill2, ELSPlayerSkillSlot::Skill3 };
+	static const ELSPlayerSkillSlot SlotOrder[] = { ELSPlayerSkillSlot::Skill1, ELSPlayerSkillSlot::Skill2, ELSPlayerSkillSlot::Skill3, ELSPlayerSkillSlot::Skill4 };
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(SlotOrder); ++Index)
 	{
 		const ELSPlayerSkillSlot Slot = SlotOrder[Index];

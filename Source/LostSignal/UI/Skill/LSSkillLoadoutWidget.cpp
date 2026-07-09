@@ -14,7 +14,7 @@
 
 namespace
 {
-constexpr int32 SkillLoadoutSlotCount = 3;
+constexpr int32 SkillLoadoutSlotCount = 4;
 }
 
 #define LOCTEXT_NAMESPACE "LSSkillLoadoutWidget"
@@ -26,6 +26,7 @@ void ULSSkillLoadoutWidget::NativeConstruct()
 	if (Slot1Button) { Slot1Button->OnClicked.AddDynamic(this, &ULSSkillLoadoutWidget::HandleSlot1Clicked); }
 	if (Slot2Button) { Slot2Button->OnClicked.AddDynamic(this, &ULSSkillLoadoutWidget::HandleSlot2Clicked); }
 	if (Slot3Button) { Slot3Button->OnClicked.AddDynamic(this, &ULSSkillLoadoutWidget::HandleSlot3Clicked); }
+	if (Slot4Button) { Slot4Button->OnClicked.AddDynamic(this, &ULSSkillLoadoutWidget::HandleSlot4Clicked); }
 
 	if (!SkillPool)
 	{
@@ -57,6 +58,7 @@ void ULSSkillLoadoutWidget::NativeDestruct()
 	if (Slot1Button) { Slot1Button->OnClicked.RemoveDynamic(this, &ULSSkillLoadoutWidget::HandleSlot1Clicked); }
 	if (Slot2Button) { Slot2Button->OnClicked.RemoveDynamic(this, &ULSSkillLoadoutWidget::HandleSlot2Clicked); }
 	if (Slot3Button) { Slot3Button->OnClicked.RemoveDynamic(this, &ULSSkillLoadoutWidget::HandleSlot3Clicked); }
+	if (Slot4Button) { Slot4Button->OnClicked.RemoveDynamic(this, &ULSSkillLoadoutWidget::HandleSlot4Clicked); }
 
 	if (SkillLoadoutChangedHandle.IsValid())
 	{
@@ -90,6 +92,7 @@ void ULSSkillLoadoutWidget::RefreshSkillLoadout()
 void ULSSkillLoadoutWidget::HandleSlot1Clicked() { SelectSlotByIndex(0); }
 void ULSSkillLoadoutWidget::HandleSlot2Clicked() { SelectSlotByIndex(1); }
 void ULSSkillLoadoutWidget::HandleSlot3Clicked() { SelectSlotByIndex(2); }
+void ULSSkillLoadoutWidget::HandleSlot4Clicked() { SelectSlotByIndex(3); }
 
 void ULSSkillLoadoutWidget::HandleEntryClicked(const int32 SkillID)
 {
@@ -256,6 +259,7 @@ UImage* ULSSkillLoadoutWidget::GetSlotIcon(const int32 SlotIndex) const
 	case 0: return Slot1Icon;
 	case 1: return Slot2Icon;
 	case 2: return Slot3Icon;
+	case 3: return Slot4Icon;
 	default: return nullptr;
 	}
 }

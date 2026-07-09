@@ -94,7 +94,7 @@ EquipmentSlots
 SkillLoadoutsByCharacter
 - 캐릭터별 스킬 선택 로드아웃. 키=CharacterID, 값=FLSSkillLoadout{ SkillIDs[3](값=Skill_ID, 0=빈 칸), bInitialized }
 - 캐릭터가 늘어도 서로 로드아웃을 덮어쓰지 않도록 CharacterID로 키잉. 키의 출처는 ULSSkillPoolDataAsset::CharacterID(로비·런타임 공용)
-- 레이드 진입 시 스폰된 캐릭터의 로드아웃(그 캐릭터 풀의 CharacterID)이 3칸에 적용됨
+- 레이드 진입 시 스폰된 캐릭터의 로드아웃(그 캐릭터 풀의 CharacterID)이 4칸에 적용됨
 - bInitialized: 그 캐릭터 기본 로드아웃을 1회 시딩했는지 플래그(중복 시딩 방지). TrySeedDefaultSkillLoadout이 설정
 - API: GetEquippedSkillIDs(CharacterID) / SetEquippedSkillSlot(CharacterID, Slot, ID) / ClearEquippedSkillSlot(CharacterID, Slot) / TrySeedDefaultSkillLoadout(CharacterID, Defaults), 변경 시 OnSkillLoadoutChanged 발행
 - 로드아웃 규칙(기본 장착·후보 풀·기본 시딩·적용 흐름)은 SkillSystemStructure.md의 `스킬 로드아웃`이 단일 출처
