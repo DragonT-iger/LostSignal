@@ -23,6 +23,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Skill")
 	void InitializeSlot(ULSPlayerSkillComponent* InSkillComponent, ELSPlayerSkillSlot InSlot);
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Skill")
+	void SetShortcutTextOverride(bool bInTextOverride, const FText& InTextOverride);
+
 	void SetPreviewBattleProtocolLevels(int32 CurrentBattleProtocol, int32 PreviousBattleProtocol);
 	void ClearPreviewBattleProtocolLevels();
 
@@ -60,7 +63,9 @@ private:
 	TObjectPtr<ULSSkillDataAsset> CachedSkillData;
 
 	ELSPlayerSkillSlot Slot = ELSPlayerSkillSlot::Skill1;
+	FText ShortcutTextOverride;
 	int32 PreviewCurrentBattleProtocol = 0;
 	int32 PreviewPreviousBattleProtocol = 0;
+	bool bShortcutTextOverride = false;
 	bool bUsePreviewBattleProtocolLevels = false;
 };

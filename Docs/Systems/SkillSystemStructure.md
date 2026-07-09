@@ -704,6 +704,7 @@ Ability BP 또는 C++ 기본값:
 ```text
 - SkillSlotWidget은 SkillData의 Icon/DisplayName을 표시한다.
 - SkillBarWidget은 ULSPlayerSkillComponent의 슬롯 데이터를 읽는다.
+- SkillBarWidget의 `bTextOverride`가 켜져 있으면 슬롯별 오버라이드 텍스트를 단축키 텍스트 대신 표시한다.
 - 쿨타임 표시는 ASC의 CooldownTag remaining time 기준으로 연결한다.
 ```
 

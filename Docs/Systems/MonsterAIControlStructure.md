@@ -603,4 +603,4 @@ AI 코드를 수정한 뒤 다음을 확인한다.
   - **미구현(후속):** 실제 공중 포물선(JumpForce)·도약 중 호밍, `Erosion_Value`(침식)·`Action_Guard`(액션 중 포이즈) 적용, `bCanCrit`(현재 false 고정).
   - **에디터/BP 셋업:** `ULSMonsterCombatComponent`에 `MonsterActionTable`(DT_MonsterAction)·텔레그래프 머티리얼(Circle/Box), `ULSSkillPreviewComponent`에 `DefaultPreviewMesh`를 BP에서 할당해야 텔레그래프가 보인다.
 - **강인도(Monster_Guard):** Row에는 존재하나(int32) 적용 정책 미정(위 "몬스터 DataTable 규칙" 참고).
-- **구체 몬스터 클래스:** `ALSEnemyHyena`(ALSEnemyCharacter 상속, 생성자에서 `MonsterRowName="10001"`만 설정) 추가 완료. 그 외 몬스터는 같은 패턴의 얇은 서브클래스 + BP로 확장.
+- **구체 몬스터 클래스:** `ALSEnemyHyena`(ALSEnemyCharacter 상속, 생성자에서 `MonsterRowName="10001"`만 설정), `ALSEnemyBuff`(`MonsterRowName="1004"`만 설정) 추가 완료. 그 외 몬스터는 같은 패턴의 얇은 서브클래스 + BP로 확장.

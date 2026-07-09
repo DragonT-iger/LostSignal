@@ -28,6 +28,13 @@ void ULSSkillSlotWidget::InitializeSlot(ULSPlayerSkillComponent* InSkillComponen
 	RefreshCooldown();
 }
 
+void ULSSkillSlotWidget::SetShortcutTextOverride(const bool bInTextOverride, const FText& InTextOverride)
+{
+	bShortcutTextOverride = bInTextOverride;
+	ShortcutTextOverride = InTextOverride;
+	RefreshShortcutText();
+}
+
 void ULSSkillSlotWidget::SetPreviewBattleProtocolLevels(const int32 CurrentBattleProtocol, const int32 PreviousBattleProtocol)
 {
 	bUsePreviewBattleProtocolLevels = true;
@@ -107,6 +114,11 @@ void ULSSkillSlotWidget::RefreshShortcutText()
 
 FText ULSSkillSlotWidget::ResolveShortcutText() const
 {
+	if (bShortcutTextOverride)
+	{
+		return ShortcutTextOverride;
+	}
+
 	const APlayerController* PlayerController = GetOwningPlayer();
 	const ALSPlayerCharacter* PlayerCharacter = PlayerController ? Cast<ALSPlayerCharacter>(PlayerController->GetPawn()) : nullptr;
 	const UInputAction* InputAction = PlayerCharacter ? PlayerCharacter->GetSkillInputAction(Slot) : nullptr;

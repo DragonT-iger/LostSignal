@@ -39,6 +39,8 @@ void ULSSkillBarWidget::InitializeSkillBar(ULSPlayerSkillComponent* InSkillCompo
 	{
 		DashSlot->InitializeSlot(SkillComponent, ELSPlayerSkillSlot::Dash);
 	}
+
+	ApplyTextOverridesToSlots();
 }
 
 void ULSSkillBarWidget::SetPreviewBattleProtocolLevels(const int32 CurrentBattleProtocol, const int32 PreviousBattleProtocol)
@@ -65,10 +67,46 @@ void ULSSkillBarWidget::ClearPreviewBattleProtocolLevels()
 	RefreshProtocolVisibility();
 }
 
+void ULSSkillBarWidget::SetTextOverrideEnabled(const bool bInTextOverride)
+{
+	bTextOverride = bInTextOverride;
+	ApplyTextOverridesToSlots();
+}
+
+void ULSSkillBarWidget::SetSkillSlotTextOverride(const ELSPlayerSkillSlot InSlot, const FText& InTextOverride)
+{
+	switch (InSlot)
+	{
+	case ELSPlayerSkillSlot::Skill1:
+		Skill1TextOverride = InTextOverride;
+		break;
+	case ELSPlayerSkillSlot::Skill2:
+		Skill2TextOverride = InTextOverride;
+		break;
+	case ELSPlayerSkillSlot::Skill3:
+		Skill3TextOverride = InTextOverride;
+		break;
+	case ELSPlayerSkillSlot::Dash:
+		DashTextOverride = InTextOverride;
+		break;
+	default:
+		return;
+	}
+
+	ApplyTextOverridesToSlots();
+}
+
+void ULSSkillBarWidget::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+	ApplyTextOverridesToSlots();
+}
+
 void ULSSkillBarWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	RefreshProtocolVisibility();
+	ApplyTextOverridesToSlots();
 
 	if (!Skill1Slot || !Skill2Slot || !Skill3Slot || !DashSlot)
 	{
@@ -79,6 +117,14 @@ void ULSSkillBarWidget::NativeConstruct()
 			*GetNameSafe(Skill3Slot),
 			*GetNameSafe(DashSlot));
 	}
+}
+
+void ULSSkillBarWidget::ApplyTextOverridesToSlots()
+{
+	if (Skill1Slot) { Skill1Slot->SetShortcutTextOverride(bTextOverride, Skill1TextOverride); }
+	if (Skill2Slot) { Skill2Slot->SetShortcutTextOverride(bTextOverride, Skill2TextOverride); }
+	if (Skill3Slot) { Skill3Slot->SetShortcutTextOverride(bTextOverride, Skill3TextOverride); }
+	if (DashSlot) { DashSlot->SetShortcutTextOverride(bTextOverride, DashTextOverride); }
 }
 
 void ULSSkillBarWidget::RefreshProtocolVisibility()

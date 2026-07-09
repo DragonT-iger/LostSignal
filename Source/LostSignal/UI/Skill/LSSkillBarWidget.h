@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Skills/LSSkillTypes.h"
 #include "LSSkillBarWidget.generated.h"
 
 class ULSSkillSlotWidget;
@@ -23,8 +24,30 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Skill")
 	void ClearPreviewBattleProtocolLevels();
 
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Skill")
+	void SetTextOverrideEnabled(bool bInTextOverride);
+
+	UFUNCTION(BlueprintCallable, Category="LS/UI|Skill")
+	void SetSkillSlotTextOverride(ELSPlayerSkillSlot InSlot, const FText& InTextOverride);
+
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI|Skill|Text")
+	bool bTextOverride = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI|Skill|Text", meta=(EditCondition="bTextOverride"))
+	FText Skill1TextOverride;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI|Skill|Text", meta=(EditCondition="bTextOverride"))
+	FText Skill2TextOverride;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI|Skill|Text", meta=(EditCondition="bTextOverride"))
+	FText Skill3TextOverride;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI|Skill|Text", meta=(EditCondition="bTextOverride"))
+	FText DashTextOverride;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Skill")
 	TObjectPtr<ULSSkillSlotWidget> Skill1Slot;
@@ -39,6 +62,7 @@ protected:
 	TObjectPtr<ULSSkillSlotWidget> DashSlot;
 
 private:
+	void ApplyTextOverridesToSlots();
 	void RefreshProtocolVisibility();
 	bool IsSkillSlotProtocolVisible() const;
 	void ResolveBattleProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const;
