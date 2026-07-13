@@ -279,9 +279,11 @@ ReturnHome / Patrol 복귀
 ```text
 StateTree Attack 상태
 -> LS Request Monster Action (FLSSTTask_RequestMonsterAction)
+   -> 발동 전 AttackAlignDuration(초, 태스크 변수) 동안 타겟 방향으로 yaw 회전(0이면 즉시). 회전이 끝난 뒤 RequestAction 호출
 -> ULSMonsterCombatComponent::RequestAction(Target)
    -> SelectActionForDistance: 거리 적합 + 쿨다운 준비 후보 중 쿨다운이 가장 긴(=강한) 액션 우선(동률 시 Action_Group 순서)
    -> 활성 액션 컨텍스트 세팅 + 액션별 쿨다운 시작(컴포넌트 TMap 타이머)
+   -> 타겟 방향 yaw 최종 보정(회전 보간의 마지막 오차 제거 — 히트박스/텔레그래프 조준 정확도 보장)
    -> RequestAbilityByTag(Ability_MonsterAction)
 -> ULSGA_MonsterAction: 활성 액션 row의 Action_Ani 몽타주 재생
 -> (윈드업) AnimNotifyState ULSANS_MonsterActionTelegraph
@@ -311,7 +313,7 @@ Attack -> Dead / Knockback
 
 `LS Request Monster Action`은 액션 어빌리티가 활성화된 뒤에는 기본적으로 거리 이탈로 취소하지 않는다(공격 모션 캔슬 금지). 공격 거리 이탈은 어빌리티 종료 후 StateTree 전이 조건으로 다시 판단한다.
 
-공격 중 facing 고정: `ULSGA_MonsterAction`이 활성인 동안 `bUseControllerDesiredRotation`을 false로 꺼 **공격 시작 시점의 방향으로 body 회전을 고정**한다(어빌리티 종료 시 복원). 따라서 공격 도중에는 플레이어를 따라 돌지 않고, 공격과 공격 사이에만 다시 타겟을 향한다.
+공격 중 facing 고정: `ULSGA_MonsterAction`이 활성인 동안 `bUseControllerDesiredRotation`을 false로 꺼 **공격 시작 시점의 방향으로 body 회전을 고정**한다(어빌리티 종료 시 복원). 공격이 연속으로 이어지면 회전이 작동할 틈이 없으므로, `LS Request Monster Action`이 발동 전 `AttackAlignDuration` 동안 타겟 방향으로 yaw를 회전시켜 매 액션의 조준을 갱신한다(0이면 즉시 조준). `RequestAction`의 최종 yaw 보정은 보간 마지막 프레임 오차를 지우는 정밀 조준용이다 — "고정"은 그 조준된 방향 기준이다.
 
 텔레그래프 표시 여부는 `ULSMonsterCombatComponent::ShouldShowActionTelegraph()`가 게이팅한다(현재는 항상 true, 추후 전투 프로토콜 레벨 게이팅 확장점).
 

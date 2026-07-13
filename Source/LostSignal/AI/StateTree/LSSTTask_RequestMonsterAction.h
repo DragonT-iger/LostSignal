@@ -28,6 +28,19 @@ struct FLSSTTask_RequestMonsterActionInstanceData
 
 	UPROPERTY(EditAnywhere, Category="LS/AI", meta=(ClampMin="0.0"))
 	float CancelIfTargetFartherThan = 600.0f;
+
+	/** 공격 발동 전 타겟 방향으로 회전하는 시간(초). 0이면 즉시 조준 후 바로 공격. */
+	UPROPERTY(EditAnywhere, Category="LS/AI", meta=(ClampMin="0.0"))
+	float AttackAlignDuration = 0.2f;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI")
+	float AlignElapsed = 0.0f;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI")
+	float AlignStartYaw = 0.0f;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/AI")
+	bool bActionRequested = false;
 };
 
 /** StateTree task that asks the monster combat component to select and run an action for the target. */

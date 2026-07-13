@@ -150,6 +150,21 @@ bool ULSMonsterCombatComponent::RequestAction(AActor* Target)
 	ActiveTarget = Target;
 	bActionDashLandingValid = false; // 새 액션 시작 — 이전 도약 착지 좌표 무효화.
 
+	// 공격 시작 직전 타겟 방향으로 yaw 즉시 스냅 — 연속 공격이 이전 공격 방향을 물려받지 않게 한다.
+	// (공격 중 회전 잠금은 이 스냅된 방향을 고정하는 것으로 유지)
+	if (Target)
+	{
+		AActor* MutableOwner = GetOwner();
+		FVector ToTarget = Target->GetActorLocation() - MutableOwner->GetActorLocation();
+		ToTarget.Z = 0.0f;
+		if (!ToTarget.IsNearlyZero())
+		{
+			FRotator SnapRotation = MutableOwner->GetActorRotation();
+			SnapRotation.Yaw = ToTarget.Rotation().Yaw;
+			MutableOwner->SetActorRotation(SnapRotation);
+		}
+	}
+
 	const bool bActivated = RequestAbilityByTag(LSGameplayTags::Ability_MonsterAction);
 	UE_LOG(LogLS, Log, TEXT("RequestAction: %s 거리 %.0f -> row=%s, 어빌리티 활성=%d"),
 		*GetNameSafe(OwnerActor), Distance, *RowName.ToString(), bActivated ? 1 : 0);
