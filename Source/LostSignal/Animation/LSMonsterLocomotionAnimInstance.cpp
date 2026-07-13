@@ -40,6 +40,12 @@ void ULSMonsterLocomotionAnimInstance::UpdateLocomotionGait()
 		return;
 	}
 
+	if (bAlwaysWalkWhenMoving)
+	{
+		LocomotionGait = ELSMonsterLocomotionGait::Walk;
+		return;
+	}
+
 	const float WalkRunMaxSpeedThreshold = ResolveWalkRunMaxSpeedThreshold();
 	if (WalkRunMaxSpeedThreshold > 0.0f && CurrentMaxWalkSpeed > 0.0f)
 	{

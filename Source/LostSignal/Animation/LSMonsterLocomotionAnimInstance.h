@@ -40,6 +40,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Animation|Locomotion", meta=(ClampMin="0.0", ClampMax="1.0"))
 	float WalkRunThresholdAlpha = 0.85f;
 
+	// run 모션이 없는 몬스터(보스 등)용: 켜면 이동 중 gait를 속도 임계와 무관하게 항상 Walk로 고정한다. ABP 클래스 디폴트에서 설정.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Animation|Locomotion")
+	bool bAlwaysWalkWhenMoving = false;
+
 private:
 	void UpdateMovementSpeedCache();
 	void UpdateLocomotionGait();

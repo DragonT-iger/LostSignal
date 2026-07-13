@@ -551,6 +551,7 @@ Run   : MaxWalkSpeed >  임계   (Chase / ReturnHome = base × AlertMoveSpeedMul
 - 기준(base) 속도는 `ALSEnemyCharacter`가 BeginPlay에서 `DefaultMaxWalkSpeed`로 1회 캡처해 보관하는 **단일 출처**다. 모든 이동 Task(Patrol/Chase/ReturnHome)는 라이브 `MaxWalkSpeed`를 캡처하지 않고 이 base를 읽어 `base × 배수`로 설정하며, 상태 이탈 시 base로 복원한다. AnimInstance도 같은 값을 읽는다. 이렇게 하면 전이 Enter/Exit 순서나 멀티플라이어 누적(줄어든 속도에 또 곱하기)에 의존하지 않는다.
 - 이동 속도 상태(Patrol/Chase/ReturnHome)는 상호 배타라는 전제로 base 복원을 쓴다. 동시에 두 속도 Task가 활성화되는 구조를 만들지 않는다.
 - 새 이동 상태(예: Investigate)를 추가해도 속도만 적절히 주면 gait가 자동으로 따라온다. Task에 gait 지정 코드를 넣지 않는다.
+- **run 모션이 없는 몬스터(보스 등):** 임계 판정은 "Chase = run"을 전제하므로, run 애니메이션이 없는 ABP에서는 Chase 구간에 gait가 Run으로 빠져 애니메이션이 비게 된다. 이 경우 `ULSMonsterLocomotionAnimInstance::bAlwaysWalkWhenMoving`을 해당 ABP 클래스 디폴트에서 켜면 이동 중 gait가 항상 Walk로 고정된다(속도 임계 판정 무시). 이동 속도 자체는 그대로 Task가 소유한다.
 
 ## 상태 태그 규칙
 
