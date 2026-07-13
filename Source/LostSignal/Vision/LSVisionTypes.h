@@ -5,6 +5,13 @@
 
 class ULSVisionOccluderComponent;
 
+namespace LSVisionTags
+{
+	// 이 ComponentTag가 달린 프리미티브는 시야 밖 숨김(VisionTarget) 대상에서 제외한다.
+	// 예: 몬스터 텔레그래프 프리뷰 — 시전자가 시야 밖이어도 위험 범위는 항상 표시.
+	inline const FName HideExempt(TEXT("LSVisionHideExempt"));
+}
+
 USTRUCT(BlueprintType)
 struct LOSTSIGNAL_API FLSVisionSegment2D
 {

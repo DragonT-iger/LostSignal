@@ -6,6 +6,9 @@
 
 class UPrimitiveComponent;
 
+// 로컬 시야 가시성이 실제로 바뀔 때만 발화 (C++ 전용, 잔상 등 코스메틱 연출 구독용)
+DECLARE_MULTICAST_DELEGATE_OneParam(FLSOnLocalVisibilityChanged, bool /*bLocallyVisible*/);
+
 UCLASS(ClassGroup = (Vision), meta = (BlueprintSpawnableComponent))
 class LOSTSIGNAL_API ULSVisionTargetComponent : public UActorComponent
 {
@@ -33,6 +36,8 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	bool bIsLocallyVisible = true;
+
+	FLSOnLocalVisibilityChanged OnLocalVisibilityChanged;
 
 	UFUNCTION(BlueprintCallable, Category = "LS/Vision")
 	void SetLocallyVisible(bool bVisible);

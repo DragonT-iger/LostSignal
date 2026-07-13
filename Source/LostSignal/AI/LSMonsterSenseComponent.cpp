@@ -116,7 +116,8 @@ void ULSMonsterSenseComponent::RegisterNoiseEvent(const FLSNoiseEvent& NoiseEven
 		return;
 	}
 
-	if (ShouldSuppressReturnHomeInterest(NoiseEvent.Location))
+	// 교전 영역 밖 소음은 무시한다(보스 아레나 — 영역 밖 대상에 반응하지 않음).
+	if (ShouldSuppressReturnHomeInterest(NoiseEvent.Location) || IsLocationOutsideEngageArea(NoiseEvent.Location))
 	{
 		return;
 	}
@@ -136,7 +137,8 @@ void ULSMonsterSenseComponent::SetCurrentTargetFromDamage(AActor* DamageInstigat
 	}
 
 	const FVector DamageInstigatorLocation = DamageInstigator->GetActorLocation();
-	if (ShouldSuppressReturnHomeInterest(DamageInstigatorLocation))
+	// 교전 영역 밖 공격자는 어그로를 잡지 않는다(영역 밖 원거리 견제 차단).
+	if (ShouldSuppressReturnHomeInterest(DamageInstigatorLocation) || IsLocationOutsideEngageArea(DamageInstigatorLocation))
 	{
 		return;
 	}
@@ -335,6 +337,13 @@ void ULSMonsterSenseComponent::UpdateSensing(float DeltaTime)
 	// 데이터로만 노출하고, 실제 타겟 해제는 StateTree가 ReturnHome으로 전이하며
 	// ClearInterest를 호출할 때 일어난다. (데이터=SenseComponent, 전이=StateTree)
 
+	// 교전 영역 밖으로 나간 타겟은 즉시 해제(보스 아레나 이탈 = 전투 해제).
+	// 조사(Alert) 없이 바로 복귀하도록 관심 위치도 함께 지운다.
+	if (CurrentTarget.IsValid() && IsLocationOutsideEngageArea(CurrentTarget.Get()->GetActorLocation(), EngageAreaReleaseBuffer))
+	{
+		ClearInterest();
+	}
+
 	// P2: 시야(전방 부채꼴 + LOS) 내 가장 가까운 대상.
 	AActor* VisibleTarget = FindBestVisibleTarget();
 	if (VisibleTarget && ShouldSuppressReturnHomeInterest(VisibleTarget->GetActorLocation()))
@@ -425,7 +434,8 @@ AActor* ULSMonsterSenseComponent::FindBestVisibleTarget() const
 			continue;
 		}
 
-		if (!CanSeeActor(Pawn))
+		// 교전 영역 밖 대상은 보여도 획득하지 않는다.
+		if (IsLocationOutsideEngageArea(Pawn->GetActorLocation()) || !CanSeeActor(Pawn))
 		{
 			continue;
 		}
@@ -444,6 +454,16 @@ AActor* ULSMonsterSenseComponent::FindBestVisibleTarget() const
 bool ULSMonsterSenseComponent::IsLocationBeyondLeashDistance(const FVector& Location) const
 {
 	return LeashDistance > 0.0f && FVector::Dist2D(Location, HomeLocation) > LeashDistance;
+}
+
+bool ULSMonsterSenseComponent::IsLocationOutsideEngageArea(const FVector& Location, float ExtraBuffer) const
+{
+	if (!bUseEngageArea || EngageAreaRadius <= 0.0f)
+	{
+		return false;
+	}
+
+	return FVector::Dist2D(Location, HomeLocation) > EngageAreaRadius + ExtraBuffer;
 }
 
 bool ULSMonsterSenseComponent::ShouldSuppressReturnHomeInterest(const FVector& InterestCandidateLocation) const

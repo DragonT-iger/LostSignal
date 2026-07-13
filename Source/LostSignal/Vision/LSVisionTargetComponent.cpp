@@ -3,6 +3,7 @@
 #include "Components/PrimitiveComponent.h"
 #include "GameFramework/Actor.h"
 #include "Vision/LSVisionSubsystem.h"
+#include "Vision/LSVisionTypes.h"
 
 ULSVisionTargetComponent::ULSVisionTargetComponent()
 {
@@ -47,7 +48,14 @@ void ULSVisionTargetComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 // Applies the local visibility result to the configured primitive set.
 void ULSVisionTargetComponent::SetLocallyVisible(const bool bVisible)
 {
+	// 시야 갱신이 변화 감지 없이 매 주기 호출되므로, 값이 실제로 바뀔 때만 알린다.
+	const bool bChanged = (bIsLocallyVisible != bVisible);
 	bIsLocallyVisible = bVisible;
+
+	if (bChanged)
+	{
+		OnLocalVisibilityChanged.Broadcast(bVisible);
+	}
 
 	if (!bHideWhenNotVisible)
 	{
@@ -91,7 +99,7 @@ void ULSVisionTargetComponent::GatherRenderPrimitives(TArray<UPrimitiveComponent
 
 	for (UPrimitiveComponent* PrimitiveComponent : RenderPrimitives)
 	{
-		if (PrimitiveComponent != nullptr)
+		if (PrimitiveComponent != nullptr && !PrimitiveComponent->ComponentHasTag(LSVisionTags::HideExempt))
 		{
 			OutPrimitives.AddUnique(PrimitiveComponent);
 		}
@@ -109,7 +117,7 @@ void ULSVisionTargetComponent::GatherRenderPrimitives(TArray<UPrimitiveComponent
 
 		for (UPrimitiveComponent* PrimitiveComponent : OwnerPrimitiveComponents)
 		{
-			if (PrimitiveComponent != nullptr)
+			if (PrimitiveComponent != nullptr && !PrimitiveComponent->ComponentHasTag(LSVisionTags::HideExempt))
 			{
 				OutPrimitives.AddUnique(PrimitiveComponent);
 			}

@@ -16,6 +16,7 @@ class ULSMonsterCombatComponent;
 class ULSMonsterSenseComponent;
 class ULSNoiseEmitterComponent;
 class ULSVisionTargetComponent;
+class ULSVisionGhostComponent;
 class ULSEnemyHealthBarComponent;
 class ULSSkillPreviewComponent;
 struct FLSMonsterArchetypeRow;
@@ -53,15 +54,14 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Vision")
 	ULSVisionTargetComponent* GetVisionTargetComponent() const { return VisionTargetComponent; }
 
+	UFUNCTION(BlueprintPure, Category="LS/Vision")
+	ULSVisionGhostComponent* GetVisionGhostComponent() const { return VisionGhostComponent; }
+
 	UFUNCTION(BlueprintPure, Category="LS/UI|Combat")
 	ULSEnemyHealthBarComponent* GetHealthBarComponent() const { return HealthBarComponent; }
 
 	UFUNCTION(BlueprintPure, Category="LS/GAS")
 	ULSCharacterAttributeSet* GetMonsterAttributeSet() const { return MonsterAttributeSet; }
-
-	/** Returns the death montage authored for this enemy. */
-	UFUNCTION(BlueprintPure, Category="LS/Combat")
-	UAnimMontage* GetDeathMontage() const { return DeathMontage; }
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastPlayAbilityMontage(UAnimMontage* Montage);
@@ -78,10 +78,6 @@ protected:
 	/** Data-driven monster attack ability granted on BeginPlay; activated via ULSMonsterCombatComponent::RequestAction. */
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TSubclassOf<UGameplayAbility> MonsterActionAbilityClass;
-
-	/** Death animation authored per enemy BP and played by the Dead state before AI logic stops. */
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
-	TObjectPtr<UAnimMontage> DeathMontage = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/AI|DataTable")
 	TObjectPtr<UDataTable> MonsterArchetypeTable;
@@ -103,6 +99,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Vision")
 	TObjectPtr<ULSVisionTargetComponent> VisionTargetComponent;
+
+	// 시야 이탈 시 마지막 위치·포즈의 실루엣 잔상을 남기는 로컬 전용 연출.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Vision")
+	TObjectPtr<ULSVisionGhostComponent> VisionGhostComponent;
 
 	// 공격 범위 텔레그래프(스킬 인디케이터 재사용). ULSMonsterCombatComponent가 구동한다.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Combat")

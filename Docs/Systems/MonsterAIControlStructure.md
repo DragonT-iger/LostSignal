@@ -27,7 +27,7 @@ ALSEnemyCharacter
 - AIControllerClass, AutoPossessAI, AI 컴포넌트 생성
 - 몬스터 DataTable 행을 컴포넌트에 적용
 - 서버에서 기본 몬스터 Ability 부여
-- 몽타주/DeathMontage 같은 캐릭터별 에셋 참조 소유
+- 공격 몽타주 같은 캐릭터별 에셋 참조 소유(사망 애니메이션은 Anim BP 담당)
 
 ALSAIController
 - StateTree 실행 호스트
@@ -253,6 +253,7 @@ Knockback
 Dead
 - LS.State.Dead 기반 터미널 상태
 - 죽음 처리 후 AI Brain 정지
+- 사망 애니메이션은 `LS.State.Dead`를 읽는 Anim BP가 재생하며, 캐릭터 C++/StateTree는 사망 몽타주를 직접 참조하거나 실행하지 않는다.
 - 사망 진입 시 `ALSEnemyCharacter::OnDeathStateChanged`가 캡슐·메시 콜리전을 해제한다(공용 `ULSCharacterCombatComponent`의 사망 핸들러가 모든 머신에서 호출). 시체는 이동을 막지 않고 추가 타격 대상에서 빠진다.
 - 사망 진입 시 진행 중 어빌리티를 전부 취소(`CancelAllAbilities`)한다. 공격 몽타주가 즉시 끊기고 `LS.Combat.Attacking`이 해제되어 Attack → Dead 전이가 공격 애니메이션 종료를 기다리지 않는다.
 
@@ -337,6 +338,8 @@ Tick (UpdateSensing = 우선순위 중재 1패스)
 -> 죽음 상태면 관심 정보 초기화 및 Tick 중지
 -> P0(해제): IsBeyondLeashDistance(앵커=최초 인식 위치 기준)는 데이터로만 노출.
    실제 해제는 StateTree가 ReturnHome 진입 시 ClearInterest로 처리(C++ 자체 해제 안 함)
+-> 교전 영역(bUseEngageArea, 보스 전용 옵션): 현재 타겟이 홈 기준 EngageAreaRadius+버퍼 밖이면
+   즉시 ClearInterest로 해제(이 경우만 C++이 직접 해제 — "보스 몬스터 구조" 참고)
 -> P2(시야): FindBestVisibleTarget(최근접) + CanSeeActor
    - 신규 획득(없다가 생김)이면 SetTarget이 앵커 캡처
    - P2 최근접 전환은 앵커 유지
@@ -349,10 +352,12 @@ Tick (UpdateSensing = 우선순위 중재 1패스)
 RegisterNoiseEvent
 -> 소음 이벤트 반경과 몬스터 청각 반경이 모두 닿으면 InterestLocation 갱신
 -> 실제 사운드 재생 여부가 아니라 게임플레이 소음 이벤트 기준
+-> 교전 영역 밖 소음은 무시(bUseEngageArea)
 
 SetCurrentTargetFromDamage
 -> 몬스터가 플레이어에게 데미지를 받으면 공격한 플레이어를 CurrentTarget으로 설정
 -> InterestLocation도 공격자 위치로 갱신
+-> 교전 영역 밖 공격자는 무시(bUseEngageArea — 영역 밖 원거리 견제 차단)
 -> StateTree 전이를 직접 실행하지 않고 Evaluator 값 갱신으로 Combat 판단을 유도
 ```
 
@@ -491,6 +496,47 @@ ReturnHome
 
 `LS Set Return Home Mode`는 State Enter에서 포커스와 기존 추적 잔상을 끊고, State Exit에서 시야 반경 강제와 이동 속도를 복구한다. State Exit에서는 `InterestLocation`을 지우지 않는다. 대신 ReturnHome 중에는 Home 기준 Leash 밖의 시야 타겟, 소음, 피격 위치를 `InterestLocation`으로 다시 만들지 않는다. Leash 안의 새 감지만 Combat 또는 InvestigateInterest 전이에 사용한다.
 
+## 보스 몬스터 구조
+
+보스(예: 골렘형, 변전소 고정 스폰)는 **전용 evaluator를 만들지 않는다**. `FLSSTEvaluator_MonsterSense`의 판단값은 보스에도 전부 유효하고, 보스 고유 동작(교전 영역 이탈 시 전투 해제)은 SenseComponent 내부에서 타겟을 해제해 `bHasTarget=false`로 노출되므로 evaluator에 새 필드도 필요 없다. 분리는 **StateTree 에셋 수준**으로 한다.
+
+```text
+보스 = ALSEnemyBossBuff(row 지정만 하는 얇은 래핑, ALSEnemyCharacter 상속)
+     + 보스 아키타입 row(Monster_Rank=Boss, 10101)
+     + SenseComponent 교전 영역 옵션 + 전용 StateTree 에셋(ST_Boss)
+```
+
+### 교전 영역 (SenseComponent, 기본 꺼짐)
+
+`ULSMonsterSenseComponent`의 `bUseEngageArea`를 켜면 홈(스폰) 기준 반경으로 교전을 제한한다. 일반 몬스터는 꺼져 있어 동작 불변. 보스 BP의 SenseComponent에서 켜고 `EngageAreaRadius`를 조정한다.
+
+- 획득 필터: 시야 후보(FindBestVisibleTarget)·피격 공격자(SetCurrentTargetFromDamage)·소음(RegisterNoiseEvent)이 홈 기준 `EngageAreaRadius` 밖이면 무시 — 영역 밖 원거리 견제로 어그로가 잡히지 않음
+- 해제: 현재 타겟이 `EngageAreaRadius + EngageAreaReleaseBuffer` 초과 시 즉시 ClearInterest(타겟+관심 해제). 버퍼는 경계 들락날락 요요 방지 히스테리시스
+- 해제되면 `bHasTarget=false` → ReturnHome 전이는 여전히 StateTree 소관
+
+### 복귀 시 전투 리셋
+
+`LS Reset Monster Combat`(FLSSTTask_ResetMonsterCombat)을 ReturnHome 상태에 기존 복귀 태스크와 병렬 배치한다. 보스 전용이 아니라 일반 몬스터 트리에도 붙일 수 있는 범용 태스크다. 상태 진입 시 1회:
+
+- `ULSGE_FullHeal`(Instant, 대상 MaxHealth 캡처로 CurrentHealth Override) 적용 — 복귀 시작 즉시 풀피로 "깎아놓고 도망 → 재진입" 누적 딜 차단
+- `ULSMonsterCombatComponent::ResetActionCooldowns()`로 액션 쿨다운 초기화
+- 리셋 실패는 경고 로그만 남기고 복귀는 계속(Running 유지)
+
+### 권장 보스 StateTree 구성 (ST_Boss)
+
+기존 evaluator·조건·태스크를 그대로 재사용한다.
+
+```text
+Dormant    : LS Dormant Wait (원거리 성능 절감 유지)
+Idle       : 태스크 없음 — 비전투 이동 없음은 Patrol 태스크를 배치하지 않는 것으로 구현
+Chase      : MoveTo + LS Apply Move Speed Multiplier
+Attack     : LS Request Monster Action (거리별 Attack_1/Attack_2 선택은 DT_MonsterAction이 담당)
+ReturnHome : LS Set Return Home Mode + MoveTo Home + LS Reset Monster Combat
+Knockback / Dead : 일반 몬스터와 동일
+```
+
+Patrol·Investigate(관심 위치 조사) 상태는 두지 않는다 — 타겟 상실(영역 이탈 포함) 시 바로 ReturnHome으로 전이한다.
+
 ## 로코모션 애니메이션(Walk/Run) 규칙
 
 이동 Gait(Idle/Walk/Run)는 StateTree Task가 AnimInstance에 직접 지정하지 않는다. `ULSMonsterLocomotionAnimInstance`가 매 프레임 `MaxWalkSpeed`를 읽어 파생한다(pull). 이동 속도는 이미 Task가 단일 출처로 소유하므로(Patrol/ReturnHome가 `MaxWalkSpeed`를 변경), gait를 별도 상태로 중복 관리하지 않는다.
@@ -605,4 +651,5 @@ AI 코드를 수정한 뒤 다음을 확인한다.
   - **미구현(후속):** 실제 공중 포물선(JumpForce)·도약 중 호밍, `Erosion_Value`(침식)·`Action_Guard`(액션 중 포이즈) 적용, `bCanCrit`(현재 false 고정).
   - **에디터/BP 셋업:** `ULSMonsterCombatComponent`에 `MonsterActionTable`(DT_MonsterAction)·텔레그래프 머티리얼(Circle/Box), `ULSSkillPreviewComponent`에 `DefaultPreviewMesh`를 BP에서 할당해야 텔레그래프가 보인다.
 - **강인도(Monster_Guard):** Row에는 존재하나(int32) 적용 정책 미정(위 "몬스터 DataTable 규칙" 참고).
-- **구체 몬스터 클래스:** `ALSEnemyHyena`(ALSEnemyCharacter 상속, 생성자에서 `MonsterRowName="10001"`만 설정), `ALSEnemyBuff`(`MonsterRowName="1004"`만 설정) 추가 완료. 그 외 몬스터는 같은 패턴의 얇은 서브클래스 + BP로 확장.
+- **보스 몬스터(골렘형):** AI 코드 구조 구현 완료 — 교전 영역(`bUseEngageArea`), 복귀 시 전투 리셋(`LS Reset Monster Combat` + `ULSGE_FullHeal`, 일반 몬스터에도 사용 가능한 범용 태스크), 전용 evaluator 없이 StateTree 에셋 수준 분리(위 "보스 몬스터 구조" 참고). **미완(에셋/데이터):** ST_Boss StateTree 에셋, 보스 BP(교전 영역 설정), 보스 아키타입 row·DT_MonsterAction 액션 row.
+- **구체 몬스터 클래스:** `ALSEnemyHyena`(ALSEnemyCharacter 상속, 생성자에서 `MonsterRowName="10001"`만 설정), `ALSEnemyBuff`(`MonsterRowName="10004"`만 설정), `ALSEnemyBossBuff`(보스 골렘, `MonsterRowName="10101"`만 설정) 추가 완료. 그 외 몬스터는 같은 패턴의 얇은 서브클래스 + BP로 확장.

@@ -22,6 +22,7 @@
 #include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "UI/Debug/LSHpDebugWidget.h"
 #include "UI/Combat/LSEnemyHealthBarComponent.h"
+#include "Vision/LSVisionGhostComponent.h"
 #include "Vision/LSVisionTargetComponent.h"
 
 namespace
@@ -49,6 +50,7 @@ ALSEnemyCharacter::ALSEnemyCharacter()
 	MinimapMarkerComponent = CreateDefaultSubobject<ULSMinimapMarkerComponent>(TEXT("MinimapMarkerComponent"));
 	NoiseEmitterComponent = CreateDefaultSubobject<ULSNoiseEmitterComponent>(TEXT("NoiseEmitterComponent"));
 	VisionTargetComponent = CreateDefaultSubobject<ULSVisionTargetComponent>(TEXT("VisionTargetComponent"));
+	VisionGhostComponent = CreateDefaultSubobject<ULSVisionGhostComponent>(TEXT("VisionGhostComponent"));
 	HealthBarComponent = CreateDefaultSubobject<ULSEnemyHealthBarComponent>(TEXT("HealthBarComponent"));
 	HealthBarComponent->SetupAttachment(GetRootComponent());
 	NoiseEmitterComponent->SetNotifyMonsterSense(false);
@@ -136,7 +138,7 @@ void ALSEnemyCharacter::OnDeathStateChanged(bool bIsDead)
 	}
 
 	// 시체가 이동을 막지 않고, 추가 타격/타겟팅 대상에서 빠지도록 캡슐·메시 콜리전 모두 해제.
-	// 메시는 계속 보이며 사망 몽타주가 재생된다(가시성은 건드리지 않음).
+	// 메시는 계속 보이며 Anim BP가 사망 애니메이션을 재생한다(가시성은 건드리지 않음).
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
 		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);

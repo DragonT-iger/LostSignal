@@ -53,6 +53,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	bool HasUsableActionInRange(float Distance) const;
 
+	/** 복귀 등 전투 리셋 시 액션 쿨다운 타이머 전체 초기화. */
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void ResetActionCooldowns() { ActionCooldownEndTimes.Empty(); }
+
 	/** 타격 프레임 AnimNotify가 호출. 활성 액션 row의 히트박스로 데미지를 적용한다. */
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void PerformActionHit();

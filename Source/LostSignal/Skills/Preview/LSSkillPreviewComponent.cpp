@@ -9,6 +9,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Vision/LSVisionTypes.h"
 
 ULSSkillPreviewComponent::ULSSkillPreviewComponent()
 {
@@ -55,6 +56,8 @@ bool ULSSkillPreviewComponent::BeginAreaPreview(const FLSSkillAreaPreviewSpec& P
 		ActivePreviewMesh->SetGenerateOverlapEvents(false);
 		ActivePreviewMesh->SetCastShadow(false);
 		ActivePreviewMesh->SetVisibility(true, true);
+		// 시전자가 시야 밖이어도 위험 범위 표시는 유지 — VisionTarget의 프리미티브 숨김에서 제외.
+		ActivePreviewMesh->ComponentTags.Add(LSVisionTags::HideExempt);
 		ActivePreviewMesh->RegisterComponent();
 	}
 

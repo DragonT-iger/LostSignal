@@ -102,6 +102,7 @@ private:
 	bool ShouldForceActiveSense() const;
 	void ApplySenseTickInterval();
 	bool IsLocationBeyondLeashDistance(const FVector& Location) const;
+	bool IsLocationOutsideEngageArea(const FVector& Location, float ExtraBuffer = 0.0f) const;
 	bool ShouldSuppressReturnHomeInterest(const FVector& InterestCandidateLocation) const;
 	bool IsOwnerDead() const;
 	bool IsOwnerAttacking() const;
@@ -138,6 +139,17 @@ private:
 	// 시야에서 타겟을 놓친 뒤 타겟을 유지하는 시간(P3). 경과 시 타겟 해제.
 	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0"))
 	float LostSightMemorySeconds = 5.0f;
+
+	// 교전 영역(보스 아레나): 켜면 홈(스폰) 기준 반경 밖 대상은 획득하지 않고, 밖으로 나간 타겟은 즉시 해제한다.
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense")
+	bool bUseEngageArea = false;
+
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0", EditCondition="bUseEngageArea"))
+	float EngageAreaRadius = 1500.0f;
+
+	// 해제는 반경+버퍼 초과 시(경계 들락날락 요요 방지 히스테리시스).
+	UPROPERTY(EditAnywhere, Category="LS/AI|Sense", meta=(ClampMin="0.0", EditCondition="bUseEngageArea"))
+	float EngageAreaReleaseBuffer = 100.0f;
 
 	UPROPERTY(EditAnywhere, Category="LS/AI|Dormant")
 	bool bEnableDistanceDormancy = true;
