@@ -38,10 +38,10 @@ public:
 
 	// 페이드 시작 전 잔상이 완전 불투명으로 유지되는 시간.
 	UPROPERTY(EditAnywhere, Category = "LS/Vision|Ghost", meta = (ClampMin = "0.0"))
-	float FadeStartDelay = 0.0f;
+	float FadeStartDelay = 1.0f;
 
 	UPROPERTY(EditAnywhere, Category = "LS/Vision|Ghost")
-	FLinearColor GhostColor = FLinearColor(0.7f, 0.75f, 0.9f, 1.0f);
+	FLinearColor GhostColor = FLinearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
 	UPROPERTY(EditAnywhere, Category = "LS/Vision|Ghost")
 	FName GhostOpacityParamName = TEXT("GhostOpacity");
