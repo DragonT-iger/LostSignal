@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Combat/LSHitboxTypes.h"
+#include "Data/LSCharacterSkillRow.h"
 #include "Engine/DataTable.h"
 #include "UObject/SoftObjectPath.h"
 #include "LSMonsterActionRow.generated.h"
@@ -35,6 +36,12 @@ struct LOSTSIGNAL_API FLSMonsterActionRow : public FTableRowBase
 	// 액션의 대미지 계수.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Combat", meta=(ClampMin="0.0"))
 	float Action_Multiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Combat/CrowdControl")
+	ELSCharacterSkillCrowdControlType CC_Type = ELSCharacterSkillCrowdControlType::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Combat/CrowdControl", meta=(ClampMin="0.0"))
+	float CC_Value = 0.0f;
 
 	// 액션 중 피격 반응을 구별하는 강인도.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Combat", meta=(ClampMin="0"))

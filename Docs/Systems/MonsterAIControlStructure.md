@@ -89,7 +89,7 @@ Action_Group           (TArray<FName>: DT_MonsterAction row 참조)
 
 `Monster_AmorPen`(공격용 방어 관통)은 기획 스키마 시트에는 있으나 실제 데이터 시트 헤더/CSV에는 없어 Row에 추가하지 않았다(기획 스키마-데이터 불일치, 기획자 확인 대상).
 
-별도 테이블 `DT_MonsterAction`은 `FLSMonsterActionRow`(`Source/LostSignal/Data/LSMonsterActionRow.h`)를 RowStruct로 쓴다. CSV(`Content/LostSignal/Sandbox/DT/DT_MonsterAction.csv`) 영문 헤더와 1:1. 첫 컬럼 `Name`은 row key. enum `ELSActionTarget`(Self/Area), `ELSHitboxShape`(Circle/Cone/Box)를 포함한다.
+별도 테이블 `DT_MonsterAction`은 `FLSMonsterActionRow`(`Source/LostSignal/Data/LSMonsterActionRow.h`)를 RowStruct로 쓴다. CSV(`Content/LostSignal/Sandbox/DT/DT_MonsterAction.csv`) 영문 헤더와 1:1. 첫 컬럼 `Name`은 row key. enum `ELSActionTarget`(Self/Area), 캐릭터 스킬과 공유하는 `ELSCharacterSkillCrowdControlType`, `ELSHitboxShape`(Circle/Cone/Box)를 포함한다. 몬스터 액션의 `CC_Type`은 현재 `None`/`KnockBack`을 사용하고, `CC_Value`는 해당 수치를 보관한다. 실제 적용 로직 연결 전까지 기존 액션은 `None`/`0`을 사용한다.
 
 현재 코드 연결 기준 (AttributeSet 역할: `ULSCombatAttributeSet`=체력 전담, `ULSCharacterAttributeSet`=공격/방어 등 능력치 전담):
 
