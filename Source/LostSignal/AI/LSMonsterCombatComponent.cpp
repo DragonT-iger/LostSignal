@@ -257,8 +257,42 @@ void ULSMonsterCombatComponent::PerformActionHit()
 		if (SharedCombatComponent->ApplyDamageEffectToTarget(HitActor, DamageEffectClass, 1.0f, 0.0f, Row->Action_Multiplier, false, BreakPower))
 		{
 			UniqueTargets.Add(HitActor);
+			ApplyActionCrowdControl(*Row, HitActor, Origin, AimDir, BreakPower);
 		}
 	}
+}
+
+void ULSMonsterCombatComponent::ApplyActionCrowdControl(const FLSMonsterActionRow& Row, AActor* HitActor, const FVector& Origin, const FVector& AimDir, ELSBreakPowerTier BreakPower) const
+{
+	if (Row.CC_Type == ELSCharacterSkillCrowdControlType::None || Row.CC_Value <= 0.0f || !HitActor)
+	{
+		return;
+	}
+
+	// 캐릭터 스킬(LSGA_Override)과 같은 경로: 강인도 게이트 통과 시 ApplyKnockback(속도=CC_Value).
+	ULSCharacterCombatComponent* TargetCombatComponent = HitActor->FindComponentByClass<ULSCharacterCombatComponent>();
+	if (!TargetCombatComponent || !TargetCombatComponent->CanApplyCrowdControl(BreakPower))
+	{
+		return;
+	}
+
+	// 방향 규칙도 캐릭터 스킬과 동일 — Pull: 판정 원점 쪽 / KnockBack: 원형은 원점 반대쪽, 그 외 조준 방향.
+	FVector Direction = AimDir;
+	if (Row.CC_Type == ELSCharacterSkillCrowdControlType::Pull)
+	{
+		Direction = Origin - HitActor->GetActorLocation();
+	}
+	else if (Row.Hitbox_Shape == ELSHitboxShape::Circle)
+	{
+		Direction = HitActor->GetActorLocation() - Origin;
+		Direction.Z = 0.0f;
+		if (Direction.IsNearlyZero())
+		{
+			Direction = AimDir;
+		}
+	}
+
+	TargetCombatComponent->ApplyKnockback(Direction.GetSafeNormal2D(), Row.CC_Value);
 }
 
 void ULSMonsterCombatComponent::ComputeActionOriginAndDirection(const FLSMonsterActionRow& Row, FVector& OutOrigin, FVector& OutDirection) const

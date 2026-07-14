@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Combat/LSCharacterCombatComponent.h"
+#include "Combat/LSCombatSettings.h"
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "Data/LSGameDataSubsystem.h"
@@ -401,8 +402,8 @@ void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLo
 	}
 
 	const float PullSpeed = Row && Row->CC_Value > 0.0f ? Row->CC_Value : BypassData->PullSpeed;
-	// 풀 지속시간은 DataAsset이 단일 출처. (DataTable Skill_Time은 시전시간 전용)
-	const float PullDuration = BypassData->PullDuration;
+	// 풀 지속시간은 전 스킬 공용 넉백 지속시간(ULSCombatSettings)을 따른다. 스턴 예약 시점 계산에도 같은 값 사용.
+	const float PullDuration = GetDefault<ULSCombatSettings>()->KnockbackDuration;
 	const ELSBreakPowerTier PullBreakPower = Row
 		? static_cast<ELSBreakPowerTier>(FMath::Clamp(
 			Row->Skill_Impact,
@@ -437,7 +438,7 @@ void ULSGA_Bypass::PullTargetsToHologram(AActor* SourceActor, FVector HologramLo
 
 		FVector PullDirection = HologramLocation - TargetActor->GetActorLocation();
 		PullDirection.Z = 0.0f;
-		if (TargetCombatComponent->ApplyKnockback(PullDirection, PullSpeed, PullDuration, BypassData->PullUpSpeed))
+		if (TargetCombatComponent->ApplyKnockback(PullDirection, PullSpeed))
 		{
 			++PulledCount;
 			ScheduleSpoofingStun(TargetActor, BypassData, PullDuration);

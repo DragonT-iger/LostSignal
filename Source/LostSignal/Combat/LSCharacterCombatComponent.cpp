@@ -10,9 +10,11 @@
 #include "Characters/LSCharacterHitAudioData.h"
 #include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Characters/LSPlayerCharacter.h"
+#include "Combat/LSCombatSettings.h"
 #include "Combat/LSCombatStateComponent.h"
 #include "Combat/LSStatusEffectComponent.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Curves/CurveFloat.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
@@ -128,8 +130,11 @@ void ULSCharacterCombatComponent::SetCombatTagActive(FGameplayTag Tag, bool bAct
 	}
 }
 
-bool ULSCharacterCombatComponent::ApplyKnockback(const FVector& Direction, float Speed, float Duration, float UpSpeed)
+bool ULSCharacterCombatComponent::ApplyKnockback(const FVector& Direction, float Speed)
 {
+	const ULSCombatSettings* CombatSettings = GetDefault<ULSCombatSettings>();
+	const float Duration = CombatSettings->KnockbackDuration;
+
 	ALSCharacterBase* OwnerCharacter = GetOwnerCharacter();
 	if (!OwnerCharacter || !OwnerCharacter->HasAuthority() || IsDead() || Speed <= 0.0f || Duration <= 0.0f)
 	{
@@ -161,8 +166,9 @@ bool ULSCharacterCombatComponent::ApplyKnockback(const FVector& Direction, float
 	RootMotion->InstanceName = FName("Knockback");
 	RootMotion->AccumulateMode = ERootMotionAccumulateMode::Override;
 	RootMotion->Priority = 8;
-	RootMotion->Force = (KnockbackDirection * Speed) + FVector(0.0f, 0.0f, UpSpeed);
+	RootMotion->Force = KnockbackDirection * Speed;
 	RootMotion->Duration = Duration;
+	RootMotion->StrengthOverTime = CombatSettings->KnockbackStrengthCurve.LoadSynchronous();
 	RootMotion->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
 	RootMotion->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
 	KnockbackRootMotionSourceID = MovementComponent->ApplyRootMotionSource(RootMotion);

@@ -42,12 +42,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Override", meta=(ClampMin="0.0"))
 	float KnockbackSpeed = 650.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Override")
-	float KnockbackUpSpeed = 80.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Override", meta=(ClampMin="0.0"))
-	float FallbackKnockbackDuration = 0.2f;
-
 	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Override|Debug")
 	bool bEnableDebugLog = false;
 

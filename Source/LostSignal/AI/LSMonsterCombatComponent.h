@@ -93,6 +93,8 @@ private:
 	const FLSMonsterActionRow* FindActionRow(FName RowName) const;
 	// 액션의 판정/표시 원점·방향. 도약 액션이면 착지 예정 지점(타겟까지 거리로 클램프)을 원점으로 한다.
 	void ComputeActionOriginAndDirection(const FLSMonsterActionRow& Row, FVector& OutOrigin, FVector& OutDirection) const;
+	// 액션 row의 CC_Type/CC_Value를 캐릭터 스킬과 같은 경로(강인도 게이트 + ApplyKnockback)로 명중 대상에 적용.
+	void ApplyActionCrowdControl(const FLSMonsterActionRow& Row, AActor* HitActor, const FVector& Origin, const FVector& AimDir, ELSBreakPowerTier BreakPower) const;
 	FName SelectActionForDistance(float Distance) const;
 	bool IsActionOnCooldown(FName RowName) const;
 	void StartActionCooldown(FName RowName, float Cooldown);

@@ -52,8 +52,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void SetCombatTagActive(FGameplayTag Tag, bool bActive);
 
+	/** 지속시간·감속 커브는 전 스킬·몬스터 공용값(ULSCombatSettings)을 읽는다. 호출부는 방향·속도만 결정. */
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
-	bool ApplyKnockback(const FVector& Direction, float Speed, float Duration, float UpSpeed = 0.0f);
+	bool ApplyKnockback(const FVector& Direction, float Speed);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	bool ApplyDamageEffectToTarget(

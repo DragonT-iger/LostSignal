@@ -298,6 +298,10 @@ StateTree Attack 상태
    -> ULSMonsterCombatComponent::PerformActionHit
    -> SphereOverlap + ULSHitboxLibrary::IsTargetInsideHitbox(Circle/Cone/Box)
    -> ULSCharacterCombatComponent::ApplyDamageEffectToTarget (Coeff=Action_Multiplier, BreakPower=Action_Impact)
+   -> (선택) row에 CC_Type/CC_Value가 있으면 ApplyActionCrowdControl — 캐릭터 스킬과 동일 경로
+      (CanApplyCrowdControl 강인도 게이트 -> ApplyKnockback, 속도=CC_Value).
+      지속시간/감속 커브는 전 스킬·몬스터 공용 프로젝트 설정(ULSCombatSettings)을 따른다.
+      방향: Pull=판정 원점 쪽, KnockBack=원형 히트박스는 원점 반대쪽·그 외 조준 방향
 ```
 
 공격 상태 이탈 규칙:

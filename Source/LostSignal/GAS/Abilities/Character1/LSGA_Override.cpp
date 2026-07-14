@@ -166,12 +166,9 @@ void ULSGA_Override::ExecuteSkillEffect()
 		OverrideData ? OverrideData->FallbackAttackCoefficient : 0.0f,
 		FallbackAttackCoefficient);
 	const ELSBreakPowerTier ResolvedBreakPower = Row ? ToOverrideAbilityBreakPowerTier(Row->Skill_Impact, BreakPower) : BreakPower;
-	// 넉백 지속시간은 DataAsset이 단일 출처. (DataTable Skill_Time은 시전시간 전용)
-	const float ResolvedKnockbackDuration = OverrideData ? OverrideData->FallbackKnockbackDuration : FallbackKnockbackDuration;
 	const float ResolvedKnockbackSpeed = Row && Row->CC_Value > 0.0f
 		? Row->CC_Value
 		: OverrideData && OverrideData->FallbackKnockbackSpeed > 0.0f ? OverrideData->FallbackKnockbackSpeed : KnockbackSpeed;
-	const float ResolvedKnockbackUpSpeed = OverrideData ? OverrideData->FallbackKnockbackUpSpeed : KnockbackUpSpeed;
 	const ELSCharacterSkillCrowdControlType ResolvedCCType = Row && Row->CC_Type != ELSCharacterSkillCrowdControlType::None
 		? Row->CC_Type
 		: ELSCharacterSkillCrowdControlType::KnockBack;
@@ -267,7 +264,7 @@ void ULSGA_Override::ExecuteSkillEffect()
 		}
 
 		KnockbackDirection = KnockbackDirection.GetSafeNormal2D();
-		if (TargetCombatComponent->ApplyKnockback(KnockbackDirection, ResolvedKnockbackSpeed, ResolvedKnockbackDuration, ResolvedKnockbackUpSpeed))
+		if (TargetCombatComponent->ApplyKnockback(KnockbackDirection, ResolvedKnockbackSpeed))
 		{
 			++KnockbackCount;
 		}

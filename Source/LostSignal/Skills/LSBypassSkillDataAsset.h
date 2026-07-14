@@ -57,12 +57,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Bypass|Spoofing", meta=(ClampMin="0.0"))
 	float PullSpeed = 900.0f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Bypass|Spoofing", meta=(ClampMin="0.0"))
-	float PullDuration = 0.25f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Bypass|Spoofing")
-	float PullUpSpeed = 0.0f;
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Bypass|Spoofing")
 	ELSBreakPowerTier PullBreakPower = ELSBreakPowerTier::SpecialAttack;
 

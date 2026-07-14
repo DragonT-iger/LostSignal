@@ -362,7 +362,7 @@ Status_ID / Effect_Target / Skill_Effect_Duration
 Status_ID_2 / Effect_Target_2 / Skill_Effect_Duration_2
 ```
 
-`Skill_Time`은 **시전시간(캐스팅 시간)** 전용이다. `ULSGA_PlayerSkillBase`가 기본으로 스킬 몽타주 전체를 이 길이에 맞춰 스케일한다. 과거처럼 다른 시간 용도로 전용하지 않는다 — 넉백 지속시간(Override)·투사체 비행시간(ShortCircuit)·대시 시간(Execution)은 각 스킬 DataAsset(`FallbackKnockbackDuration` / `ProjectileFlightDuration` / `FallbackDashDuration`)이, Bypass 스푸핑 풀 지속시간은 `PullDuration`이 단일 출처다. Bypass 슬라이드는 이동시간이 곧 시전시간이므로 `Skill_Time`을 그대로 쓴다.
+`Skill_Time`은 **시전시간(캐스팅 시간)** 전용이다. `ULSGA_PlayerSkillBase`가 기본으로 스킬 몽타주 전체를 이 길이에 맞춰 스케일한다. 과거처럼 다른 시간 용도로 전용하지 않는다 — 투사체 비행시간(ShortCircuit)·대시 시간(Execution)은 각 스킬 DataAsset(`ProjectileFlightDuration` / `FallbackDashDuration`)이 단일 출처다. 넉백/끌어당김 지속시간·감속 커브는 스킬별 값이 아니라 프로젝트 설정 `ULSCombatSettings`(Knockback Duration / Knockback Strength Curve)가 전 스킬·몬스터 액션 공용 단일 출처다(속도만 각 테이블의 `CC_Value`). Bypass 슬라이드는 이동시간이 곧 시전시간이므로 `Skill_Time`을 그대로 쓴다.
 
 UE DataTable CSV import에서는 첫 컬럼이 RowName으로 소비된다. 액티브 스킬 테이블은 `Skill_ID`를 첫 컬럼 RowName으로 사용하되, `FLSCharacterSkillRow`가 import/change 시 RowName 숫자를 `Skill_ID` 프로퍼티에도 보정한다.
 
