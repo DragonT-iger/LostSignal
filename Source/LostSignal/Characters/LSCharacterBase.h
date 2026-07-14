@@ -64,6 +64,9 @@ public:
 	/** 사망 상태가 바뀔 때 CharacterCombatComponent가 모든 머신에서 호출. 파생 클래스가 콜리전·마커 등 사망 후처리를 붙이는 확장점. 기본 동작 없음. */
 	virtual void OnDeathStateChanged(bool bIsDead) {}
 
+	/** 넉백 시작/종료 시 CharacterCombatComponent가 서버 권한에서 호출. 파생(몬스터)이 연출(몽타주/애니 정지)을 붙이는 확장점. 기본 동작 없음. */
+	virtual void OnKnockbackStateChanged(bool bKnockbackActive) {}
+
 protected:
 	virtual void BeginPlay() override;
 

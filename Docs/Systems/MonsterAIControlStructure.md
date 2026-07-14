@@ -210,7 +210,7 @@ Dormant
 - ULSMonsterSenseComponent가 WakeDistance / SleepDistance / DormantSenseTickInterval을 에디터 변수로 관리
 - StateTree Dormant 상태는 LS Dormant Wait(FLSSTTask_DormantWait)로 이동/포커스를 정리한 뒤 전이까지 유지
 - LS Dormant Wait는 진입 시 StateTree 컴포넌트 틱을 DormantTickInterval로 스로틀하고 이탈 시 복원 — 휴면 중 evaluator 갱신 비용을 함께 줄임(웨이크 지연 상한 = 그 간격)
-- LS Dormant Wait는 진입 시 메시 애니메이션도 일시정지(bPauseAnims)하고 이탈 시 재개 — 렌더 기반 판정은 RT/VSM 환경에서 섀도우·RT 렌더로 무력화되므로 휴면 상태에 직접 묶음
+- LS Dormant Wait는 진입 시 메시 애니메이션도 일시정지하고 이탈 시 재개 — 렌더 기반 판정은 RT/VSM 환경에서 섀도우·RT 렌더로 무력화되므로 휴면 상태에 직접 묶음. bPauseAnims는 `ALSEnemyCharacter::SetAnimPauseReason` 사유 비트마스크(Dormant/Knockback)로 일원화 — 넉백 프리즈와 겹쳐도 서로 덮어쓰지 않는다
 - Dormant 중에는 거리 체크만 유지하고 시야/FOV/LOS 감지와 Patrol MoveTo 비용을 쓰지 않음
 - 가장 가까운 플레이어가 WakeDistance 안으로 들어오면 Patrol로 복귀
 - 화면 밖 몬스터는 메시가 몽타주만 틱(OnlyTickMontagesWhenNotRendered, ALSEnemyCharacter 생성자) — 포즈/본 갱신은 생략되지만 공격 노티파이(타격/대시/텔레그래프)는 유지
@@ -249,6 +249,13 @@ Attack
 Knockback
 - LS.State.Knockback 동안 이동 정지 및 공격 취소
 - 태그가 해제되면 일반 판단 흐름으로 복귀
+- 넉백 연출은 StateTree가 아니라 캐릭터 소유: 공용 ApplyKnockback/ClearKnockback이 서버에서
+  `ALSCharacterBase::OnKnockbackStateChanged(bool)` 훅을 호출하고, `ALSEnemyCharacter` 오버라이드가
+  KnockbackMontage 할당 시 멀티캐스트 재생(종료 시 KnockbackMontageBlendOutTime으로 블렌드아웃),
+  미할당 시 애니 정지(pose freeze, 사유 비트 Knockback)를 수행한다.
+  StateTree 경유가 아니므로 휴면 틱 스로틀·스턴 StopLogic 상태에서도 즉시 발화한다.
+- KnockbackMontage는 몬스터 BP에서 매핑(루트모션 없는 in-place 권장 — 이동은 넉백 루트모션 소스 담당)
+- 사망 경로(HandleDeathStateChanged)도 ClearKnockback을 호출하므로 프리즈/몽타주가 시체에 잔류하지 않는다
 
 Dead
 - LS.State.Dead 기반 터미널 상태

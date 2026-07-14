@@ -178,6 +178,8 @@ bool ULSCharacterCombatComponent::ApplyKnockback(const FVector& Direction, float
 		World->GetTimerManager().SetTimer(KnockbackTimerHandle, this, &ULSCharacterCombatComponent::FinishKnockback, Duration, false);
 	}
 
+	OwnerCharacter->OnKnockbackStateChanged(true);
+
 	return true;
 }
 
@@ -608,6 +610,8 @@ void ULSCharacterCombatComponent::ClearKnockback()
 					CombatStateComponent->EndAction();
 				}
 			}
+
+			OwnerCharacter->OnKnockbackStateChanged(false);
 		}
 	}
 

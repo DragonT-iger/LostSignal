@@ -2,6 +2,7 @@
 
 #include "AI/LSAIController.h"
 #include "AIController.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StateTreeAIComponent.h"
 #include "GameFramework/Character.h"
@@ -13,7 +14,15 @@ namespace
 	// 섀도우·RT 씬 렌더로 LastRenderTime이 계속 갱신돼 무력화되므로 휴면 상태에 직접 묶는다.
 	void SetDormantPawnAnimPaused(const AAIController* AIController, bool bPaused)
 	{
-		const ACharacter* PawnCharacter = AIController ? Cast<ACharacter>(AIController->GetPawn()) : nullptr;
+		ACharacter* PawnCharacter = AIController ? Cast<ACharacter>(AIController->GetPawn()) : nullptr;
+
+		// LS 몬스터는 사유 비트마스크 API 경유 — 넉백 프리즈 등 다른 정지 사유와 서로 덮어쓰지 않는다.
+		if (ALSEnemyCharacter* EnemyCharacter = Cast<ALSEnemyCharacter>(PawnCharacter))
+		{
+			EnemyCharacter->SetAnimPauseReason(ELSEnemyAnimPauseReason::Dormant, bPaused);
+			return;
+		}
+
 		if (USkeletalMeshComponent* MeshComponent = PawnCharacter ? PawnCharacter->GetMesh() : nullptr)
 		{
 			MeshComponent->bPauseAnims = bPaused;

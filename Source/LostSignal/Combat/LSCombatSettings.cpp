@@ -2,5 +2,5 @@
 
 FName ULSCombatSettings::GetCategoryName() const
 {
-	return TEXT("Project");
+	return TEXT("Game");
 }

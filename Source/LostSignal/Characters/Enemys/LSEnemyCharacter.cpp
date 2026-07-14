@@ -92,6 +92,49 @@ void ALSEnemyCharacter::MulticastStopAbilityMontage_Implementation(UAnimMontage*
 	AnimInstance->Montage_Stop(BlendOutTime, Montage);
 }
 
+void ALSEnemyCharacter::SetAnimPauseReason(ELSEnemyAnimPauseReason Reason, bool bActive)
+{
+	if (bActive)
+	{
+		AnimPauseReasonBits |= static_cast<uint8>(Reason);
+	}
+	else
+	{
+		AnimPauseReasonBits &= ~static_cast<uint8>(Reason);
+	}
+
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MeshComp->bPauseAnims = AnimPauseReasonBits != 0;
+	}
+}
+
+void ALSEnemyCharacter::OnKnockbackStateChanged(bool bKnockbackActive)
+{
+	Super::OnKnockbackStateChanged(bKnockbackActive);
+
+	// 전용 몽타주가 있으면 재생/블렌드아웃, 없으면 넉백 동안 포즈를 정지한다.
+	if (KnockbackMontage)
+	{
+		if (bKnockbackActive)
+		{
+			MulticastPlayAbilityMontage(KnockbackMontage);
+		}
+		else
+		{
+			MulticastStopAbilityMontage(KnockbackMontage, KnockbackMontageBlendOutTime);
+		}
+		return;
+	}
+
+	MulticastSetKnockbackAnimFrozen(bKnockbackActive);
+}
+
+void ALSEnemyCharacter::MulticastSetKnockbackAnimFrozen_Implementation(bool bFrozen)
+{
+	SetAnimPauseReason(ELSEnemyAnimPauseReason::Knockback, bFrozen);
+}
+
 void ALSEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
