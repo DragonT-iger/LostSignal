@@ -28,11 +28,12 @@ ALSEnemyCharacter
 - 몬스터 DataTable 행을 컴포넌트에 적용
 - 서버에서 기본 몬스터 Ability 부여
 - 공격 몽타주 같은 캐릭터별 에셋 참조 소유(사망 애니메이션은 Anim BP 담당)
+- 몬스터별 StateTree 에셋 참조(DefaultStateTree) 소유 — 몬스터 BP에서 매핑
 
 ALSAIController
-- StateTree 실행 호스트
+- StateTree 실행 호스트 (몬스터 공통 1종 — 몬스터별 컨트롤러 BP를 만들지 않는다)
 - UStateTreeAIComponent 보유
-- 서버 권한에서만 DefaultStateTree 시작/중지
+- 서버 권한에서만 빙의한 ALSEnemyCharacter의 DefaultStateTree를 읽어 시작/중지
 - StateTree 상태 판단 로직을 직접 들고 있지 않는다
 
 ULSMonsterSenseComponent

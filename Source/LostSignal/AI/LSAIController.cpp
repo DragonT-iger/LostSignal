@@ -1,5 +1,6 @@
 #include "AI/LSAIController.h"
 
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Components/StateTreeAIComponent.h"
 #include "Engine/World.h"
 #include "StateTree.h"
@@ -38,14 +39,22 @@ void ALSAIController::OnUnPossess()
 
 void ALSAIController::TryStartStateTreeLogic()
 {
-	if (!HasAuthority() || !StateTreeComponent || !DefaultStateTree || !GetPawn())
+	if (!HasAuthority() || !GetPawn())
 	{
-		if(!StateTreeComponent)
-			UE_LOG(LogLS, Warning, TEXT("StateTreeComponent Init Faild"));
+		return;
+	}
 
-		if (!DefaultStateTree)
-			UE_LOG(LogLS, Warning, TEXT("DefaultStateTree Init Faild"));
+	if (!StateTreeComponent)
+	{
+		UE_LOG(LogLS, Warning, TEXT("StateTreeComponent Init Faild"));
+		return;
+	}
 
+	const ALSEnemyCharacter* EnemyCharacter = Cast<ALSEnemyCharacter>(GetPawn());
+	UStateTree* PawnStateTree = EnemyCharacter ? EnemyCharacter->GetDefaultStateTree() : nullptr;
+	if (!PawnStateTree)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[%s] DefaultStateTree 미할당 — 몬스터 BP에서 매핑 필요"), *GetPawn()->GetName());
 		return;
 	}
 
@@ -54,6 +63,6 @@ void ALSAIController::TryStartStateTreeLogic()
 		return;
 	}
 
-	StateTreeComponent->SetStateTree(DefaultStateTree);
+	StateTreeComponent->SetStateTree(PawnStateTree);
 	StateTreeComponent->StartLogic();
 }

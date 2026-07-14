@@ -8,6 +8,7 @@
 
 class UDataTable;
 class UGameplayAbility;
+class UStateTree;
 class UAnimMontage;
 class ULSCharacterAttributeSet;
 class ULSHpDebugWidget;
@@ -45,6 +46,9 @@ public:
 
 	/** 멀티플라이어가 적용되지 않은 기준(base) MaxWalkSpeed. BeginPlay에서 1회 저장. 이동 Task/AnimInstance가 base × 배수의 단일 출처로 사용. */
 	float GetDefaultMaxWalkSpeed() const { return DefaultMaxWalkSpeed; }
+
+	/** 이 몬스터가 사용할 StateTree. ALSAIController가 OnPossess 시 읽어 시작한다. */
+	UStateTree* GetDefaultStateTree() const { return DefaultStateTree; }
 
 	UFUNCTION(BlueprintPure, Category="LS/AI")
 	ULSMonsterSenseComponent* GetMonsterSenseComponent() const { return MonsterSenseComponent; }
@@ -103,6 +107,10 @@ protected:
 	/** Data-driven monster attack ability granted on BeginPlay; activated via ULSMonsterCombatComponent::RequestAction. */
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TSubclassOf<UGameplayAbility> MonsterActionAbilityClass;
+
+	// 몬스터 행동 StateTree(BP에서 매핑). 컨트롤러가 아니라 캐릭터가 소유한다 — AIController는 몬스터 공통 1종 유지.
+	UPROPERTY(EditDefaultsOnly, Category="LS/AI|StateTree", meta=(RequiredAssetDataTags="Schema=/Script/GameplayStateTreeModule.StateTreeAIComponentSchema"))
+	TObjectPtr<UStateTree> DefaultStateTree;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/AI|DataTable")
 	TObjectPtr<UDataTable> MonsterArchetypeTable;

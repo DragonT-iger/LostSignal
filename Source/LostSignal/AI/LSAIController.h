@@ -4,10 +4,9 @@
 #include "AIController.h"
 #include "LSAIController.generated.h"
 
-class UStateTree;
 class UStateTreeAIComponent;
 
-/** AI controller that hosts the monster StateTree on the server. */
+/** AI controller that hosts the monster StateTree on the server. 실행할 StateTree 에셋은 빙의한 ALSEnemyCharacter의 DefaultStateTree에서 읽는다. */
 UCLASS()
 class LOSTSIGNAL_API ALSAIController : public AAIController
 {
@@ -27,7 +26,4 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/AI|StateTree")
 	TObjectPtr<UStateTreeAIComponent> StateTreeComponent;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/AI|StateTree", meta=(RequiredAssetDataTags="Schema=/Script/GameplayStateTreeModule.StateTreeAIComponentSchema"))
-	TObjectPtr<UStateTree> DefaultStateTree;
 };
