@@ -1,7 +1,7 @@
 #include "UI/Combat/LSEnemyHealthBarComponent.h"
 
 #include "AbilitySystemComponent.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"

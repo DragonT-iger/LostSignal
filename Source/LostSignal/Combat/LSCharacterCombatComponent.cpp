@@ -8,7 +8,7 @@
 #include "AI/LSMonsterSenseComponent.h"
 #include "Characters/LSCharacterBase.h"
 #include "Characters/LSCharacterHitAudioData.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Characters/LSPlayerCharacter.h"
 #include "Combat/LSCombatStateComponent.h"
 #include "Combat/LSStatusEffectComponent.h"

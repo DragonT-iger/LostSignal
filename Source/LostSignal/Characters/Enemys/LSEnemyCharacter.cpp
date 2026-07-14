@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 
 #include "AI/LSAIController.h"
 #include "AI/LSMonsterCombatComponent.h"

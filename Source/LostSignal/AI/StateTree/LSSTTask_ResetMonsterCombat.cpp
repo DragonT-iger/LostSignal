@@ -3,7 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "AI/LSMonsterCombatComponent.h"
 #include "AIController.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "GAS/Effects/LSGE_FullHeal.h"
 #include "StateTreeExecutionContext.h"
 #include "LostSignal.h"

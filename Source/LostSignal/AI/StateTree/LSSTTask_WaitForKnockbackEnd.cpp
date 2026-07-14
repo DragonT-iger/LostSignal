@@ -2,7 +2,7 @@
 
 #include "AI/LSMonsterCombatComponent.h"
 #include "AIController.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "GAS/LSGameplayTags.h"
 #include "StateTreeExecutionContext.h"
 

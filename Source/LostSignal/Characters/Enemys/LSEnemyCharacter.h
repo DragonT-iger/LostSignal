@@ -24,7 +24,7 @@ struct FLSMonsterArchetypeRow;
 /**
  * Base enemy pawn that wires monster AI components, animation data, and grants the data-driven monster action ability.
  * Not marked Abstract: StateTree(ST_*)의 Context Actor Class로 이 타입을 골라 evaluator의 EnemyCharacter 바인딩에 쓰기 위함.
- * 직접 스폰은 의도하지 않음(자식 ALSEnemy* 사용). MonsterRowName 미설정 시 BeginPlay에서 경고 로그.
+ * 직접 스폰은 의도하지 않음(자식 몬스터 클래스 사용). MonsterRowName 미설정 시 BeginPlay에서 경고 로그.
  */
 UCLASS()
 class LOSTSIGNAL_API ALSEnemyCharacter : public ALSCharacterBase

@@ -2,7 +2,7 @@
 
 #include "AI/LSMonsterSenseComponent.h"
 #include "AIController.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"

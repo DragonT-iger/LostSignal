@@ -1,7 +1,7 @@
 #include "Animation/LSMonsterLocomotionAnimInstance.h"
 
 #include "AI/LSMonsterSenseComponent.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 

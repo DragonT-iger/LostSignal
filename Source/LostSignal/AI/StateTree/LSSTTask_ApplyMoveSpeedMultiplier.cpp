@@ -1,7 +1,7 @@
 #include "AI/StateTree/LSSTTask_ApplyMoveSpeedMultiplier.h"
 
 #include "AIController.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "StateTreeExecutionContext.h"
 #include "LostSignal.h"

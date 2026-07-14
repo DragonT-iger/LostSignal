@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Characters/LSEnemyBossBuff.h"
+#include "Characters/Enemys/LSEnemyBossBuff.h"
 
 ALSEnemyBossBuff::ALSEnemyBossBuff()
 {

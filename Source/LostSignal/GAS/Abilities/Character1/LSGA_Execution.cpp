@@ -5,7 +5,7 @@
 #include "Animation/AnimMontage.h"
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Characters/LSCharacterBase.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "Engine/EngineTypes.h"

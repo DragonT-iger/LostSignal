@@ -4,7 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
 #include "Abilities/GameplayAbilityTypes.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSCharacterSkillRow.h"

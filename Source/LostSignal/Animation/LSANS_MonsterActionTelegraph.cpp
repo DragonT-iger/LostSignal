@@ -1,7 +1,7 @@
 #include "Animation/LSANS_MonsterActionTelegraph.h"
 
 #include "AI/LSMonsterCombatComponent.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 
 namespace

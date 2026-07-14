@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Characters/LSEnemyHyena.h"
+#include "Characters/Enemys/LSEnemyHyena.h"
 
 ALSEnemyHyena::ALSEnemyHyena()
 {

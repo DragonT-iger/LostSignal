@@ -1,7 +1,7 @@
 #include "Animation/LSAN_MonsterActionDash.h"
 
 #include "AI/LSMonsterCombatComponent.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 
 void ULSAN_MonsterActionDash::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference)

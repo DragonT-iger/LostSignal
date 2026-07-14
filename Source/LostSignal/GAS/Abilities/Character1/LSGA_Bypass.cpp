@@ -1,7 +1,7 @@
 #include "GAS/Abilities/Character1/LSGA_Bypass.h"
 
 #include "AbilitySystemComponent.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Data/LSCharacterSkillRow.h"

@@ -1,7 +1,7 @@
 #include "AI/StateTree/LSSTTask_ClearInterest.h"
 
 #include "AI/LSMonsterSenseComponent.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "StateTreeExecutionContext.h"
 
 FLSSTTask_ClearInterest::FLSSTTask_ClearInterest()

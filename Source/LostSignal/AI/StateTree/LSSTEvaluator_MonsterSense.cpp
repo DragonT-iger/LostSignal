@@ -4,7 +4,7 @@
 #include "AI/LSMonsterSenseComponent.h"
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
-#include "Characters/LSEnemyCharacter.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "GAS/LSGameplayTags.h"
 #include "StateTreeExecutionContext.h"
 #include "LostSignal.h"
