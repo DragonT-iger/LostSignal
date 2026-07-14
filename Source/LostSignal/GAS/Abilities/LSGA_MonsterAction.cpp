@@ -119,7 +119,7 @@ void ULSGA_MonsterAction::EndAbility(
 		{
 			if (ActiveActionMontage && AnimInstance->Montage_IsPlaying(ActiveActionMontage))
 			{
-				EnemyCharacter->MulticastStopAbilityMontage(ActiveActionMontage, 0.1f);
+				EnemyCharacter->MulticastStopAbilityMontage(ActiveActionMontage, 0.5f);
 			}
 		}
 
