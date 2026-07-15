@@ -1,12 +1,14 @@
 #include "Combat/LSPlayerCombatComponent.h"
 
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "Animation/AnimInstance.h"
 #include "Characters/LSCharacterBase.h"
 #include "Combat/LSAimComponent.h"
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Combat/LSCombatStateComponent.h"
 #include "Combat/LSCombatTypes.h"
+#include "Combat/LSHitboxLibrary.h"
 #include "Data/LSComboAttackRow.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Engine/EngineTypes.h"
@@ -21,12 +23,15 @@
 #include "GameFramework/RootMotionSource.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "LostSignal.h"
+#include "NiagaraSystem.h"
 #include "Skills/LSPlayerSkillComponent.h"
 #include "TimerManager.h"
 
 ULSPlayerCombatComponent::ULSPlayerCombatComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	// 틱은 디버그 범위 표시(LS.Debug.BasicAttackRange) 전용 — CVar가 꺼져 있으면 즉시 반환한다.
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = true;
 	SetIsReplicatedByDefault(true);
 	BasicAttackAbilityClass = ULSGA_PlayerBasicAttack::StaticClass();
 	DashAbilityClass = ULSGA_Dash::StaticClass();
@@ -295,21 +300,7 @@ void ULSPlayerCombatComponent::PerformMeleeHit()
 	bAttackHitConsumed = true;
 	SharedCombatComponent->SetCombatTagActive(LSGameplayTags::Combat_AttackActive, true);
 
-	FVector AttackDirection = OwnerCharacter->GetActorForwardVector();
-	if (const ULSAimComponent* AimComponent = ResolveAimComponent())
-	{
-		AttackDirection = AimComponent->GetAimDirection();
-	}
-
-	AttackDirection.Z = 0.0f;
-	if (AttackDirection.IsNearlyZero())
-	{
-		AttackDirection = OwnerCharacter->GetActorForwardVector();
-	}
-	else
-	{
-		AttackDirection = AttackDirection.GetSafeNormal();
-	}
+	const FVector AttackDirection = ResolveBasicAttackDirection();
 	ULSGA_PlayerBasicAttack* ActiveBasicAttackAbility = FindActiveBasicAttackAbility();
 	const int32 ComboIndex = ActiveBasicAttackAbility
 		? ActiveBasicAttackAbility->GetCurrentComboIndex()
@@ -411,6 +402,11 @@ void ULSPlayerCombatComponent::BeginPlay()
 
 	if (ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter(); OwnerCharacter && OwnerCharacter->HasAuthority())
 	{
+		if (!BasicAttackHitEffect)
+		{
+			UE_LOG(LogLS, Warning, TEXT("%s basic attack hit effect is not set."), *GetNameSafe(OwnerCharacter));
+		}
+
 		if (BasicAttackAbilityClass)
 		{
 			OwnerCharacter->GrantAbility(BasicAttackAbilityClass);
@@ -600,6 +596,26 @@ int32 ULSPlayerCombatComponent::ResolveComboAttackID(int32 ComboSectionIndex, in
 	return ComboRow ? ComboRow->Combo_ID : INDEX_NONE;
 }
 
+FVector ULSPlayerCombatComponent::ResolveBasicAttackDirection() const
+{
+	const ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
+	if (!OwnerCharacter)
+	{
+		return FVector::ForwardVector;
+	}
+
+	FVector AttackDirection = OwnerCharacter->GetActorForwardVector();
+	if (const ULSAimComponent* AimComponent = ResolveAimComponent())
+	{
+		AttackDirection = AimComponent->GetAimDirection();
+	}
+
+	AttackDirection.Z = 0.0f;
+	return AttackDirection.IsNearlyZero()
+		? OwnerCharacter->GetActorForwardVector()
+		: AttackDirection.GetSafeNormal();
+}
+
 const FLSComboAttackRow* ULSPlayerCombatComponent::ResolveComboAttackRow(int32 ComboSectionIndex, int32 ComboTagOverride) const
 {
 	if (ComboSectionIndex == INDEX_NONE)
@@ -622,6 +638,58 @@ const FLSComboAttackRow* ULSPlayerCombatComponent::ResolveComboAttackRow(int32 C
 		TEXT("PlayerCombat.ResolveComboAttackID"));
 }
 
+bool ULSPlayerCombatComponent::GatherBasicAttackTargets(const FVector& AttackDirection, const FLSComboAttackRow* ComboRow, TArray<AActor*>& OutActors) const
+{
+	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
+	if (!OwnerCharacter)
+	{
+		return false;
+	}
+
+	// Row Range가 유효하면 스킬/몬스터와 동일한 shape 판정(원점=액터 위치), 아니면 기존 고정 오프셋 구체 폴백.
+	const bool bUseRowRange = ComboRow
+		&& ComboRow->Range_Shape != ELSCharacterSkillRangeShape::None
+		&& ComboRow->Range_X > 0.0f;
+	const FVector SourceLocation = OwnerCharacter->GetActorLocation();
+	const FVector TraceCenter = bUseRowRange
+		? SourceLocation
+		: SourceLocation + (AttackDirection * BasicAttackForwardOffset);
+	const float QueryRadius = bUseRowRange
+		? ULSHitboxLibrary::GetSkillRangeQueryRadius(ComboRow->Range_Shape, ComboRow->Range_X, ComboRow->Range_Y)
+		: BasicAttackRadius;
+
+	TArray<AActor*> ActorsToIgnore;
+	ActorsToIgnore.Add(OwnerCharacter);
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+	UKismetSystemLibrary::SphereOverlapActors(
+		GetWorld(),
+		TraceCenter,
+		QueryRadius,
+		ObjectTypes,
+		nullptr,
+		ActorsToIgnore,
+		OutActors);
+
+	if (bUseRowRange)
+	{
+		// 브로드페이즈(구체) 후보를 Row shape로 정밀 필터 — 스킬/몬스터와 동일한 2단 판정.
+		OutActors.RemoveAll([&](const AActor* Candidate)
+		{
+			return !Candidate || !ULSHitboxLibrary::IsTargetInsideSkillRange(
+				SourceLocation,
+				AttackDirection,
+				Candidate->GetActorLocation(),
+				ComboRow->Range_Shape,
+				ComboRow->Range_X,
+				ComboRow->Range_Y);
+		});
+	}
+
+	return bUseRowRange;
+}
+
 int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection, const FLSComboAttackRow* ComboRow)
 {
 	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
@@ -631,22 +699,8 @@ int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection, 
 		return 0;
 	}
 
-	const FVector TraceCenter = OwnerCharacter->GetActorLocation() + (AttackDirection * BasicAttackForwardOffset);
-
 	TArray<AActor*> OverlappedActors;
-	TArray<AActor*> ActorsToIgnore;
-	ActorsToIgnore.Add(OwnerCharacter);
-	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
-	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
-
-	UKismetSystemLibrary::SphereOverlapActors(
-		GetWorld(),
-		TraceCenter,
-		BasicAttackRadius,
-		ObjectTypes,
-		nullptr,
-		ActorsToIgnore,
-		OverlappedActors);
+	const bool bUsedRowRange = GatherBasicAttackTargets(AttackDirection, ComboRow, OverlappedActors);
 
 	const float AttackCoefficient = ComboRow && ComboRow->Combo_Multiplier > 0.0f
 		? ComboRow->Combo_Multiplier
@@ -654,11 +708,15 @@ int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection, 
 	UE_LOG(
 		LogLS,
 		Log,
-		TEXT("%s basic attack damage coefficient resolved. ComboID=%d ComboMultiplier=%.3f FinalCoefficient=%.3f"),
+		TEXT("%s basic attack damage coefficient resolved. ComboID=%d ComboMultiplier=%.3f FinalCoefficient=%.3f Shape=%d RangeX=%.0f RangeY=%.0f UseRowRange=%d"),
 		*GetNameSafe(OwnerCharacter),
 		ComboRow ? ComboRow->Combo_ID : INDEX_NONE,
 		ComboRow ? ComboRow->Combo_Multiplier : 0.0f,
-		AttackCoefficient);
+		AttackCoefficient,
+		ComboRow ? static_cast<int32>(ComboRow->Range_Shape) : 0,
+		ComboRow ? ComboRow->Range_X : 0.0f,
+		ComboRow ? ComboRow->Range_Y : 0.0f,
+		bUsedRowRange ? 1 : 0);
 
 	TSet<AActor*> UniqueTargets;
 	for (AActor* HitActor : OverlappedActors)
@@ -678,6 +736,7 @@ int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection, 
 			BasicAttackBreakPower))
 		{
 			UniqueTargets.Add(HitActor);
+			ExecuteBasicAttackHitCue(HitActor, AttackDirection);
 
 			// 콤보 row에 정의된 상태이상을 명중 대상/자신에게 적용한다(서버 권위).
 			if (ComboRow)
@@ -689,6 +748,28 @@ int32 ULSPlayerCombatComponent::ExecuteMeleeHit(const FVector& AttackDirection, 
 	}
 
 	return UniqueTargets.Num();
+}
+
+void ULSPlayerCombatComponent::ExecuteBasicAttackHitCue(AActor* HitActor, const FVector& AttackDirection) const
+{
+	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
+	ALSCharacterBase* OwnerCharacter = ResolveOwnerCharacter();
+	if (!TargetASC || !OwnerCharacter || !OwnerCharacter->HasAuthority() || !BasicAttackHitEffect)
+	{
+		return;
+	}
+
+	FVector BoundsOrigin = HitActor->GetActorLocation();
+	FVector BoundsExtent = FVector::ZeroVector;
+	HitActor->GetActorBounds(true, BoundsOrigin, BoundsExtent);
+
+	FGameplayCueParameters CueParams;
+	CueParams.SourceObject = BasicAttackHitEffect;
+	CueParams.Location = BoundsOrigin;
+	CueParams.Normal = -AttackDirection.GetSafeNormal();
+	CueParams.Instigator = OwnerCharacter;
+	CueParams.EffectCauser = OwnerCharacter;
+	TargetASC->ExecuteGameplayCue(LSGameplayTags::GameplayCue_Combat_HitVFX, CueParams);
 }
 
 bool ULSPlayerCombatComponent::ApplyDashRootMotion(const FVector& DashDirection, uint16& OutRootMotionSourceID) const

@@ -195,12 +195,14 @@ ALSPlayerCharacter::OnAttack
 ```text
 Anim Notify 또는 Ability 타이밍
 -> ULSPlayerCombatComponent::PerformMeleeHit
--> 전방 공격 위치 계산
--> Sphere overlap/trace
--> 유효 타겟 필터링
+-> GatherBasicAttackTargets: 브로드페이즈 SphereOverlap + Row Range shape 정밀 필터
 -> 데미지 GameplayEffect 적용
 -> ULSPlayerSkillComponent::HandleBasicAttackHit
 ```
+
+판정 범위는 `FLSComboAttackRow`의 `Range_Shape` / `Range_X` / `Range_Y`가 단일 출처다 (Circle: 반경=X / Cone: 반경=X, 각도=Y / Box: 길이=X, 폭=Y — 스킬·프리뷰와 동일 규약). 원점은 캐릭터 액터 위치이고, 정밀 판정은 스킬(Override)·몬스터와 같은 공용 경로 `ULSHitboxLibrary::IsTargetInsideSkillRange`를 쓴다. 판정은 2D(XY)라 `Range_Z`는 사용하지 않는다. Row가 없거나 `Range_Shape`가 None이거나 `Range_X`가 0 이하면 기존 폴백(전방 `BasicAttackForwardOffset` 지점의 `BasicAttackRadius` 구체, shape 필터 없음)으로 동작한다.
+
+디버그 범위 표시: 콘솔 `LS.Debug.BasicAttackRange 1`을 켜면 로컬 플레이어의 기본 공격 판정 범위를 스킬 프리뷰 컴포넌트(`ULSSkillPreviewComponent`)로 표시한다 (`0`=끔, 구현: `LSPlayerCombatDebugPreview.cpp`). 공격 중이면 재생 중인 콤보 섹션, 아니면 1타 row 기준으로 조준 방향을 따라가고, 폴백 판정이면 폴백 구체를 그대로 보여준다. 실제 스킬 프리뷰가 뜨면 양보하고 끝나면 자동 복귀한다. 표시 재질은 `ULSPlayerCombatComponent`의 `DebugRangeCircleMaterial` / `DebugRangeBoxMaterial`을 캐릭터 BP에서 매핑해야 하며(몬스터 텔레그래프 재질 재사용 가능), 미할당이면 Warning 로그만 남고 표시되지 않는다.
 
 패시브 트리거:
 
@@ -327,7 +329,7 @@ ASC와 AttributeSet 관계:
 
 즉 Ability가 Attribute 값을 참조하면 해당 캐릭터 인스턴스에 등록된 AttributeSet 값을 읽는다. 서버에서 적용된 Attribute 변경은 복제를 통해 클라이언트 UI와 표시 상태에 반영된다.
 
-## 타격 사운드 레이어 (GameplayCue + AnimNotify)
+## 타격 사운드·VFX 레이어 (GameplayCue + AnimNotify)
 
 타격 사운드는 **주체(때리는 쪽/맞는 쪽)** 와 **레이어**로 나뉜다.
 
@@ -336,8 +338,25 @@ ASC와 AttributeSet 관계:
 | 휘두름 효과음 / 공격 음성(기합) | 때리는 쪽 | 공격 몽타주의 `LSAN_PlaySound` 노티파이 (코드 무관, 아트 영역) |
 | 스킬 시전음 | 때리는 쪽 | 스킬 발동 시 코드가 Cue 발동 |
 | 피격 임팩트음(재질) + 피격 보이스 | 맞는 쪽 | 데미지 수신 시 코드가 Cue 발동 |
+| 기본 공격 명중 VFX | 때리는 쪽 데이터 + 맞는 쪽 ASC | 서버 데미지 적용 성공 분기에서 Cue 발동 |
 
 **공통 GCN**: 세 Cue 모두 사운드를 직접 들지 않고 `GameplayCueParameters.SourceObject`로 받은 `USoundBase`를 대상 위치에서 재생하는 **`ULSGCN_PlaySound` 한 클래스**를 공유한다. 태그별로 BP만 하나씩 둔다(`GameplayCue.Combat.Hit` / `GameplayCue.Voice` / `GameplayCue.Skill.Cast`). 사운드는 BP가 아니라 데이터(피격자/스킬)에서 오므로 종류가 늘어도 GCN/태그가 늘지 않는다. Notify BP는 `/Game/LostSignal` 하위, 스캔 경로는 `DefaultGame.ini`의 `GameplayCueNotifyPaths`.
+
+### 기본 공격 명중 VFX (성공 판정 이후)
+
+기본 공격 명중 VFX는 공격 몽타주 Notify가 직접 출력하지 않는다. `LSAN_PlayerMeleeHit`는 판정 타이밍만 전달하고, 서버의 실제 데미지 적용 성공 분기에서 피격 대상 ASC로 `GameplayCue.Combat.HitVFX`를 실행한다. 따라서 빗나감·무적 등으로 `ApplyDamageEffectToTarget`이 실패하면 VFX도 출력되지 않는다.
+
+```text
+LSAN_PlayerMeleeHit
+-> ULSPlayerCombatComponent::PerformMeleeHit
+-> ExecuteMeleeHit의 대상별 ApplyDamageEffectToTarget 성공
+-> BasicAttackHitEffect를 SourceObject에 담아 피격 대상 ASC에서 GameplayCue.Combat.HitVFX 실행
+-> ULSGCN_SpawnNiagara 파생 BP가 전 클라이언트에서 Niagara 1회 출력
+```
+
+- Niagara 에셋의 단일 출처는 `ULSPlayerCombatComponent::BasicAttackHitEffect`이며 캐릭터 BP 컴포넌트 기본값에서 매핑한다.
+- `GameplayCue.Combat.HitVFX`용 BP는 `ULSGCN_SpawnNiagara`를 상속하고 `/Game/LostSignal` 하위에 둔다. BP에는 로직이나 Niagara 에셋을 넣지 않고 태그만 매핑한다.
+- 현재 기본 공격 판정은 `SphereOverlapActors`라 `FHitResult`가 없다. VFX 위치는 명중 액터의 콜리전 바운드 중심, 방향은 공격 반대 방향을 사용한다. 정확한 표면·본 위치가 필요해지면 판정 결과 구조에 충돌 정보를 추가해 확장한다.
 
 ### 피격 사운드 (맞는 쪽, victim-side)
 

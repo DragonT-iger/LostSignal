@@ -1,5 +1,7 @@
 #include "Combat/LSHitboxLibrary.h"
 
+#include "Data/LSCharacterSkillRow.h"
+
 bool ULSHitboxLibrary::IsTargetInsideHitbox(
 	const FVector& SourceLocation,
 	const FVector& AimDirection2D,
@@ -46,4 +48,46 @@ bool ULSHitboxLibrary::IsTargetInsideHitbox(
 	default:
 		return Distance <= Radius;
 	}
+}
+
+bool ULSHitboxLibrary::IsTargetInsideSkillRange(
+	const FVector& SourceLocation,
+	const FVector& AimDirection2D,
+	const FVector& TargetLocation,
+	ELSCharacterSkillRangeShape Shape,
+	float RangeX,
+	float RangeY)
+{
+	ELSHitboxShape HitboxShape = ELSHitboxShape::Circle;
+	switch (Shape)
+	{
+	case ELSCharacterSkillRangeShape::Cone:
+		HitboxShape = ELSHitboxShape::Cone;
+		break;
+	case ELSCharacterSkillRangeShape::Box:
+		HitboxShape = ELSHitboxShape::Box;
+		break;
+	case ELSCharacterSkillRangeShape::Circle:
+	case ELSCharacterSkillRangeShape::None:
+	default:
+		HitboxShape = ELSHitboxShape::Circle;
+		break;
+	}
+
+	return IsTargetInsideHitbox(
+		SourceLocation,
+		AimDirection2D,
+		TargetLocation,
+		HitboxShape,
+		RangeX,
+		RangeX,
+		RangeY,
+		RangeY);
+}
+
+float ULSHitboxLibrary::GetSkillRangeQueryRadius(ELSCharacterSkillRangeShape Shape, float RangeX, float RangeY)
+{
+	return Shape == ELSCharacterSkillRangeShape::Box
+		? FMath::Sqrt(FMath::Square(RangeX) + FMath::Square(RangeY * 0.5f))
+		: RangeX;
 }

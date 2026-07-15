@@ -8,10 +8,13 @@
 class UAnimMontage;
 class UGameplayAbility;
 class UGameplayEffect;
+class UMaterialInterface;
+class UNiagaraSystem;
 class ULSGA_PlayerBasicAttack;
 class ULSAimComponent;
 class ULSCharacterCombatComponent;
 class ULSCombatStateComponent;
+class ULSSkillPreviewComponent;
 struct FLSComboAttackRow;
 
 UCLASS(ClassGroup=(LS), meta=(BlueprintSpawnableComponent))
@@ -67,6 +70,8 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	// 디버그 기본 공격 범위 표시(LS.Debug.BasicAttackRange) 전용 틱. 구현: LSPlayerCombatDebugPreview.cpp
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
@@ -105,6 +110,17 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	ELSBreakPowerTier BasicAttackBreakPower = ELSBreakPowerTier::NormalAttack;
 
+	// 기본 공격이 실제로 명중했을 때 피격 위치에 재생할 Niagara. 캐릭터 BP에서 매핑한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat/Effects")
+	TObjectPtr<UNiagaraSystem> BasicAttackHitEffect;
+
+	// LS.Debug.BasicAttackRange 디버그 범위 표시용 재질(원/부채꼴, 박스). 몬스터 텔레그래프와 같은 재질을 캐릭터 BP에서 매핑한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat/Debug")
+	TObjectPtr<UMaterialInterface> DebugRangeCircleMaterial;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat/Debug")
+	TObjectPtr<UMaterialInterface> DebugRangeBoxMaterial;
+
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	int32 ComboCharacterID = 101;
 
@@ -113,6 +129,9 @@ private:
 	FTimerHandle PendingComboIndexOverrideTimerHandle;
 	bool bAttackHitConsumed = false;
 	bool bBasicAttackHeld = false;
+	bool bDebugRangePreviewActive = false;
+	bool bDebugRangeMaterialWarned = false;
+	int32 DebugRangePreviewKey = INDEX_NONE;
 	bool bPredictedDashInProgress = false;
 	bool bPredictedDashCooldownActive = false;
 	uint16 PredictedDashRootMotionSourceID = 0;
@@ -124,13 +143,21 @@ private:
 	ULSCharacterCombatComponent* ResolveSharedCombatComponent() const;
 	ULSCombatStateComponent* ResolveCombatStateComponent() const;
 	class ALSCharacterBase* ResolveOwnerCharacter() const;
+	FVector ResolveBasicAttackDirection() const;
+	// 디버그 범위 표시(LS.Debug.BasicAttackRange) — 구현: LSPlayerCombatDebugPreview.cpp
+	void UpdateDebugBasicAttackRangePreview();
+	void EndDebugBasicAttackRangePreview();
+	void BuildDebugBasicAttackRangeSpec(const FLSComboAttackRow* ComboRow, struct FLSSkillAreaPreviewSpec& OutSpec, float& OutForwardOffset) const;
 	void FinishAttack();
 	void CancelAttackForDash();
 	void TryExecuteBufferedCommand();
 	void FinishPredictedDash();
 	void FinishPredictedDashCooldown();
 	void ClearPendingBasicAttackComboIndexOverride();
+	// 브로드페이즈(구체) + Row Range shape 정밀 필터로 명중 후보를 수집. 반환값: Row Range 사용 여부(false면 고정 구체 폴백).
+	bool GatherBasicAttackTargets(const FVector& AttackDirection, const FLSComboAttackRow* ComboRow, TArray<AActor*>& OutActors) const;
 	int32 ExecuteMeleeHit(const FVector& AttackDirection, const FLSComboAttackRow* ComboRow);
+	void ExecuteBasicAttackHitCue(AActor* HitActor, const FVector& AttackDirection) const;
 	int32 ResolveComboAttackID(int32 ComboSectionIndex, int32 ComboTagOverride) const;
 	ULSGA_PlayerBasicAttack* FindActiveBasicAttackAbility() const;
 	bool ApplyDashRootMotion(const FVector& DashDirection, uint16& OutRootMotionSourceID) const;

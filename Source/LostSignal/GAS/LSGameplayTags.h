@@ -46,6 +46,7 @@ namespace LSGameplayTags
 
 	// Gameplay cue tags (피격 등 연출용. 반드시 "GameplayCue." 루트로 시작)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Combat_Hit)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Combat_HitVFX)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Skill_Cast)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Voice)
 

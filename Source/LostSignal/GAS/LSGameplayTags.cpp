@@ -33,6 +33,7 @@ namespace LSGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Event_Skill_Hit, "LS.Event.Skill.Hit")
 
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Combat_Hit, "GameplayCue.Combat.Hit")
+	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Combat_HitVFX, "GameplayCue.Combat.HitVFX")
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Skill_Cast, "GameplayCue.Skill.Cast")
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Voice, "GameplayCue.Voice")
 
