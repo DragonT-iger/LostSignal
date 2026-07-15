@@ -12,7 +12,8 @@ class UAnimMontage;
 class ULSCharacterCombatComponent;
 class ULSCombatStateComponent;
 class ULSStatusEffectComponent;
-class ULSFootstepComponent;
+class UNiagaraSystem;
+class USoundBase;
 
 UCLASS(Abstract)
 class LOSTSIGNAL_API ALSCharacterBase : public ACharacter, public IAbilitySystemInterface
@@ -35,6 +36,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="LS/StatusEffect")
 	ULSStatusEffectComponent* GetStatusEffectComponent() const { return StatusEffectComponent; }
+
+	USoundBase* GetFootstepSound() const { return FootstepSound; }
+	UNiagaraSystem* GetFootstepVFX() const { return FootstepVFX; }
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastPlayLSMontage(UAnimMontage* Montage, FName StartSection = NAME_None, float PlayRate = 1.0f);
@@ -87,8 +91,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/StatusEffect")
 	TObjectPtr<ULSStatusEffectComponent> StatusEffectComponent;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Audio")
-	TObjectPtr<ULSFootstepComponent> FootstepComponent;
+	// 발소리(Sound Cue로 변주). LSAN_Footstep 노티파이가 접지 프레임마다 조회. 캐릭터 BP에서 매핑(미할당이면 무음).
+	UPROPERTY(EditDefaultsOnly, Category="LS/Audio")
+	TObjectPtr<USoundBase> FootstepSound;
+
+	// 발소리와 함께 접지한 발 위치에 스폰되는 이펙트(먼지 등). 캐릭터 BP에서 매핑(미할당이면 스폰 없음).
+	UPROPERTY(EditDefaultsOnly, Category="LS/VFX")
+	TObjectPtr<UNiagaraSystem> FootstepVFX;
 
 	FRotator CachedSkillActivationRotation = FRotator::ZeroRotator;
 	bool bHasSkillActivationRotation = false;

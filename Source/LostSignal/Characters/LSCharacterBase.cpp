@@ -5,7 +5,6 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
-#include "Characters/LSFootstepComponent.h"
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Combat/LSCombatStateComponent.h"
 #include "Combat/LSStatusEffectComponent.h"
@@ -37,7 +36,6 @@ ALSCharacterBase::ALSCharacterBase()
 	CharacterCombatComponent = CreateDefaultSubobject<ULSCharacterCombatComponent>(TEXT("CharacterCombatComponent"));
 	CombatStateComponent = CreateDefaultSubobject<ULSCombatStateComponent>(TEXT("CombatStateComponent"));
 	StatusEffectComponent = CreateDefaultSubobject<ULSStatusEffectComponent>(TEXT("StatusEffectComponent"));
-	FootstepComponent = CreateDefaultSubobject<ULSFootstepComponent>(TEXT("FootstepComponent"));
 
 	GetMesh()->SetRenderCustomDepth(true);
 	GetMesh()->SetCustomDepthStencilValue(1);

@@ -406,24 +406,24 @@ Ability 실행
 
 플레이어 액티브 스킬은 `ULSGA_PlayerSkillBase`가 `SkillMontage`를 재생하고, 몽타주의 `LSAN_SkillEffect` 노티파이가 `LS.Event.Skill.Hit` 이벤트를 보내는 시점에 효과(`ExecuteSkillEffect`)를 발동한다. 몽타주가 없는 스킬은 발동 즉시 효과가 나가는 즉발로 fallback한다(애니메이션 미적용 스킬 호환). 노티파이가 누락된 몽타주는 몽타주 종료 시점에 효과를 보장하고, 윈드업 중 캔슬(스턴/사망)되면 효과가 발동하지 않는다.
 
-### 발소리 (거리 기반)
+### 발소리 (싱크 마커 노티파이 기반)
 
-이동 로코모션은 AnimBP 스테이트머신의 8방향 블렌드스페이스(걷기/달리기 포함)다. 걷기·달리기의 **보폭 수가 달라**(걷기 2세트 / 달리기 3세트) 마커·커브 기반 동기화로는 발 착지를 못 맞춘다. 그래서 발소리를 **애니 타이밍이 아니라 이동 거리**로 발동하며, movement 도메인이라 AnimBP가 아니라 **전용 [ULSFootstepComponent](../../Source/LostSignal/Characters/LSFootstepComponent.h)** 가 담당한다(`ALSCharacterBase`에 부착).
+이동 로코모션은 AnimBP 스테이트머신의 8방향 블렌드스페이스(걷기/달리기 포함)다. 로코모션 시퀀스에 발 접지 싱크 마커(L/R)가 들어간 뒤로는 접지 프레임을 애니메이션이 직접 알므로, 발소리는 마커 위치에 삽입된 **[ULSAN_Footstep](../../Source/LostSignal/Animation/LSAN_Footstep.h) 노티파이**가 발동한다. (이전의 거리 누적 방식 `ULSFootstepComponent`는 마커 도입 전 임시 구현이라 삭제됨.)
 
 ```text
-ULSFootstepComponent::TickComponent
--> 소유자 수평 이동거리 누적(사망·공중·정지 제외)
--> 누적이 StrideLength 넘으면 좌우 발 번갈아 PlayFootstep(발 소켓 위치) + 거리 차감
--> 속도가 빠를수록 거리가 빨리 차 발소리도 빨라짐
+로코모션 시퀀스의 LS_Footsteps 트랙 노티파이 발화 (싱크 마커 L/R와 같은 시간)
+-> ULSAN_Footstep::Notify
+-> 소유자 ALSCharacterBase에서 FootstepSound·FootstepVFX 조회(미할당 항목은 생략)
+-> 공중·이동 스킬(RootMotionSource) 중이면 스킵
+-> 접지한 발 소켓(SocketName) 위치에서 사운드 로컬 재생 + VFX 비부착 스폰
 ```
 
-- 이동 스킬(대시/바이패스/처형 등 `ApplyRootMotionSource` 이동) 중에는 발소리를 억제한다: 틱에서 `Movement->CurrentRootMotion.HasActiveRootMotionSources()`면 스킵. 스크립트 이동이라 보행 발소리가 부적합하고, 태그/어빌리티를 안 건드려도 RootMotion 이동기 전부(향후 추가분 포함) 자동 커버. 몽타주 애님 루트모션은 그룹 API라 대상 아님.
-
-- 트리거가 C++ 컴포넌트 한 곳이라 시퀀스에 마커/커브/노티파이를 **아무것도 안 넣어도 된다.** 어떤 블렌드·속도에도 견고.
-- AnimInstance가 아니라 컴포넌트인 이유: 거리 기반은 movement 도메인이고, AnimInstance는 URO로 업데이트가 throttle돼 박자가 틀어질 수 있다.
-- `FootstepSound`(Sound Cue로 변주), `StrideLength`, `MinFootstepSpeed`, 발 본 이름은 캐릭터 BP의 `FootstepComponent`에서 매핑.
-- 컴포넌트 틱은 클라마다 로컬로 도므로 발소리도 로컬 재생 → MO 복제 불필요.
-- 트레이드오프: 발소리가 화면상 발 착지와 100% 일치하진 않으나 탑다운 쿼터뷰라 무시 가능. 지면 재질별이 필요하면 `PlayFootstep`에서 발밑 라인트레이스 → `PhysicalMaterial` → 사운드 선택으로 확장(트리거가 한 곳이라 여기만 수정).
+- 노티파이 삽입은 수작업이 아니라 `tools/insert_footstep_notifies.py`가 수행: 블렌드 스페이스(`BS_Unarmed`) 샘플 시퀀스들의 싱크 마커를 읽어 같은 시간에 `LSAN_Footstep`을 삽입하고 마커 L/R로 `SocketName`(foot_l/foot_r)을 굽는다. 새 로코모션 시퀀스를 추가하면 마커를 찍고 스크립트를 재실행해야 발소리가 난다(마커 없는 시퀀스는 무음).
+- 블렌드 스페이스의 Notify Trigger Mode 기본값(Highest Weighted Animation) 덕에 가중치 1등 샘플의 노티파이만 발화 → 27샘플이 블렌딩돼도 발소리 중복 없음. 샘플들이 싱크 마커로 위상 동기화되므로 1등이 바뀌어도 타이밍이 튀지 않는다.
+- 사운드·VFX는 노티파이가 아니라 **캐릭터가 소유**: `ALSCharacterBase::FootstepSound`(Sound Cue로 변주)·`FootstepVFX`(먼지 등, 발에 붙지 않고 접지 지점에 남는 비부착 스폰)를 캐릭터 BP에서 매핑. 같은 애니메이션을 공유해도 캐릭터별 연출이 다르고, 에셋 교체 시 시퀀스를 다시 안 건드린다.
+- 이동 스킬(대시/바이패스/처형 등 `ApplyRootMotionSource` 이동) 중에는 발소리를 억제한다: `Movement->CurrentRootMotion.HasActiveRootMotionSources()`면 스킵. 스크립트 이동이라 보행 발소리가 부적합하고, 태그/어빌리티를 안 건드려도 RootMotion 이동기 전부(향후 추가분 포함) 자동 커버. 몽타주 애님 루트모션은 그룹 API라 대상 아님. 공중(점프/낙하)도 같은 지점에서 스킵.
+- 노티파이는 각 클라의 로컬 애님 재생에서 발화하므로 발소리도 로컬 재생 → MO 복제 불필요.
+- 확장: 지면 재질별 사운드/이펙트가 필요하면 `ULSAN_Footstep::Notify`에서 `SocketName` 발밑 라인트레이스 → `PhysicalMaterial` → 선택으로 확장(트리거가 한 곳이라 여기만 수정, 시퀀스 재작업 없음).
 - AI 청각용 `Noise_Walk`/`Noise_Run` 태그는 발소리 오디오와 별개 레이어다.
 
 ## 몬스터와 플레이어 전투 연결
