@@ -20,4 +20,8 @@ private:
 	// 접지한 발 소켓(본). 사운드 재생 위치이자 향후 VFX·표면 트레이스 확장의 기준점. 없으면 메시 위치에서 재생.
 	UPROPERTY(EditAnywhere, Category="LS/Audio")
 	FName SocketName = NAME_None;
+
+	// false면 이 접지에서 FootstepVFX 스폰을 생략(사운드만). 걷기처럼 이펙트가 과한 애니메이션에서 끈다.
+	UPROPERTY(EditAnywhere, Category="LS/VFX")
+	bool bSpawnVFX = true;
 };

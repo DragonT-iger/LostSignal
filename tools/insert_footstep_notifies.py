@@ -23,6 +23,9 @@ TRACK_NAME = "LS_Footsteps"
 # True면 기존 TRACK_NAME 트랙의 노티파이를 지우고 다시 삽입한다.
 FORCE_REBUILD = True
 
+# 시퀀스 이름에 이 키워드가 포함되면 bSpawnVFX=False로 굽는다(사운드만). 걷기는 먼지 이펙트가 과함.
+VFX_EXCLUDE_KEYWORDS = ["walk"]
+
 FOOTSTEP_CLASS_PATH = "/Script/LostSignal.LSAN_Footstep"
 
 
@@ -75,12 +78,15 @@ def _prepare_track(sequence: unreal.AnimSequence) -> bool:
     return True
 
 
-def _insert_footstep(sequence, time, socket_name, footstep_class):
+def _insert_footstep(sequence, time, socket_name, spawn_vfx, footstep_class):
     """한 발 접지 시점에 LSAN_Footstep 노티파이를 삽입한다."""
     notify = unreal.AnimationLibrary.add_animation_notify_event(
         sequence, TRACK_NAME, time, footstep_class)
-    if notify and socket_name:
+    if not notify:
+        return
+    if socket_name:
         notify.set_editor_property("socket_name", socket_name)
+    notify.set_editor_property("spawn_vfx", spawn_vfx)
 
 
 def main() -> None:
@@ -105,13 +111,14 @@ def main() -> None:
             unreal.log(f"[건너뜀] {seq_name}: '{TRACK_NAME}' 트랙이 이미 있음 (재삽입은 FORCE_REBUILD=True)")
             continue
 
+        spawn_vfx = not any(keyword in seq_name.lower() for keyword in VFX_EXCLUDE_KEYWORDS)
         for marker_name, time in markers:
             socket_name = _socket_for_marker(marker_name)
             if not socket_name:
                 unreal.log_warning(f"{seq_name}: 마커 '{marker_name}' 좌/우 판별 실패 — 소켓 미지정으로 삽입")
-            _insert_footstep(sequence, time, socket_name, footstep_class)
+            _insert_footstep(sequence, time, socket_name, spawn_vfx, footstep_class)
             inserted_total += 1
-            unreal.log(f"  {seq_name} @ {time:.3f}s ({marker_name}) → LSAN_Footstep 삽입")
+            unreal.log(f"  {seq_name} @ {time:.3f}s ({marker_name}) → LSAN_Footstep 삽입 (VFX {'on' if spawn_vfx else 'off'})")
 
         unreal.EditorAssetLibrary.save_loaded_asset(sequence)
 

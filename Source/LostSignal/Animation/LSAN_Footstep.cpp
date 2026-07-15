@@ -24,7 +24,7 @@ void ULSAN_Footstep::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase*
 
 	// 사운드·VFX는 캐릭터 BP에서 매핑한다. 미할당이면 해당 항목만 조용히 생략.
 	USoundBase* FootstepSound = Character->GetFootstepSound();
-	UNiagaraSystem* FootstepVFX = Character->GetFootstepVFX();
+	UNiagaraSystem* FootstepVFX = bSpawnVFX ? Character->GetFootstepVFX() : nullptr;
 	if (!FootstepSound && !FootstepVFX)
 	{
 		return;

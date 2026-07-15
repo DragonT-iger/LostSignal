@@ -419,6 +419,7 @@ Ability 실행
 ```
 
 - 노티파이 삽입은 수작업이 아니라 `tools/insert_footstep_notifies.py`가 수행: 블렌드 스페이스(`BS_Unarmed`) 샘플 시퀀스들의 싱크 마커를 읽어 같은 시간에 `LSAN_Footstep`을 삽입하고 마커 L/R로 `SocketName`(foot_l/foot_r)을 굽는다. 새 로코모션 시퀀스를 추가하면 마커를 찍고 스크립트를 재실행해야 발소리가 난다(마커 없는 시퀀스는 무음).
+- 노티파이별 `bSpawnVFX`로 이펙트만 끌 수 있다(사운드는 유지). 걷기는 먼지가 과해서 스크립트가 시퀀스 이름 키워드(`walk`)로 자동으로 끄고 굽는다.
 - 블렌드 스페이스의 Notify Trigger Mode 기본값(Highest Weighted Animation) 덕에 가중치 1등 샘플의 노티파이만 발화 → 27샘플이 블렌딩돼도 발소리 중복 없음. 샘플들이 싱크 마커로 위상 동기화되므로 1등이 바뀌어도 타이밍이 튀지 않는다.
 - 사운드·VFX는 노티파이가 아니라 **캐릭터가 소유**: `ALSCharacterBase::FootstepSound`(Sound Cue로 변주)·`FootstepVFX`(먼지 등, 발에 붙지 않고 접지 지점에 남는 비부착 스폰)를 캐릭터 BP에서 매핑. 같은 애니메이션을 공유해도 캐릭터별 연출이 다르고, 에셋 교체 시 시퀀스를 다시 안 건드린다.
 - 이동 스킬(대시/바이패스/처형 등 `ApplyRootMotionSource` 이동) 중에는 발소리를 억제한다: `Movement->CurrentRootMotion.HasActiveRootMotionSources()`면 스킵. 스크립트 이동이라 보행 발소리가 부적합하고, 태그/어빌리티를 안 건드려도 RootMotion 이동기 전부(향후 추가분 포함) 자동 커버. 몽타주 애님 루트모션은 그룹 API라 대상 아님. 공중(점프/낙하)도 같은 지점에서 스킵.
