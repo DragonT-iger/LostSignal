@@ -9,6 +9,7 @@
 #include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/LSUILayer.h"
 #include "UI/Lobby/LSLobbyTabWidget.h"
+#include "UI/Lobby/Store/LSStoreWidget.h"
 #include "UI/Skill/LSSkillLoadoutWidget.h"
 
 #define LOCTEXT_NAMESPACE "LSLoadoutPreparation"
@@ -72,6 +73,38 @@ ULSSkillLoadoutWidget* FindLoadoutSkillLoadoutWidget(UWidget* Widget)
 			if (ULSSkillLoadoutWidget* SkillLoadout = FindLoadoutSkillLoadoutWidget(Panel->GetChildAt(ChildIndex)))
 			{
 				return SkillLoadout;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+// 스위처 페이지 아래에서 에이베리 보급소 상점 위젯을 찾는다. UserWidget 내부 트리까지 재귀 탐색.
+ULSStoreWidget* FindLoadoutStoreWidget(UWidget* Widget)
+{
+	if (!Widget)
+	{
+		return nullptr;
+	}
+
+	if (ULSStoreWidget* Store = Cast<ULSStoreWidget>(Widget))
+	{
+		return Store;
+	}
+
+	if (const UUserWidget* UserWidget = Cast<UUserWidget>(Widget))
+	{
+		return UserWidget->WidgetTree ? FindLoadoutStoreWidget(UserWidget->WidgetTree->RootWidget) : nullptr;
+	}
+
+	if (const UPanelWidget* Panel = Cast<UPanelWidget>(Widget))
+	{
+		for (int32 ChildIndex = 0; ChildIndex < Panel->GetChildrenCount(); ++ChildIndex)
+		{
+			if (ULSStoreWidget* Store = FindLoadoutStoreWidget(Panel->GetChildAt(ChildIndex)))
+			{
+				return Store;
 			}
 		}
 	}
@@ -206,14 +239,8 @@ void ULSLoadoutPreparationWidget::CloseActiveConfirmDialog()
 
 void ULSLoadoutPreparationWidget::HandleSupplyTabClicked()
 {
-	// 안내창이 이미 떠 있으면 닫기만 한다(토글).
-	// 에이베리 보급소(상점/제작)는 아직 안 만들어서 나중에 구현할 예정입니다. 그때까지 탭 목록을 유지한다.
-	if (HasActiveConfirmDialog())
-	{
-		CloseActiveConfirmDialog();
-		return;
-	}
-	ShowNotImplementedNotice();
+	CloseActiveConfirmDialog();
+	ShowTab(ELSLoadoutTab::Supply);
 }
 
 void ULSLoadoutPreparationWidget::HandleStorageTabClicked()
@@ -258,6 +285,18 @@ void ULSLoadoutPreparationWidget::ShowTab(const ELSLoadoutTab Tab) const
 		else
 		{
 			UE_LOG(LogLS, Warning, TEXT("[Loadout] Chip station widget not found under chip tab page on %s."), *GetNameSafe(this));
+		}
+	}
+	// 보급소(상점) 페이지는 열 때마다 초기 상태(기능 선택)로 되돌린다. 대화 도중 닫았다 열어도 이어지지 않게.
+	else if (Tab == ELSLoadoutTab::Supply)
+	{
+		if (ULSStoreWidget* Store = FindLoadoutStoreWidget(ContentSwitcher->GetActiveWidget()))
+		{
+			Store->ResetStore();
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Loadout] Store widget not found under supply tab page on %s."), *GetNameSafe(this));
 		}
 	}
 	// 스킬 로드아웃 페이지도 열 때마다 최신 세이브 기준으로 리빌드한다.

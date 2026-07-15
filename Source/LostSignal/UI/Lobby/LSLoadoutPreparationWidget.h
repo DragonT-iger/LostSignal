@@ -14,7 +14,7 @@ enum class ELSLoadoutTab : uint8
 {
 	Chip,     // 칩 강화/합성/장착 (칩 스테이션)
 	Storage,  // 물품창고 (인벤토리 창고)
-	Supply,   // 에이베리 보급소 (상점/제작) — 아직 안 만들어서 나중에 구현할 예정입니다
+	Supply,   // 에이베리 보급소 (상점/제작) — WBP_Store 배치. 대화하기(퀘스트 수락/거절)까지 구현, 자판기/제작대는 placeholder
 	Upgrade,  // 업그레이드 (캐릭터/기지 강화) — 아직 안 만들어서 나중에 구현할 예정입니다
 	Skill     // 스킬 로드아웃 (액티브/궁극기 3칸 선택). ContentSwitcher 마지막(인덱스 4)에 배치.
 };
@@ -62,7 +62,7 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")
 	TObjectPtr<ULSLobbyTabWidget> StorageTab;
 
-	// 에이베리 보급소(상점/제작) 탭. 콘텐츠 미구현이라 클릭 시 미구현 안내창만 띄운다.
+	// 에이베리 보급소(상점/제작) 탭. 상점 페이지(인덱스 2, WBP_Store)로 전환한다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")
 	TObjectPtr<ULSLobbyTabWidget> SupplyTab;
 
