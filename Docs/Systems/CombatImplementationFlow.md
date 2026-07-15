@@ -202,7 +202,7 @@ Anim Notify 또는 Ability 타이밍
 
 판정 범위는 `FLSComboAttackRow`의 `Range_Shape` / `Range_X` / `Range_Y`가 단일 출처다 (Circle: 반경=X / Cone: 반경=X, 각도=Y / Box: 길이=X, 폭=Y — 스킬·프리뷰와 동일 규약). 원점은 캐릭터 액터 위치이고, 정밀 판정은 스킬(Override)·몬스터와 같은 공용 경로 `ULSHitboxLibrary::IsTargetInsideSkillRange`를 쓴다. 판정은 2D(XY)라 `Range_Z`는 사용하지 않는다. Row가 없거나 `Range_Shape`가 None이거나 `Range_X`가 0 이하면 기존 폴백(전방 `BasicAttackForwardOffset` 지점의 `BasicAttackRadius` 구체, shape 필터 없음)으로 동작한다.
 
-디버그 범위 표시: 콘솔 `LS.Debug.BasicAttackRange 1`을 켜면 로컬 플레이어의 기본 공격 판정 범위를 스킬 프리뷰 컴포넌트(`ULSSkillPreviewComponent`)로 표시한다 (`0`=끔, 구현: `LSPlayerCombatDebugPreview.cpp`). 공격 중이면 재생 중인 콤보 섹션, 아니면 1타 row 기준으로 조준 방향을 따라가고, 폴백 판정이면 폴백 구체를 그대로 보여준다. 실제 스킬 프리뷰가 뜨면 양보하고 끝나면 자동 복귀한다. 표시 재질은 `ULSPlayerCombatComponent`의 `DebugRangeCircleMaterial` / `DebugRangeBoxMaterial`을 캐릭터 BP에서 매핑해야 하며(몬스터 텔레그래프 재질 재사용 가능), 미할당이면 Warning 로그만 남고 표시되지 않는다.
+디버그 범위 표시: 콘솔 `LS.Debug.BasicAttackRange 1`을 켜면 로컬 플레이어의 기본 공격 판정 범위를 스킬 프리뷰 컴포넌트(`ULSSkillPreviewComponent`)로 표시한다 (`0`=끔, 구현: `LSPlayerCombatDebugPreview.cpp`). 공격 중이면 재생 중인 콤보 섹션, 아니면 1타 row 기준으로 조준 방향을 따라가고, 폴백 판정이면 폴백 구체를 그대로 보여준다. 실제 스킬 프리뷰가 뜨면 양보하고 끝나면 자동 복귀한다. 표시 재질은 별도 매핑 없이 `ULSSkillPreviewComponent`가 소유한 CircleMaterial/BoxMaterial을 그대로 쓴다(미할당이면 프리뷰 컴포넌트가 Warning 로그를 남기고 표시되지 않음 — [SkillSystemStructure.md](SkillSystemStructure.md) 참고).
 
 패시브 트리거:
 

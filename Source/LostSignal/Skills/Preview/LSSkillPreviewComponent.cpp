@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
+#include "LostSignal.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -22,10 +23,23 @@ ULSSkillPreviewComponent::ULSSkillPreviewComponent()
 	}
 }
 
-bool ULSSkillPreviewComponent::BeginAreaPreview(const FLSSkillAreaPreviewSpec& PreviewSpec)
+bool ULSSkillPreviewComponent::BeginAreaPreview(const FLSSkillAreaPreviewSpec& PreviewSpec, UMaterialInterface* MaterialOverride)
 {
-	if (GetNetMode() == NM_DedicatedServer || !PreviewSpec.Material)
+	if (GetNetMode() == NM_DedicatedServer)
 	{
+		return false;
+	}
+
+	UMaterialInterface* ResolvedMaterial = MaterialOverride
+		? MaterialOverride
+		: (PreviewSpec.Shape == ELSSkillAreaShape::Box ? BoxMaterial.Get() : CircleMaterial.Get());
+	if (!ResolvedMaterial)
+	{
+		if (!bMissingMaterialWarned)
+		{
+			bMissingMaterialWarned = true;
+			UE_LOG(LogLS, Warning, TEXT("%s SkillPreviewComponent: CircleMaterial/BoxMaterial이 BP에 매핑되지 않아 범위 프리뷰를 표시할 수 없다."), *GetNameSafe(GetOwner()));
+		}
 		return false;
 	}
 
@@ -68,7 +82,7 @@ bool ULSSkillPreviewComponent::BeginAreaPreview(const FLSSkillAreaPreviewSpec& P
 		return false;
 	}
 
-	ActivePreviewMaterial = UMaterialInstanceDynamic::Create(PreviewSpec.Material, this);
+	ActivePreviewMaterial = UMaterialInstanceDynamic::Create(ResolvedMaterial, this);
 	if (!ActivePreviewMaterial)
 	{
 		EndAreaPreview();

@@ -6,6 +6,7 @@
 #include "LSSkillPreviewComponent.generated.h"
 
 class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class UStaticMesh;
 class UStaticMeshComponent;
 
@@ -17,8 +18,9 @@ class LOSTSIGNAL_API ULSSkillPreviewComponent : public UActorComponent
 public:
 	ULSSkillPreviewComponent();
 
+	/** MaterialOverride를 지정하면 컴포넌트 소유 재질 대신 그 재질을 쓴다(몬스터 텔레그래프 등). */
 	UFUNCTION(BlueprintCallable, Category="LS/Skill|Preview")
-	bool BeginAreaPreview(const FLSSkillAreaPreviewSpec& PreviewSpec);
+	bool BeginAreaPreview(const FLSSkillAreaPreviewSpec& PreviewSpec, UMaterialInterface* MaterialOverride = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Skill|Preview")
 	void UpdateAreaPreview(const FVector& WorldLocation, const FRotator& WorldRotation);
@@ -51,8 +53,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Preview")
 	TObjectPtr<UStaticMesh> DefaultPreviewMesh;
 
+	// 범위 프리뷰 기본 재질(Circle=원/부채꼴 공용, Box=박스). 캐릭터 BP에서 매핑. MaterialOverride가 없을 때 사용된다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Preview")
+	TObjectPtr<UMaterialInterface> CircleMaterial;
+
+	UPROPERTY(EditDefaultsOnly, Category="LS/Skill|Preview")
+	TObjectPtr<UMaterialInterface> BoxMaterial;
+
 private:
 	void ApplyMeshScale();
 	void ApplyMaterialParameters(float WorldYaw);
 	float ResolveOwnerFootZ(float FallbackZ) const;
+
+	bool bMissingMaterialWarned = false;
 };

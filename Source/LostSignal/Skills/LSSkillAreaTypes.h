@@ -3,8 +3,6 @@
 #include "CoreMinimal.h"
 #include "LSSkillAreaTypes.generated.h"
 
-class UMaterialInterface;
-
 UENUM(BlueprintType)
 enum class ELSSkillAreaShape : uint8
 {
@@ -62,7 +60,4 @@ struct FLSSkillAreaPreviewSpec
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
 	float WorldZOffset = 0.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Skill|Preview")
-	TObjectPtr<UMaterialInterface> Material = nullptr;
 };

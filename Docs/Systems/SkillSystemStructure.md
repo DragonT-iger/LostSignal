@@ -136,6 +136,7 @@ PreviewSpec
 - 프리뷰 표시 기본값
 - DataTable Range_Shape / Range_X / Range_Y / Range_Z가 있으면 프리뷰 범위는 DataTable 값을 우선한다.
 - Range_Shape가 Cone이면 원형 프리뷰 머티리얼을 쓰고 Degrees는 Range_Y 값을 그대로 사용한다.
+- 프리뷰 머티리얼은 DataAsset이 아니라 `ULSSkillPreviewComponent`의 CircleMaterial/BoxMaterial(캐릭터 BP 매핑)이 소유한다. PreviewSpec에는 머티리얼 필드가 없다(몬스터 텔레그래프 등 전용 재질이 필요한 호출자만 `BeginAreaPreview`의 MaterialOverride 인자로 지정).
 
 DamageEffectClass
 - 데미지 적용용 GameplayEffect

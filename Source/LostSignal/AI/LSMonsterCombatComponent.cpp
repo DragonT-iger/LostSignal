@@ -418,33 +418,33 @@ void ULSMonsterCombatComponent::BeginActionTelegraph(float Duration)
 	const float X = Row->Hitbox_X;
 	const float Y = Row->Hitbox_Y;
 
+	// 텔레그래프는 위험 표시용 전용 재질을 오버라이드로 넘긴다(프리뷰 컴포넌트 기본 재질 미사용).
 	FLSSkillAreaPreviewSpec Spec;
 	Spec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
+	UMaterialInterface* TelegraphMaterial = TelegraphCircleMaterial;
 	switch (Row->Hitbox_Shape)
 	{
 	case ELSHitboxShape::Box:
 		Spec.Shape = ELSSkillAreaShape::Box;
 		Spec.BoxLength = X;
 		Spec.BoxWidth = Y;
-		Spec.Material = TelegraphBoxMaterial;
 		Spec.OutlineThickness = 0.2f;
+		TelegraphMaterial = TelegraphBoxMaterial;
 		break;
 	case ELSHitboxShape::Cone:
 		Spec.Shape = ELSSkillAreaShape::Circle;
 		Spec.Radius = X;
 		Spec.Degrees = Y;
-		Spec.Material = TelegraphCircleMaterial;
 		break;
 	case ELSHitboxShape::Circle:
 	default:
 		Spec.Shape = ELSSkillAreaShape::Circle;
 		Spec.Radius = X;
 		Spec.Degrees = 360.0f;
-		Spec.Material = TelegraphCircleMaterial;
 		break;
 	}
 
-	if (Preview->BeginAreaPreview(Spec))
+	if (Preview->BeginAreaPreview(Spec, TelegraphMaterial))
 	{
 		// 도약 액션이면 착지 예정 지점/방향에 표시(비-도약은 몬스터 현재 위치·방향).
 		FVector PreviewOrigin;

@@ -8,7 +8,6 @@
 class UAnimMontage;
 class UGameplayAbility;
 class UGameplayEffect;
-class UMaterialInterface;
 class UNiagaraSystem;
 class ULSGA_PlayerBasicAttack;
 class ULSAimComponent;
@@ -114,13 +113,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat/Effects")
 	TObjectPtr<UNiagaraSystem> BasicAttackHitEffect;
 
-	// LS.Debug.BasicAttackRange 디버그 범위 표시용 재질(원/부채꼴, 박스). 몬스터 텔레그래프와 같은 재질을 캐릭터 BP에서 매핑한다.
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat/Debug")
-	TObjectPtr<UMaterialInterface> DebugRangeCircleMaterial;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat/Debug")
-	TObjectPtr<UMaterialInterface> DebugRangeBoxMaterial;
-
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	int32 ComboCharacterID = 101;
 
@@ -130,7 +122,6 @@ private:
 	bool bAttackHitConsumed = false;
 	bool bBasicAttackHeld = false;
 	bool bDebugRangePreviewActive = false;
-	bool bDebugRangeMaterialWarned = false;
 	int32 DebugRangePreviewKey = INDEX_NONE;
 	bool bPredictedDashInProgress = false;
 	bool bPredictedDashCooldownActive = false;

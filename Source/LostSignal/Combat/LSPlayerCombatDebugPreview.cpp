@@ -5,8 +5,6 @@
 #include "Data/LSComboAttackRow.h"
 #include "GAS/Abilities/Character1/LSGA_PlayerBasicAttack.h"
 #include "HAL/IConsoleManager.h"
-#include "LostSignal.h"
-#include "Materials/MaterialInterface.h"
 #include "Skills/LSPlayerSkillComponent.h"
 #include "Skills/LSSkillAreaTypes.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
@@ -55,19 +53,10 @@ void ULSPlayerCombatComponent::UpdateDebugBasicAttackRangePreview()
 	const int32 ComboTag = ActiveAbility ? ActiveAbility->GetCurrentComboTag() : 0;
 	const FLSComboAttackRow* ComboRow = ResolveComboAttackRow(ComboSectionIndex, ComboTag);
 
+	// 재질은 프리뷰 컴포넌트 소유(Circle/BoxMaterial) — Spec.Material은 채우지 않는다. 미할당 경고도 컴포넌트가 남긴다.
 	FLSSkillAreaPreviewSpec Spec;
 	float ForwardOffset = 0.0f;
 	BuildDebugBasicAttackRangeSpec(ComboRow, Spec, ForwardOffset);
-	if (!Spec.Material)
-	{
-		if (!bDebugRangeMaterialWarned)
-		{
-			bDebugRangeMaterialWarned = true;
-			UE_LOG(LogLS, Warning, TEXT("%s LS.Debug.BasicAttackRange: DebugRangeCircleMaterial/DebugRangeBoxMaterial이 캐릭터 BP에 매핑되지 않아 범위를 표시할 수 없다."), *GetNameSafe(OwnerCharacter));
-		}
-		EndDebugBasicAttackRangePreview();
-		return;
-	}
 
 	// 표시 중인 row가 바뀌었거나 프리뷰가 꺼져 있으면 재시작(같은 row면 위치/방향만 갱신).
 	const int32 PreviewKey = ComboRow ? ComboRow->Combo_ID : INDEX_NONE;
@@ -105,7 +94,6 @@ void ULSPlayerCombatComponent::BuildDebugBasicAttackRangeSpec(const FLSComboAtta
 		OutSpec.Shape = ELSSkillAreaShape::Circle;
 		OutSpec.Radius = BasicAttackRadius;
 		OutSpec.Degrees = 360.0f;
-		OutSpec.Material = DebugRangeCircleMaterial;
 		OutForwardOffset = BasicAttackForwardOffset;
 		return;
 	}
@@ -116,7 +104,6 @@ void ULSPlayerCombatComponent::BuildDebugBasicAttackRangeSpec(const FLSComboAtta
 		OutSpec.BoxLength = ComboRow->Range_X;
 		OutSpec.BoxWidth = ComboRow->Range_Y;
 		OutSpec.OutlineThickness = 0.2f;
-		OutSpec.Material = DebugRangeBoxMaterial;
 		// 박스 판정은 원점에서 전방으로 뻗지만 프리뷰 메시는 중심 정렬 — 전방 절반만큼 밀어 맞춘다(몬스터 텔레그래프와 동일).
 		OutForwardOffset = ComboRow->Range_X * 0.5f;
 		return;
@@ -125,7 +112,6 @@ void ULSPlayerCombatComponent::BuildDebugBasicAttackRangeSpec(const FLSComboAtta
 	OutSpec.Shape = ELSSkillAreaShape::Circle;
 	OutSpec.Radius = ComboRow->Range_X;
 	OutSpec.Degrees = ComboRow->Range_Shape == ELSCharacterSkillRangeShape::Cone ? ComboRow->Range_Y : 360.0f;
-	OutSpec.Material = DebugRangeCircleMaterial;
 }
 
 void ULSPlayerCombatComponent::EndDebugBasicAttackRangePreview()
