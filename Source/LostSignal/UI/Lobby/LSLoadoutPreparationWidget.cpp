@@ -1,6 +1,7 @@
 #include "UI/Lobby/LSLoadoutPreparationWidget.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/Image.h"
 #include "Components/PanelWidget.h"
 #include "Components/WidgetSwitcher.h"
 #include "GameFramework/PlayerController.h"
@@ -8,8 +9,10 @@
 #include "UI/ChipSystem/LSChipStationWidget.h"
 #include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/LSUILayer.h"
+#include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/Lobby/LSLobbyTabWidget.h"
 #include "UI/Lobby/Store/LSStoreWidget.h"
+#include "UI/Storage/LSLobbyStorageWidget.h"
 #include "UI/Skill/LSSkillLoadoutWidget.h"
 
 #define LOCTEXT_NAMESPACE "LSLoadoutPreparation"
@@ -73,6 +76,40 @@ ULSSkillLoadoutWidget* FindLoadoutSkillLoadoutWidget(UWidget* Widget)
 			if (ULSSkillLoadoutWidget* SkillLoadout = FindLoadoutSkillLoadoutWidget(Panel->GetChildAt(ChildIndex)))
 			{
 				return SkillLoadout;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+// 스위처 페이지 아래에서 지정 타입 위젯을 찾는다. UserWidget 내부 트리까지 재귀 탐색.
+// (기존 타입별 Find 함수들의 공용 버전. 새 타입은 이걸 쓴다.)
+template<typename WidgetType>
+WidgetType* FindLoadoutWidgetByType(UWidget* Widget)
+{
+	if (!Widget)
+	{
+		return nullptr;
+	}
+
+	if (WidgetType* Found = Cast<WidgetType>(Widget))
+	{
+		return Found;
+	}
+
+	if (const UUserWidget* UserWidget = Cast<UUserWidget>(Widget))
+	{
+		return UserWidget->WidgetTree ? FindLoadoutWidgetByType<WidgetType>(UserWidget->WidgetTree->RootWidget) : nullptr;
+	}
+
+	if (const UPanelWidget* Panel = Cast<UPanelWidget>(Widget))
+	{
+		for (int32 ChildIndex = 0; ChildIndex < Panel->GetChildrenCount(); ++ChildIndex)
+		{
+			if (WidgetType* Found = FindLoadoutWidgetByType<WidgetType>(Panel->GetChildAt(ChildIndex)))
+			{
+				return Found;
 			}
 		}
 	}
@@ -287,6 +324,30 @@ void ULSLoadoutPreparationWidget::ShowTab(const ELSLoadoutTab Tab) const
 			UE_LOG(LogLS, Warning, TEXT("[Loadout] Chip station widget not found under chip tab page on %s."), *GetNameSafe(this));
 		}
 	}
+	// 물품창고 페이지도 열 때마다 최신 세이브 기준으로 리빌드한다.
+	// 상점 구매/판매 등 다른 페이지에서 인벤토리·창고가 바뀐 뒤 열어도 stale 표시가 없게 한다.
+	else if (Tab == ELSLoadoutTab::Storage)
+	{
+		UWidget* StoragePage = ContentSwitcher->GetActiveWidget();
+		if (ULSInventoryWidget* Inventory = FindLoadoutWidgetByType<ULSInventoryWidget>(StoragePage))
+		{
+			Inventory->RebuildInventorySlots();
+			Inventory->RebuildConfirmedStorageSlots();
+			Inventory->RebuildEquipmentSlots();
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Loadout] Inventory widget not found under storage tab page on %s."), *GetNameSafe(this));
+		}
+		if (ULSLobbyStorageWidget* Storage = FindLoadoutWidgetByType<ULSLobbyStorageWidget>(StoragePage))
+		{
+			Storage->RefreshStorage();
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Loadout] Storage widget not found under storage tab page on %s."), *GetNameSafe(this));
+		}
+	}
 	// 보급소(상점) 페이지는 열 때마다 초기 상태(기능 선택)로 되돌린다. 대화 도중 닫았다 열어도 이어지지 않게.
 	else if (Tab == ELSLoadoutTab::Supply)
 	{
@@ -370,6 +431,16 @@ void ULSLoadoutPreparationWidget::SetTabBarVisible(const bool bVisible) const
 	if (UpgradeTab)
 	{
 		UpgradeTab->SetVisibility(TabVisibility);
+	}
+
+	// 탭 옆 장식 이미지도 탭 목록과 같이 숨긴다.
+	const TObjectPtr<UImage> TabImages[] = { ChipTabImage, StorageTabImage, SupplyTabImage, UpgradeTabImage };
+	for (const TObjectPtr<UImage>& TabImage : TabImages)
+	{
+		if (TabImage)
+		{
+			TabImage->SetVisibility(TabVisibility);
+		}
 	}
 }
 

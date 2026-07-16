@@ -35,6 +35,10 @@ public:
 	UPROPERTY(config, EditAnywhere, Category="DataTables")
 	TSoftObjectPtr<UDataTable> ChipStatTable;
 
+	// 자판기 판매 목록(DT_StoreStock, Row=FLSStoreStockRow). 상점 UI가 읽는다.
+	UPROPERTY(config, EditAnywhere, Category="DataTables")
+	TSoftObjectPtr<UDataTable> StoreStockTable;
+
 	ULSDropSettings()
 	{
 		// 루트박스 단계 공개: 등급이 높을수록 공개 전 대기를 길게 둬 긴장감을 쌓는다.

@@ -8,6 +8,7 @@ class UButton;
 class UTextBlock;
 class UVerticalBox;
 class ULSStoreButtonWidget;
+class ULSVendingWidget;
 
 // 상점 화면의 우측 버튼 영역 상태. 상태별로 ButtonBox 안의 버튼을 동적으로 다시 만든다.
 UENUM(BlueprintType)
@@ -38,7 +39,7 @@ struct FLSStoreTalkEntry
 // 에이베리 보급소 상점 화면(WBP_Store)의 부모 클래스. 개인정비 ContentSwitcher의 Supply 페이지에 배치된다.
 // CASHIER-9 이미지/이름표는 아트가 WBP에 고정 배치하고, C++은 버튼과 대사창 텍스트만 제어한다.
 // 버튼은 상태 전환 시 ButtonBox(버티컬 박스) 안에 WBP_StoreButton을 동적으로 생성/삭제해 채운다.
-// 상점(자판기)/제작대 버튼은 아직 콘텐츠가 없어 placeholder로 두고, 대화하기(퀘스트 수락/거절)까지만 구현한다.
+// 자판기는 VendingPanel(구매/판매 화면)로 전환하고, 제작대는 아직 콘텐츠가 없어 placeholder로 둔다.
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSStoreWidget : public UUserWidget
 {
@@ -52,6 +53,15 @@ public:
 	void ResetStore();
 
 protected:
+	// 기능 선택/대화 화면 전체(CASHIER-9 이미지·버튼·대사창 묶음) 컨테이너. 자판기를 열면 통째로 숨긴다.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Store")
+	TObjectPtr<UWidget> SelectionPanel;
+
+	// 자판기(구매/판매) 화면 위젯 클래스. BP(WBP_Store) 클래스 디폴트에서 WBP_Vending을 매핑한다.
+	// WBP에 인스턴스를 배치하지 않고, 자판기를 처음 열 때 생성해 루트 캔버스에 전체 화면으로 붙인다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Store")
+	TSubclassOf<ULSVendingWidget> VendingWidgetClass;
+
 	// 상태별 버튼들을 담는 버티컬 박스. 내용물은 C++이 동적으로 채운다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Store")
 	TObjectPtr<UVerticalBox> ButtonBox;
@@ -81,8 +91,18 @@ private:
 	UFUNCTION()
 	void HandleTalkDownClicked();
 
+	// 자판기 화면 뒤로가기. 기능 선택 화면으로 되돌린다.
+	UFUNCTION()
+	void HandleVendingBackRequested();
+
 	// 상태 전환: ButtonBox를 비우고 상태에 맞는 버튼들을 다시 만든다. 기본 대사/화살표 표시도 함께 적용.
 	void ShowState(ELSStoreState NewState);
+
+	// 자판기 화면 표시 전환. true면 기능 선택 화면을 숨기고 자판기를 연다(최초 1회 생성).
+	void SetVendingVisible(bool bVisible);
+
+	// 자판기 위젯이 없으면 생성해 루트 캔버스에 전체 화면으로 붙인다. 실패하면 nullptr.
+	ULSVendingWidget* EnsureVendingWidget();
 
 	// 클릭된 버튼의 ButtonBox 내 순서(0부터)를 상태별 의미로 해석해 분기한다.
 	void HandleClickForState(int32 ButtonOrdinal);
@@ -117,6 +137,10 @@ private:
 
 	// 임시 퀘스트 진행 상태. 세이브 연동 없이 위젯 수명 동안만 유지한다(추후 퀘스트 시스템으로 이관).
 	bool bQuestAccepted = false;
+
+	// 런타임 생성한 자판기 화면. 처음 자판기를 열 때 만들어 재사용한다.
+	UPROPERTY(Transient)
+	TObjectPtr<ULSVendingWidget> VendingPanel;
 
 	ELSStoreState CurrentState = ELSStoreState::FunctionSelect;
 };

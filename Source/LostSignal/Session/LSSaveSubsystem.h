@@ -17,6 +17,9 @@ DECLARE_MULTICAST_DELEGATE(FLSOnEquipmentChanged);
 // 스킬 선택 슬롯이 바뀌면 발행된다. (로비 스킬 UI 갱신에 사용)
 DECLARE_MULTICAST_DELEGATE(FLSOnSkillLoadoutChanged);
 
+// 보유 골드가 바뀌면 발행된다. (상점 골드 표시 갱신에 사용)
+DECLARE_MULTICAST_DELEGATE(FLSOnGoldChanged);
+
 UCLASS()
 class LOSTSIGNAL_API ULSSaveSubsystem : public UGameInstanceSubsystem
 {
@@ -33,6 +36,20 @@ public:
 
 	// 스킬 선택 슬롯 변경 알림. 로비 스킬 로드아웃 UI가 구독한다.
 	FLSOnSkillLoadoutChanged OnSkillLoadoutChanged;
+
+	// 골드 변경 알림. 상점 UI 등이 구독한다.
+	FLSOnGoldChanged OnGoldChanged;
+
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	int32 GetGold() const;
+
+	// 골드를 지급한다. Amount가 0 이하이면 무시. 성공 시 저장 후 OnGoldChanged 발행.
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	void AddGold(int32 Amount);
+
+	// 보유 골드가 충분하면 차감한다. 부족하거나 Amount가 0 이하이면 false. 성공 시 저장 후 OnGoldChanged 발행.
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	bool TrySpendGold(int32 Amount);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void AddToInventory(const TArray<FLSSessionItem>& Items);
@@ -154,6 +171,8 @@ private:
 	void SaveDebugJson() const;
 	void ResolveInterruptedRaid();
 	void MigrateInventory();
+	// 골드 필드가 없던 세이브(또는 새 데이터)에 기본 골드를 1회 지급한다.
+	void EnsureGoldInitialized();
 	void EnsureChipEquipmentSlots();
 	void EnsureEquipmentSlots();
 	// CharacterID 로드아웃 항목을 없으면 만들고 SkillIDs를 3칸으로 보정해 참조로 돌려준다. SaveData 유효성은 호출부가 보장.

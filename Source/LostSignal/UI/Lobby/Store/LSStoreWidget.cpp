@@ -1,11 +1,14 @@
 #include "UI/Lobby/Store/LSStoreWidget.h"
 
 #include "Components/Button.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "LostSignal.h"
 #include "UI/Lobby/Store/LSStoreButtonWidget.h"
+#include "UI/Lobby/Store/LSVendingWidget.h"
 
 #define LOCTEXT_NAMESPACE "LSStore"
 
@@ -28,6 +31,14 @@ void ULSStoreWidget::NativeConstruct()
 	if (!ButtonBox)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Store] ButtonBox is not bound on %s."), *GetNameSafe(this));
+	}
+	if (!SelectionPanel)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] SelectionPanel is not bound on %s."), *GetNameSafe(this));
+	}
+	if (!VendingWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] VendingWidgetClass is not set on %s."), *GetNameSafe(this));
 	}
 	if (!DialogueText)
 	{
@@ -76,6 +87,10 @@ void ULSStoreWidget::NativeDestruct()
 	{
 		TalkDownButton->OnClicked.RemoveDynamic(this, &ULSStoreWidget::HandleTalkDownClicked);
 	}
+	if (VendingPanel)
+	{
+		VendingPanel->OnBackRequested.RemoveDynamic(this, &ULSStoreWidget::HandleVendingBackRequested);
+	}
 
 	Super::NativeDestruct();
 }
@@ -83,6 +98,81 @@ void ULSStoreWidget::NativeDestruct()
 void ULSStoreWidget::ResetStore()
 {
 	TalkListStartIndex = 0;
+	SetVendingVisible(false);
+	ShowState(ELSStoreState::FunctionSelect);
+}
+
+void ULSStoreWidget::SetVendingVisible(const bool bVisible)
+{
+	// 자판기 위젯은 처음 열 때만 생성한다. 닫기 경로에서는 이미 있는 위젯만 숨긴다.
+	ULSVendingWidget* Vending = bVisible ? EnsureVendingWidget() : VendingPanel.Get();
+	if (bVisible && !Vending)
+	{
+		return;
+	}
+
+	if (SelectionPanel)
+	{
+		SelectionPanel->SetVisibility(bVisible ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+	}
+	if (Vending)
+	{
+		Vending->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		if (bVisible)
+		{
+			Vending->OpenVending();
+		}
+	}
+}
+
+ULSVendingWidget* ULSStoreWidget::EnsureVendingWidget()
+{
+	if (VendingPanel)
+	{
+		return VendingPanel;
+	}
+	if (!VendingWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] Cannot open vending. VendingWidgetClass is not set on %s."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(GetRootWidget());
+	if (!RootCanvas)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] Cannot open vending. Root widget of %s is not a CanvasPanel."), *GetNameSafe(this));
+		return nullptr;
+	}
+	if (RootCanvas == SelectionPanel)
+	{
+		// 루트가 SelectionPanel이면 자판기가 그 자식으로 붙어, SelectionPanel을 숨길 때 같이 숨는다.
+		// WBP_Store는 [루트 캔버스 > SelectionPanel > 기존 콘텐츠] 구조여야 한다.
+		UE_LOG(LogLS, Warning, TEXT("[Store] Cannot open vending. SelectionPanel must not be the root widget of %s."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	VendingPanel = CreateWidget<ULSVendingWidget>(this, VendingWidgetClass);
+	if (!VendingPanel)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] Failed to create vending widget on %s."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	VendingPanel->OnBackRequested.AddDynamic(this, &ULSStoreWidget::HandleVendingBackRequested);
+
+	// 루트 캔버스에 전체 화면으로 붙인다.
+	UCanvasPanelSlot* PanelSlot = RootCanvas->AddChildToCanvas(VendingPanel);
+	if (PanelSlot)
+	{
+		PanelSlot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
+		PanelSlot->SetOffsets(FMargin(0.0f));
+	}
+	return VendingPanel;
+}
+
+void ULSStoreWidget::HandleVendingBackRequested()
+{
+	SetVendingVisible(false);
 	ShowState(ELSStoreState::FunctionSelect);
 }
 
@@ -192,8 +282,12 @@ void ULSStoreWidget::HandleClickForState(const int32 ButtonOrdinal)
 	switch (CurrentState)
 	{
 	case ELSStoreState::FunctionSelect:
-		// 자판기(0)/제작대(1)는 상점·제작 콘텐츠가 아직 없어 placeholder로 둔다(클릭해도 동작 없음).
-		if (ButtonOrdinal == 2)
+		// 자판기(0)는 구매/판매 화면으로 전환. 제작대(1)는 아직 콘텐츠가 없어 placeholder(클릭해도 동작 없음).
+		if (ButtonOrdinal == 0)
+		{
+			SetVendingVisible(true);
+		}
+		else if (ButtonOrdinal == 2)
 		{
 			TalkListStartIndex = 0;
 			ShowState(ELSStoreState::TalkList);

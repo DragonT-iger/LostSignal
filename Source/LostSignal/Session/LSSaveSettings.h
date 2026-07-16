@@ -37,4 +37,8 @@ public:
 
 	UPROPERTY(config, EditAnywhere, Category="LS/Save")
 	TArray<FLSStarterItemConfig> StarterItems;
+
+	// 새 게임(또는 골드 필드가 없던 기존 세이브 로드) 시 1회 지급하는 기본 골드.
+	UPROPERTY(config, EditAnywhere, Category="LS/Save", meta=(ClampMin="0"))
+	int32 NewGameGold = 1000;
 };

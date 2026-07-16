@@ -33,6 +33,7 @@ TARGETS = [
     DataTableTarget("DT_Item", "DT_Item.csv", "/Script/LostSignal.LSItemRow"),
     DataTableTarget("DT_Protocol", "DT_Protocol.csv", "/Script/LostSignal.LSProtocolUnlockRow"),
     DataTableTarget("DT_RootingObject", "DT_RootingObject.csv", "/Script/LostSignal.LSRootingObjectRow"),
+    DataTableTarget("DT_StoreStock", "DT_StoreStock.csv", "/Script/LostSignal.LSStoreStockRow"),
     DataTableTarget("DT_Weapon", "DT_Weapon.csv", "/Script/LostSignal.LSWeaponRow"),
 ]
 
@@ -67,7 +68,12 @@ def reimport_target(target: DataTableTarget) -> bool:
 
     row_struct = _load_row_struct(target.row_struct_path)
     datatable = _load_or_create_datatable(target, row_struct)
-    datatable.row_struct = row_struct
+    # UE5.7 파이썬은 row_struct 속성 직접 대입을 지원하지 않는다. 신규 생성은 팩토리가 구조체를
+    # 이미 지정했으므로, 기존 자산만 시도하고 실패(읽기 전용)하면 그대로 둔다.
+    try:
+        datatable.set_editor_property("row_struct", row_struct)
+    except Exception:
+        pass
 
     with open(csv_path, "r", encoding="utf-8-sig") as csv_file:
         csv_content = csv_file.read()

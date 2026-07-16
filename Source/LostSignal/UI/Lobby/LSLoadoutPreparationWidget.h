@@ -4,6 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "LSLoadoutPreparationWidget.generated.h"
 
+class UImage;
 class UWidgetSwitcher;
 class ULSConfirmDialogWidget;
 class ULSLobbyTabWidget;
@@ -69,6 +70,19 @@ protected:
 	// 업그레이드(캐릭터/기지 강화) 탭. 전용 스킬 탭 버튼이 없어서, 이 버튼으로 스킬 로드아웃 페이지(Skill)를 연다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")
 	TObjectPtr<ULSLobbyTabWidget> UpgradeTab;
+
+	// 탭 옆에 배치된 장식 이미지 4개. 탭 목록이 숨겨질 때(콘텐츠 열림) 같이 숨긴다.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")
+	TObjectPtr<UImage> ChipTabImage;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")
+	TObjectPtr<UImage> StorageTabImage;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")
+	TObjectPtr<UImage> SupplyTabImage;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Loadout")
+	TObjectPtr<UImage> UpgradeTabImage;
 
 	// 미구현 안내창용. BP(WBP_LoadoutPreparation) 클래스 디폴트에서 WBP_ConfirmDialog를 매핑한다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Loadout")

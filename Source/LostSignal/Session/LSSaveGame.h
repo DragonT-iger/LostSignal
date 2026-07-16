@@ -42,6 +42,10 @@ public:
 	// 캐릭터별 스킬 선택 로드아웃. 키 = CharacterID(ULSSkillPoolDataAsset::CharacterID). 로비에서 선택.
 	UPROPERTY() TMap<int32, FLSSkillLoadout> SkillLoadoutsByCharacter;
 
+	// 보유 골드(상점 재화). 골드 필드가 없던 기존 세이브는 bGoldInitialized로 구분해 로드 시 1회 기본 지급한다.
+	UPROPERTY() int32 Gold = 0;
+	UPROPERTY() bool bGoldInitialized = false;
+
 	UPROPERTY() bool bRaidSaveActive = false;
 	UPROPERTY() TArray<FLSSessionItem> ActiveRaidLoadout;
 	UPROPERTY() TArray<FLSSessionItem> ActiveRaidConsumedItems;

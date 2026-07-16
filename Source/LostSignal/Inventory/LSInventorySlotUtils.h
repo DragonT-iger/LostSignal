@@ -23,6 +23,20 @@ namespace LSInventorySlotUtils
 
 	int32 ResolveItemMaxStack(FName ItemRowName, const TCHAR* Context);
 
+	// 상점 등에서 쓰는 아이템 공통 표시 정보. Row Name 접두사로 소속 테이블을 찾아 읽는다.
+	struct FLSItemTradeInfo
+	{
+		FText Name;
+		FText Description;
+		int32 Cost = 0;
+		// ItemTable(Item_) 행의 Item_Type(4~9=소모품, 20~=재료 등). 그 외 테이블 아이템은 0.
+		int32 ItemType = 0;
+		bool bValid = false;
+	};
+
+	// 행을 못 찾으면 bValid=false를 돌려준다(경고 로그 포함).
+	FLSItemTradeInfo ResolveItemTradeInfo(FName ItemRowName);
+
 	// 아이템 등급을 Row Name에서 파싱한다. (예: Chip_Supply_HP / Armor_Frame_Supply / Weapon_HF_Blade_Precision)
 	// Name 토큰 중 알려진 등급(Supply/Standard/Precision/Tuning/Prototype/Masterpiece)을 찾아 반환. 없으면 빈 문자열.
 	FString ResolveItemGradeFromRowName(FName ItemRowName);

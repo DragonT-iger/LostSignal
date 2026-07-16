@@ -887,6 +887,7 @@ void ULSSaveSubsystem::StartNewGame()
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	EnsureChipEquipmentSlots();
 	EnsureEquipmentSlots();
+	EnsureGoldInitialized();
 	ApplyStarterItems();
 	UE_LOG(LogLS, Log, TEXT("[Save] New game started - all save files deleted for a fresh start"));
 }
@@ -1062,6 +1063,7 @@ void ULSSaveSubsystem::Load()
 			LSInventorySlotUtils::NormalizeSlotArray(SaveData->SafeStash);
 			EnsureChipEquipmentSlots();
 			EnsureEquipmentSlots();
+			EnsureGoldInitialized();
 			ResolveInterruptedRaid();
 			Save();
 		}
@@ -1077,7 +1079,51 @@ void ULSSaveSubsystem::Load()
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	EnsureChipEquipmentSlots();
 	EnsureEquipmentSlots();
+	EnsureGoldInitialized();
 	UE_LOG(LogLS, Log, TEXT("[Save] Created new save object for slot %s"), *ResolvedSlotName);
+}
+
+void ULSSaveSubsystem::EnsureGoldInitialized()
+{
+	if (!SaveData || SaveData->bGoldInitialized)
+	{
+		return;
+	}
+
+	const ULSSaveSettings* Settings = GetDefault<ULSSaveSettings>();
+	SaveData->Gold = Settings ? Settings->NewGameGold : 0;
+	SaveData->bGoldInitialized = true;
+	UE_LOG(LogLS, Log, TEXT("[Save] Gold initialized to %d."), SaveData->Gold);
+}
+
+int32 ULSSaveSubsystem::GetGold() const
+{
+	return SaveData ? SaveData->Gold : 0;
+}
+
+void ULSSaveSubsystem::AddGold(const int32 Amount)
+{
+	if (!SaveData || Amount <= 0)
+	{
+		return;
+	}
+
+	SaveData->Gold += Amount;
+	Save();
+	OnGoldChanged.Broadcast();
+}
+
+bool ULSSaveSubsystem::TrySpendGold(const int32 Amount)
+{
+	if (!SaveData || Amount <= 0 || SaveData->Gold < Amount)
+	{
+		return false;
+	}
+
+	SaveData->Gold -= Amount;
+	Save();
+	OnGoldChanged.Broadcast();
+	return true;
 }
 
 void ULSSaveSubsystem::MigrateInventory()

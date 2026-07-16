@@ -81,6 +81,25 @@ int32 ResolveItemSortKey(const FName ItemRowName)
 }
 
 template<typename RowType>
+LSInventorySlotUtils::FLSItemTradeInfo ResolveTradeInfoFromTable(TSoftObjectPtr<UDataTable> TablePtr, const FName ItemRowName, const TCHAR* RowTypeName)
+{
+	LSInventorySlotUtils::FLSItemTradeInfo Info;
+	UDataTable* Table = TablePtr.LoadSynchronous();
+	const RowType* Row = Table ? Table->FindRow<RowType>(ItemRowName, TEXT("ResolveItemTradeInfo")) : nullptr;
+	if (!Row)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Inventory] %s row missing for trade info: %s"), RowTypeName, *ItemRowName.ToString());
+		return Info;
+	}
+
+	Info.Name = Row->Item_Text;
+	Info.Description = Row->Item_Description;
+	Info.Cost = Row->Item_Cost;
+	Info.bValid = true;
+	return Info;
+}
+
+template<typename RowType>
 int32 ResolveMaxStackFromTable(TSoftObjectPtr<UDataTable> TablePtr, const FName ItemRowName, const TCHAR* Context, const TCHAR* RowTypeName)
 {
 	UDataTable* Table = TablePtr.LoadSynchronous();
@@ -194,6 +213,45 @@ int32 ResolveItemMaxStack(const FName ItemRowName, const TCHAR* Context)
 	}
 
 	return MaxStack;
+}
+
+FLSItemTradeInfo ResolveItemTradeInfo(const FName ItemRowName)
+{
+	FLSItemTradeInfo Info;
+	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
+	if (ItemRowName.IsNone() || !Settings)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Inventory] Cannot resolve trade info. Row=%s"), *ItemRowName.ToString());
+		return Info;
+	}
+
+	const FString RowNameString = ItemRowName.ToString();
+	if (RowNameString.StartsWith(TEXT("Chip_")))
+	{
+		return ResolveTradeInfoFromTable<FLSChipRow>(Settings->ChipTable, ItemRowName, TEXT("Chip"));
+	}
+	if (RowNameString.StartsWith(TEXT("Weapon_")))
+	{
+		return ResolveTradeInfoFromTable<FLSWeaponRow>(Settings->WeaponTable, ItemRowName, TEXT("Weapon"));
+	}
+	if (RowNameString.StartsWith(TEXT("Armor_")))
+	{
+		return ResolveTradeInfoFromTable<FLSArmorRow>(Settings->ArmorTable, ItemRowName, TEXT("Armor"));
+	}
+	if (RowNameString.StartsWith(TEXT("Item_")))
+	{
+		Info = ResolveTradeInfoFromTable<FLSItemRow>(Settings->ItemTable, ItemRowName, TEXT("Item"));
+		if (Info.bValid)
+		{
+			UDataTable* ItemTable = Settings->ItemTable.LoadSynchronous();
+			const FLSItemRow* Row = ItemTable ? ItemTable->FindRow<FLSItemRow>(ItemRowName, TEXT("ResolveItemTradeInfo")) : nullptr;
+			Info.ItemType = Row ? Row->Item_Type : 0;
+		}
+		return Info;
+	}
+
+	UE_LOG(LogLS, Warning, TEXT("[Inventory] Unknown item row prefix for trade info: %s"), *ItemRowName.ToString());
+	return Info;
 }
 
 ELSEquipmentSlot ResolveEquipmentSlotType(const FName ItemRowName)
