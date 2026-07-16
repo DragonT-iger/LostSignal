@@ -376,6 +376,20 @@ LSAN_PlayerMeleeHit
 - 데미지 GE에는 Cue를 박지 않는다(과거 GE-박기 방식은 피격자 재질을 몰라 재질 분기 불가 → victim-side로 통합).
 - 사망 음성은 `DeathVoices` + `HandleDeathStateChanged` 훅으로 확장(에셋 생기면 치사타에서 분기).
 
+### 몬스터 피격 림 플래시 (맞는 쪽, victim-side)
+
+피격 순간 붉은 림라이트가 짧게 켜졌다 꺼지는 머테리얼 연출. [ULSHitFlashComponent](../../Source/LostSignal/Combat/LSHitFlashComponent.h)가 담당하며 `ALSEnemyCharacter` 생성자에서 부착된다.
+
+```text
+BeginPlay: 메시의 기존 오버레이(아웃라인) 머테리얼 해석 → MID로 감싸 SetOverlayMaterial 교체
+데미지로 CurrentHealth 감소 (어트리뷰트 델리게이트, NewValue < OldValue, 사망 제외)
+-> HitFlashIntensity 1.0 세팅 → FlashDuration 동안 틱에서 1→0 선형 페이드 → 틱 비활성
+```
+
+- 오버레이 슬롯은 컴포넌트당 1개뿐이라 **아웃라인 오버레이 머테리얼에 림 블록을 추가**하고 파라미터(`HitFlashIntensity` 기본 0, `HitFlashColor`)로 게이트한다. XRay식 복제 메시를 쓰지 않아 드로우 패스 증가가 없다.
+- GameplayCue가 아니라 어트리뷰트 리플리케이션으로 각 머신이 로컬 재생한다(authority 체크 없음, 코스메틱).
+- 오버레이 머테리얼 미설정 몬스터는 `LogLS` Warning 후 무동작.
+
 ### 스킬 시전음 (때리는 쪽, 스킬별)
 
 사운드 에셋을 스킬 DataAsset(`CastSound`)에 두고 발동 시 파라미터로 전달한다. DataAsset 필드는 [SkillSystemStructure.md](SkillSystemStructure.md)의 `ULSSkillDataAssetBase`가 단일 출처.

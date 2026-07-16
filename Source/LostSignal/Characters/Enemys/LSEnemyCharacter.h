@@ -19,6 +19,7 @@ class ULSNoiseEmitterComponent;
 class ULSVisionTargetComponent;
 class ULSVisionGhostComponent;
 class ULSEnemyHealthBarComponent;
+class ULSHitFlashComponent;
 class ULSSkillPreviewComponent;
 struct FLSMonsterArchetypeRow;
 
@@ -143,6 +144,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/UI|Combat")
 	TObjectPtr<ULSEnemyHealthBarComponent> HealthBarComponent;
+
+	// 피격 순간 오버레이(아웃라인) 머테리얼의 붉은 림 파라미터를 깜빡이는 코스메틱.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Combat")
+	TObjectPtr<ULSHitFlashComponent> HitFlashComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/GAS")
 	TObjectPtr<ULSCharacterAttributeSet> MonsterAttributeSet;

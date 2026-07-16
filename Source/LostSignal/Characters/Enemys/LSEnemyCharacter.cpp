@@ -7,6 +7,7 @@
 #include "AI/LSMonsterSenseComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Blueprint/UserWidget.h"
+#include "Combat/LSHitFlashComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Core/LSPlayerControllerBase.h"
@@ -58,6 +59,7 @@ ALSEnemyCharacter::ALSEnemyCharacter()
 	MinimapMarkerComponent->SetMarkerColor(FLinearColor(1.0f, 0.12f, 0.1f, 1.0f));
 	MonsterAttributeSet = CreateDefaultSubobject<ULSCharacterAttributeSet>(TEXT("MonsterAttributeSet"));
 	SkillPreviewComponent = CreateDefaultSubobject<ULSSkillPreviewComponent>(TEXT("SkillPreviewComponent"));
+	HitFlashComponent = CreateDefaultSubobject<ULSHitFlashComponent>(TEXT("HitFlashComponent"));
 }
 
 void ALSEnemyCharacter::MulticastPlayAbilityMontage_Implementation(UAnimMontage* Montage)
