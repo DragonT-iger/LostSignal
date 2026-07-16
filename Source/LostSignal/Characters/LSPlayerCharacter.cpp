@@ -957,8 +957,15 @@ bool ALSPlayerCharacter::IsModalUIBlockingInput() const
 
 bool ALSPlayerCharacter::IsFacingRotationLocked() const
 {
-	// 스킬 시전(LS.Combat.SkillCasting)은 전 구간 회전 잠금.
 	const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+
+	// 사망 상태에서는 마우스 조준·이동 방향 회전을 전부 잠근다.
+	if (ASC && ASC->HasMatchingGameplayTag(LSGameplayTags::State_Dead))
+	{
+		return true;
+	}
+
+	// 스킬 시전(LS.Combat.SkillCasting)은 전 구간 회전 잠금.
 	if (ASC && ASC->HasMatchingGameplayTag(LSGameplayTags::Combat_SkillCasting))
 	{
 		return true;
