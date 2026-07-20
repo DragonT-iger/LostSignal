@@ -91,6 +91,11 @@ void ULSSaveSubsystem::ReplaceWarehouseItems(const TArray<FLSSessionItem>& Items
 
 	SaveData->WarehouseItems = Items;
 	LSInventorySlotUtils::NormalizeSlotArray(SaveData->WarehouseItems);
+	if (HasWarehouseOverflow())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Warehouse replacement contains slots beyond capacity. Items are preserved, but new warehouse entries are blocked. Slots=%d Max=%d"),
+			SaveData->WarehouseItems.Num(), GetMaxWarehouseSlotCount());
+	}
 
 	UE_LOG(LogLS, Log, TEXT("[Save] Warehouse replaced. Total slots: %d"), SaveData->WarehouseItems.Num());
 	Save();
@@ -305,6 +310,28 @@ int32 ULSSaveSubsystem::GetMaxSafeStashSlotCount() const
 	return FMath::Clamp(GetCarryingProtocolSlotBonus(TEXT("Protected_Inventory")), 0, SaveMaxSafeStashSlotCount);
 }
 
+int32 ULSSaveSubsystem::GetMaxWarehouseSlotCount() const
+{
+	return FMath::Max(1, GetDefault<ULSSaveSettings>()->MaxWarehouseSlotCount);
+}
+
+bool ULSSaveSubsystem::HasWarehouseOverflow() const
+{
+	if (!SaveData)
+	{
+		return false;
+	}
+
+	for (int32 SlotIndex = GetMaxWarehouseSlotCount(); SlotIndex < SaveData->WarehouseItems.Num(); ++SlotIndex)
+	{
+		if (LSInventorySlotUtils::IsFilled(SaveData->WarehouseItems[SlotIndex]))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 float ULSSaveSubsystem::GetChipSignalGaugePercent() const
 {
 	return SaveData ? FMath::Clamp(SaveData->ChipSignalGaugePercent, 0.0f, 1.0f) : 1.0f;
@@ -467,12 +494,18 @@ bool ULSSaveSubsystem::UnequipChipToWarehouse(const int32 EquipmentIndex)
 		return false;
 	}
 
+	if (HasWarehouseOverflow())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot unequip chip because warehouse contains overflow items. Index=%d"), EquipmentIndex);
+		return false;
+	}
+
 	FLSSessionItem RemainingItem;
 	const bool bMoved = LSInventorySlotUtils::TryAddItemsToSlotArray(
 		SaveData->WarehouseItems,
 		EquipmentSlot.ItemRowName,
 		EquipmentSlot.Amount,
-		MAX_int32,
+		GetMaxWarehouseSlotCount(),
 		EquipmentSlot.ChipStats,
 		RemainingItem);
 	if (!bMoved || LSInventorySlotUtils::IsFilled(RemainingItem))
@@ -523,9 +556,16 @@ bool ULSSaveSubsystem::MoveEquipmentSlot(const ELSInventorySlotArea FromArea, co
 		return false;
 	}
 
+	if (ToArea == ELSInventorySlotArea::Warehouse && FromArea != ELSInventorySlotArea::Warehouse && HasWarehouseOverflow())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot move equipment because warehouse contains overflow items."));
+		return false;
+	}
+
 	const int32 ToMaxSlotCount =
 		ToArea == ELSInventorySlotArea::Inventory ? GetMaxInventorySlotCount() :
 		ToArea == ELSInventorySlotArea::Safe ? GetMaxSafeStashSlotCount() :
+		ToArea == ELSInventorySlotArea::Warehouse ? GetMaxWarehouseSlotCount() :
 		EquipmentSlotCount;
 
 	// 영역 쌍/타입 검증과 배치/스왑은 레이드 세션과 공유하는 공용 코어가 처리한다.
@@ -593,9 +633,17 @@ bool ULSSaveSubsystem::DropStoredSlot(const ELSInventorySlotArea FromArea, const
 		return false;
 	}
 
+	if (ToArea == ELSInventorySlotArea::Warehouse && FromArea != ELSInventorySlotArea::Warehouse && HasWarehouseOverflow())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot drop stored slot because warehouse contains overflow items."));
+		return false;
+	}
+
 	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
 		? GetMaxInventorySlotCount()
-		: (ToArea == ELSInventorySlotArea::Safe ? GetMaxSafeStashSlotCount() : INDEX_NONE);
+		: (ToArea == ELSInventorySlotArea::Safe
+			? GetMaxSafeStashSlotCount()
+			: (ToArea == ELSInventorySlotArea::Warehouse ? GetMaxWarehouseSlotCount() : INDEX_NONE));
 	const bool bChanged = LSInventorySlotUtils::DropSlot(*FromSlots, FromIndex, *ToSlots, ToIndex, ToMaxSlotCount);
 	if (bChanged)
 	{
@@ -632,11 +680,19 @@ bool ULSSaveSubsystem::TransferStoredSlotToArea(const ELSInventorySlotArea FromA
 		return false;
 	}
 
+	if (ToArea == ELSInventorySlotArea::Warehouse && HasWarehouseOverflow())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot transfer stored slot because warehouse contains overflow items."));
+		return false;
+	}
+
 	FLSSessionItem& FromSlot = (*FromSlots)[FromIndex];
 	FLSSessionItem RemainingItem;
 	const int32 ToMaxSlotCount = ToArea == ELSInventorySlotArea::Inventory
 		? GetMaxInventorySlotCount()
-		: (ToArea == ELSInventorySlotArea::Safe ? GetMaxSafeStashSlotCount() : MAX_int32);
+		: (ToArea == ELSInventorySlotArea::Safe
+			? GetMaxSafeStashSlotCount()
+			: (ToArea == ELSInventorySlotArea::Warehouse ? GetMaxWarehouseSlotCount() : MAX_int32));
 	if (!LSInventorySlotUtils::TryAddItemsToSlotArray(*ToSlots, FromSlot.ItemRowName, FromSlot.Amount, ToMaxSlotCount, FromSlot.ChipStats, RemainingItem))
 	{
 		return false;
@@ -647,7 +703,7 @@ bool ULSSaveSubsystem::TransferStoredSlotToArea(const ELSInventorySlotArea FromA
 	return true;
 }
 
-bool ULSSaveSubsystem::TransferAllInventoryToWarehouse(const int32 WarehouseMaxSlotCount, bool& bOutStoppedBecauseFull)
+bool ULSSaveSubsystem::TransferAllInventoryToWarehouse(bool& bOutStoppedBecauseFull)
 {
 	bOutStoppedBecauseFull = false;
 	if (!SaveData)
@@ -656,12 +712,14 @@ bool ULSSaveSubsystem::TransferAllInventoryToWarehouse(const int32 WarehouseMaxS
 		return false;
 	}
 
-	if (WarehouseMaxSlotCount <= 0)
+	if (HasWarehouseOverflow())
 	{
 		bOutStoppedBecauseFull = true;
-		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot store all inventory items because warehouse has no available slots."));
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot store all inventory items because warehouse contains overflow items."));
 		return false;
 	}
+
+	const int32 WarehouseMaxSlotCount = GetMaxWarehouseSlotCount();
 
 	bool bChanged = false;
 	for (int32 InventoryIndex = 0; InventoryIndex < SaveData->Inventory.Num(); ++InventoryIndex)
@@ -786,7 +844,14 @@ bool ULSSaveSubsystem::ReplaceStoredSlotItem(const ELSInventorySlotArea SlotArea
 
 	const int32 MaxSlotCount = SlotArea == ELSInventorySlotArea::Inventory
 		? GetMaxInventorySlotCount()
-		: (SlotArea == ELSInventorySlotArea::Safe ? GetMaxSafeStashSlotCount() : INDEX_NONE);
+		: (SlotArea == ELSInventorySlotArea::Safe
+			? GetMaxSafeStashSlotCount()
+			: (SlotArea == ELSInventorySlotArea::Warehouse ? GetMaxWarehouseSlotCount() : INDEX_NONE));
+	if (SlotArea == ELSInventorySlotArea::Warehouse && LSInventorySlotUtils::IsFilled(NewItem) && HasWarehouseOverflow())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace warehouse slot because warehouse contains overflow items. Index=%d"), SlotIndex);
+		return false;
+	}
 	if (MaxSlotCount != INDEX_NONE && SlotIndex >= MaxSlotCount)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Save] Cannot replace stored slot because index exceeds max. Area=%d Index=%d Max=%d"),
@@ -996,6 +1061,13 @@ void ULSSaveSubsystem::AddStarterItemToArea(
 		return;
 	}
 
+	if (TargetArea == ELSInventorySlotArea::Warehouse && HasWarehouseOverflow())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] Starter item skipped because warehouse contains overflow items. Source=%s Row=%s"),
+			SourceLabel, *ItemRowName.ToString());
+		return;
+	}
+
 	FLSSessionItem RemainingItem;
 	LSInventorySlotUtils::TryAddItemsToSlotArray(
 		*TargetSlots,
@@ -1023,7 +1095,7 @@ int32 ULSSaveSubsystem::GetStarterTargetMaxSlotCount(const ELSInventorySlotArea 
 	case ELSInventorySlotArea::Safe:
 		return GetMaxSafeStashSlotCount();
 	case ELSInventorySlotArea::Warehouse:
-		return MAX_int32;
+		return GetMaxWarehouseSlotCount();
 	default:
 		{
 			return INDEX_NONE;
@@ -1061,6 +1133,11 @@ void ULSSaveSubsystem::Load()
 			LSInventorySlotUtils::NormalizeSlotArray(SaveData->Inventory);
 			LSInventorySlotUtils::NormalizeSlotArray(SaveData->WarehouseItems);
 			LSInventorySlotUtils::NormalizeSlotArray(SaveData->SafeStash);
+			if (HasWarehouseOverflow())
+			{
+				UE_LOG(LogLS, Warning, TEXT("[Save] Loaded warehouse contains slots beyond capacity. Items are preserved, but new warehouse entries are blocked. Slots=%d Max=%d"),
+					SaveData->WarehouseItems.Num(), GetMaxWarehouseSlotCount());
+			}
 			EnsureChipEquipmentSlots();
 			EnsureEquipmentSlots();
 			EnsureGoldInitialized();

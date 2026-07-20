@@ -201,6 +201,27 @@ void ULSItemSlotWidget::SetEquipCandidateHighlight(const bool bInIsCandidate)
 	ApplyHoverVisual();
 }
 
+void ULSItemSlotWidget::SetInvalidEquipDropHighlight(const bool bInIsInvalid)
+{
+	if (bIsInvalidEquipDropTarget == bInIsInvalid)
+	{
+		return;
+	}
+
+	bIsInvalidEquipDropTarget = bInIsInvalid;
+	ApplyHoverVisual();
+}
+
+void ULSItemSlotWidget::PlayEquipDropRejectedFeedback()
+{
+	bIsDragTarget = false;
+	bIsInvalidEquipDropTarget = false;
+	bIsEquipRejectAnimating = true;
+	EquipRejectElapsed = 0.f;
+	SetRenderTranslation(FVector2D::ZeroVector);
+	ApplyHoverVisual();
+}
+
 void ULSItemSlotWidget::SetDisplayOnlySlotContext()
 {
 	InventoryWidget.Reset();
@@ -232,7 +253,7 @@ void ULSItemSlotWidget::NativeTick(const FGeometry& MyGeometry, const float InDe
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
 	// 연출이 없는 평상시 슬롯은 비용이 들지 않도록 조기 종료한다(모든 슬롯이 공유하는 클래스).
-	if (!bIsPopInAnimating && !bIsPlaceholder && !bIsEquipCandidate)
+	if (!bIsPopInAnimating && !bIsPlaceholder && !bIsEquipCandidate && !bIsEquipRejectAnimating)
 	{
 		return;
 	}
@@ -268,6 +289,12 @@ void ULSItemSlotWidget::NativeTick(const FGeometry& MyGeometry, const float InDe
 		return;
 	}
 
+	if (bIsEquipRejectAnimating)
+	{
+		TickEquipDropRejectedFeedback(InDeltaTime);
+		return;
+	}
+
 	// 장착 후보 펄스: 드래그 중 이 아이템이 들어갈 장비칸을 스케일 진동으로 강조한다.
 	// 커서가 슬롯 위에 있으면(호버/드래그 타겟) 그쪽 강조가 우선이라 펄스는 양보한다.
 	if (bIsEquipCandidate && !bIsHovered && !bIsDragTarget)
@@ -276,6 +303,23 @@ void ULSItemSlotWidget::NativeTick(const FGeometry& MyGeometry, const float InDe
 		const float PulseT = (FMath::Sin(Time * EquipCandidatePulseSpeed * 2.f * PI) + 1.f) * 0.5f;
 		const float Scale = FMath::Lerp(EquipCandidatePulseMinScale, EquipCandidatePulseMaxScale, PulseT);
 		SetRenderScale(FVector2D(Scale, Scale));
+	}
+}
+
+void ULSItemSlotWidget::TickEquipDropRejectedFeedback(const float InDeltaTime)
+{
+	EquipRejectElapsed += InDeltaTime;
+	const float Duration = FMath::Max(KINDA_SMALL_NUMBER, EquipRejectDuration);
+	const float LinearAlpha = FMath::Clamp(EquipRejectElapsed / Duration, 0.f, 1.f);
+	const float Oscillation = FMath::Sin(LinearAlpha * FMath::Max(1, EquipRejectShakeCount) * 2.f * PI);
+	const float OffsetX = Oscillation * EquipRejectShakeAmplitude * (1.f - LinearAlpha);
+	SetRenderTranslation(FVector2D(OffsetX, 0.f));
+
+	if (LinearAlpha >= 1.f)
+	{
+		SetRenderTranslation(FVector2D::ZeroVector);
+		bIsEquipRejectAnimating = false;
+		ApplyHoverVisual();
 	}
 }
 
@@ -443,6 +487,10 @@ void ULSItemSlotWidget::NativeOnDragEnter(const FGeometry& InGeometry, const FDr
 {
 	Super::NativeOnDragEnter(InGeometry, InDragDropEvent, InOperation);
 
+	const ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
+	const bool bInvalidEquipmentTarget = DragOperation && InventoryWidget.IsValid() && SlotArea == ELSInventorySlotArea::Equipment
+		&& !InventoryWidget->CanAcceptEquipmentDrop(DragOperation->DragItemRowName, SlotIndex);
+	SetInvalidEquipDropHighlight(bInvalidEquipmentTarget);
 	bIsDragTarget = IsValidInventoryDropTarget(InOperation) || IsValidLootDropTarget(InOperation) || IsValidWarehouseDropTarget(InOperation)
 		|| IsValidChipEquipmentDropTarget(InOperation) || IsValidChipStationDropTarget(InOperation);
 	ApplyHoverVisual();
@@ -453,6 +501,7 @@ void ULSItemSlotWidget::NativeOnDragLeave(const FDragDropEvent& InDragDropEvent,
 	Super::NativeOnDragLeave(InDragDropEvent, InOperation);
 
 	bIsDragTarget = false;
+	SetInvalidEquipDropHighlight(false);
 	ApplyHoverVisual();
 }
 
@@ -531,7 +580,15 @@ bool ULSItemSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDro
 	}
 
 	bIsDragTarget = false;
+	SetInvalidEquipDropHighlight(false);
 	ApplyHoverVisual();
+
+	if (InventoryWidget.IsValid() && SlotArea == ELSInventorySlotArea::Equipment
+		&& !InventoryWidget->CanAcceptEquipmentDrop(DragOperation->DragItemRowName, SlotIndex))
+	{
+		PlayEquipDropRejectedFeedback();
+		return true;
+	}
 
 	if (bIsLocked)
 	{
@@ -657,9 +714,13 @@ void ULSItemSlotWidget::ResetTransientSlotState()
 	bIsHovered = false;
 	bIsDragTarget = false;
 	bIsEquipCandidate = false;
+	bIsInvalidEquipDropTarget = false;
+	bIsEquipRejectAnimating = false;
+	EquipRejectElapsed = 0.f;
 	SetVisibility(ESlateVisibility::Visible);
 	SetRenderOpacity(1.0f);
 	SetRenderScale(FVector2D::UnitVector);
+	SetRenderTranslation(FVector2D::ZeroVector);
 	// 진행 중이던 등장 pop-in은 멈춘다. (다음 NativeTick이 다시 적용하므로 공개 직후 슬롯은 다시 popin 됨)
 	bIsPopInAnimating = false;
 }
@@ -688,7 +749,11 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 	}
 
 	FLinearColor Tint = NormalIconTint;
-	if (bIsLocked)
+	if (bIsEquipRejectAnimating || bIsInvalidEquipDropTarget)
+	{
+		Tint = EquipRejectTint;
+	}
+	else if (bIsLocked)
 	{
 		Tint = LockedIconTint;
 	}
@@ -709,7 +774,8 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 	// 아이템이 있는 배경은 등급색을 유지해 장비 등급을 계속 구분할 수 있게 한다.
 	if (SlotBackgroundImage)
 	{
-		const bool bSpecialState = bIsDragTarget || bIsHovered || bIsEquipCandidate || (bIsLocked && !bHasItem);
+		const bool bSpecialState = bIsDragTarget || bIsHovered || bIsEquipCandidate || bIsInvalidEquipDropTarget
+			|| bIsEquipRejectAnimating || (bIsLocked && !bHasItem);
 		SlotBackgroundImage->SetColorAndOpacity(bSpecialState ? Tint : CurrentGradeBackgroundColor);
 	}
 
@@ -1188,6 +1254,12 @@ bool ULSItemSlotWidget::IsValidInventoryDropTarget(const UDragDropOperation* InO
 {
 	const ULSInventoryDragDropOperation* DragOperation = Cast<ULSInventoryDragDropOperation>(InOperation);
 	if (!DragOperation || bIsLocked || !InventoryWidget.IsValid() || SlotIndex == INDEX_NONE || DragOperation->SourceSlotIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	if (SlotArea == ELSInventorySlotArea::Equipment
+		&& !InventoryWidget->CanAcceptEquipmentDrop(DragOperation->DragItemRowName, SlotIndex))
 	{
 		return false;
 	}

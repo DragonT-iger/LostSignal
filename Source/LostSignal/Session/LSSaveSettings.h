@@ -41,4 +41,8 @@ public:
 	// 새 게임(또는 골드 필드가 없던 기존 세이브 로드) 시 1회 지급하는 기본 골드.
 	UPROPERTY(config, EditAnywhere, Category="LS/Save", meta=(ClampMin="0"))
 	int32 NewGameGold = 1000;
+
+	// 창고(Warehouse) 최대 슬롯 수의 단일 출처. 창고 UI와 자판기 좌측 창고 격자가 함께 읽는다.
+	UPROPERTY(config, EditAnywhere, Category="LS/Save", meta=(ClampMin="1"))
+	int32 MaxWarehouseSlotCount = 100;
 };

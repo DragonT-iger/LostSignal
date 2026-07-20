@@ -166,10 +166,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Store", meta=(ClampMin="0.0", ClampMax="10.0"))
 	float SellPriceRatio = 1.0f;
 
-	// 창고 표시 슬롯 수. 창고 UI(WBP_LobbyStorage)의 설정값과 맞춘다.
-	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Store", meta=(ClampMin="1"))
-	int32 MaxWarehouseSlotCount = 30;
-
 	// 자동 새로고침 주기(초). 시간이 다 되면 재고를 리셋하고 타이머를 다시 시작한다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Store", meta=(ClampMin="1.0"))
 	float RefreshIntervalSeconds = 300.0f;

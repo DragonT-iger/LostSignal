@@ -42,8 +42,9 @@ public:
 
 	void RefreshStorageCountText();
 
+	// 창고 최대 슬롯 수. ULSSaveSubsystem(ULSSaveSettings)이 단일 출처다.
 	UFUNCTION(BlueprintPure, Category="LS/UI|Storage")
-	int32 GetMaxStorageSlotCount() const { return MaxStorageSlotCount; }
+	int32 GetMaxStorageSlotCount() const;
 
 	bool HandleStorageSlotDrop(ELSInventorySlotArea FromArea, int32 FromIndex, int32 ToWarehouseIndex);
 	bool TryDropStorageDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FPointerEvent& PointerEvent);
@@ -81,9 +82,6 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Storage")
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Storage", meta=(ClampMin="0"))
-	int32 MaxStorageSlotCount = 100;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Storage")
 	TSubclassOf<ALSWorldDroppedItem> DroppedItemActorClass;

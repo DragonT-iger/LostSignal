@@ -33,6 +33,8 @@ public:
 	// 드래그 중 이 슬롯이 "지금 끌고 있는 아이템이 장착될 장비칸"임을 알리는 후보 하이라이트를 켜고 끈다.
 	// 켜면 후보 색 틴트 + 스케일 펄스(NativeTick)로 강조한다. 장비 슬롯에만 쓴다.
 	void SetEquipCandidateHighlight(bool bInIsCandidate);
+	void SetInvalidEquipDropHighlight(bool bInIsInvalid);
+	void PlayEquipDropRejectedFeedback();
 
 	void SetDisplayOnlySlotContext();
 	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem, bool bInLocked = false);
@@ -140,6 +142,19 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipCandidate")
 	float EquipCandidatePulseMaxScale = 1.18f;
 
+	// 장비 슬롯 타입 불일치 피드백. 드래그 중에는 빨간 틴트, 드롭 시에는 감쇠 흔들림으로 표시한다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipReject")
+	FLinearColor EquipRejectTint = FLinearColor(1.0f, 0.15f, 0.1f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipReject", meta=(ClampMin="0.01"))
+	float EquipRejectDuration = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipReject", meta=(ClampMin="0.0"))
+	float EquipRejectShakeAmplitude = 8.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipReject", meta=(ClampMin="1"))
+	int32 EquipRejectShakeCount = 3;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTexture2D> DefaultSlotTexture;
 
@@ -183,6 +198,10 @@ private:
 	bool bIsDragTarget = false;
 	// 드래그 중 이 슬롯이 대상 장비칸일 때 켜지는 후보 하이라이트 상태(NativeTick이 펄스 구동).
 	bool bIsEquipCandidate = false;
+	// 드래그 중인 아이템과 이 장비 슬롯의 타입이 맞지 않을 때 켜지는 빨간 하이라이트 상태.
+	bool bIsInvalidEquipDropTarget = false;
+	bool bIsEquipRejectAnimating = false;
+	float EquipRejectElapsed = 0.f;
 	// 이 인벤토리 슬롯을 호버해 장비칸 후보 하이라이트를 켠 상태. 호버 해제 시 끄고, 드래그 시작 시 드래그 하이라이트로 넘긴다.
 	bool bShowingEquipHoverHint = false;
 	// 드래그 중 커서를 따라가는 비주얼 인스턴스 표시. 이 슬롯은 아이템 아이콘만 보이고 배경 프레임은 숨긴다.
@@ -205,6 +224,7 @@ private:
 	FName DisplayedIconKey;
 
 	void ApplyHoverVisual();
+	void TickEquipDropRejectedFeedback(float InDeltaTime);
 	void ApplySlotBackground();
 	// 아이템 Row Name의 등급 토큰을 슬롯 배경색으로 매핑한다. 등급이 없으면 DefaultGradeColor를 반환.
 	FLinearColor ResolveGradeBackgroundColor(FName ItemRowName) const;

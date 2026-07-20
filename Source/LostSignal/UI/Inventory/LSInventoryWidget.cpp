@@ -489,9 +489,7 @@ void ULSInventoryWidget::HandleStoreAllButtonClicked()
 	}
 
 	bool bStoppedBecauseFull = false;
-	const bool bChanged = SaveSubsystem->TransferAllInventoryToWarehouse(
-		PlayerController->GetOpenLobbyStorageMaxSlotCount(),
-		bStoppedBecauseFull);
+	const bool bChanged = SaveSubsystem->TransferAllInventoryToWarehouse(bStoppedBecauseFull);
 
 	if (bChanged)
 	{
@@ -693,6 +691,16 @@ void ULSInventoryWidget::ClearEquipmentDragHighlight()
 			SlotWidget->SetEquipCandidateHighlight(false);
 		}
 	}
+}
+
+bool ULSInventoryWidget::CanAcceptEquipmentDrop(const FName ItemRowName, const int32 EquipmentSlotIndex) const
+{
+	if (EquipmentSlotIndex < 0 || EquipmentSlotIndex >= static_cast<int32>(ELSEquipmentSlot::Count))
+	{
+		return false;
+	}
+
+	return LSInventorySlotUtils::ResolveEquipmentSlotType(ItemRowName) == static_cast<ELSEquipmentSlot>(EquipmentSlotIndex);
 }
 
 bool ULSInventoryWidget::HandleInventoryBackgroundDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)

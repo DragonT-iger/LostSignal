@@ -130,6 +130,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	int32 GetMaxSafeStashSlotCount() const;
 
+	// 창고 최대 슬롯 수. ULSSaveSettings가 단일 출처이며 창고 UI/자판기가 함께 읽는다.
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	int32 GetMaxWarehouseSlotCount() const;
+
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	float GetChipSignalGaugePercent() const;
 
@@ -154,7 +158,7 @@ public:
 	bool MoveEquipmentSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool DropStoredSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool TransferStoredSlotToArea(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea);
-	bool TransferAllInventoryToWarehouse(int32 WarehouseMaxSlotCount, bool& bOutStoppedBecauseFull);
+	bool TransferAllInventoryToWarehouse(bool& bOutStoppedBecauseFull);
 	// 외부 아이템(예: 룻박스 결과)을 인벤토리/금고의 특정 슬롯에 스택/배치한다. 남은 수량은 InOut 인자로 돌려준다.
 	bool DropExternalItemToStoredSlot(FLSSessionItem& InOutExternalItem, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool GetStoredSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, FLSSessionItem& OutItem) const;
@@ -182,6 +186,7 @@ private:
 	void ApplyLowestGradeChipStarterItems();
 	void AddStarterItemToArea(FName ItemRowName, int32 Amount, ELSInventorySlotArea TargetArea, const TArray<FLSChipResolvedStat>& ChipStats, const TCHAR* SourceLabel);
 	int32 GetStarterTargetMaxSlotCount(ELSInventorySlotArea TargetArea) const;
+	bool HasWarehouseOverflow() const;
 	int32 GetCarryingProtocolSlotBonus(FName EnableName) const;
 	// 주어진 칩 장착 배열 기준으로 적재 프로토콜 슬롯 보너스를 계산한다(현재 저장 상태가 아니라 가정 배열도 넣을 수 있음).
 	int32 ComputeCarryingProtocolSlotBonus(const TArray<FLSSessionItem>& EquipmentSlots, FName EnableName) const;

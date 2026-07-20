@@ -475,7 +475,7 @@ void ULSVendingWidget::RebuildOwnedPanels()
 
 	RebuildOwnedBox(BagBox, ELSInventorySlotArea::Inventory, SaveSubsystem->GetInventory(), SaveSubsystem->GetMaxInventorySlotCount(), BagCountText);
 	RebuildOwnedBox(SafeBox, ELSInventorySlotArea::Safe, SaveSubsystem->GetSafeStash(), SaveSubsystem->GetMaxSafeStashSlotCount(), SafeCountText);
-	RebuildOwnedBox(WarehouseBox, ELSInventorySlotArea::Warehouse, SaveSubsystem->GetWarehouseItems(), MaxWarehouseSlotCount, WarehouseCountText);
+	RebuildOwnedBox(WarehouseBox, ELSInventorySlotArea::Warehouse, SaveSubsystem->GetWarehouseItems(), SaveSubsystem->GetMaxWarehouseSlotCount(), WarehouseCountText);
 }
 
 void ULSVendingWidget::RebuildOwnedBox(UWrapBox* TargetBox, const ELSInventorySlotArea Area, const TArray<FLSSessionItem>& Items, const int32 MaxSlotCount, UTextBlock* CountText)
@@ -485,8 +485,12 @@ void ULSVendingWidget::RebuildOwnedBox(UWrapBox* TargetBox, const ELSInventorySl
 		return;
 	}
 	// 실제 인벤토리 UI처럼 최대 슬롯 수만큼 빈 칸 포함 전체 격자를 그린다. 슬롯 위젯은 풀링으로 재사용.
+	// 창고는 기존 세이브의 초과 슬롯을 숨기지 않고 반출할 수 있도록 저장 배열 길이까지 임시 표시한다.
+	const int32 SlotCountToBuild = Area == ELSInventorySlotArea::Warehouse
+		? FMath::Max(MaxSlotCount, Items.Num())
+		: MaxSlotCount;
 	int32 FilledCount = 0;
-	for (int32 SlotIndex = 0; SlotIndex < MaxSlotCount; ++SlotIndex)
+	for (int32 SlotIndex = 0; SlotIndex < SlotCountToBuild; ++SlotIndex)
 	{
 		ULSVendingSlotWidget* SlotWidget = GetOrCreateSlotWidget(TargetBox, SlotIndex);
 		if (!SlotWidget)
@@ -504,7 +508,7 @@ void ULSVendingWidget::RebuildOwnedBox(UWrapBox* TargetBox, const ELSInventorySl
 			SlotWidget->SetOwnedEmpty(Area, SlotIndex);
 		}
 	}
-	TrimSlotWidgets(TargetBox, MaxSlotCount);
+	TrimSlotWidgets(TargetBox, SlotCountToBuild);
 
 	if (CountText)
 	{

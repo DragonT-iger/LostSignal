@@ -100,7 +100,8 @@ void ULSLobbyStorageWidget::RefreshStorage()
 		return;
 	}
 
-	const int32 SlotCountToBuild = FMath::Max(0, MaxStorageSlotCount);
+	// 기존 세이브의 초과 슬롯은 숨기거나 삭제하지 않고 반출할 수 있도록 임시로 함께 표시한다.
+	const int32 SlotCountToBuild = FMath::Max(GetMaxStorageSlotCount(), StashItems.Num());
 
 	if (CurrentFilter == ELSStorageFilter::All)
 	{
@@ -148,6 +149,12 @@ void ULSLobbyStorageWidget::RefreshStorageCountText()
 	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
 	static const TArray<FLSSessionItem> EmptyStashItems;
 	UpdateStorageCountText(SaveSubsystem ? SaveSubsystem->GetWarehouseItems() : EmptyStashItems);
+}
+
+int32 ULSLobbyStorageWidget::GetMaxStorageSlotCount() const
+{
+	const ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	return SaveSubsystem ? SaveSubsystem->GetMaxWarehouseSlotCount() : 0;
 }
 
 bool ULSLobbyStorageWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
@@ -457,7 +464,7 @@ void ULSLobbyStorageWidget::UpdateStorageCountText(const TArray<FLSSessionItem>&
 	StorageCountText->SetText(FText::Format(
 		LOCTEXT("StorageCountFormat", "{0}/{1}"),
 		FText::AsNumber(FilledSlotCount),
-		FText::AsNumber(FMath::Max(0, MaxStorageSlotCount))));
+		FText::AsNumber(GetMaxStorageSlotCount())));
 }
 
 void ULSLobbyStorageWidget::ApplyFilterButtonState() const

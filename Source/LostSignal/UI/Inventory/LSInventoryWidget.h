@@ -42,6 +42,7 @@ public:
 	// 장착 불가 아이템이면 어느 칸도 켜지지 않는다. 드래그 종료 시 ClearEquipmentDragHighlight로 전부 끈다.
 	void SetEquipmentDragHighlight(FName DraggedItemRowName);
 	void ClearEquipmentDragHighlight();
+	bool CanAcceptEquipmentDrop(FName ItemRowName, int32 EquipmentSlotIndex) const;
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void SetStoreAllButtonVisible(bool bVisible);

@@ -93,7 +93,6 @@ public:
 	// 모달 패널(인벤토리/창고/칩스테이션/루트드랍)이 하나라도 보이면 true. 매번 현재 상태를 재계산한다.
 	bool IsAnyModalPanelOpen() const;
 
-	int32 GetOpenLobbyStorageMaxSlotCount() const;
 	void RefreshOpenLobbyStorageWidget();
 
 	// 칩 스테이션이 열려 있으면 칩 리스트를 다시 그린다. 인벤토리/창고 "창"에서 칩을 옮기거나 버려
