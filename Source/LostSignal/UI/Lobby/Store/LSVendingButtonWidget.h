@@ -11,7 +11,7 @@ class ULSVendingButtonWidget;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLSVendingButtonClicked, ULSVendingButtonWidget*, ClickedButton);
 
 // 자판기 화면 공용 버튼(WBP_VendingButton)의 부모 클래스. 분류(카테고리) 버튼 등에 쓴다.
-// WBP_StoreButton과 비슷하지만 퀘스트 아이콘이 없는 자판기 전용 스타일이라 클래스를 나눈다.
+// WBP_StoreButton과 비슷하지만 블루프린트에서 스타일이 다를수도 있어서 나눈다.
 // 클릭 델리게이트는 자기 포인터를 실어 보내, 자판기 위젯이 어느 버튼인지 구분하게 한다.
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSVendingButtonWidget : public UUserWidget

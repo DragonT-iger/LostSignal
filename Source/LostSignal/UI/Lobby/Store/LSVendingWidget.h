@@ -178,6 +178,7 @@ private:
 	UFUNCTION() void HandleBackClicked();
 	UFUNCTION() void HandleCategoryTabClicked(ULSVendingButtonWidget* ClickedButton);
 	UFUNCTION() void HandleSlotClicked(ULSVendingSlotWidget* ClickedSlot);
+	UFUNCTION() void HandleSlotDropped(ULSVendingSlotWidget* SourceSlot, ULSVendingSlotWidget* TargetSlot);
 	UFUNCTION() void HandleTradeClicked();
 	UFUNCTION() void HandleDecreaseClicked();
 	UFUNCTION() void HandleIncreaseClicked();
@@ -213,7 +214,12 @@ private:
 	void RebuildOwnedPanels();
 	// 한 패널(WrapBox)을 슬롯 배열로 채운다. 빈 칸은 만들지 않고 채워진 아이템만 나열한다.
 	void RebuildOwnedBox(UWrapBox* TargetBox, ELSInventorySlotArea Area, const TArray<FLSSessionItem>& Items, int32 MaxSlotCount, UTextBlock* CountText);
-	ULSVendingSlotWidget* CreateSlotWidget(UWrapBox* TargetBox);
+
+	// 풀링: TargetBox의 ChildIndex 자리 슬롯을 재사용하고, 없으면 만들어 붙인다. 매 리빌드마다 파괴/생성하지 않는다.
+	ULSVendingSlotWidget* GetOrCreateSlotWidget(UWrapBox* TargetBox, int32 ChildIndex);
+
+	// 풀링: UsedCount 뒤로 남는 슬롯을 뒤에서부터 제거한다(목록이 줄어든 경우).
+	void TrimSlotWidgets(UWrapBox* TargetBox, int32 UsedCount) const;
 	void SelectSlot(ULSVendingSlotWidget* SlotWidget);
 	void ClearSelection();
 	void ExecuteBuy(int32 Quantity);

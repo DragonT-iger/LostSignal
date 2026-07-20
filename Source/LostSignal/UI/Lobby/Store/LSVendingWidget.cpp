@@ -79,6 +79,17 @@ void ULSVendingWidget::NativeConstruct()
 		SaveSubsystem->OnGoldChanged.AddUObject(this, &ULSVendingWidget::HandleGoldChanged);
 	}
 
+	// WBP에 아트 미리보기용으로 배치된 디자인타임 자식(WBP_ItemSlot 등)을 비운다.
+	// 풀링(GetOrCreateSlotWidget)은 자식을 재사용하므로, 다른 타입 자식이 남아 있으면 인덱스가 어긋난다.
+	UWrapBox* PooledBoxes[] = { StockBox, BagBox, SafeBox, WarehouseBox };
+	for (UWrapBox* PooledBox : PooledBoxes)
+	{
+		if (PooledBox)
+		{
+			PooledBox->ClearChildren();
+		}
+	}
+
 	// 재고를 채우고 자동 새로고침 카운트다운을 시작한다. 위젯이 숨어 있어도 타이머는 계속 돈다.
 	ResetStock();
 	if (UWorld* World = GetWorld())
@@ -171,6 +182,34 @@ void ULSVendingWidget::HandleSlotClicked(ULSVendingSlotWidget* ClickedSlot)
 	{
 		SelectSlot(ClickedSlot);
 	}
+}
+
+void ULSVendingWidget::HandleSlotDropped(ULSVendingSlotWidget* SourceSlot, ULSVendingSlotWidget* TargetSlot)
+{
+	if (!SourceSlot || !TargetSlot || SourceSlot == TargetSlot
+		|| SourceSlot->IsStockSlot() || TargetSlot->IsStockSlot())
+	{
+		return;
+	}
+
+	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	if (!SaveSubsystem)
+	{
+		return;
+	}
+
+	// 이동/스왑/스택 병합 규칙은 실제 인벤토리와 동일한 공용 경로를 쓴다.
+	if (!SaveSubsystem->DropStoredSlot(SourceSlot->GetArea(), SourceSlot->GetSlotIndex(), TargetSlot->GetArea(), TargetSlot->GetSlotIndex()))
+	{
+		UE_LOG(LogLS, Log, TEXT("[Store] Owned slot drop rejected. From %d/%d To %d/%d"),
+			static_cast<int32>(SourceSlot->GetArea()), SourceSlot->GetSlotIndex(),
+			static_cast<int32>(TargetSlot->GetArea()), TargetSlot->GetSlotIndex());
+		return;
+	}
+
+	// 인덱스가 바뀌었을 수 있으니 좌측 패널과 선택 상태를 다시 만든다.
+	RebuildOwnedPanels();
+	ClearSelection();
 }
 
 void ULSVendingWidget::HandleTradeClicked()
@@ -388,16 +427,17 @@ void ULSVendingWidget::RebuildStockList()
 	{
 		return;
 	}
-	StockBox->ClearChildren();
 
 	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
 	UDataTable* StockTable = Settings ? Settings->StoreStockTable.LoadSynchronous() : nullptr;
 	if (!StockTable)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Store] StoreStockTable is not set. Vending list will be empty."));
+		StockBox->ClearChildren();
 		return;
 	}
 
+	int32 UsedCount = 0;
 	for (const FName RowName : StockTable->GetRowNames())
 	{
 		const FLSStoreStockRow* StockRow = StockTable->FindRow<FLSStoreStockRow>(RowName, TEXT("RebuildStockList"));
@@ -416,11 +456,13 @@ void ULSVendingWidget::RebuildStockList()
 			continue;
 		}
 
-		if (ULSVendingSlotWidget* SlotWidget = CreateSlotWidget(StockBox))
+		if (ULSVendingSlotWidget* SlotWidget = GetOrCreateSlotWidget(StockBox, UsedCount))
 		{
 			SlotWidget->SetStockItem(StockRow->Item_Name, Info.Cost);
+			++UsedCount;
 		}
 	}
+	TrimSlotWidgets(StockBox, UsedCount);
 }
 
 void ULSVendingWidget::RebuildOwnedPanels()
@@ -442,22 +484,27 @@ void ULSVendingWidget::RebuildOwnedBox(UWrapBox* TargetBox, const ELSInventorySl
 	{
 		return;
 	}
-	TargetBox->ClearChildren();
-
+	// 실제 인벤토리 UI처럼 최대 슬롯 수만큼 빈 칸 포함 전체 격자를 그린다. 슬롯 위젯은 풀링으로 재사용.
 	int32 FilledCount = 0;
-	for (int32 SlotIndex = 0; SlotIndex < Items.Num(); ++SlotIndex)
+	for (int32 SlotIndex = 0; SlotIndex < MaxSlotCount; ++SlotIndex)
 	{
-		if (!LSInventorySlotUtils::IsFilled(Items[SlotIndex]))
+		ULSVendingSlotWidget* SlotWidget = GetOrCreateSlotWidget(TargetBox, SlotIndex);
+		if (!SlotWidget)
 		{
 			continue;
 		}
 
-		++FilledCount;
-		if (ULSVendingSlotWidget* SlotWidget = CreateSlotWidget(TargetBox))
+		if (Items.IsValidIndex(SlotIndex) && LSInventorySlotUtils::IsFilled(Items[SlotIndex]))
 		{
+			++FilledCount;
 			SlotWidget->SetOwnedItem(Items[SlotIndex].ItemRowName, Items[SlotIndex].Amount, Area, SlotIndex);
 		}
+		else
+		{
+			SlotWidget->SetOwnedEmpty(Area, SlotIndex);
+		}
 	}
+	TrimSlotWidgets(TargetBox, MaxSlotCount);
 
 	if (CountText)
 	{
@@ -466,11 +513,24 @@ void ULSVendingWidget::RebuildOwnedBox(UWrapBox* TargetBox, const ELSInventorySl
 	}
 }
 
-ULSVendingSlotWidget* ULSVendingWidget::CreateSlotWidget(UWrapBox* TargetBox)
+ULSVendingSlotWidget* ULSVendingWidget::GetOrCreateSlotWidget(UWrapBox* TargetBox, const int32 ChildIndex)
 {
 	if (!TargetBox || !VendingSlotClass)
 	{
 		return nullptr;
+	}
+
+	// 이미 그 자리에 슬롯이 있으면 재사용한다(매 리빌드 파괴/생성으로 인한 히칭 방지).
+	if (ChildIndex < TargetBox->GetChildrenCount())
+	{
+		if (ULSVendingSlotWidget* Existing = Cast<ULSVendingSlotWidget>(TargetBox->GetChildAt(ChildIndex)))
+		{
+			return Existing;
+		}
+
+		// 풀링 대상이 아닌 자식(디자인타임 미리보기 등)이 섞여 있으면 인덱스가 어긋나므로 통째로 비우고 다시 만든다.
+		UE_LOG(LogLS, Warning, TEXT("[Store] Non-vending-slot child found in %s. Clearing box for rebuild."), *GetNameSafe(TargetBox));
+		TargetBox->ClearChildren();
 	}
 
 	ULSVendingSlotWidget* SlotWidget = CreateWidget<ULSVendingSlotWidget>(this, VendingSlotClass);
@@ -481,8 +541,22 @@ ULSVendingSlotWidget* ULSVendingWidget::CreateSlotWidget(UWrapBox* TargetBox)
 	}
 
 	SlotWidget->OnClicked.AddDynamic(this, &ULSVendingWidget::HandleSlotClicked);
+	SlotWidget->OnDropped.AddDynamic(this, &ULSVendingWidget::HandleSlotDropped);
 	TargetBox->AddChildToWrapBox(SlotWidget);
 	return SlotWidget;
+}
+
+void ULSVendingWidget::TrimSlotWidgets(UWrapBox* TargetBox, const int32 UsedCount) const
+{
+	if (!TargetBox)
+	{
+		return;
+	}
+
+	for (int32 ChildIndex = TargetBox->GetChildrenCount() - 1; ChildIndex >= UsedCount; --ChildIndex)
+	{
+		TargetBox->RemoveChildAt(ChildIndex);
+	}
 }
 
 void ULSVendingWidget::SelectSlot(ULSVendingSlotWidget* SlotWidget)
