@@ -9,6 +9,7 @@
 #include "Combat/LSCombatStateComponent.h"
 #include "Combat/LSCombatTypes.h"
 #include "Combat/LSHitboxLibrary.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Data/LSComboAttackRow.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Engine/EngineTypes.h"
@@ -406,6 +407,15 @@ void ULSPlayerCombatComponent::BeginPlay()
 		{
 			UE_LOG(LogLS, Warning, TEXT("%s basic attack hit effect is not set."), *GetNameSafe(OwnerCharacter));
 		}
+		else if (!BasicAttackHitEffectSocketName.IsNone())
+		{
+			USkeletalMeshComponent* OwnerMesh = OwnerCharacter->GetMesh();
+			if (!OwnerMesh || !OwnerMesh->DoesSocketExist(BasicAttackHitEffectSocketName))
+			{
+				UE_LOG(LogLS, Warning, TEXT("%s basic attack hit effect socket '%s' is missing. Target bounds center will be used."),
+					*GetNameSafe(OwnerCharacter), *BasicAttackHitEffectSocketName.ToString());
+			}
+		}
 
 		if (BasicAttackAbilityClass)
 		{
@@ -762,11 +772,22 @@ void ULSPlayerCombatComponent::ExecuteBasicAttackHitCue(AActor* HitActor, const 
 	FVector BoundsOrigin = HitActor->GetActorLocation();
 	FVector BoundsExtent = FVector::ZeroVector;
 	HitActor->GetActorBounds(true, BoundsOrigin, BoundsExtent);
+	FVector EffectLocation = BoundsOrigin;
+
+	if (!BasicAttackHitEffectSocketName.IsNone())
+	{
+		USkeletalMeshComponent* OwnerMesh = OwnerCharacter->GetMesh();
+		if (OwnerMesh && OwnerMesh->DoesSocketExist(BasicAttackHitEffectSocketName))
+		{
+			EffectLocation = OwnerMesh->GetSocketLocation(BasicAttackHitEffectSocketName);
+		}
+	}
 
 	FGameplayCueParameters CueParams;
 	CueParams.SourceObject = BasicAttackHitEffect;
-	CueParams.Location = BoundsOrigin;
+	CueParams.Location = EffectLocation;
 	CueParams.Normal = -AttackDirection.GetSafeNormal();
+	CueParams.RawMagnitude = BasicAttackHitEffectScale;
 	CueParams.Instigator = OwnerCharacter;
 	CueParams.EffectCauser = OwnerCharacter;
 	TargetASC->ExecuteGameplayCue(LSGameplayTags::GameplayCue_Combat_HitVFX, CueParams);

@@ -1,6 +1,7 @@
 #include "Vision/LSVisionComponent.h"
 
 #include "Camera/CameraComponent.h"
+#include "Combat/LSAimComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Components/CapsuleComponent.h"
@@ -178,7 +179,13 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	// 푸시가 0이 되는 지점이 마스크가 유효한 평면과 일치하게 한다. bSliceHeightFromPlayer=false면 고정 절대 Z라 수직 이동에 불변.
 	const float SliceZ = VisionSubsystem->GetRuntimeSliceZ();
 
-	const FVector ActorForward = GetOwner()->GetActorForwardVector();
+	// 시야 방향은 항상 캐릭터→마우스 방향으로 잡는다(캐릭터 실제 facing이 공격/대시 등으로 고정돼도 시야는 조준을 따른다).
+	// AimComponent가 마우스 조준 방향(없으면 액터 forward)을 반환하므로, 없을 때만 액터 forward로 폴백.
+	FVector ActorForward = GetOwner()->GetActorForwardVector();
+	if (const ULSAimComponent* AimComponent = GetOwner()->FindComponentByClass<ULSAimComponent>())
+	{
+		ActorForward = AimComponent->GetAimDirection();
+	}
 	const FVector2D ActorForward2D = FVector2D(ActorForward.X, ActorForward.Y).GetSafeNormal();
 	const FVector2D RayOrigin2D = ActorLocation2D - (ActorForward2D * (VisionRadius - 50));
 

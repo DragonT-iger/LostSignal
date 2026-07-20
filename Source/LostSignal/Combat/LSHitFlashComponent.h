@@ -31,10 +31,10 @@ protected:
 
 	// 플래시 강도가 1→0으로 떨어지는 시간(초).
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat|HitFlash", meta=(ClampMin="0.01"))
-	float FlashDuration = 0.1f;
+	float FlashDuration = 0.2f;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat|HitFlash")
-	FLinearColor FlashColor = FLinearColor(1.0f, 0.08f, 0.05f, 1.0f);
+	FLinearColor FlashColor = FLinearColor(1.0f, 0.204f, 0.0003f, 1.0f);
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat|HitFlash")
 	FName HitFlashIntensityParamName = TEXT("HitFlashIntensity");

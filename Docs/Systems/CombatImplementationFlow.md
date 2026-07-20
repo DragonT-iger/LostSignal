@@ -354,9 +354,9 @@ LSAN_PlayerMeleeHit
 -> ULSGCN_SpawnNiagara 파생 BP가 전 클라이언트에서 Niagara 1회 출력
 ```
 
-- Niagara 에셋의 단일 출처는 `ULSPlayerCombatComponent::BasicAttackHitEffect`이며 캐릭터 BP 컴포넌트 기본값에서 매핑한다.
+- Niagara 에셋과 연출 설정의 단일 출처는 `ULSPlayerCombatComponent`의 `BasicAttackHitEffect`, `BasicAttackHitEffectSocketName`, `BasicAttackHitEffectScale`이며 캐릭터 BP 컴포넌트 기본값에서 매핑한다.
 - `GameplayCue.Combat.HitVFX`용 BP는 `ULSGCN_SpawnNiagara`를 상속하고 `/Game/LostSignal` 하위에 둔다. BP에는 로직이나 Niagara 에셋을 넣지 않고 태그만 매핑한다.
-- 현재 기본 공격 판정은 `SphereOverlapActors`라 `FHitResult`가 없다. VFX 위치는 명중 액터의 콜리전 바운드 중심, 방향은 공격 반대 방향을 사용한다. 정확한 표면·본 위치가 필요해지면 판정 결과 구조에 충돌 정보를 추가해 확장한다.
+- `BasicAttackHitEffectSocketName`을 지정하고 공격자 Mesh에 해당 소켓이 있으면 그 소켓의 현재 월드 위치에 생성한다. 이름이 비어 있거나 소켓이 없으면 피격 액터의 콜리전 바운드 중심으로 폴백한다. 방향은 공격 반대 방향, 스케일은 `BasicAttackHitEffectScale`의 균일 배율을 사용한다.
 
 ### 피격 사운드 (맞는 쪽, victim-side)
 

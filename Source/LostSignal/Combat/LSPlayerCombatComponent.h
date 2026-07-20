@@ -113,6 +113,14 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat/Effects")
 	TObjectPtr<UNiagaraSystem> BasicAttackHitEffect;
 
+	// 지정하면 공격자 Mesh의 해당 소켓 월드 위치에 명중 VFX를 생성한다. 비어 있거나 소켓이 없으면 피격 대상 중심을 사용한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat/Effects")
+	FName BasicAttackHitEffectSocketName = NAME_None;
+
+	// 명중 VFX의 균일 스케일 배율.
+	UPROPERTY(EditDefaultsOnly, Category="LS/Combat/Effects", meta=(ClampMin="0.01"))
+	float BasicAttackHitEffectScale = 1.0f;
+
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	int32 ComboCharacterID = 101;
 

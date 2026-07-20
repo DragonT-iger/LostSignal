@@ -20,6 +20,7 @@ bool ULSGCN_SpawnNiagara::OnExecute_Implementation(AActor* MyTarget, const FGame
 	const FRotator Rotation = Parameters.Normal.IsNearlyZero()
 		? FRotator::ZeroRotator
 		: Parameters.Normal.Rotation();
-	UNiagaraFunctionLibrary::SpawnSystemAtLocation(MyTarget, NiagaraSystem, Location, Rotation);
+	const float UniformScale = Parameters.RawMagnitude > 0.0f ? Parameters.RawMagnitude : 1.0f;
+	UNiagaraFunctionLibrary::SpawnSystemAtLocation(MyTarget, NiagaraSystem, Location, Rotation, FVector(UniformScale));
 	return true;
 }
