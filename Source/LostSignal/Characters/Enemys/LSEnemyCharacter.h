@@ -6,6 +6,7 @@
 #include "Characters/LSCharacterBase.h"
 #include "LSEnemyCharacter.generated.h"
 
+class ALSLootBox;
 class UDataTable;
 class UGameplayAbility;
 class UStateTree;
@@ -109,6 +110,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TSubclassOf<UGameplayAbility> MonsterActionAbilityClass;
 
+	// 사망 시 발밑에 스폰할 루트박스 클래스(BP에서 매핑). 미할당이면 스폰하지 않는다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/Loot")
+	TSubclassOf<ALSLootBox> DeathLootBoxClass;
+
+	// 스폰된 박스에 주입할 DT_RootingObject Row 이름. None이면 박스 BP 기본값을 그대로 사용.
+	UPROPERTY(EditDefaultsOnly, Category="LS/Loot")
+	FName DeathLootRowName;
+
+	// 사망 후 몬스터 액터를 제거하기까지의 지연(초). 서버 Destroy가 클라로 복제된다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/Loot", meta=(ClampMin="0.0"))
+	float DeathDestroyDelay = 5.0f;
+
 	// 몬스터 행동 StateTree(BP에서 매핑). 컨트롤러가 아니라 캐릭터가 소유한다 — AIController는 몬스터 공통 1종 유지.
 	UPROPERTY(EditDefaultsOnly, Category="LS/AI|StateTree", meta=(RequiredAssetDataTags="Schema=/Script/GameplayStateTreeModule.StateTreeAIComponentSchema"))
 	TObjectPtr<UStateTree> DefaultStateTree;
@@ -170,6 +183,7 @@ protected:
 private:
 	const FLSMonsterArchetypeRow* FindMonsterArchetypeRow() const;
 	void InitializeMonsterArchetype();
+	void SpawnDeathLootBox();
 	void ApplyMonsterAttributes(const FLSMonsterArchetypeRow& Row);
 	void TryCreateDebugHpWidget();
 	void DestroyDebugHpWidget();

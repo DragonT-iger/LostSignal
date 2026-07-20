@@ -17,6 +17,7 @@
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Gameplay/LSLootBox.h"
 #include "Gameplay/LSNoiseEmitterComponent.h"
 #include "LostSignal.h"
 #include "Minimap/LSMinimapMarkerComponent.h"
@@ -183,7 +184,6 @@ void ALSEnemyCharacter::OnDeathStateChanged(bool bIsDead)
 	}
 
 	// 시체가 이동을 막지 않고, 추가 타격/타겟팅 대상에서 빠지도록 캡슐·메시 콜리전 모두 해제.
-	// 메시는 계속 보이며 Anim BP가 사망 애니메이션을 재생한다(가시성은 건드리지 않음).
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
 		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -191,6 +191,53 @@ void ALSEnemyCharacter::OnDeathStateChanged(bool bIsDead)
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
 		MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// 사망 즉시 몬스터 전체(메시·헬스바 등)를 숨긴다. 이 함수는 GAS 체력 복제로 모든 머신에서 호출된다.
+	SetActorHiddenInGame(true);
+
+	if (HasAuthority())
+	{
+		SpawnDeathLootBox();
+		SetLifeSpan(DeathDestroyDelay);
+	}
+}
+
+void ALSEnemyCharacter::SpawnDeathLootBox()
+{
+	if (!DeathLootBoxClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s: DeathLootBoxClass 미할당 — 사망 루트박스를 스폰하지 않습니다."), *GetNameSafe(this));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	FVector SpawnLocation = GetActorLocation();
+	if (const UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		SpawnLocation.Z -= Capsule->GetScaledCapsuleHalfHeight();
+	}
+	const FRotator SpawnRotation(0.0f, GetActorRotation().Yaw, 0.0f);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+	ALSLootBox* LootBox = World->SpawnActor<ALSLootBox>(DeathLootBoxClass, SpawnLocation, SpawnRotation, SpawnParams);
+	if (!LootBox)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s: 사망 루트박스(%s) 스폰 실패."), *GetNameSafe(this), *GetNameSafe(DeathLootBoxClass));
+		return;
+	}
+
+	// Row 주입은 서버에서만 필요 — 드랍 롤이 서버 Interact 시점에 이 값을 읽는다. None이면 박스 BP 기본값 유지.
+	if (!DeathLootRowName.IsNone())
+	{
+		LootBox->SetRootingObjectRowName(DeathLootRowName);
 	}
 }
 

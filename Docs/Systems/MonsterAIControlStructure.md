@@ -27,7 +27,7 @@ ALSEnemyCharacter
 - AIControllerClass, AutoPossessAI, AI 컴포넌트 생성
 - 몬스터 DataTable 행을 컴포넌트에 적용
 - 서버에서 기본 몬스터 Ability 부여
-- 공격 몽타주 같은 캐릭터별 에셋 참조 소유(사망 애니메이션은 Anim BP 담당)
+- 공격 몽타주·사망 루트박스(DeathLootBoxClass) 같은 캐릭터별 에셋 참조 소유
 - 몬스터별 StateTree 에셋 참조(DefaultStateTree) 소유 — 몬스터 BP에서 매핑
 
 ALSAIController
@@ -261,8 +261,8 @@ Knockback
 Dead
 - LS.State.Dead 기반 터미널 상태
 - 죽음 처리 후 AI Brain 정지
-- 사망 애니메이션은 `LS.State.Dead`를 읽는 Anim BP가 재생하며, 캐릭터 C++/StateTree는 사망 몽타주를 직접 참조하거나 실행하지 않는다.
-- 사망 진입 시 `ALSEnemyCharacter::OnDeathStateChanged`가 캡슐·메시 콜리전을 해제한다(공용 `ULSCharacterCombatComponent`의 사망 핸들러가 모든 머신에서 호출). 시체는 이동을 막지 않고 추가 타격 대상에서 빠진다.
+- 사망 진입 시 `ALSEnemyCharacter::OnDeathStateChanged`가 캡슐·메시 콜리전을 해제하고 액터 전체를 즉시 숨긴다(`SetActorHiddenInGame`, 공용 `ULSCharacterCombatComponent`의 사망 핸들러가 모든 머신에서 호출). 사망 애니메이션은 재생되지 않는다.
+- 서버는 사망 진입 시 몬스터 발밑에 루트박스를 스폰(`DeathLootBoxClass`, `DeathLootRowName` 주입 — 모두 몬스터 BP에서 매핑)하고, `DeathDestroyDelay` 후 `SetLifeSpan`으로 액터를 제거한다. 드랍 롤·단계 공개 파이프라인은 [LootDropDataTable.md](LootDropDataTable.md) 참고.
 - 사망 진입 시 진행 중 어빌리티를 전부 취소(`CancelAllAbilities`)한다. 공격 몽타주가 즉시 끊기고 `LS.Combat.Attacking`이 해제되어 Attack → Dead 전이가 공격 애니메이션 종료를 기다리지 않는다.
 
 ReturnHome / Patrol 복귀

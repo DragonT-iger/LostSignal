@@ -25,6 +25,9 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	// 스폰 직후 루팅 테이블 Row를 주입한다(예: 몬스터 사망 드랍). 드랍 롤은 서버 Interact 시점에 지연 실행되므로 복제 불필요.
+	void SetRootingObjectRowName(FName InRowName) { RootingObjectRowName = InRowName; }
+
 	const TArray<FLSDropResult>& GetLootResults() const { return LootResults; }
 	// 클라가 미공개 placeholder 슬롯을 그릴 수 있도록 총 드랍 개수만 노출한다(아이템 정체는 비복제).
 	int32 GetTotalLootCount() const { return TotalLootCount; }
