@@ -2,12 +2,25 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Components/PoseableMeshComponent.h"
 #include "LSVisionGhostComponent.generated.h"
 
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
-class UPoseableMeshComponent;
 class USkeletalMeshComponent;
+
+UCLASS(Transient)
+class ULSVisionGhostMeshComponent final : public UPoseableMeshComponent
+{
+	GENERATED_BODY()
+
+public:
+	virtual void GetDefaultMaterialSlotsOverlayMaterial(
+		TArray<TObjectPtr<UMaterialInterface>>& OutMaterialSlotOverlayMaterials) const override;
+
+protected:
+	virtual UMaterialInterface* GetDefaultOverlayMaterial() const override;
+};
 
 /**
  * 적이 로컬 시야에서 사라지는 순간, 마지막 위치·포즈에 고정된 실루엣(잔상) 메쉬를 남기고
@@ -74,7 +87,7 @@ private:
 	void ApplyGhostOpacity(float Opacity);
 
 	UPROPERTY(Transient)
-	TObjectPtr<UPoseableMeshComponent> GhostMeshComponent;
+	TObjectPtr<ULSVisionGhostMeshComponent> GhostMeshComponent;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> GhostMaterialInstances;

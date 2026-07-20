@@ -10,6 +10,17 @@
 #include "Vision/LSVisionTargetComponent.h"
 #include "Vision/LSVisionTypes.h"
 
+void ULSVisionGhostMeshComponent::GetDefaultMaterialSlotsOverlayMaterial(
+	TArray<TObjectPtr<UMaterialInterface>>& OutMaterialSlotOverlayMaterials) const
+{
+	OutMaterialSlotOverlayMaterials.Reset();
+}
+
+UMaterialInterface* ULSVisionGhostMeshComponent::GetDefaultOverlayMaterial() const
+{
+	return nullptr;
+}
+
 ULSVisionGhostComponent::ULSVisionGhostComponent()
 {
 	// 잔상 페이드가 진행 중일 때만 틱을 켠다.
@@ -115,9 +126,9 @@ void ULSVisionGhostComponent::CreateGhostMeshComponent()
 		return;
 	}
 
-	GhostMeshComponent = NewObject<UPoseableMeshComponent>(
+	GhostMeshComponent = NewObject<ULSVisionGhostMeshComponent>(
 		GetOwner(),
-		UPoseableMeshComponent::StaticClass(),
+		ULSVisionGhostMeshComponent::StaticClass(),
 		TEXT("VisionGhostMesh"),
 		RF_Transient);
 
