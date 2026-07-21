@@ -18,7 +18,7 @@ void ULSANS_MonsterActionTelegraph::NotifyBegin(USkeletalMeshComponent* MeshComp
 	if (ULSMonsterCombatComponent* CombatComponent = ResolveMonsterCombat(MeshComp))
 	{
 		// TotalDuration(윈드업 윈도우)이 fill 차오름 기준 시간.
-		CombatComponent->BeginActionTelegraph(TotalDuration);
+		CombatComponent->BeginActionTelegraph(TotalDuration, OriginMode);
 	}
 }
 

@@ -296,7 +296,7 @@ StateTree Attack 상태
    -> RequestAbilityByTag(Ability_MonsterAction)
 -> ULSGA_MonsterAction: 활성 액션 row의 Action_Ani 몽타주 재생
 -> (윈드업) AnimNotifyState ULSANS_MonsterActionTelegraph
-   -> Begin: BeginActionTelegraph(TotalDuration) / Tick: UpdateActionTelegraphFill / End: EndActionTelegraph
+   -> Begin: BeginActionTelegraph(TotalDuration, OriginMode) / Tick: UpdateActionTelegraphFill / End: EndActionTelegraph
    -> ULSSkillPreviewComponent(스킬 인디케이터 재사용)로 Hitbox 모양/크기 표시
    -> fill은 NotifyState 윈도우(TotalDuration) 동안 0→1로 차오름(가득 참=타격 시점). ULSSkillPreviewComponent::SetAreaFillAmount
 -> (도약 프레임, 선택) AnimNotify ULSAN_MonsterActionDash
@@ -312,6 +312,32 @@ StateTree Attack 상태
       방향: Pull=판정 원점 쪽, KnockBack=원형 히트박스는 원점 반대쪽·그 외 조준 방향
 ```
 
+충돌형 돌진은 `FLSMonsterActionRow`/CSV 스키마를 늘리지 않고 **전용 montage Notify 배치로 실행 방식을 구분**한다. 기존 도약 액션은 `ULSAN_MonsterActionDash`와 `ULSAN_MonsterActionHit`을 그대로 사용하고, 충돌형 돌진은 `ChargeStart` 섹션에 `ULSAN_MonsterActionChargeStart`를 한 번만 배치한다.
+
+```text
+ChargeStart
+-> ULSAN_MonsterActionChargeStart
+-> ULSMonsterCombatComponent::BeginActionCharge
+   -> 시작 시점 전방을 고정하고 Dash_Distance/Duration 속도로 서버 RootMotionSource 이동
+   -> ChargeStart -> ChargeLoop, ChargeLoop -> ChargeLoop 연결
+-> 서버 몬스터 캡슐 OnComponentHit
+   ├─ 살아 있는 플레이어: 해당 플레이어에게 1회 GAS 데미지/CC -> ChargeHit 즉시 진입
+   └─ 비보행 장애물: 데미지 없이 ChargeMiss 즉시 진입
+-> Duration 만료: 데미지 없이 ChargeMiss 즉시 진입
+-> 결과 섹션이 있으면 ChargeHit/ChargeMiss 진입 후 종료
+-> 결과 섹션이 없으면 ChargeLoop 자기 연결 해제 -> 현재 루프 종료 후 Ability 종료
+```
+
+충돌형 돌진 montage는 `ChargeStart` / `ChargeLoop` 섹션이 필수다. `ChargeHit` / `ChargeMiss`는 선택 사항이며, 해당 결과 섹션이 있으면 즉시 진입하고 없으면 `ChargeLoop`의 자기 연결을 해제해 현재 루프가 끝난 뒤 montage를 자연 종료한다. `ChargeLoop`에는 시작 Notify를 다시 배치하지 않으며, 선택 결과 섹션에는 `ULSAN_MonsterActionHit`을 배치하지 않는다. 코드도 충돌형 돌진이 선택된 액션에서 일반 Hit Notify가 호출되면 Warning을 남기고 무시해 이중 데미지를 막는다. 필수 섹션 누락 시 Ability를 안전 종료한다.
+
+충돌형 돌진은 기존 Row 값을 다음 의미로 재사용한다. 별도 타입 필드나 수치를 추가하지 않는다.
+
+- `Dash_Distance`: 타겟 거리로 줄이지 않는 최대 돌진 거리
+- `Duration`: 최대 돌진 시간(이동 속도=`Dash_Distance / Duration`)
+- `Action_Multiplier`, `Action_Impact`, `CC_Type`, `CC_Value`: 충돌한 첫 유효 플레이어에게 적용하는 기존 GAS 데미지/CC 값
+
+기존 도약은 타겟 거리 클램프와 착지 예정 위치 범위 판정을 유지한다. 충돌형 돌진은 시작 방향 고정·호밍 없음이며, 첫 플레이어 충돌 또는 장애물/시간 만료로 끝난다. 스턴·넉백·사망 등 Ability 취소 시 충돌 상태·타이머·RootMotionSource를 함께 정리한다.
+
 공격 상태 이탈 규칙:
 
 ```text
@@ -326,15 +352,18 @@ Attack -> Dead / Knockback
 
 `LS Request Monster Action`은 액션 어빌리티가 활성화된 뒤에는 기본적으로 거리 이탈로 취소하지 않는다(공격 모션 캔슬 금지). 공격 거리 이탈은 어빌리티 종료 후 StateTree 전이 조건으로 다시 판단한다.
 
-공격 중 facing 고정: `ULSGA_MonsterAction`이 활성인 동안 `bUseControllerDesiredRotation`을 false로 꺼 **공격 시작 시점의 방향으로 body 회전을 고정**한다(어빌리티 종료 시 복원). 공격이 연속으로 이어지면 회전이 작동할 틈이 없으므로, `LS Request Monster Action`이 발동 전 `AttackAlignDuration` 동안 타겟 방향으로 yaw를 회전시켜 매 액션의 조준을 갱신한다(0이면 즉시 조준). `RequestAction`의 최종 yaw 보정은 보간 마지막 프레임 오차를 지우는 정밀 조준용이다 — "고정"은 그 조준된 방향 기준이다.
+공격 중 이동·facing 고정: `ULSGA_MonsterAction` 활성 시 Chase에서 남은 AI `MoveTo`와 이동 속도를 먼저 정리해 선딜 중 플레이어를 계속 따라가지 않게 한다. `CharacterMovementComponent` 자체는 유지하므로 액션 Notify가 시작하는 도약/돌진 `RootMotionSource`는 정상 동작한다. Ability가 활성인 동안 `bUseControllerDesiredRotation`을 false로 꺼 **공격 시작 시점의 방향으로 body 회전을 고정**한다(어빌리티 종료 시 복원). 공격이 연속으로 이어지면 회전이 작동할 틈이 없으므로, `LS Request Monster Action`이 발동 전 `AttackAlignDuration` 동안 타겟 방향으로 yaw를 회전시켜 매 액션의 조준을 갱신한다(0이면 즉시 조준). `RequestAction`의 최종 yaw 보정은 보간 마지막 프레임 오차를 지우는 정밀 조준용이다 — "고정"은 그 조준된 방향 기준이다.
 
 텔레그래프 표시 여부는 `ULSMonsterCombatComponent::ShouldShowActionTelegraph()`가 게이팅한다(현재는 항상 true, 추후 전투 프로토콜 레벨 게이팅 확장점).
+
+`ULSANS_MonsterActionTelegraph`의 `OriginMode`는 텔레그래프 생성 위치 기준을 몽타주 NotifyState별로 선택한다. 기본값은 `Caster`이며 Notify Begin 시점의 시전자 위치·전방에 배치한다. `Target`이면 활성 타겟 위치에 배치하고 방향은 시전자에서 타겟을 향한다. 위치는 Begin에서 한 번 정하며 NotifyState Tick 동안 타겟을 추적하지 않는다. Box는 기존 판정 정렬 규칙대로 선택 원점에서 전방 절반만큼 중심을 보정한다.
 
 공격 로직을 추가할 때 지킬 규칙:
 
 - 어떤 액션을 할지는 StateTree가 아니라 CombatComponent가 거리/쿨다운으로 고른다(StateTree는 "공격" 요청만).
 - 실제 공격 실행은 `ULSGA_MonsterAction`(단일 데이터 주도 어빌리티)에 둔다.
 - 타격·텔레그래프 타이밍은 montage Notify(`ULSAN_MonsterActionHit`)/NotifyState(`ULSANS_MonsterActionTelegraph`)가 호출한다.
+- 충돌형 돌진은 `ULSAN_MonsterActionChargeStart`가 시작하고 서버 캡슐 충돌이 타격 시점을 결정한다. 이를 구분하기 위한 필드를 `FLSMonsterActionRow`에 추가하지 않는다.
 - 데미지는 `ULSCharacterCombatComponent::ApplyDamageEffectToTarget` GAS 경로를 사용한다.
 - 히트박스(Circle/Cone/Box) 판정은 공용 `ULSHitboxLibrary`를 쓴다(플레이어 스킬과 공유).
 - Attribute를 직접 수정하지 않는다.
@@ -659,8 +688,9 @@ AI 코드를 수정한 뒤 다음을 확인한다.
 - **회전 속도(Turn_Rate):** 최신 DT_MonsterStat CSV에서 컬럼이 빠져 Row 필드·RotationRate 적용 모두 제거됨. 회전 속도는 생성자 기본값(540)으로 동작. 데이터 주도가 필요하면 CSV에 Turn_Rate 컬럼을 다시 넣고 재적용해야 한다.
 - **몬스터 공격(데이터 주도):** 평타(`ULSGA_MonsterMelee`/`PerformMeleeHit`) **제거 완료**. 모든 공격이 `DT_MonsterAction`(FLSMonsterActionRow) 기반으로 `ULSGA_MonsterAction` + montage Notify(`ULSAN_MonsterActionHit`)/NotifyState(`ULSANS_MonsterActionTelegraph`)로 실행된다. 거리/쿨다운 선택은 `ULSMonsterCombatComponent::SelectActionForDistance`(쿨다운은 컴포넌트 TMap 월드타이머). 범위 표시는 `ULSSkillPreviewComponent` 재사용. 히트박스 판정은 공용 `ULSHitboxLibrary`(플레이어 Override와 공유).
   - **Dash 이동(도약 물기):** **구현 완료**. `ULSAN_MonsterActionDash`(도약 프레임 노티파이) → `ULSMonsterCombatComponent::PerformActionDash`가 `Dash_Distance`/`Duration`으로 타겟 방향 평면 전진(`FRootMotionSource_ConstantForce`, Priority 6, 타겟까지 거리로 클램프해 오버슈트 방지). 수직 점프 비주얼은 애니메이션이 담당. 어빌리티 종료/캔슬 시 `EndActionDash`로 루트모션 제거. 몽타주 도약 프레임에 노티파이 배치 필요.
-    - **착지 정렬:** 도약 액션은 텔레그래프(`BeginActionTelegraph`)·데미지 판정(`PerformActionHit`)을 모두 **착지 예정 지점**에 맞춘다(공유 헬퍼 `ComputeActionOriginAndDirection`). 타격 프레임이 착지보다 일러도 데미지·범위표시가 착지 위치에 들어간다. 텔레그래프는 윈드업 시작 시점의 예측 착지로 1회 배치(윈드업 중 타겟 추종은 미적용).
+    - **착지 판정:** 도약 액션 데미지 판정(`PerformActionHit`)은 **착지 예정 지점**에 맞춘다(`ComputeActionOriginAndDirection`). 타격 프레임이 착지보다 일러도 데미지가 착지 위치에 들어간다. 텔레그래프 위치는 착지 계산과 분리되어 montage의 `ULSANS_MonsterActionTelegraph.OriginMode`가 시전자/타겟 기준을 선택한다.
     - **박스 프리뷰 전방 보정:** Box 히트박스는 원점(뒷변)에서 전방으로 뻗는데 프리뷰 메시는 중심 정렬이라, `BeginActionTelegraph`가 Box일 때 프리뷰를 전방 `Hitbox_X*0.5`만큼 밀어 실제 판정과 맞춘다(플레이어 `LocationOffset.X=Range_X*0.5`와 동일 규칙). Circle/Cone은 원점 중심이라 보정 없음. `ULSSkillPreviewComponent::UpdateAreaPreview`는 `LocationOffset`을 적용하지 않으므로 호출부(여기)에서 더한다.
+  - **충돌형 돌진:** **구현 완료**. 별도 Row/CSV 필드 없이 `ULSAN_MonsterActionChargeStart` 배치로 선택한다. 서버 캡슐의 blocking hit에서 첫 살아 있는 플레이어에게 기존 GAS 데미지/CC를 1회 적용한다. 결과별 `ChargeHit`/`ChargeMiss` 섹션이 있으면 즉시 전환하고, 없으면 `ChargeLoop` 자기 연결을 해제해 현재 루프 끝에서 종료한다. 섹션 계약과 Row 값 재사용 규칙은 위 "공격 제어 규칙" 참고.
   - **미구현(후속):** 실제 공중 포물선(JumpForce)·도약 중 호밍, `Erosion_Value`(침식)·`Action_Guard`(액션 중 포이즈) 적용, `bCanCrit`(현재 false 고정).
   - **에디터/BP 셋업:** `ULSMonsterCombatComponent`에 `MonsterActionTable`(DT_MonsterAction)·텔레그래프 머티리얼(Circle/Box), `ULSSkillPreviewComponent`에 `DefaultPreviewMesh`를 BP에서 할당해야 텔레그래프가 보인다.
 - **강인도(Monster_Guard):** Row에는 존재하나(int32) 적용 정책 미정(위 "몬스터 DataTable 규칙" 참고).

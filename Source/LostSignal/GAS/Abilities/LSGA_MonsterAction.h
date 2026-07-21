@@ -4,6 +4,7 @@
 #include "LSGA_MonsterAction.generated.h"
 
 class UAnimMontage;
+class ULSMonsterCombatComponent;
 
 /**
  * Data-driven monster attack ability.
@@ -35,10 +36,19 @@ protected:
 
 private:
 	void HandleActionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void HandleActionChargeStarted();
+	void HandleActionChargeFinished(bool bHit);
+	void BindActionChargeDelegates(ULSMonsterCombatComponent* CombatComponent);
+	void UnbindActionChargeDelegates();
+	bool HasValidActionChargeSections() const;
 
 	/** Montage resolved from the active action row (Action_Ani) when the ability activates. */
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveActionMontage;
+
+	TWeakObjectPtr<ULSMonsterCombatComponent> ActiveCombatComponent;
+	FDelegateHandle ActionChargeStartedHandle;
+	FDelegateHandle ActionChargeFinishedHandle;
 
 	bool bEndingAbility = false;
 

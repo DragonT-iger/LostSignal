@@ -2,8 +2,11 @@
 
 #include "AbilitySystemComponent.h"
 #include "Characters/LSCharacterBase.h"
+#include "Characters/LSPlayerCharacter.h"
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Combat/LSHitboxLibrary.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "Data/LSMonsterActionRow.h"
 #include "Data/LSMonsterArchetypeRow.h"
 #include "Engine/World.h"
@@ -15,11 +18,35 @@
 #include "Skills/LSSkillAreaTypes.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "LostSignal.h"
+#include "TimerManager.h"
 
 ULSMonsterCombatComponent::ULSMonsterCombatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	DamageEffectClass = ULSGE_MonsterBasicDamage::StaticClass();
+}
+
+void ULSMonsterCombatComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner());
+	if (OwnerCharacter && OwnerCharacter->HasAuthority())
+	{
+		OwnerCharacter->GetCapsuleComponent()->OnComponentHit.AddDynamic(this, &ULSMonsterCombatComponent::HandleOwnerCapsuleHit);
+	}
+}
+
+void ULSMonsterCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	CancelActionCharge();
+
+	if (ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner()))
+	{
+		OwnerCharacter->GetCapsuleComponent()->OnComponentHit.RemoveDynamic(this, &ULSMonsterCombatComponent::HandleOwnerCapsuleHit);
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void ULSMonsterCombatComponent::ApplyArchetype(const FLSMonsterArchetypeRow& Row)
@@ -149,6 +176,7 @@ bool ULSMonsterCombatComponent::RequestAction(AActor* Target)
 	ActiveActionRowName = RowName;
 	ActiveTarget = Target;
 	bActionDashLandingValid = false; // 새 액션 시작 — 이전 도약 착지 좌표 무효화.
+	bActionUsesContactHit = false;
 
 	// 공격 시작 직전 타겟 방향으로 yaw 즉시 스냅 — 연속 공격이 이전 공격 방향을 물려받지 않게 한다.
 	// (공격 중 회전 잠금은 이 스냅된 방향을 고정하는 것으로 유지)
@@ -204,6 +232,11 @@ void ULSMonsterCombatComponent::PerformActionHit()
 		UE_LOG(LogLS, Warning, TEXT("%s: PerformActionHit skipped, active action row missing (%s)."), *GetNameSafe(OwnerCharacter), *ActiveActionRowName.ToString());
 		return;
 	}
+	if (bActionUsesContactHit)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s: 충돌형 돌진 중 LSAN_MonsterActionHit 호출을 무시합니다. ChargeHit/ChargeMiss 섹션에서 Hit Notify를 제거하세요."), *GetNameSafe(OwnerCharacter));
+		return;
+	}
 
 	// 공격 타격 시점에 사용한 액션 row 출력.
 	UE_LOG(LogLS, Log, TEXT("PerformActionHit %s: action row=%s (%s), 계수=%.2f"),
@@ -254,12 +287,31 @@ void ULSMonsterCombatComponent::PerformActionHit()
 			continue;
 		}
 
-		if (SharedCombatComponent->ApplyDamageEffectToTarget(HitActor, DamageEffectClass, 1.0f, 0.0f, Row->Action_Multiplier, false, BreakPower))
+		if (TryApplyActionDamage(*Row, HitActor, Origin, AimDir, BreakPower))
 		{
 			UniqueTargets.Add(HitActor);
-			ApplyActionCrowdControl(*Row, HitActor, Origin, AimDir, BreakPower);
 		}
 	}
+}
+
+bool ULSMonsterCombatComponent::TryApplyActionDamage(const FLSMonsterActionRow& Row, AActor* HitActor, const FVector& Origin, const FVector& AimDir, ELSBreakPowerTier BreakPower) const
+{
+	const ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner());
+	ULSCharacterCombatComponent* SharedCombatComponent = OwnerCharacter
+		? OwnerCharacter->FindComponentByClass<ULSCharacterCombatComponent>()
+		: nullptr;
+	if (!OwnerCharacter || !OwnerCharacter->HasAuthority() || !SharedCombatComponent || !DamageEffectClass || SharedCombatComponent->IsDead())
+	{
+		return false;
+	}
+
+	if (!SharedCombatComponent->ApplyDamageEffectToTarget(HitActor, DamageEffectClass, 1.0f, 0.0f, Row.Action_Multiplier, false, BreakPower))
+	{
+		return false;
+	}
+
+	ApplyActionCrowdControl(Row, HitActor, Origin, AimDir, BreakPower);
+	return true;
 }
 
 void ULSMonsterCombatComponent::ApplyActionCrowdControl(const FLSMonsterActionRow& Row, AActor* HitActor, const FVector& Origin, const FVector& AimDir, ELSBreakPowerTier BreakPower) const
@@ -324,11 +376,40 @@ void ULSMonsterCombatComponent::ComputeActionOriginAndDirection(const FLSMonster
 	OutDirection = Direction;
 }
 
+void ULSMonsterCombatComponent::ComputeActionTelegraphOriginAndDirection(
+	ELSMonsterTelegraphOrigin OriginMode,
+	FVector& OutOrigin,
+	FVector& OutDirection) const
+{
+	const AActor* OwnerActor = GetOwner();
+	OutOrigin = OwnerActor ? OwnerActor->GetActorLocation() : FVector::ZeroVector;
+	OutDirection = OwnerActor ? OwnerActor->GetActorForwardVector().GetSafeNormal2D() : FVector::ForwardVector;
+
+	const AActor* Target = OriginMode == ELSMonsterTelegraphOrigin::Target ? ActiveTarget.Get() : nullptr;
+	if (!Target)
+	{
+		return;
+	}
+
+	FVector ToTarget = Target->GetActorLocation() - OutOrigin;
+	ToTarget.Z = 0.0f;
+	if (!ToTarget.IsNearlyZero())
+	{
+		OutDirection = ToTarget.GetSafeNormal();
+	}
+	OutOrigin = Target->GetActorLocation();
+}
+
 void ULSMonsterCombatComponent::PerformActionDash()
 {
 	ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner());
 	if (!OwnerCharacter || !OwnerCharacter->HasAuthority())
 	{
+		return;
+	}
+	if (bActionUsesContactHit)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s: 충돌형 돌진에 LSAN_MonsterActionDash가 함께 호출되어 기존 도약을 무시합니다."), *GetNameSafe(OwnerCharacter));
 		return;
 	}
 
@@ -377,18 +458,146 @@ void ULSMonsterCombatComponent::PerformActionDash()
 	ActionDashRootMotionSourceID = MovementComponent->ApplyRootMotionSource(RootMotion);
 }
 
-void ULSMonsterCombatComponent::EndActionDash()
+void ULSMonsterCombatComponent::BeginActionCharge()
 {
-	if (ActionDashRootMotionSourceID == 0)
+	ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner());
+	const FLSMonsterActionRow* Row = GetActiveActionRow();
+	if (!OwnerCharacter || !OwnerCharacter->HasAuthority())
 	{
 		return;
 	}
 
-	if (const ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner()))
+	CancelActionCharge();
+	bActionUsesContactHit = true;
+	if (!Row || Row->Dash_Distance <= 0.0f || Row->Duration <= 0.0f)
 	{
-		if (UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement())
+		UE_LOG(LogLS, Warning, TEXT("%s: 충돌형 돌진 시작 실패. 활성 row의 Dash_Distance/Duration을 확인하세요."), *GetNameSafe(OwnerCharacter));
+		ActionChargeFinishedDelegate.Broadcast(false);
+		return;
+	}
+
+	UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement();
+	ActionDashDirection = OwnerCharacter->GetActorForwardVector().GetSafeNormal2D();
+	if (!MovementComponent || ActionDashDirection.IsNearlyZero())
+	{
+		ActionChargeFinishedDelegate.Broadcast(false);
+		return;
+	}
+
+	TSharedPtr<FRootMotionSource_ConstantForce> RootMotion = MakeShared<FRootMotionSource_ConstantForce>();
+	RootMotion->InstanceName = FName("MonsterActionCharge");
+	RootMotion->AccumulateMode = ERootMotionAccumulateMode::Override;
+	RootMotion->Priority = 6;
+	RootMotion->Force = ActionDashDirection * (Row->Dash_Distance / Row->Duration);
+	RootMotion->Duration = Row->Duration;
+	RootMotion->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::SetVelocity;
+	RootMotion->FinishVelocityParams.SetVelocity = FVector::ZeroVector;
+	ActionDashRootMotionSourceID = MovementComponent->ApplyRootMotionSource(RootMotion);
+
+	bActionChargeActive = ActionDashRootMotionSourceID != 0;
+	if (!bActionChargeActive)
+	{
+		ActionChargeFinishedDelegate.Broadcast(false);
+		return;
+	}
+
+	GetWorld()->GetTimerManager().SetTimer(ActionChargeTimerHandle, this, &ULSMonsterCombatComponent::HandleActionChargeTimeout, Row->Duration, false);
+	// [돌진 진단] 시작 상태 덤프.
+	UE_LOG(LogLS, Log, TEXT("[돌진] Begin %s: 소스ID=%u, Duration=%.2f, Dist=%.0f, 속도=%.0f, 방향=%s"),
+		*GetNameSafe(OwnerCharacter), ActionDashRootMotionSourceID, Row->Duration, Row->Dash_Distance,
+		Row->Dash_Distance / Row->Duration, *ActionDashDirection.ToString());
+	ActionChargeStartedDelegate.Broadcast();
+}
+
+void ULSMonsterCombatComponent::CancelActionCharge()
+{
+	bActionChargeActive = false;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ActionChargeTimerHandle);
+	}
+	EndActionDash();
+}
+
+void ULSMonsterCombatComponent::FinishActionCharge(bool bHit)
+{
+	if (!bActionChargeActive)
+	{
+		return;
+	}
+
+	bActionChargeActive = false;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ActionChargeTimerHandle);
+	}
+	EndActionDash();
+	ActionChargeFinishedDelegate.Broadcast(bHit);
+}
+
+void ULSMonsterCombatComponent::HandleActionChargeTimeout()
+{
+	// [돌진 진단] Duration 만료로 종료된 경우.
+	UE_LOG(LogLS, Log, TEXT("[돌진] Timeout 종료 %s"), *GetNameSafe(GetOwner()));
+	FinishActionCharge(false);
+}
+
+void ULSMonsterCombatComponent::HandleOwnerCapsuleHit(
+	UPrimitiveComponent* HitComponent,
+	AActor* OtherActor,
+	UPrimitiveComponent* OtherComponent,
+	FVector NormalImpulse,
+	const FHitResult& Hit)
+{
+	ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner());
+	if (!bActionChargeActive || !OwnerCharacter || !OwnerCharacter->HasAuthority() || !OtherActor || OtherActor == OwnerCharacter)
+	{
+		return;
+	}
+
+	// [돌진 진단] 돌진 중 발생한 캡슐 충돌 전부 기록.
+	{
+		UCharacterMovementComponent* DiagMovement = OwnerCharacter->GetCharacterMovement();
+		const bool bWalkable = Hit.bBlockingHit && DiagMovement && DiagMovement->IsWalkable(Hit);
+		UE_LOG(LogLS, Log, TEXT("[돌진] CapsuleHit: Other=%s(%s), Comp=%s, Blocking=%d, Walkable=%d, Normal=%s"),
+			*GetNameSafe(OtherActor), *OtherActor->GetClass()->GetName(), *GetNameSafe(OtherComponent),
+			Hit.bBlockingHit ? 1 : 0, bWalkable ? 1 : 0, *Hit.ImpactNormal.ToString());
+	}
+
+	if (ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(OtherActor))
+	{
+		ULSCharacterCombatComponent* TargetCombatComponent = PlayerCharacter->GetCharacterCombatComponent();
+		if (TargetCombatComponent && !TargetCombatComponent->IsDead())
 		{
-			MovementComponent->RemoveRootMotionSourceByID(ActionDashRootMotionSourceID);
+			if (const FLSMonsterActionRow* Row = GetActiveActionRow())
+			{
+				TryApplyActionDamage(*Row, PlayerCharacter, OwnerCharacter->GetActorLocation(), ActionDashDirection, ToBreakPowerTier(Row->Action_Impact));
+				FinishActionCharge(true);
+				return;
+			}
+		}
+
+		FinishActionCharge(false);
+		return;
+	}
+
+	UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement();
+	if (Hit.bBlockingHit && (!MovementComponent || !MovementComponent->IsWalkable(Hit)))
+	{
+		FinishActionCharge(false);
+	}
+}
+
+void ULSMonsterCombatComponent::EndActionDash()
+{
+	if (ActionDashRootMotionSourceID != 0)
+	{
+		if (const ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner()))
+		{
+			if (UCharacterMovementComponent* MovementComponent = OwnerCharacter->GetCharacterMovement())
+			{
+				MovementComponent->RemoveRootMotionSourceByID(ActionDashRootMotionSourceID);
+			}
 		}
 	}
 
@@ -396,7 +605,7 @@ void ULSMonsterCombatComponent::EndActionDash()
 	bActionDashLandingValid = false;
 }
 
-void ULSMonsterCombatComponent::BeginActionTelegraph(float Duration)
+void ULSMonsterCombatComponent::BeginActionTelegraph(float Duration, ELSMonsterTelegraphOrigin OriginMode)
 {
 	if (!ShouldShowActionTelegraph())
 	{
@@ -446,10 +655,10 @@ void ULSMonsterCombatComponent::BeginActionTelegraph(float Duration)
 
 	if (Preview->BeginAreaPreview(Spec, TelegraphMaterial))
 	{
-		// 도약 액션이면 착지 예정 지점/방향에 표시(비-도약은 몬스터 현재 위치·방향).
+		// NotifyState가 선택한 시전자/타겟의 Begin 시점 위치에 한 번 배치한다.
 		FVector PreviewOrigin;
 		FVector PreviewDirection;
-		ComputeActionOriginAndDirection(*Row, PreviewOrigin, PreviewDirection);
+		ComputeActionTelegraphOriginAndDirection(OriginMode, PreviewOrigin, PreviewDirection);
 
 		// 박스 히트박스는 원점(뒷변)에서 전방으로 뻗지만 프리뷰 메시는 중심 정렬이라,
 		// 전방 절반만큼 밀어 실제 판정과 표시를 맞춘다(플레이어 LocationOffset.X=Range_X*0.5와 동일).

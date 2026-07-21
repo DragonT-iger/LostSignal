@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AI/LSMonsterCombatComponent.h"
 #include "Animation/AnimNotifies/AnimNotifyState.h"
 #include "LSANS_MonsterActionTelegraph.generated.h"
 
@@ -18,4 +19,9 @@ public:
 	virtual void NotifyTick(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, float FrameDeltaTime, const FAnimNotifyEventReference& EventReference) override;
 	virtual void NotifyEnd(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation, const FAnimNotifyEventReference& EventReference) override;
 	virtual FString GetNotifyName_Implementation() const override;
+
+private:
+	/** 텔레그래프를 배치할 월드 위치 기준. Notify Begin 시점 위치를 사용하며 기본은 시전자다. */
+	UPROPERTY(EditAnywhere, Category="LS/Combat|Telegraph")
+	ELSMonsterTelegraphOrigin OriginMode = ELSMonsterTelegraphOrigin::Caster;
 };

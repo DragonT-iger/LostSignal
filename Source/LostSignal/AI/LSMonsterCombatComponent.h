@@ -9,9 +9,21 @@
 class UDataTable;
 class UGameplayEffect;
 class UMaterialInterface;
+class UPrimitiveComponent;
 class ULSSkillPreviewComponent;
 struct FLSMonsterArchetypeRow;
 struct FLSMonsterActionRow;
+struct FHitResult;
+
+DECLARE_MULTICAST_DELEGATE(FLSMonsterActionChargeStarted);
+DECLARE_MULTICAST_DELEGATE_OneParam(FLSMonsterActionChargeFinished, bool /* bHit */);
+
+UENUM(BlueprintType)
+enum class ELSMonsterTelegraphOrigin : uint8
+{
+	Caster UMETA(DisplayName="시전자"),
+	Target UMETA(DisplayName="타겟")
+};
 
 /**
  * Thin bridge from monster AI to GAS ability activation and data-driven action hits.
@@ -65,13 +77,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void PerformActionDash();
 
+	/** 충돌형 돌진 시작 Notify가 호출. 고정된 전방으로 이동하며 첫 플레이어 충돌 시 데미지를 적용한다. */
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void BeginActionCharge();
+
+	/** 충돌형 돌진 상태와 이동을 결과 알림 없이 정리한다. 어빌리티 종료/캔슬 시 호출. */
+	UFUNCTION(BlueprintCallable, Category="LS/Combat")
+	void CancelActionCharge();
+
 	/** 도약 루트모션 소스 제거. 어빌리티 종료/캔슬 시 호출돼 이동이 남지 않게 한다. */
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	void EndActionDash();
 
-	/** 윈드업 AnimNotifyState Begin이 호출. 활성 액션 row 범위로 텔레그래프 표시. Duration은 fill 차오름 기준 시간. */
+	/** 윈드업 AnimNotifyState Begin이 호출. 선택한 위치 기준에 활성 액션 row 범위를 표시한다. */
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
-	void BeginActionTelegraph(float Duration = 0.0f);
+	void BeginActionTelegraph(float Duration = 0.0f, ELSMonsterTelegraphOrigin OriginMode = ELSMonsterTelegraphOrigin::Caster);
 
 	/** 윈드업 AnimNotifyState Tick이 호출. 경과 시간 비율로 텔레그래프 fill을 0→1로 채운다. */
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
@@ -89,15 +109,29 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	bool HasValidDamageEffect() const;
 
+	FLSMonsterActionChargeStarted& OnActionChargeStarted() { return ActionChargeStartedDelegate; }
+	FLSMonsterActionChargeFinished& OnActionChargeFinished() { return ActionChargeFinishedDelegate; }
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 private:
 	const FLSMonsterActionRow* FindActionRow(FName RowName) const;
-	// 액션의 판정/표시 원점·방향. 도약 액션이면 착지 예정 지점(타겟까지 거리로 클램프)을 원점으로 한다.
+	// 액션의 이동/판정 원점·방향. 도약 액션이면 착지 예정 지점(타겟까지 거리로 클램프)을 원점으로 한다.
 	void ComputeActionOriginAndDirection(const FLSMonsterActionRow& Row, FVector& OutOrigin, FVector& OutDirection) const;
+	// 텔레그래프 NotifyState가 선택한 시전자/타겟 위치 기준 원점과 방향을 계산한다.
+	void ComputeActionTelegraphOriginAndDirection(ELSMonsterTelegraphOrigin OriginMode, FVector& OutOrigin, FVector& OutDirection) const;
 	// 액션 row의 CC_Type/CC_Value를 캐릭터 스킬과 같은 경로(강인도 게이트 + ApplyKnockback)로 명중 대상에 적용.
 	void ApplyActionCrowdControl(const FLSMonsterActionRow& Row, AActor* HitActor, const FVector& Origin, const FVector& AimDir, ELSBreakPowerTier BreakPower) const;
 	FName SelectActionForDistance(float Distance) const;
 	bool IsActionOnCooldown(FName RowName) const;
 	void StartActionCooldown(FName RowName, float Cooldown);
+	bool TryApplyActionDamage(const FLSMonsterActionRow& Row, AActor* HitActor, const FVector& Origin, const FVector& AimDir, ELSBreakPowerTier BreakPower) const;
+	void FinishActionCharge(bool bHit);
+	void HandleActionChargeTimeout();
+	UFUNCTION()
+	void HandleOwnerCapsuleHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit);
 	ULSSkillPreviewComponent* GetPreviewComponent() const;
 	/** 전투 프로토콜 레벨 게이팅을 끼울 확장점. 현재는 항상 표시. */
 	bool ShouldShowActionTelegraph() const;
@@ -139,6 +173,13 @@ private:
 
 	// 진행 중인 도약 루트모션 소스 ID. 0 = 없음(ERootMotionSourceID::Invalid).
 	uint16 ActionDashRootMotionSourceID = 0;
+
+	// 전용 ChargeStart Notify가 시작한 충돌형 돌진 상태. DataTable 스키마와 분리해 몽타주 저작으로 선택한다.
+	bool bActionChargeActive = false;
+	bool bActionUsesContactHit = false;
+	FTimerHandle ActionChargeTimerHandle;
+	FLSMonsterActionChargeStarted ActionChargeStartedDelegate;
+	FLSMonsterActionChargeFinished ActionChargeFinishedDelegate;
 
 	// 도약 착지 예정 지점/방향. PerformActionHit이 타격 프레임 타이밍과 무관하게 착지 위치에 데미지를 적용하도록 사용.
 	bool bActionDashLandingValid = false;
