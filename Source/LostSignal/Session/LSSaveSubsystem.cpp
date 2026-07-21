@@ -1,9 +1,11 @@
 #include "Session/LSSaveSubsystem.h"
+#include "Data/LSCraftingRecipeRow.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSDropSettings.h"
 #include "Session/LSSaveGame.h"
 #include "Session/LSSaveSettings.h"
+#include "Inventory/LSCraftingUtils.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Engine/DataTable.h"
 #include "Kismet/GameplayStatics.h"
@@ -21,6 +23,27 @@ constexpr int32 ChipEquipmentSlotCount = 10;
 // 무기/방어구 장착칸 수는 공용 상수 LSInventorySlotUtils::EquipmentSlotCount를 쓴다.
 constexpr int32 EquipmentSlotCount = LSInventorySlotUtils::EquipmentSlotCount;
 constexpr int32 EquippedSkillSlotCount = 4;
+
+namespace
+{
+bool ValidateSaveCraftingRecipeRows(const FLSCraftingRecipeRow& Recipe)
+{
+	if (!LSInventorySlotUtils::ResolveItemTradeInfo(Recipe.ResultItemRowName).bValid)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Crafting] Result item row is missing: %s"), *Recipe.ResultItemRowName.ToString());
+		return false;
+	}
+	for (const FLSCraftingMaterialCost& Material : Recipe.Materials)
+	{
+		if (!LSInventorySlotUtils::ResolveItemTradeInfo(Material.ItemRowName).bValid)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[Crafting] Material item row is missing: %s"), *Material.ItemRowName.ToString());
+			return false;
+		}
+	}
+	return true;
+}
+}
 
 const FString ULSSaveSubsystem::SlotName = TEXT("LostSignalSave");
 const FString ULSSaveSubsystem::DebugFileName = TEXT("LostSignalSave_Debug.json");
@@ -1200,6 +1223,96 @@ bool ULSSaveSubsystem::TrySpendGold(const int32 Amount)
 	SaveData->Gold -= Amount;
 	Save();
 	OnGoldChanged.Broadcast();
+	return true;
+}
+
+int32 ULSSaveSubsystem::GetCraftingOwnedItemCount(const FName ItemRowName) const
+{
+	if (!SaveData || ItemRowName.IsNone())
+	{
+		return 0;
+	}
+
+	LSCraftingUtils::FLSCraftingStorageState State;
+	State.Inventory = SaveData->Inventory;
+	State.Warehouse = SaveData->WarehouseItems;
+	return LSCraftingUtils::CountOwnedItem(State, ItemRowName);
+}
+
+int32 ULSSaveSubsystem::GetCraftableCount(const FLSCraftingRecipeRow& Recipe) const
+{
+	if (!SaveData || !LSCraftingUtils::IsRecipeValid(Recipe))
+	{
+		return 0;
+	}
+
+	LSCraftingUtils::FLSCraftingStorageState State;
+	State.Inventory = SaveData->Inventory;
+	State.Warehouse = SaveData->WarehouseItems;
+	State.Gold = SaveData->Gold;
+	return LSCraftingUtils::CalculateCraftableCount(
+		State,
+		Recipe,
+		GetMaxInventorySlotCount(),
+		GetMaxWarehouseSlotCount());
+}
+
+bool ULSSaveSubsystem::TryCraft(const FLSCraftingRecipeRow& Recipe, bool& bOutStoredInWarehouse)
+{
+	bOutStoredInWarehouse = false;
+	if (!SaveData || !LSCraftingUtils::IsRecipeValid(Recipe))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Crafting] Cannot craft an invalid recipe. Result=%s"), *Recipe.ResultItemRowName.ToString());
+		return false;
+	}
+
+	if (!ValidateSaveCraftingRecipeRows(Recipe))
+	{
+		return false;
+	}
+
+	LSCraftingUtils::FLSCraftingStorageState State;
+	State.Inventory = SaveData->Inventory;
+	State.Warehouse = SaveData->WarehouseItems;
+	State.Gold = SaveData->Gold;
+	if (LSCraftingUtils::CalculateCraftableCount(
+		State,
+		Recipe,
+		GetMaxInventorySlotCount(),
+		GetMaxWarehouseSlotCount()) <= 0)
+	{
+		return false;
+	}
+
+	TArray<FLSChipResolvedStat> ResultChipStats;
+	if (Recipe.ResultItemRowName.ToString().StartsWith(TEXT("Chip_")))
+	{
+		ResultChipStats = LSChipStats::RollChipStats(Recipe.ResultItemRowName);
+	}
+
+	if (!LSCraftingUtils::TryCraftOne(
+		State,
+		Recipe,
+		GetMaxInventorySlotCount(),
+		GetMaxWarehouseSlotCount(),
+		ResultChipStats,
+		bOutStoredInWarehouse))
+	{
+		return false;
+	}
+
+	SaveData->Inventory = MoveTemp(State.Inventory);
+	SaveData->WarehouseItems = MoveTemp(State.Warehouse);
+	SaveData->Gold = State.Gold;
+	Save();
+	if (Recipe.GoldCost > 0)
+	{
+		OnGoldChanged.Broadcast();
+	}
+
+	UE_LOG(LogLS, Log, TEXT("[Crafting] Crafted %s to %s."),
+		*Recipe.ResultItemRowName.ToString(),
+		bOutStoredInWarehouse ? TEXT("Warehouse") : TEXT("Inventory"));
 	return true;
 }
 

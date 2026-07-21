@@ -7,6 +7,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "LostSignal.h"
+#include "UI/Lobby/Crafting/LSCraftingWidget.h"
 #include "UI/Lobby/Store/LSStoreButtonWidget.h"
 #include "UI/Lobby/Store/LSVendingWidget.h"
 
@@ -39,6 +40,10 @@ void ULSStoreWidget::NativeConstruct()
 	if (!VendingWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Store] VendingWidgetClass is not set on %s."), *GetNameSafe(this));
+	}
+	if (!CraftingWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] CraftingWidgetClass is not set on %s."), *GetNameSafe(this));
 	}
 	if (!DialogueText)
 	{
@@ -99,6 +104,7 @@ void ULSStoreWidget::ResetStore()
 {
 	TalkListStartIndex = 0;
 	SetVendingVisible(false);
+	SetCraftingVisible(false);
 	ShowState(ELSStoreState::FunctionSelect);
 }
 
@@ -122,6 +128,10 @@ void ULSStoreWidget::SetVendingVisible(const bool bVisible)
 		{
 			Vending->OpenVending();
 		}
+	}
+	if (bVisible && CraftingPanel)
+	{
+		CraftingPanel->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 
@@ -174,6 +184,66 @@ void ULSStoreWidget::HandleVendingBackRequested()
 {
 	SetVendingVisible(false);
 	ShowState(ELSStoreState::FunctionSelect);
+}
+
+void ULSStoreWidget::SetCraftingVisible(const bool bVisible)
+{
+	ULSCraftingWidget* Crafting = bVisible ? EnsureCraftingWidget() : CraftingPanel.Get();
+	if (bVisible && !Crafting)
+	{
+		return;
+	}
+
+	if (SelectionPanel)
+	{
+		SelectionPanel->SetVisibility(bVisible ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+	}
+	if (VendingPanel && bVisible)
+	{
+		VendingPanel->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if (Crafting)
+	{
+		Crafting->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		if (bVisible)
+		{
+			Crafting->OpenCrafting();
+		}
+	}
+}
+
+ULSCraftingWidget* ULSStoreWidget::EnsureCraftingWidget()
+{
+	if (CraftingPanel)
+	{
+		return CraftingPanel;
+	}
+	if (!CraftingWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] Cannot open crafting. CraftingWidgetClass is not set on %s."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(GetRootWidget());
+	if (!RootCanvas || RootCanvas == SelectionPanel)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] Cannot attach crafting to the root canvas on %s."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	CraftingPanel = CreateWidget<ULSCraftingWidget>(this, CraftingWidgetClass);
+	if (!CraftingPanel)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] Failed to create crafting widget on %s."), *GetNameSafe(this));
+		return nullptr;
+	}
+
+	if (UCanvasPanelSlot* PanelSlot = RootCanvas->AddChildToCanvas(CraftingPanel))
+	{
+		PanelSlot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
+		PanelSlot->SetOffsets(FMargin(0.0f));
+	}
+	return CraftingPanel;
 }
 
 void ULSStoreWidget::HandleStoreButtonClicked(ULSStoreButtonWidget* ClickedButton)
@@ -282,10 +352,14 @@ void ULSStoreWidget::HandleClickForState(const int32 ButtonOrdinal)
 	switch (CurrentState)
 	{
 	case ELSStoreState::FunctionSelect:
-		// 자판기(0)는 구매/판매 화면으로 전환. 제작대(1)는 아직 콘텐츠가 없어 placeholder(클릭해도 동작 없음).
+		// 자판기(0)는 구매/판매, 제작대(1)는 제작 화면으로 전환한다.
 		if (ButtonOrdinal == 0)
 		{
 			SetVendingVisible(true);
+		}
+		else if (ButtonOrdinal == 1)
+		{
+			SetCraftingVisible(true);
 		}
 		else if (ButtonOrdinal == 2)
 		{

@@ -39,6 +39,10 @@ public:
 	UPROPERTY(config, EditAnywhere, Category="DataTables")
 	TSoftObjectPtr<UDataTable> StoreStockTable;
 
+	// 제작 레시피 목록(DT_CraftingRecipe, Row=FLSCraftingRecipeRow). 제작 UI가 읽는다.
+	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
+	TSoftObjectPtr<UDataTable> CraftingRecipeTable;
+
 	ULSDropSettings()
 	{
 		// 루트박스 단계 공개: 등급이 높을수록 공개 전 대기를 길게 둬 긴장감을 쌓는다.

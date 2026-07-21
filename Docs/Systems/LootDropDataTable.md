@@ -373,11 +373,11 @@ UE DeveloperSettings(`config=Game`)로 프로젝트 설정 > "LS Drop Settings"�
 
 **메뉴**: `Tools > LostSignal > Reimport DataTables`
 
-`LostSignalEditorDataToolsModule.cpp`에 등록된 10개 DataTable을 CSV에서 일괄 재임포트.
+`LostSignalEditorDataToolsModule.cpp`에 등록된 DataTable을 CSV에서 일괄 재임포트.
 
 **Python 에디터 스크립트**: `tools/reimport_datatables.py`
 
-Unreal Editor Python 환경에서 실행하면 같은 10개 DataTable을 CSV에서 재임포트한다. 누락된 `DT_Protocol` asset은 `FLSProtocolUnlockRow` 구조체로 생성한 뒤 import를 시도한다.
+Unreal Editor Python 환경에서 실행하면 스크립트의 `TARGETS`에 등록된 DataTable을 CSV에서 재임포트한다. 누락된 `DT_Protocol` asset은 `FLSProtocolUnlockRow` 구조체로 생성한 뒤 import를 시도한다.
 
 **MCP 명령** (에디터가 켜진 상태에서 깨진 테이블 복구용):
 

@@ -24,11 +24,13 @@ namespace
 		{ TEXT("DT_CharacterStat"), TEXT("DT_CharacterStat.csv") },
 		{ TEXT("DT_ChipRow"), TEXT("DT_Chip.csv") },
 		{ TEXT("DT_ChipStat"), TEXT("DT_ChipStat.csv") },
+		{ TEXT("DT_CraftingRecipe"), TEXT("DT_CraftingRecipe.csv") },
 		{ TEXT("DT_DropTable"), TEXT("DT_DropTable.csv") },
 		{ TEXT("DT_GroupTable"), TEXT("DT_GroupTable.csv") },
 		{ TEXT("DT_Item"), TEXT("DT_Item.csv") },
 		{ TEXT("DT_Protocol"), TEXT("DT_Protocol.csv") },
 		{ TEXT("DT_RootingObject"), TEXT("DT_RootingObject.csv") },
+		{ TEXT("DT_StoreStock"), TEXT("DT_StoreStock.csv") },
 		{ TEXT("DT_Weapon"), TEXT("DT_Weapon.csv") },
 	};
 }

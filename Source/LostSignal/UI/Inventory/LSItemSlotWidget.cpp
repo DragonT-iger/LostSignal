@@ -184,6 +184,14 @@ void ULSItemSlotWidget::SetSlotLocked(const bool bInLocked)
 	ApplyHoverVisual();
 }
 
+void ULSItemSlotWidget::SetAmountTextVisible(const bool bVisible) const
+{
+	if (AmountText)
+	{
+		AmountText->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+}
+
 void ULSItemSlotWidget::SetEquipCandidateHighlight(const bool bInIsCandidate)
 {
 	if (bIsEquipCandidate == bInIsCandidate)

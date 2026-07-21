@@ -15,9 +15,13 @@
 #include "Core/LSFarmingGameMode.h"
 #include "Core/LSLobbyGameMode.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Engine/GameInstance.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
+#include "Session/LSSaveSubsystem.h"
+
+#define LOCTEXT_NAMESPACE "LSProtocolDebugWidget"
 
 TSharedRef<SWidget> ULSProtocolDebugWidget::RebuildWidget()
 {
@@ -71,6 +75,13 @@ void ULSProtocolDebugWidget::BuildPanel()
 	if (UHorizontalBoxSlot* MaxSlot = ActionRow->AddChildToHorizontalBox(MaxButton))
 	{
 		MaxSlot->SetPadding(FMargin(4.f, 2.f));
+	}
+
+	UButton* AddGoldButton = MakeButton(LOCTEXT("AddGoldButton", "Gold +10,000"), 16);
+	AddGoldButton->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleAddGold);
+	if (UHorizontalBoxSlot* AddGoldSlot = ActionRow->AddChildToHorizontalBox(AddGoldButton))
+	{
+		AddGoldSlot->SetPadding(FMargin(4.f, 2.f));
 	}
 
 	if (UVerticalBoxSlot* ActionSlot = VBox->AddChildToVerticalBox(ActionRow))
@@ -258,6 +269,11 @@ void ULSProtocolDebugWidget::ApplyTimeScale(const float Scale)
 
 UButton* ULSProtocolDebugWidget::MakeButton(const FString& Label, const int32 FontSize)
 {
+	return MakeButton(FText::FromString(Label), FontSize);
+}
+
+UButton* ULSProtocolDebugWidget::MakeButton(const FText& Label, const int32 FontSize)
+{
 	UButton* Button = WidgetTree->ConstructWidget<UButton>();
 
 	UTextBlock* Text = MakeText(Label, FontSize);
@@ -269,8 +285,13 @@ UButton* ULSProtocolDebugWidget::MakeButton(const FString& Label, const int32 Fo
 
 UTextBlock* ULSProtocolDebugWidget::MakeText(const FString& InText, const int32 FontSize)
 {
+	return MakeText(FText::FromString(InText), FontSize);
+}
+
+UTextBlock* ULSProtocolDebugWidget::MakeText(const FText& InText, const int32 FontSize)
+{
 	UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>();
-	Text->SetText(FText::FromString(InText));
+	Text->SetText(InText);
 	Text->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 
 	FSlateFontInfo Font = Text->GetFont();
@@ -503,3 +524,18 @@ void ULSProtocolDebugWidget::HandleMaxAll()
 	}
 	RefreshLevelTexts();
 }
+
+void ULSProtocolDebugWidget::HandleAddGold()
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[ProtocolDebug] 골드 추가 실패: SaveSubsystem을 찾지 못했습니다."));
+		return;
+	}
+
+	SaveSubsystem->AddGold(DebugGoldAmount);
+}
+
+#undef LOCTEXT_NAMESPACE

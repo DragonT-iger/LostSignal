@@ -7,6 +7,7 @@
 class UButton;
 class UTextBlock;
 class UVerticalBox;
+class ULSCraftingWidget;
 class ULSStoreButtonWidget;
 class ULSVendingWidget;
 
@@ -39,7 +40,7 @@ struct FLSStoreTalkEntry
 // 에이베리 보급소 상점 화면(WBP_Store)의 부모 클래스. 개인정비 ContentSwitcher의 Supply 페이지에 배치된다.
 // CASHIER-9 이미지/이름표는 아트가 WBP에 고정 배치하고, C++은 버튼과 대사창 텍스트만 제어한다.
 // 버튼은 상태 전환 시 ButtonBox(버티컬 박스) 안에 WBP_StoreButton을 동적으로 생성/삭제해 채운다.
-// 자판기는 VendingPanel(구매/판매 화면)로 전환하고, 제작대는 아직 콘텐츠가 없어 placeholder로 둔다.
+// 자판기와 제작대는 각 전용 화면을 최초 진입 시 생성해 전환한다.
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSStoreWidget : public UUserWidget
 {
@@ -61,6 +62,10 @@ protected:
 	// WBP에 인스턴스를 배치하지 않고, 자판기를 처음 열 때 생성해 루트 캔버스에 전체 화면으로 붙인다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Store")
 	TSubclassOf<ULSVendingWidget> VendingWidgetClass;
+
+	// 제작 화면 위젯 클래스. BP(WBP_Store) 클래스 디폴트에서 WBP_Crafting을 매핑한다.
+	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Store")
+	TSubclassOf<ULSCraftingWidget> CraftingWidgetClass;
 
 	// 상태별 버튼들을 담는 버티컬 박스. 내용물은 C++이 동적으로 채운다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Store")
@@ -104,6 +109,12 @@ private:
 	// 자판기 위젯이 없으면 생성해 루트 캔버스에 전체 화면으로 붙인다. 실패하면 nullptr.
 	ULSVendingWidget* EnsureVendingWidget();
 
+	// 제작 화면 표시 전환. true면 기능 선택을 숨기고 최신 제작 데이터를 연다.
+	void SetCraftingVisible(bool bVisible);
+
+	// 제작 위젯이 없으면 생성해 루트 캔버스에 전체 화면으로 붙인다. 실패하면 nullptr.
+	ULSCraftingWidget* EnsureCraftingWidget();
+
 	// 클릭된 버튼의 ButtonBox 내 순서(0부터)를 상태별 의미로 해석해 분기한다.
 	void HandleClickForState(int32 ButtonOrdinal);
 
@@ -141,6 +152,10 @@ private:
 	// 런타임 생성한 자판기 화면. 처음 자판기를 열 때 만들어 재사용한다.
 	UPROPERTY(Transient)
 	TObjectPtr<ULSVendingWidget> VendingPanel;
+
+	// 지연 생성한 제작 화면. 보급소를 닫았다 다시 열 때 재사용한다.
+	UPROPERTY(Transient)
+	TObjectPtr<ULSCraftingWidget> CraftingPanel;
 
 	ELSStoreState CurrentState = ELSStoreState::FunctionSelect;
 };

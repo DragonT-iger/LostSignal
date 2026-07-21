@@ -7,6 +7,7 @@
 
 class ULSSaveGame;
 struct FLSSkillLoadout;
+struct FLSCraftingRecipeRow;
 
 // 칩 장착 슬롯 또는 신호 게이지가 바뀌면 발행된다. (전투 스탯 재적용 등에 사용)
 DECLARE_MULTICAST_DELEGATE(FLSOnChipLoadoutChanged);
@@ -50,6 +51,16 @@ public:
 	// 보유 골드가 충분하면 차감한다. 부족하거나 Amount가 0 이하이면 false. 성공 시 저장 후 OnGoldChanged 발행.
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	bool TrySpendGold(int32 Amount);
+
+	// 제작 UI 기준 보유량. 보호 슬롯은 제외하고 인벤토리와 창고를 합산한다.
+	int32 GetCraftingOwnedItemCount(FName ItemRowName) const;
+
+	// 재료/골드/결과물 공간을 모두 반영한 연속 제작 가능 횟수.
+	int32 GetCraftableCount(const FLSCraftingRecipeRow& Recipe) const;
+
+	// 제작 1회를 원자적으로 처리한다. 인벤토리 재료를 먼저 쓰고 결과물도 인벤토리에 우선 넣는다.
+	// 인벤토리에 못 넣으면 창고로 폴백하며, 양쪽 모두 불가능하면 저장 상태를 전혀 바꾸지 않는다.
+	bool TryCraft(const FLSCraftingRecipeRow& Recipe, bool& bOutStoredInWarehouse);
 
 	UFUNCTION(BlueprintCallable, Category="LS/Save")
 	void AddToInventory(const TArray<FLSSessionItem>& Items);

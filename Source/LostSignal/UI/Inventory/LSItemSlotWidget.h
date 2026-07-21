@@ -30,6 +30,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void SetSlotLocked(bool bInLocked);
 
+	// 제작 목록처럼 수량을 별도 텍스트로 표시하는 화면에서 아이콘 위 수량만 숨긴다.
+	void SetAmountTextVisible(bool bVisible) const;
+
 	// 드래그 중 이 슬롯이 "지금 끌고 있는 아이템이 장착될 장비칸"임을 알리는 후보 하이라이트를 켜고 끈다.
 	// 켜면 후보 색 틴트 + 스케일 펄스(NativeTick)로 강조한다. 장비 슬롯에만 쓴다.
 	void SetEquipCandidateHighlight(bool bInIsCandidate);

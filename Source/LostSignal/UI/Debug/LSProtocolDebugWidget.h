@@ -76,6 +76,8 @@ protected:
 	UFUNCTION()
 	void HandleMaxAll();
 	UFUNCTION()
+	void HandleAddGold();
+	UFUNCTION()
 	void HandleEndRaid();
 	UFUNCTION()
 	void HandleGoToTestMap();
@@ -94,6 +96,7 @@ protected:
 
 private:
 	static constexpr int32 MaxProtocolLevel = 8;
+	static constexpr int32 DebugGoldAmount = 10000;
 
 	void BuildPanel();
 	void BuildProtocolRow(UVerticalBox* Parent, ELSProtocolType Type, const FString& DisplayName);
@@ -102,7 +105,9 @@ private:
 	// 글로벌 타임 딜레이션을 적용하고 표시 텍스트를 갱신한다.
 	void ApplyTimeScale(float Scale);
 	UButton* MakeButton(const FString& Label, int32 FontSize);
+	UButton* MakeButton(const FText& Label, int32 FontSize);
 	UTextBlock* MakeText(const FString& InText, int32 FontSize);
+	UTextBlock* MakeText(const FText& InText, int32 FontSize);
 
 	ALSPlayerControllerBase* ResolvePC() const;
 	// 현재 레이드 진행 중인지 — 소유 PC 의 레이드 인벤토리 활성 여부로 판정.
