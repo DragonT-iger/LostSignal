@@ -23,6 +23,7 @@ void ULSCraftingRowWidget::NativeConstruct()
 	if (SelectionBorder)
 	{
 		NormalBorderColor = SelectionBorder->GetBrushColor();
+		RefreshBorderColor();
 	}
 }
 
@@ -42,9 +43,11 @@ void ULSCraftingRowWidget::SetRecipe(
 	const FName InRecipeRowName,
 	const FName ResultItemRowName,
 	const FText& ItemName,
-	const int32 OwnedAmount)
+	const int32 OwnedAmount,
+	const bool bInCraftable)
 {
 	RecipeRowName = InRecipeRowName;
+	bCraftable = bInCraftable;
 	if (ItemSlot)
 	{
 		ItemSlot->SetDisplayOnlySlotContext();
@@ -59,12 +62,20 @@ void ULSCraftingRowWidget::SetRecipe(
 	{
 		OwnedCountText->SetText(FText::AsNumber(OwnedAmount));
 	}
+	RefreshBorderColor();
 }
 
-void ULSCraftingRowWidget::SetSelected(const bool bSelected) const
+void ULSCraftingRowWidget::SetSelected(const bool bSelected)
+{
+	bIsSelected = bSelected;
+	RefreshBorderColor();
+}
+
+void ULSCraftingRowWidget::RefreshBorderColor() const
 {
 	if (SelectionBorder)
 	{
-		SelectionBorder->SetBrushColor(bSelected ? SelectedBorderColor : NormalBorderColor);
+		SelectionBorder->SetBrushColor(
+			bIsSelected ? SelectedBorderColor : (bCraftable ? CraftableBorderColor : NormalBorderColor));
 	}
 }

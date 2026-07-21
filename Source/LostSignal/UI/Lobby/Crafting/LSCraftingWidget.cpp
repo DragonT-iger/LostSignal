@@ -273,7 +273,8 @@ ULSCraftingRowWidget* ULSCraftingWidget::CreateRecipeRow(
 	const int32 OwnedAmount = SaveSubsystem
 		? SaveSubsystem->GetCraftingOwnedItemCount(Entry.Recipe.ResultItemRowName)
 		: 0;
-	NewRow->SetRecipe(Entry.RowName, Entry.Recipe.ResultItemRowName, Info.Name, OwnedAmount);
+	const bool bCraftable = SaveSubsystem && SaveSubsystem->GetCraftableCount(Entry.Recipe) > 0;
+	NewRow->SetRecipe(Entry.RowName, Entry.Recipe.ResultItemRowName, Info.Name, OwnedAmount, bCraftable);
 	NewRow->OnClicked.AddDynamic(this, &ULSCraftingWidget::HandleRecipeClicked);
 	return NewRow;
 }
@@ -319,7 +320,13 @@ void ULSCraftingWidget::RefreshRecipeRows()
 		const int32 OwnedAmount = SaveSubsystem
 			? SaveSubsystem->GetCraftingOwnedItemCount(Entry->Recipe.ResultItemRowName)
 			: 0;
-		RecipeRow->SetRecipe(Entry->RowName, Entry->Recipe.ResultItemRowName, Info.Name, OwnedAmount);
+		const bool bCraftable = SaveSubsystem && SaveSubsystem->GetCraftableCount(Entry->Recipe) > 0;
+		RecipeRow->SetRecipe(
+			Entry->RowName,
+			Entry->Recipe.ResultItemRowName,
+			Info.Name,
+			OwnedAmount,
+			bCraftable);
 	}
 }
 
