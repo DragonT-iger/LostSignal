@@ -1,6 +1,7 @@
 #include "Gameplay/LSInteractableObject.h"
 
 #include "Characters/LSPlayerCharacter.h"
+#include "Components/MeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -37,6 +38,7 @@ void ALSInteractableObject::BeginPlay()
 	InteractionSphere->OnComponentBeginOverlap.AddDynamic(this, &ALSInteractableObject::OnSphereBeginOverlap);
 	InteractionSphere->OnComponentEndOverlap.AddDynamic(this, &ALSInteractableObject::OnSphereEndOverlap);
 	InteractionSphere->UpdateOverlaps();
+	GatherOutlineMeshes();
 	RefreshWidgetVisibility();
 
 	if (UWorld* World = GetWorld())
@@ -49,6 +51,13 @@ void ALSInteractableObject::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	RefreshWidgetVisibility();
+}
+
+void ALSInteractableObject::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 하이라이트 중 파괴·레벨 전환 시 커스텀뎁스가 켜진 채 남지 않게 확실히 끈다.
+	ApplyOutlineState(false);
+	Super::EndPlay(EndPlayReason);
 }
 
 bool ALSInteractableObject::CanInteract_Implementation(APawn* Interactor)
@@ -67,6 +76,67 @@ FText ALSInteractableObject::GetInteractText_Implementation()
 
 void ALSInteractableObject::HandleLocalPawnEndOverlap(APawn* Pawn)
 {
+}
+
+void ALSInteractableObject::SetProximityOutlineEnabled(bool bEnabled)
+{
+	bEnableProximityOutline = bEnabled;
+	if (!bEnabled)
+	{
+		ApplyOutlineState(false);
+	}
+	else
+	{
+		RefreshWidgetVisibility();
+	}
+}
+
+void ALSInteractableObject::GatherOutlineMeshes()
+{
+	OutlineMeshes.Reset();
+
+	TArray<UMeshComponent*> Meshes;
+	GetComponents<UMeshComponent>(Meshes);
+	for (UMeshComponent* Mesh : Meshes)
+	{
+		if (!Mesh || Mesh->IsA<UWidgetComponent>())
+		{
+			// 힌트 위젯(UWidgetComponent도 UMeshComponent를 상속)은 아웃라인 대상이 아니다.
+			continue;
+		}
+		if (Mesh->bRenderCustomDepth)
+		{
+			// 이미 커스텀뎁스를 쓰는 메시(예: 마커 스텐실 253)는 건드리지 않는다.
+			UE_LOG(LogLS, Log,
+				TEXT("[Outline] %s의 %s는 이미 CustomDepth 사용(Stencil=%d) — 근접 아웃라인 대상에서 제외."),
+				*GetNameSafe(this), *GetNameSafe(Mesh), Mesh->CustomDepthStencilValue);
+			continue;
+		}
+		OutlineMeshes.Add(Mesh);
+	}
+}
+
+void ALSInteractableObject::ApplyOutlineState(bool bWantOutline)
+{
+	const bool bTarget = bWantOutline && bEnableProximityOutline;
+	if (bTarget == bOutlineActive)
+	{
+		// 매 틱 렌더 플래그를 다시 세팅하지 않도록 전이 시에만 적용한다.
+		return;
+	}
+	bOutlineActive = bTarget;
+
+	for (const TWeakObjectPtr<UMeshComponent>& WeakMesh : OutlineMeshes)
+	{
+		if (UMeshComponent* Mesh = WeakMesh.Get())
+		{
+			if (bTarget)
+			{
+				Mesh->SetCustomDepthStencilValue(OutlineStencilValue);
+			}
+			Mesh->SetRenderCustomDepth(bTarget);
+		}
+	}
 }
 
 void ALSInteractableObject::RefreshWidgetVisibility()
@@ -90,6 +160,7 @@ void ALSInteractableObject::RefreshWidgetVisibility()
 		LSChar->ResolveBestInteractTarget() == this;
 
 	InteractWidget->SetHiddenInGame(!bShouldShow);
+	ApplyOutlineState(bShouldShow);
 	SetActorTickEnabled(Pawn != nullptr);
 }
 
@@ -120,6 +191,8 @@ void ALSInteractableObject::OnSphereEndOverlap(UPrimitiveComponent* OverlappedCo
 	}
 
 	InteractWidget->SetHiddenInGame(true);
+	// 이 경로는 RefreshWidgetVisibility를 호출하지 않으므로 아웃라인을 명시적으로 끈다.
+	ApplyOutlineState(false);
 	SetActorTickEnabled(false);
 }
 
