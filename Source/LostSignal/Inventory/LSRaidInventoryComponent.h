@@ -31,6 +31,9 @@ public:
 	bool DropExternalItemToSessionSlot(FLSSessionItem& InOutExternalItem, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool GetSessionSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, FLSSessionItem& OutItem) const;
 	bool ClearSessionSlot(ELSInventorySlotArea SlotArea, int32 SlotIndex);
+	// 세션 인벤토리(금고 제외)에서 ItemRowName을 Amount만큼 제거한다. 서버 권한 가정. 실제 제거된 수량 반환.
+	// 소모품 사용 시 수량 차감에 쓴다(차감 소스는 일반 인벤토리로 한정).
+	int32 ConsumeSessionItem(FName ItemRowName, int32 Amount);
 	bool ReplaceSessionSlotItem(ELSInventorySlotArea SlotArea, int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem);
 
 private:

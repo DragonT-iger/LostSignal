@@ -1461,11 +1461,10 @@ bool ULSSaveSubsystem::SetQuickSlot(const int32 SlotIndex, const FName ItemRowNa
 		return ClearQuickSlot(SlotIndex);
 	}
 
-	// 소모품(Item_Type 4~9)만 등록을 허용한다.
-	const LSInventorySlotUtils::FLSItemTradeInfo TradeInfo = LSInventorySlotUtils::ResolveItemTradeInfo(ItemRowName);
-	if (!TradeInfo.bValid || TradeInfo.ItemType < 4 || TradeInfo.ItemType > 9)
+	// 소모품만 등록을 허용한다. RowName에 "Consumable"이 포함된 아이템을 소모품으로 판정한다.
+	if (!ItemRowName.ToString().Contains(TEXT("Consumable")))
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Save] SetQuickSlot rejected non-consumable '%s' (Item_Type=%d)"), *ItemRowName.ToString(), TradeInfo.ItemType);
+		UE_LOG(LogLS, Warning, TEXT("[Save] SetQuickSlot rejected non-consumable '%s'"), *ItemRowName.ToString());
 		return false;
 	}
 

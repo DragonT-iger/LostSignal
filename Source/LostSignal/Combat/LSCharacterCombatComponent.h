@@ -86,6 +86,13 @@ public:
 	 */
 	bool ApplyConsumableEffects(const FLSConsumableRow& ConsumableRow, AActor* HitTarget = nullptr) const;
 
+	/**
+	 * 투척 소모품용: 범위 내 적 대상들에게 효과를 적용한다(서버 전용).
+	 * Self 효과는 소유자에게 1회, Enemy 효과는 AreaEnemyTargets 각각에 적용한다(Self 중복 적용 방지).
+	 * @return 효과 중 하나라도 적용되면 true
+	 */
+	bool ApplyConsumableEffectsInArea(const FLSConsumableRow& ConsumableRow, const TArray<AActor*>& AreaEnemyTargets) const;
+
 protected:
 	virtual void BeginPlay() override;
 

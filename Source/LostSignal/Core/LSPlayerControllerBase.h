@@ -106,6 +106,11 @@ public:
 	// 창 주도 편집 직후 호출한다. (칩 스테이션 내부 빠른 장착 경로에서는 호출하지 않는다 — 쓸기 중 리스트 재정렬 방지.)
 	void RefreshOpenChipStationWidget();
 
+	// 소모품 시전 게이지 표시/숨김. HUD의 스킬 캐스팅 게이지(ShowSkillCastGauge)를 재사용한다.
+	// 로컬 컨트롤러 + HUD 존재 시에만 동작한다.
+	void ShowCastGauge(const FText& Label, float Duration);
+	void HideCastGauge();
+
 	void RefreshLootDropWidgetForSource(ALSLootBox* SourceLootBox, const TArray<FLSDropResult>& Results);
 	void SyncRaidInventoryToClient();
 	void RequestRaidEntryDataForRaidStart();
@@ -229,9 +234,9 @@ protected:
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSInventoryWidget> LobbyInventoryWidgetInstance;
 
-	// 현재 화면에 떠 있는 퀵슬롯 바(로비 또는 레이드 HUD). 바 위젯이 스스로 등록/해제한다.
-	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSQuickSlotBarWidget> ActiveQuickSlotBar;
+	// 현재 등록된 퀵슬롯 바들. 인벤토리 패널의 바와 HUD의 바가 동시에 떠 있을 수 있으므로 배열로 모두 들고 함께 갱신한다.
+	// 바 위젯이 스스로 등록/해제하며, 약참조라 미해제 시에도 dangling이 없다.
+	TArray<TWeakObjectPtr<ULSQuickSlotBarWidget>> RegisteredQuickSlotBars;
 
 	// 시연용 프로토콜 조정 패널 인스턴스.
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug")

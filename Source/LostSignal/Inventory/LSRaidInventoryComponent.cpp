@@ -1,5 +1,6 @@
 #include "Inventory/LSRaidInventoryComponent.h"
 
+#include "Inventory/LSCraftingUtils.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
@@ -139,6 +140,25 @@ bool ULSRaidInventoryComponent::ClearSessionSlot(const ELSInventorySlotArea Slot
 
 	(*Slots)[SlotIndex] = LSInventorySlotUtils::MakeEmptyItem();
 	return true;
+}
+
+int32 ULSRaidInventoryComponent::ConsumeSessionItem(const FName ItemRowName, const int32 Amount)
+{
+	if (ItemRowName.IsNone() || Amount <= 0)
+	{
+		return 0;
+	}
+
+	// 차감 소스는 일반 인벤토리로 한정한다(금고 제외).
+	const int32 Before = LSCraftingUtils::CountItem(SessionInventory, ItemRowName);
+	if (Before <= 0)
+	{
+		return 0;
+	}
+
+	LSInventorySlotUtils::RemoveItemsFromSlotArray(SessionInventory, ItemRowName, Amount);
+	const int32 After = LSCraftingUtils::CountItem(SessionInventory, ItemRowName);
+	return Before - After;
 }
 
 bool ULSRaidInventoryComponent::ReplaceSessionSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, const FLSSessionItem& NewItem, FLSSessionItem& OutPreviousItem)

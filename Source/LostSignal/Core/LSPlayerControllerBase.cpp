@@ -316,14 +316,39 @@ void ALSPlayerControllerBase::UnregisterLobbyInventoryWidget(const ULSInventoryW
 
 void ALSPlayerControllerBase::RegisterQuickSlotBar(ULSQuickSlotBarWidget* InWidget)
 {
-	ActiveQuickSlotBar = InWidget;
+	if (!InWidget)
+	{
+		return;
+	}
+
+	// 무효 참조 정리 후 중복 없이 등록한다(인벤토리 바 + HUD 바 공존 가능).
+	RegisteredQuickSlotBars.RemoveAll([](const TWeakObjectPtr<ULSQuickSlotBarWidget>& Bar) { return !Bar.IsValid(); });
+	RegisteredQuickSlotBars.AddUnique(InWidget);
 }
 
 void ALSPlayerControllerBase::UnregisterQuickSlotBar(const ULSQuickSlotBarWidget* InWidget)
 {
-	if (ActiveQuickSlotBar == InWidget)
+	RegisteredQuickSlotBars.RemoveAll([InWidget](const TWeakObjectPtr<ULSQuickSlotBarWidget>& Bar)
 	{
-		ActiveQuickSlotBar = nullptr;
+		return !Bar.IsValid() || Bar.Get() == InWidget;
+	});
+}
+
+void ALSPlayerControllerBase::ShowCastGauge(const FText& Label, const float Duration)
+{
+	if (!IsLocalPlayerController() || !PlayerHUDWidgetInstance)
+	{
+		return;
+	}
+
+	PlayerHUDWidgetInstance->ShowSkillCastGauge(Label, FMath::Max(Duration, 0.0f));
+}
+
+void ALSPlayerControllerBase::HideCastGauge()
+{
+	if (PlayerHUDWidgetInstance)
+	{
+		PlayerHUDWidgetInstance->HideSkillCastGauge();
 	}
 }
 
@@ -374,10 +399,17 @@ void ALSPlayerControllerBase::RefreshAllInventoryUI()
 	RefreshOpenLobbyStorageWidget();
 	RefreshOpenChipStationWidget();
 
-	// 퀵슬롯 개수는 인벤토리에서 실시간 합산하므로, 인벤토리가 바뀔 때마다 활성 바를 다시 그린다.
-	if (ActiveQuickSlotBar)
+	// 퀵슬롯 개수는 인벤토리에서 실시간 합산하므로, 인벤토리가 바뀔 때마다 등록된 모든 바(인벤토리+HUD)를 다시 그린다.
+	for (int32 Index = RegisteredQuickSlotBars.Num() - 1; Index >= 0; --Index)
 	{
-		ActiveQuickSlotBar->RefreshAll();
+		if (ULSQuickSlotBarWidget* Bar = RegisteredQuickSlotBars[Index].Get())
+		{
+			Bar->RefreshAll();
+		}
+		else
+		{
+			RegisteredQuickSlotBars.RemoveAt(Index);
+		}
 	}
 }
 

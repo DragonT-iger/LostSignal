@@ -3,6 +3,7 @@
 #include "Characters/LSPlayerCharacter.h"
 
 #include "Camera/CameraComponent.h"
+#include "Characters/Enemys/LSEnemyCharacter.h"
 #include "Characters/LSChipStatComponent.h"
 #include "Characters/LSEquipmentStatComponent.h"
 #include "Combat/LSAimComponent.h"
@@ -10,6 +11,14 @@
 #include "Combat/LSPlayerCombatComponent.h"
 #include "Core/LSFarmingGameMode.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Data/LSConsumableRow.h"
+#include "Data/LSGameDataSubsystem.h"
+#include "Engine/GameInstance.h"
+#include "Inventory/LSCraftingUtils.h"
+#include "Inventory/LSInventorySlotUtils.h"
+#include "Inventory/LSRaidInventoryComponent.h"
+#include "Session/LSSaveSubsystem.h"
+#include "TimerManager.h"
 #include "EnhancedInputComponent.h"
 #include "AbilitySystemComponent.h"
 #include "GAS/LSCharacterAttributeSet.h"
@@ -27,6 +36,7 @@
 #include "InputActionValue.h"
 #include "LostSignal.h"
 #include "Skills/LSPlayerSkillComponent.h"
+#include "Skills/LSSkillAreaTypes.h"
 #include "Skills/Preview/LSSkillPreviewComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/Inventory/LSInventoryWidget.h"
@@ -150,6 +160,7 @@ void ALSPlayerCharacter::Tick(float DeltaSeconds)
 
 	UpdateInventoryWidgetDistance();
 	UpdateActiveSkillPreview();
+	UpdateThrowAim();
 	UpdateRunStamina(DeltaSeconds);
 	UpdateStaminaRecovery(DeltaSeconds);
 	UpdateHealthRecovery(DeltaSeconds);
@@ -306,6 +317,13 @@ void ALSPlayerCharacter::OnAttack()
 		return;
 	}
 
+	// 투척 조준 중이면 좌클릭으로 착탄 지점을 확정한다(기본 공격보다 우선).
+	if (bIsThrowAiming)
+	{
+		ConfirmThrowAim();
+		return;
+	}
+
 	if (PlayerSkillComponent && PlayerSkillComponent->IsPreviewingSkill())
 	{
 		if (!ConfirmActiveSkillPreview())
@@ -348,7 +366,7 @@ void ALSPlayerCharacter::OnDash()
 		return;
 	}
 
-	if (CancelActiveSkillPreview())
+	if (CancelThrowAim() || CancelActiveSkillPreview())
 	{
 		return;
 	}
@@ -389,13 +407,17 @@ void ALSPlayerCharacter::OnDash()
 
 void ALSPlayerCharacter::OnSkillPreviewCancelInput()
 {
+	if (CancelThrowAim())
+	{
+		return;
+	}
 	CancelActiveSkillPreview();
 }
 
 void ALSPlayerCharacter::OnSkill1()
 {
-	// 우클릭 겸용: 스킬 프리뷰 중이면 취소, 아니면 스킬1 발동/프리뷰. (우클릭엔 IA_Skill1만 매핑 — IA_SkillCancel 중복 금지)
-	if (CancelActiveSkillPreview())
+	// 우클릭 겸용: 투척 조준/스킬 프리뷰 중이면 취소, 아니면 스킬1 발동/프리뷰. (우클릭엔 IA_Skill1만 매핑 — IA_SkillCancel 중복 금지)
+	if (CancelThrowAim() || CancelActiveSkillPreview())
 	{
 		return;
 	}
@@ -408,12 +430,496 @@ void ALSPlayerCharacter::OnSkill1Released() { HandleSkillInputReleased(ELSPlayer
 void ALSPlayerCharacter::OnSkill2Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill2); }
 void ALSPlayerCharacter::OnSkill3Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill3); }
 void ALSPlayerCharacter::OnSkill4Released() { HandleSkillInputReleased(ELSPlayerSkillSlot::Skill4); }
-void ALSPlayerCharacter::OnItem1() {}
-void ALSPlayerCharacter::OnItem2() {}
-void ALSPlayerCharacter::OnItem3() {}
-void ALSPlayerCharacter::OnItem4() {}
-void ALSPlayerCharacter::OnItem5() {}
-void ALSPlayerCharacter::OnItem6() {}
+void ALSPlayerCharacter::OnItem1() { TryUseQuickSlot(0); }
+void ALSPlayerCharacter::OnItem2() { TryUseQuickSlot(1); }
+void ALSPlayerCharacter::OnItem3() { TryUseQuickSlot(2); }
+void ALSPlayerCharacter::OnItem4() { TryUseQuickSlot(3); }
+void ALSPlayerCharacter::OnItem5() { TryUseQuickSlot(4); }
+void ALSPlayerCharacter::OnItem6() { TryUseQuickSlot(5); }
+
+void ALSPlayerCharacter::TryUseQuickSlot(const int32 QuickSlotIndex)
+{
+	if (!IsLocallyControlled() || bIsConsumableCasting)
+	{
+		return;
+	}
+
+	// 투척 조준 중 아이템 키 재입력은 조준을 취소한다(확정은 좌클릭).
+	if (bIsThrowAiming)
+	{
+		CancelThrowAim();
+		return;
+	}
+
+	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	if (!GameInstance)
+	{
+		return;
+	}
+
+	// 1) 퀵슬롯 등록 소모품 RowName 조회.
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<ULSSaveSubsystem>();
+	if (!SaveSubsystem || !SaveSubsystem->GetQuickSlots().IsValidIndex(QuickSlotIndex))
+	{
+		return;
+	}
+	const FName ItemRowName = SaveSubsystem->GetQuickSlots()[QuickSlotIndex];
+	if (ItemRowName.IsNone())
+	{
+		UE_LOG(LogLS, Verbose, TEXT("[Consumable] 사용 실패: 퀵슬롯 %d 비어 있음."), QuickSlotIndex);
+		return;
+	}
+
+	// 2) 소모품 거동 정의 조회.
+	const ULSGameDataSubsystem* GameData = GameInstance->GetSubsystem<ULSGameDataSubsystem>();
+	const FLSConsumableRow* ConsumableDef = GameData ? GameData->FindConsumableRow(ItemRowName, TEXT("TryUseQuickSlot")) : nullptr;
+	if (!ConsumableDef)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[QuickSlot] No DT_Consumable row for '%s'."), *ItemRowName.ToString());
+		return;
+	}
+
+	// 3) 레이드 중 + 보유 수량 확인(클라 미러 기준 선검사).
+	const ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>();
+	const ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
+	if (!RaidInventory || !RaidInventory->IsRaidActive())
+	{
+		return;
+	}
+	if (LSCraftingUtils::CountItem(RaidInventory->GetSessionInventory(), ItemRowName) < 1)
+	{
+		UE_LOG(LogLS, Log, TEXT("[Consumable] 사용 실패: '%s' 보유 수량 없음."), *ItemRowName.ToString());
+		return;
+	}
+
+	// 투척형은 조준(범위 인디케이터)부터, 그 외는 즉시(시전 시간 반영) 사용한다.
+	if (ConsumableDef->Item_Use_Type == ELSConsumableUseType::Throwable)
+	{
+		BeginThrowAim(ItemRowName, *ConsumableDef);
+		return;
+	}
+
+	bPendingThrow = false;
+	BeginConsumableCast(ItemRowName, *ConsumableDef);
+}
+
+void ALSPlayerCharacter::BeginConsumableCast(const FName ItemRowName, const FLSConsumableRow& ConsumableDef)
+{
+	CastingConsumableRowName = ItemRowName;
+	PendingTriggerDelay = FMath::Max(ConsumableDef.Item_Trigger_Delay, 0.0f);
+
+	// 시전 시간이 없으면 게이지 없이 바로 완료 처리로 넘어간다.
+	if (ConsumableDef.Item_Cast_Time <= 0.0f)
+	{
+		bIsConsumableCasting = false;
+		HandleConsumableCastComplete();
+		return;
+	}
+
+	bIsConsumableCasting = true;
+	bCastAllowsMove = ConsumableDef.Item_Can_Move;
+
+	if (ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>())
+	{
+		const LSInventorySlotUtils::FLSItemTradeInfo TradeInfo = LSInventorySlotUtils::ResolveItemTradeInfo(ItemRowName);
+		PlayerController->ShowCastGauge(TradeInfo.bValid ? TradeInfo.Name : FText::FromName(ItemRowName), ConsumableDef.Item_Cast_Time);
+	}
+
+	GetWorldTimerManager().SetTimer(ConsumableCastCompleteTimer, this, &ALSPlayerCharacter::HandleConsumableCastComplete, ConsumableDef.Item_Cast_Time, false);
+}
+
+void ALSPlayerCharacter::HandleConsumableCastComplete()
+{
+	// 시전 구간 종료(여기부터는 취소 불가). 게이지를 내린다.
+	bIsConsumableCasting = false;
+	if (ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>())
+	{
+		PlayerController->HideCastGauge();
+	}
+
+	if (PendingTriggerDelay > 0.0f)
+	{
+		GetWorldTimerManager().SetTimer(ConsumableTriggerDelayTimer, this, &ALSPlayerCharacter::FinishConsumableUse, PendingTriggerDelay, false);
+		return;
+	}
+
+	FinishConsumableUse();
+}
+
+void ALSPlayerCharacter::FinishConsumableUse()
+{
+	const FName ItemRowName = CastingConsumableRowName;
+	CastingConsumableRowName = NAME_None;
+	if (ItemRowName.IsNone())
+	{
+		bPendingThrow = false;
+		return;
+	}
+
+	// 투척 확정이면 착탄 지점을 함께 서버로 보낸다.
+	if (bPendingThrow)
+	{
+		const FVector TargetLocation = PendingThrowTargetLocation;
+		bPendingThrow = false;
+		if (HasAuthority())
+		{
+			UseThrownConsumableAuthoritative(ItemRowName, TargetLocation);
+		}
+		else
+		{
+			ServerUseThrownConsumable(ItemRowName, TargetLocation);
+		}
+		return;
+	}
+
+	if (HasAuthority())
+	{
+		UseConsumableAuthoritative(ItemRowName);
+	}
+	else
+	{
+		ServerUseConsumable(ItemRowName);
+	}
+}
+
+void ALSPlayerCharacter::CancelConsumableCast()
+{
+	if (!bIsConsumableCasting)
+	{
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(ConsumableCastCompleteTimer);
+	bIsConsumableCasting = false;
+	CastingConsumableRowName = NAME_None;
+	bPendingThrow = false;
+
+	if (ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>())
+	{
+		PlayerController->HideCastGauge();
+	}
+}
+
+void ALSPlayerCharacter::ServerUseConsumable_Implementation(const FName ItemRowName)
+{
+	UseConsumableAuthoritative(ItemRowName);
+}
+
+void ALSPlayerCharacter::UseConsumableAuthoritative(const FName ItemRowName)
+{
+	if (!HasAuthority() || ItemRowName.IsNone())
+	{
+		return;
+	}
+
+	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	const FLSConsumableRow* ConsumableDef = GameData ? GameData->FindConsumableRow(ItemRowName, TEXT("UseConsumableAuthoritative")) : nullptr;
+	if (!ConsumableDef)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[QuickSlot] No DT_Consumable row for '%s' on server."), *ItemRowName.ToString());
+		return;
+	}
+
+	ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>();
+	ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
+	if (!RaidInventory || !RaidInventory->IsRaidActive())
+	{
+		return;
+	}
+
+	// 그새 소진돼 없으면 사용하지 않는다(서버 재검증).
+	if (LSCraftingUtils::CountItem(RaidInventory->GetSessionInventory(), ItemRowName) < 1)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Consumable] 사용 실패: '%s' 보유 수량 없음."), *ItemRowName.ToString());
+		return;
+	}
+
+	// 효과 적용(대상=자기 자신). 소모품 효과 코어가 서버 권한을 다시 검증한다.
+	bool bApplied = false;
+	if (ULSCharacterCombatComponent* CombatComponent = GetCharacterCombatComponent())
+	{
+		bApplied = CombatComponent->ApplyConsumableEffects(*ConsumableDef);
+	}
+
+	// 수량 1 차감 후 클라로 미러(퀵슬롯/인벤토리 개수 갱신).
+	RaidInventory->ConsumeSessionItem(ItemRowName, 1);
+	PlayerController->SyncRaidInventoryToClient();
+
+	UE_LOG(LogLS, Log, TEXT("[Consumable] 사용 성공: '%s'%s."), *ItemRowName.ToString(), bApplied ? TEXT("") : TEXT(" (적용된 효과 없음)"));
+}
+
+namespace
+{
+// 소모품 Row의 도형/크기를 스킬 범위 인디케이터 스펙으로 변환한다(투척물은 착탄 지점 기준).
+FLSSkillAreaPreviewSpec BuildConsumableThrowPreviewSpec(const FLSConsumableRow& Row)
+{
+	FLSSkillAreaPreviewSpec Spec;
+	Spec.LocationMode = ELSSkillPreviewLocationMode::MouseWorld;
+	switch (Row.Item_Range_Shape)
+	{
+	case ELSConsumableRangeShape::Cone:
+		Spec.Shape = ELSSkillAreaShape::Circle;
+		Spec.Radius = Row.Item_Range_X;
+		Spec.Degrees = Row.Item_Range_Y;
+		break;
+	case ELSConsumableRangeShape::Box:
+		Spec.Shape = ELSSkillAreaShape::Box;
+		Spec.BoxLength = Row.Item_Range_X;
+		Spec.BoxWidth = Row.Item_Range_Y;
+		break;
+	case ELSConsumableRangeShape::Sphere:
+	case ELSConsumableRangeShape::None:
+	default:
+		Spec.Shape = ELSSkillAreaShape::Circle;
+		Spec.Radius = Row.Item_Range_X;
+		Spec.Degrees = 360.0f;
+		break;
+	}
+	return Spec;
+}
+}
+
+ULSSkillPreviewComponent* ALSPlayerCharacter::ResolveSkillPreviewComponent() const
+{
+	return FindComponentByClass<ULSSkillPreviewComponent>();
+}
+
+void ALSPlayerCharacter::BeginThrowAim(const FName ItemRowName, const FLSConsumableRow& ConsumableDef)
+{
+	if (bIsThrowAiming || bIsConsumableCasting)
+	{
+		return;
+	}
+
+	ULSSkillPreviewComponent* PreviewComponent = ResolveSkillPreviewComponent();
+	if (!PreviewComponent)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[QuickSlot] 투척 조준 실패: ULSSkillPreviewComponent가 없음(%s)."), *GetNameSafe(this));
+		return;
+	}
+
+	if (!PreviewComponent->BeginAreaPreview(BuildConsumableThrowPreviewSpec(ConsumableDef)))
+	{
+		return;
+	}
+
+	bIsThrowAiming = true;
+	ThrowAimRowName = ItemRowName;
+	ThrowAimCastRange = FMath::Max(ConsumableDef.Item_Cast_Range, 0.0f);
+	ThrowAimTargetLocation = GetActorLocation();
+	UpdateThrowAim();
+}
+
+void ALSPlayerCharacter::UpdateThrowAim()
+{
+	if (!bIsThrowAiming)
+	{
+		return;
+	}
+
+	ULSSkillPreviewComponent* PreviewComponent = ResolveSkillPreviewComponent();
+	if (!PreviewComponent)
+	{
+		return;
+	}
+
+	FVector MouseWorldPoint = FVector::ZeroVector;
+	if (!ResolveMouseWorldPoint(MouseWorldPoint))
+	{
+		return;
+	}
+
+	// 사거리 clamp(소유자 기준 2D).
+	const FVector OwnerLocation = GetActorLocation();
+	FVector ToTarget = MouseWorldPoint - OwnerLocation;
+	ToTarget.Z = 0.0f;
+	const float Distance = ToTarget.Size();
+	FVector TargetLocation = MouseWorldPoint;
+	if (ThrowAimCastRange > 0.0f && Distance > ThrowAimCastRange && Distance > KINDA_SMALL_NUMBER)
+	{
+		TargetLocation = OwnerLocation + (ToTarget / Distance * ThrowAimCastRange);
+		TargetLocation.Z = MouseWorldPoint.Z;
+	}
+
+	ThrowAimTargetLocation = TargetLocation;
+
+	FVector AimDirection = TargetLocation - OwnerLocation;
+	AimDirection.Z = 0.0f;
+	if (AimDirection.IsNearlyZero())
+	{
+		AimDirection = GetActorForwardVector();
+	}
+
+	PreviewComponent->UpdateAreaPreview(TargetLocation, AimDirection.Rotation());
+}
+
+bool ALSPlayerCharacter::ConfirmThrowAim()
+{
+	if (!bIsThrowAiming)
+	{
+		return false;
+	}
+
+	const FName ItemRowName = ThrowAimRowName;
+	const FVector TargetLocation = ThrowAimTargetLocation;
+
+	if (ULSSkillPreviewComponent* PreviewComponent = ResolveSkillPreviewComponent())
+	{
+		PreviewComponent->EndAreaPreview();
+	}
+	bIsThrowAiming = false;
+	ThrowAimRowName = NAME_None;
+
+	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	const FLSConsumableRow* ConsumableDef = GameData ? GameData->FindConsumableRow(ItemRowName, TEXT("ConfirmThrowAim")) : nullptr;
+	if (!ConsumableDef)
+	{
+		return false;
+	}
+
+	// 확정된 착탄 지점으로 (시전 시간 반영) 투척한다.
+	bPendingThrow = true;
+	PendingThrowTargetLocation = TargetLocation;
+	BeginConsumableCast(ItemRowName, *ConsumableDef);
+	return true;
+}
+
+bool ALSPlayerCharacter::CancelThrowAim()
+{
+	if (!bIsThrowAiming)
+	{
+		return false;
+	}
+
+	if (ULSSkillPreviewComponent* PreviewComponent = ResolveSkillPreviewComponent())
+	{
+		PreviewComponent->EndAreaPreview();
+	}
+	bIsThrowAiming = false;
+	ThrowAimRowName = NAME_None;
+	return true;
+}
+
+void ALSPlayerCharacter::ServerUseThrownConsumable_Implementation(const FName ItemRowName, const FVector_NetQuantize TargetLocation)
+{
+	UseThrownConsumableAuthoritative(ItemRowName, TargetLocation);
+}
+
+void ALSPlayerCharacter::UseThrownConsumableAuthoritative(const FName ItemRowName, const FVector& TargetLocation)
+{
+	if (!HasAuthority() || ItemRowName.IsNone())
+	{
+		return;
+	}
+
+	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	const FLSConsumableRow* ConsumableDef = GameData ? GameData->FindConsumableRow(ItemRowName, TEXT("UseThrownConsumableAuthoritative")) : nullptr;
+	if (!ConsumableDef)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[QuickSlot] No DT_Consumable row for '%s' on server (thrown)."), *ItemRowName.ToString());
+		return;
+	}
+
+	ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>();
+	ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
+	if (!RaidInventory || !RaidInventory->IsRaidActive())
+	{
+		return;
+	}
+
+	if (LSCraftingUtils::CountItem(RaidInventory->GetSessionInventory(), ItemRowName) < 1)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Consumable] 투척 실패: '%s' 보유 수량 없음."), *ItemRowName.ToString());
+		return;
+	}
+
+	// 착탄 지점 범위 내 적을 수집해 효과 적용(Self 효과는 소유자 1회).
+	TArray<AActor*> AreaTargets;
+	CollectThrowTargets(*ConsumableDef, TargetLocation, AreaTargets);
+
+	bool bApplied = false;
+	if (ULSCharacterCombatComponent* CombatComponent = GetCharacterCombatComponent())
+	{
+		bApplied = CombatComponent->ApplyConsumableEffectsInArea(*ConsumableDef, AreaTargets);
+	}
+
+	RaidInventory->ConsumeSessionItem(ItemRowName, 1);
+	PlayerController->SyncRaidInventoryToClient();
+
+	UE_LOG(LogLS, Log, TEXT("[Consumable] 투척 성공: '%s' 착탄 대상 %d명%s."), *ItemRowName.ToString(), AreaTargets.Num(), bApplied ? TEXT("") : TEXT(" (적용된 효과 없음)"));
+}
+
+void ALSPlayerCharacter::CollectThrowTargets(const FLSConsumableRow& ConsumableDef, const FVector& Center, TArray<AActor*>& OutTargets) const
+{
+	UWorld* World = GetWorld();
+	const float RangeX = FMath::Max(ConsumableDef.Item_Range_X, 0.0f);
+	if (!World || RangeX <= 0.0f)
+	{
+		return;
+	}
+
+	// 도형 방향(소유자 → 착탄 지점).
+	FVector Forward = Center - GetActorLocation();
+	Forward.Z = 0.0f;
+	Forward = Forward.GetSafeNormal2D();
+	if (Forward.IsNearlyZero())
+	{
+		Forward = GetActorForwardVector().GetSafeNormal2D();
+	}
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
+
+	const float HalfConeCos = FMath::Cos(FMath::DegreesToRadians(FMath::Clamp(ConsumableDef.Item_Range_Y, 0.0f, 360.0f) * 0.5f));
+	const float HalfLength = RangeX * 0.5f;
+	const float HalfWidth = FMath::Max(ConsumableDef.Item_Range_Y, 0.0f) * 0.5f;
+
+	for (TActorIterator<ALSEnemyCharacter> It(World); It; ++It)
+	{
+		ALSEnemyCharacter* Enemy = *It;
+		if (!Enemy)
+		{
+			continue;
+		}
+
+		FVector ToEnemy = Enemy->GetActorLocation() - Center;
+		ToEnemy.Z = 0.0f;
+		const float Dist = ToEnemy.Size();
+
+		bool bInside = false;
+		switch (ConsumableDef.Item_Range_Shape)
+		{
+		case ELSConsumableRangeShape::Box:
+		{
+			const float ForwardDist = FMath::Abs(FVector::DotProduct(ToEnemy, Forward));
+			const float RightDist = FMath::Abs(FVector::DotProduct(ToEnemy, Right));
+			bInside = ForwardDist <= HalfLength && RightDist <= HalfWidth;
+			break;
+		}
+		case ELSConsumableRangeShape::Cone:
+			if (Dist <= KINDA_SMALL_NUMBER)
+			{
+				bInside = true;
+			}
+			else if (Dist <= RangeX)
+			{
+				bInside = FVector::DotProduct(ToEnemy / Dist, Forward) >= HalfConeCos;
+			}
+			break;
+		case ELSConsumableRangeShape::Sphere:
+		case ELSConsumableRangeShape::None:
+		default:
+			bInside = Dist <= RangeX;
+			break;
+		}
+
+		if (bInside)
+		{
+			OutTargets.Add(Enemy);
+		}
+	}
+}
 
 void ALSPlayerCharacter::OnInteract()
 {
@@ -979,6 +1485,12 @@ bool ALSPlayerCharacter::IsFacingRotationLocked() const
 
 void ALSPlayerCharacter::Move(const FInputActionValue& Value)
 {
+	// 이동 불가 소모품을 시전 중이면 이동 입력이 시전을 취소한다.
+	if (bIsConsumableCasting && !bCastAllowsMove)
+	{
+		CancelConsumableCast();
+	}
+
 	// 스킬 몽타주 재생 중이면 입력 이동을 무시한다(루트모션 이동은 별도 경로라 영향 없음).
 	if (IsInputBlocked())
 	{

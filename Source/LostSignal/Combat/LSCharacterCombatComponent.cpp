@@ -376,6 +376,72 @@ bool ULSCharacterCombatComponent::ApplyConsumableEffects(const FLSConsumableRow&
 	return bAnyApplied;
 }
 
+bool ULSCharacterCombatComponent::ApplyConsumableEffectsInArea(const FLSConsumableRow& ConsumableRow, const TArray<AActor*>& AreaEnemyTargets) const
+{
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor || !OwnerActor->HasAuthority())
+	{
+		return false;
+	}
+
+	const UGameInstance* GameInstance = OwnerActor->GetGameInstance();
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	if (!GameData)
+	{
+		return false;
+	}
+
+	bool bAnyApplied = false;
+	for (const FLSConsumableEffectValue& EffectValue : ConsumableRow.Item_Effects)
+	{
+		const FLSConsumableEffectRow* EffectDef = GameData->FindConsumableEffectRow(EffectValue.Effect_ID, TEXT("ApplyConsumableEffectsInArea"));
+		if (!EffectDef)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Consumable: 적용효과 '%s'를 DT_ConsumableEffect에서 찾을 수 없음."), *EffectValue.Effect_ID.ToString());
+			continue;
+		}
+
+		// Self 효과는 소유자에게 1회, Enemy 효과는 범위 내 대상 각각에 적용한다.
+		TArray<AActor*, TInlineAllocator<8>> EffectActors;
+		switch (EffectDef->Consumable_Effect_Target)
+		{
+		case ELSConsumableEffectTarget::Self:
+			EffectActors.Add(OwnerActor);
+			break;
+		case ELSConsumableEffectTarget::Enemy:
+			for (AActor* EnemyTarget : AreaEnemyTargets)
+			{
+				if (EnemyTarget)
+				{
+					EffectActors.Add(EnemyTarget);
+				}
+			}
+			break;
+		default:
+			// Friendly/All은 진영/광역 정책이 정해지면 확장한다.
+			UE_LOG(LogLS, Verbose, TEXT("Consumable: 투척 효과 Target=Friendly/All은 아직 미지원."));
+			break;
+		}
+
+		for (AActor* EffectActor : EffectActors)
+		{
+			switch (EffectDef->Consumable_Effect_Type)
+			{
+			case ELSConsumableEffectType::Attribute:
+				bAnyApplied |= ApplyConsumableAttributeEffect(EffectActor, *EffectDef, EffectValue.Effect_Value, OwnerActor);
+				break;
+			case ELSConsumableEffectType::Status:
+				bAnyApplied |= ApplyConsumableStatusEffect(EffectActor, *EffectDef, OwnerActor);
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	return bAnyApplied;
+}
+
 AActor* ULSCharacterCombatComponent::ResolveConsumableEffectActor(ELSConsumableEffectTarget Target, AActor* OwnerActor, AActor* HitTarget) const
 {
 	switch (Target)
