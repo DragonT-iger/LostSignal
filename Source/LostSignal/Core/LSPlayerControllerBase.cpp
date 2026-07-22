@@ -34,6 +34,7 @@
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Protocol/LSProtocolUIWidget.h"
+#include "UI/QuickSlot/LSQuickSlotBarWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
 #include "UI/ChipSystem/LSChipStationWidget.h"
 
@@ -313,6 +314,19 @@ void ALSPlayerControllerBase::UnregisterLobbyInventoryWidget(const ULSInventoryW
 	}
 }
 
+void ALSPlayerControllerBase::RegisterQuickSlotBar(ULSQuickSlotBarWidget* InWidget)
+{
+	ActiveQuickSlotBar = InWidget;
+}
+
+void ALSPlayerControllerBase::UnregisterQuickSlotBar(const ULSQuickSlotBarWidget* InWidget)
+{
+	if (ActiveQuickSlotBar == InWidget)
+	{
+		ActiveQuickSlotBar = nullptr;
+	}
+}
+
 void ALSPlayerControllerBase::RegisterLobbyStorageWidget(ULSLobbyStorageWidget* InWidget)
 {
 	LobbyStorageWidgetInstance = InWidget;
@@ -359,6 +373,12 @@ void ALSPlayerControllerBase::RefreshAllInventoryUI()
 	// 창고·칩 스테이션은 열려 있을 때만 각자 데이터에서 다시 그린다(내부에서 가시성 체크).
 	RefreshOpenLobbyStorageWidget();
 	RefreshOpenChipStationWidget();
+
+	// 퀵슬롯 개수는 인벤토리에서 실시간 합산하므로, 인벤토리가 바뀔 때마다 활성 바를 다시 그린다.
+	if (ActiveQuickSlotBar)
+	{
+		ActiveQuickSlotBar->RefreshAll();
+	}
 }
 
 bool ALSPlayerControllerBase::IsInventoryUIOpen() const

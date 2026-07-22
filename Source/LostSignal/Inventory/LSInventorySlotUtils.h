@@ -4,10 +4,15 @@
 #include "Data/LSDropSubsystem.h"
 #include "Session/LSSessionSubsystem.h"
 
+class UTexture2D;
+
 namespace LSInventorySlotUtils
 {
 	// 무기/방어구 장착칸 수. 인덱스가 곧 슬롯 타입(ELSEquipmentSlot)이다.
 	constexpr int32 EquipmentSlotCount = static_cast<int32>(ELSEquipmentSlot::Count);
+
+	// 퀵슬롯 칸 수. SaveGame.QuickSlots 배열 길이와 퀵슬롯 바 위젯 칸 수의 단일 출처다.
+	constexpr int32 QuickSlotCount = 6;
 
 	bool IsFilled(const FLSSessionItem& Item);
 	bool IsFilled(const FLSDropResult& Item);
@@ -44,6 +49,10 @@ namespace LSInventorySlotUtils
 	// 칩 행 이름(Chip_{Grade}_{Func})의 기능 토큰으로 기능별 아이콘 에셋명을 반환한다.
 	// 칩이 아니거나 알 수 없는 기능이면 행 이름 문자열을 그대로 반환(기존 동작 폴백).
 	FString ResolveIconAssetNameFromRowName(FName ItemRowName);
+
+	// RowName 접두사로 아이콘 폴더를 정해 아이템 아이콘 텍스처를 동기 로드한다. 실패 시 nullptr(경고 로그).
+	// 인벤토리 슬롯·퀵슬롯 등 아이템 아이콘을 그리는 모든 위젯의 단일 출처다.
+	UTexture2D* LoadItemIconTexture(FName ItemRowName);
 
 	// 아이템 Row Name으로 장착 가능한 장비 슬롯 타입을 판정한다.
 	// Weapon_* -> Weapon, Armor_* -> ArmorTable의 Item_Equipment(Processor/Core/Actuator/Frame).

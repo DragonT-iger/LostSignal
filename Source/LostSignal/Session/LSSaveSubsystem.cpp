@@ -975,6 +975,7 @@ void ULSSaveSubsystem::StartNewGame()
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	EnsureChipEquipmentSlots();
 	EnsureEquipmentSlots();
+	EnsureQuickSlots();
 	EnsureGoldInitialized();
 	ApplyStarterItems();
 	UE_LOG(LogLS, Log, TEXT("[Save] New game started - all save files deleted for a fresh start"));
@@ -1163,6 +1164,7 @@ void ULSSaveSubsystem::Load()
 			}
 			EnsureChipEquipmentSlots();
 			EnsureEquipmentSlots();
+			EnsureQuickSlots();
 			EnsureGoldInitialized();
 			ResolveInterruptedRaid();
 			Save();
@@ -1179,6 +1181,7 @@ void ULSSaveSubsystem::Load()
 	SaveData = Cast<ULSSaveGame>(UGameplayStatics::CreateSaveGameObject(ULSSaveGame::StaticClass()));
 	EnsureChipEquipmentSlots();
 	EnsureEquipmentSlots();
+	EnsureQuickSlots();
 	EnsureGoldInitialized();
 	UE_LOG(LogLS, Log, TEXT("[Save] Created new save object for slot %s"), *ResolvedSlotName);
 }
@@ -1414,6 +1417,99 @@ void ULSSaveSubsystem::EnsureEquipmentSlots()
 	{
 		SaveData->EquipmentSlots.SetNum(EquipmentSlotCount);
 	}
+}
+
+void ULSSaveSubsystem::EnsureQuickSlots()
+{
+	if (!SaveData)
+	{
+		return;
+	}
+
+	while (SaveData->QuickSlots.Num() < LSInventorySlotUtils::QuickSlotCount)
+	{
+		SaveData->QuickSlots.Add(NAME_None);
+	}
+
+	if (SaveData->QuickSlots.Num() > LSInventorySlotUtils::QuickSlotCount)
+	{
+		SaveData->QuickSlots.SetNum(LSInventorySlotUtils::QuickSlotCount);
+	}
+}
+
+const TArray<FName>& ULSSaveSubsystem::GetQuickSlots() const
+{
+	static const TArray<FName> Empty;
+	return SaveData ? SaveData->QuickSlots : Empty;
+}
+
+bool ULSSaveSubsystem::SetQuickSlot(const int32 SlotIndex, const FName ItemRowName)
+{
+	if (!SaveData)
+	{
+		return false;
+	}
+
+	if (SlotIndex < 0 || SlotIndex >= LSInventorySlotUtils::QuickSlotCount)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] SetQuickSlot invalid slot index %d"), SlotIndex);
+		return false;
+	}
+
+	if (ItemRowName.IsNone())
+	{
+		return ClearQuickSlot(SlotIndex);
+	}
+
+	// 소모품(Item_Type 4~9)만 등록을 허용한다.
+	const LSInventorySlotUtils::FLSItemTradeInfo TradeInfo = LSInventorySlotUtils::ResolveItemTradeInfo(ItemRowName);
+	if (!TradeInfo.bValid || TradeInfo.ItemType < 4 || TradeInfo.ItemType > 9)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] SetQuickSlot rejected non-consumable '%s' (Item_Type=%d)"), *ItemRowName.ToString(), TradeInfo.ItemType);
+		return false;
+	}
+
+	EnsureQuickSlots();
+
+	// 같은 소모품이 다른 칸에 이미 있으면 그 칸을 비워 중복 등록을 막는다(이동).
+	for (int32 Index = 0; Index < LSInventorySlotUtils::QuickSlotCount; ++Index)
+	{
+		if (Index != SlotIndex && SaveData->QuickSlots[Index] == ItemRowName)
+		{
+			SaveData->QuickSlots[Index] = NAME_None;
+		}
+	}
+
+	SaveData->QuickSlots[SlotIndex] = ItemRowName;
+	Save();
+	OnQuickSlotsChanged.Broadcast();
+	return true;
+}
+
+bool ULSSaveSubsystem::ClearQuickSlot(const int32 SlotIndex)
+{
+	if (!SaveData)
+	{
+		return false;
+	}
+
+	if (SlotIndex < 0 || SlotIndex >= LSInventorySlotUtils::QuickSlotCount)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Save] ClearQuickSlot invalid slot index %d"), SlotIndex);
+		return false;
+	}
+
+	EnsureQuickSlots();
+
+	if (SaveData->QuickSlots[SlotIndex].IsNone())
+	{
+		return false;
+	}
+
+	SaveData->QuickSlots[SlotIndex] = NAME_None;
+	Save();
+	OnQuickSlotsChanged.Broadcast();
+	return true;
 }
 
 int32 ULSSaveSubsystem::GetCarryingProtocolSlotBonus(const FName EnableName) const

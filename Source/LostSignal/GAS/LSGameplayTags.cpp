@@ -51,6 +51,8 @@ namespace LSGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Data_Stamina_Amount, "LS.Data.Stamina.Amount")
 
+	UE_DEFINE_GAMEPLAY_TAG(Data_Health_Amount, "LS.Data.Health.Amount")
+
 	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_Attack, "LS.Data.Chip.Attack")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_Health, "LS.Data.Chip.Health")
 	UE_DEFINE_GAMEPLAY_TAG(Data_Chip_Defense, "LS.Data.Chip.Defense")

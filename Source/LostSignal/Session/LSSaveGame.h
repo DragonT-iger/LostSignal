@@ -42,6 +42,10 @@ public:
 	// 캐릭터별 스킬 선택 로드아웃. 키 = CharacterID(ULSSkillPoolDataAsset::CharacterID). 로비에서 선택.
 	UPROPERTY() TMap<int32, FLSSkillLoadout> SkillLoadoutsByCharacter;
 
+	// 퀵슬롯 등록(6칸, 값 = 소모품 RowName, NAME_None = 빈 칸). 로비에서 편집하고 레이드까지 유지한다.
+	// 아이템 스택을 담지 않고 참조만 저장하며, 표시 개수는 인벤토리에서 실시간 합산한다.
+	UPROPERTY() TArray<FName> QuickSlots;
+
 	// 보유 골드(상점 재화). 골드 필드가 없던 기존 세이브는 bGoldInitialized로 구분해 로드 시 1회 기본 지급한다.
 	UPROPERTY() int32 Gold = 0;
 	UPROPERTY() bool bGoldInitialized = false;

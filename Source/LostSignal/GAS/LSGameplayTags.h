@@ -68,6 +68,9 @@ namespace LSGameplayTags
 	// SetByCaller stamina data
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Stamina_Amount)
 
+	// SetByCaller health data (소모품 즉발 회복/피해 수치를 캐릭터 어트리뷰트로 적용할 때 사용)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Health_Amount)
+
 	// SetByCaller chip stat data (칩 장착 합산값을 캐릭터 어트리뷰트로 적용할 때 사용)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_Attack)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Chip_Health)

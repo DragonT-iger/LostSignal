@@ -16,6 +16,11 @@
 #include "Core/LSPlayerControllerBase.h"
 #include "Curves/CurveFloat.h"
 #include "Data/LSCharacterSkillRow.h"
+#include "Data/LSConsumableRow.h"
+#include "Data/LSGameDataSubsystem.h"
+#include "Engine/GameInstance.h"
+#include "GAS/Effects/LSGE_HealthChange.h"
+#include "GAS/Effects/LSGE_StaminaChange.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -29,6 +34,9 @@
 ULSCharacterCombatComponent::ULSCharacterCombatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+
+	HealthChangeEffectClass = ULSGE_HealthChange::StaticClass();
+	StaminaChangeEffectClass = ULSGE_StaminaChange::StaticClass();
 }
 
 ALSCharacterBase* ULSCharacterCombatComponent::GetOwnerCharacter() const
@@ -318,6 +326,171 @@ bool ULSCharacterCombatComponent::ApplyStatusEffectFromRow(int32 StatusID, ELSCh
 	}
 
 	return StatusEffectComponent->ApplyStatusEffectByID(StatusID, OwnerActor, Duration);
+}
+
+bool ULSCharacterCombatComponent::ApplyConsumableEffects(const FLSConsumableRow& ConsumableRow, AActor* HitTarget) const
+{
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor || !OwnerActor->HasAuthority())
+	{
+		return false;
+	}
+
+	const UGameInstance* GameInstance = OwnerActor->GetGameInstance();
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	if (!GameData)
+	{
+		return false;
+	}
+
+	bool bAnyApplied = false;
+	for (const FLSConsumableEffectValue& EffectValue : ConsumableRow.Item_Effects)
+	{
+		// 적용효과 사전에서 "어떻게 작동하는가"를 조회. 수치("얼마나")는 EffectValue.Effect_Value가 전달한다.
+		const FLSConsumableEffectRow* EffectDef = GameData->FindConsumableEffectRow(EffectValue.Effect_ID, TEXT("ApplyConsumableEffects"));
+		if (!EffectDef)
+		{
+			UE_LOG(LogLS, Warning, TEXT("Consumable: 적용효과 '%s'를 DT_ConsumableEffect에서 찾을 수 없음."), *EffectValue.Effect_ID.ToString());
+			continue;
+		}
+
+		AActor* EffectActor = ResolveConsumableEffectActor(EffectDef->Consumable_Effect_Target, OwnerActor, HitTarget);
+		if (!EffectActor)
+		{
+			continue;
+		}
+
+		switch (EffectDef->Consumable_Effect_Type)
+		{
+		case ELSConsumableEffectType::Attribute:
+			bAnyApplied |= ApplyConsumableAttributeEffect(EffectActor, *EffectDef, EffectValue.Effect_Value, OwnerActor);
+			break;
+		case ELSConsumableEffectType::Status:
+			bAnyApplied |= ApplyConsumableStatusEffect(EffectActor, *EffectDef, OwnerActor);
+			break;
+		default:
+			break;
+		}
+	}
+
+	return bAnyApplied;
+}
+
+AActor* ULSCharacterCombatComponent::ResolveConsumableEffectActor(ELSConsumableEffectTarget Target, AActor* OwnerActor, AActor* HitTarget) const
+{
+	switch (Target)
+	{
+	case ELSConsumableEffectTarget::Self:
+		return OwnerActor;
+	case ELSConsumableEffectTarget::Enemy:
+		return HitTarget;
+	case ELSConsumableEffectTarget::Friendly:
+	case ELSConsumableEffectTarget::All:
+		// 진영 판정/광역 수집 정책이 정해지면 확장한다.
+		UE_LOG(LogLS, Verbose, TEXT("Consumable: Target=Friendly/All은 아직 미지원."));
+		return nullptr;
+	default:
+		return nullptr;
+	}
+}
+
+bool ULSCharacterCombatComponent::ApplyConsumableAttributeEffect(AActor* EffectActor, const FLSConsumableEffectRow& EffectDef, float Value, AActor* Instigator) const
+{
+	// 주기 적용(HoT/DoT)은 즉발 GE 경로로 표현 불가 — DT_StatusEffect 주기틱 지원이 선행돼야 한다(후속).
+	if (EffectDef.Consumable_Effect_Apply_Type == ELSConsumableApplyType::Periodic)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Consumable: Apply_Type=Periodic(주기 Attribute 효과)는 아직 미지원."));
+		return false;
+	}
+
+	// 비율(Percent) 즉발 가감은 아직 미지원(고정값만). Value_Type=None/Flat만 처리.
+	if (EffectDef.Consumable_Effect_Value_Type == ELSConsumableValueType::Percent)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Consumable: Value_Type=Percent(비율 즉발)는 아직 미지원."));
+		return false;
+	}
+
+	// Operation으로 부호 결정(Add=+, Subtract=-). Apply/Remove는 Attribute에 무의미.
+	float SignedMagnitude = Value;
+	if (EffectDef.Consumable_Effect_Operation == ELSConsumableEffectOperation::Subtract)
+	{
+		SignedMagnitude = -Value;
+	}
+	else if (EffectDef.Consumable_Effect_Operation != ELSConsumableEffectOperation::Add)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Consumable: Attribute 효과에 Operation=Apply/Remove는 무효."));
+		return false;
+	}
+
+	if (FMath::IsNearlyZero(SignedMagnitude))
+	{
+		return false;
+	}
+
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(EffectActor);
+	if (!ASC)
+	{
+		return false;
+	}
+
+	TSubclassOf<UGameplayEffect> EffectClass = nullptr;
+	FGameplayTag DataTag;
+	switch (EffectDef.Consumable_Effect_Attribute)
+	{
+	case ELSConsumableAttribute::Health:
+		EffectClass = HealthChangeEffectClass;
+		DataTag = LSGameplayTags::Data_Health_Amount;
+		break;
+	case ELSConsumableAttribute::Stamina:
+		EffectClass = StaminaChangeEffectClass;
+		DataTag = LSGameplayTags::Data_Stamina_Amount;
+		break;
+	default:
+		// Attack/Defense/MoveSpeed 등 즉발 가감은 미지원(지속 버프는 Status 효과 권장).
+		UE_LOG(LogLS, Warning, TEXT("Consumable: 즉발 Attribute는 Health/Stamina만 지원(그 외는 Status 효과 권장)."));
+		return false;
+	}
+
+	FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
+	EffectContext.AddSourceObject(Instigator);
+
+	const FGameplayEffectSpecHandle SpecHandle = ASC->MakeOutgoingSpec(EffectClass, 1.0f, EffectContext);
+	if (!SpecHandle.IsValid() || !SpecHandle.Data.IsValid())
+	{
+		return false;
+	}
+
+	SpecHandle.Data->SetSetByCallerMagnitude(DataTag, SignedMagnitude);
+	ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+	return true;
+}
+
+bool ULSCharacterCombatComponent::ApplyConsumableStatusEffect(AActor* EffectActor, const FLSConsumableEffectRow& EffectDef, AActor* Instigator) const
+{
+	const int32 StatusID = EffectDef.Consumable_Status_Effect_Name;
+	if (StatusID <= 0)
+	{
+		return false;
+	}
+
+	ALSCharacterBase* EffectCharacter = Cast<ALSCharacterBase>(EffectActor);
+	ULSStatusEffectComponent* StatusEffectComponent = EffectCharacter ? EffectCharacter->GetStatusEffectComponent() : nullptr;
+	if (!StatusEffectComponent)
+	{
+		return false;
+	}
+
+	switch (EffectDef.Consumable_Effect_Operation)
+	{
+	case ELSConsumableEffectOperation::Apply:
+		// Duration>0이면 override, 0이면 status row 기본 정책.
+		return StatusEffectComponent->ApplyStatusEffectByID(StatusID, Instigator, EffectDef.Consumable_Effect_Duration);
+	case ELSConsumableEffectOperation::Remove:
+		return StatusEffectComponent->RemoveStatusEffectByID(StatusID);
+	default:
+		UE_LOG(LogLS, Warning, TEXT("Consumable: Status 효과에 Operation=Add/Subtract는 무효(Apply/Remove 사용)."));
+		return false;
+	}
 }
 
 void ULSCharacterCombatComponent::BeginPlay()

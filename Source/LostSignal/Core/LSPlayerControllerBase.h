@@ -16,6 +16,7 @@ class ALSWorldDroppedItem;
 class UInputMappingContext;
 class ULSLobbyStorageWidget;
 class ULSInventoryWidget;
+class ULSQuickSlotBarWidget;
 class ULSChipStationWidget;
 class ULSBackgroundBlurWidget;
 class ULSRaidInventoryComponent;
@@ -74,6 +75,11 @@ public:
 	ULSInventoryWidget* GetLobbyInventoryWidget() const { return LobbyInventoryWidgetInstance; }
 	void RegisterLobbyStorageWidget(ULSLobbyStorageWidget* InWidget);
 	void UnregisterLobbyStorageWidget(const ULSLobbyStorageWidget* InWidget);
+
+	// 로비/레이드 HUD에 배치된 퀵슬롯 바를 활성 바로 등록한다(바 위젯이 생성/소멸 시 스스로 호출).
+	// RefreshAllInventoryUI가 개수 갱신을 이 바에 태운다.
+	void RegisterQuickSlotBar(ULSQuickSlotBarWidget* InWidget);
+	void UnregisterQuickSlotBar(const ULSQuickSlotBarWidget* InWidget);
 
 	// 폰이 있으면 폰의 인벤토리 위젯을, 없으면 등록된 로비 인벤토리 위젯을 갱신한다.
 	void RefreshActiveInventoryWidget();
@@ -222,6 +228,10 @@ protected:
 	// 로비 오버레이에 배치돼 PC에 등록된 인벤토리 위젯(폰 없는 로비용). 폰이 있으면 사용하지 않는다.
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSInventoryWidget> LobbyInventoryWidgetInstance;
+
+	// 현재 화면에 떠 있는 퀵슬롯 바(로비 또는 레이드 HUD). 바 위젯이 스스로 등록/해제한다.
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSQuickSlotBarWidget> ActiveQuickSlotBar;
 
 	// 시연용 프로토콜 조정 패널 인스턴스.
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug")

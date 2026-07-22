@@ -9,6 +9,8 @@ class UDataTable;
 struct FLSComboAttackRow;
 struct FLSCharacterPassiveSkillRow;
 struct FLSCharacterSkillRow;
+struct FLSConsumableRow;
+struct FLSConsumableEffectRow;
 struct FLSProtocolUnlockRow;
 struct FLSStatusEffectRow;
 
@@ -32,6 +34,8 @@ public:
 	const FLSComboAttackRow* FindComboAttackRowByIndex(int32 CharacterID, int32 ComboIndex, int32 ComboTag = 0, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSStatusEffectRow* FindStatusEffectRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSStatusEffectRow* FindStatusEffectRowByID(int32 StatusID, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	const FLSConsumableRow* FindConsumableRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	const FLSConsumableEffectRow* FindConsumableEffectRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSProtocolUnlockRow* FindProtocolUnlockRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSProtocolUnlockRow* FindProtocolUnlockRowByEnableName(ELSProtocolType ProtocolType, FName EnableName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	void GetProtocolUnlockRows(ELSProtocolType ProtocolType, TArray<const FLSProtocolUnlockRow*>& OutRows, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
@@ -59,6 +63,12 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UDataTable> StatusEffectTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> ConsumableTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> ConsumableEffectTable;
 
 	UPROPERTY()
 	TObjectPtr<UDataTable> ProtocolUnlockTable;

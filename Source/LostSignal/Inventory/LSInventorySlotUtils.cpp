@@ -6,6 +6,7 @@
 #include "Data/LSItemRow.h"
 #include "Data/LSWeaponRow.h"
 #include "Engine/DataTable.h"
+#include "Engine/Texture2D.h"
 #include "LostSignal.h"
 
 namespace
@@ -35,6 +36,46 @@ const TMap<FString, FString>& GetChipFunctionIconNames()
 constexpr int32 SortGroupWeaponOffset = 100000;
 constexpr int32 SortGroupArmorOffset = 200000;
 constexpr int32 SortGroupItemOffset = 300000;
+
+// 아이콘 에셋명/경로를 완전한 오브젝트 경로로 조립한다. (/Game/ 절대경로면 그대로, 아니면 폴더+이름.이름)
+FString BuildItemIconObjectPath(const FString& IconNameOrPath, const FString& BaseFolder)
+{
+	if (IconNameOrPath.StartsWith(TEXT("/Game/")))
+	{
+		if (IconNameOrPath.Contains(TEXT(".")))
+		{
+			return IconNameOrPath;
+		}
+
+		FString AssetName;
+		IconNameOrPath.Split(TEXT("/"), nullptr, &AssetName, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+		return FString::Printf(TEXT("%s.%s"), *IconNameOrPath, *AssetName);
+	}
+
+	return FString::Printf(TEXT("%s%s.%s"), *BaseFolder, *IconNameOrPath, *IconNameOrPath);
+}
+
+// RowName 접두사(Chip_/Weapon_/Armor_/기타)로 아이콘 폴더를 정한다.
+FString GetItemIconBaseFolderByRowName(const FName ItemRowName)
+{
+	const FString RowNameString = ItemRowName.ToString();
+	if (RowNameString.StartsWith(TEXT("Chip_")))
+	{
+		return TEXT("/Game/LostSignal/UI/Icons/Chips/");
+	}
+
+	if (RowNameString.StartsWith(TEXT("Weapon_")))
+	{
+		return TEXT("/Game/LostSignal/UI/Icons/Weapons/");
+	}
+
+	if (RowNameString.StartsWith(TEXT("Armor_")))
+	{
+		return TEXT("/Game/LostSignal/UI/Icons/Armors/");
+	}
+
+	return TEXT("/Game/LostSignal/UI/Icons/Items/");
+}
 
 int32 FindRowOrder(UDataTable* Table, const FName RowName)
 {
@@ -347,6 +388,18 @@ FString ResolveIconAssetNameFromRowName(const FName ItemRowName)
 
 	UE_LOG(LogLS, Warning, TEXT("[Inventory] Cannot resolve chip icon from row name '%s' (unknown function token '%s')."), *RowNameString, *FunctionToken);
 	return RowNameString;
+}
+
+UTexture2D* LoadItemIconTexture(const FName ItemRowName)
+{
+	const FString IconObjectPath = BuildItemIconObjectPath(ResolveIconAssetNameFromRowName(ItemRowName), GetItemIconBaseFolderByRowName(ItemRowName));
+	UTexture2D* IconTexture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *IconObjectPath));
+	if (!IconTexture)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Inventory] Failed to load item icon '%s' for row '%s'."), *IconObjectPath, *ItemRowName.ToString());
+	}
+
+	return IconTexture;
 }
 
 void EnsureSlotIndex(TArray<FLSSessionItem>& Slots, const int32 SlotIndex)

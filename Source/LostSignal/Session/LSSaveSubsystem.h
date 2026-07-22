@@ -21,6 +21,9 @@ DECLARE_MULTICAST_DELEGATE(FLSOnSkillLoadoutChanged);
 // 보유 골드가 바뀌면 발행된다. (상점 골드 표시 갱신에 사용)
 DECLARE_MULTICAST_DELEGATE(FLSOnGoldChanged);
 
+// 퀵슬롯 등록이 바뀌면 발행된다. (퀵슬롯 바 UI 아이콘 갱신에 사용)
+DECLARE_MULTICAST_DELEGATE(FLSOnQuickSlotsChanged);
+
 UCLASS()
 class LOSTSIGNAL_API ULSSaveSubsystem : public UGameInstanceSubsystem
 {
@@ -40,6 +43,9 @@ public:
 
 	// 골드 변경 알림. 상점 UI 등이 구독한다.
 	FLSOnGoldChanged OnGoldChanged;
+
+	// 퀵슬롯 등록 변경 알림. 퀵슬롯 바 위젯이 구독한다.
+	FLSOnQuickSlotsChanged OnQuickSlotsChanged;
 
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	int32 GetGold() const;
@@ -135,6 +141,19 @@ public:
 	// 이후엔 사용자가 슬롯을 다 비워도 다시 채우지 않는다. 시딩했으면 true(저장 후 OnSkillLoadoutChanged 발행).
 	bool TrySeedDefaultSkillLoadout(int32 CharacterID, const TArray<int32>& DefaultSkillIDs);
 
+	// 퀵슬롯 등록 6칸(인덱스 = 슬롯 번호, 값 = 소모품 RowName, NAME_None = 빈 칸).
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	const TArray<FName>& GetQuickSlots() const;
+
+	// SlotIndex 칸에 소모품 ItemRowName을 등록한다. 소모품(Item_Type 4~9)이 아니거나 인덱스가 범위 밖이면 false.
+	// 같은 아이템이 다른 칸에 이미 있으면 그 칸을 비운다(이동). 성공 시 저장 후 OnQuickSlotsChanged 발행.
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	bool SetQuickSlot(int32 SlotIndex, FName ItemRowName);
+
+	// SlotIndex 칸을 비운다. 성공 시 저장 후 OnQuickSlotsChanged 발행.
+	UFUNCTION(BlueprintCallable, Category="LS/Save")
+	bool ClearQuickSlot(int32 SlotIndex);
+
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	int32 GetMaxInventorySlotCount() const;
 
@@ -190,6 +209,8 @@ private:
 	void EnsureGoldInitialized();
 	void EnsureChipEquipmentSlots();
 	void EnsureEquipmentSlots();
+	// 퀵슬롯 배열을 QuickSlotCount(6)칸으로 보정한다(부족하면 NAME_None으로 채우고 초과분은 잘라낸다).
+	void EnsureQuickSlots();
 	// CharacterID 로드아웃 항목을 없으면 만들고 SkillIDs를 3칸으로 보정해 참조로 돌려준다. SaveData 유효성은 호출부가 보장.
 	FLSSkillLoadout& EnsureSkillLoadout(int32 CharacterID);
 	void ApplyStarterItems();

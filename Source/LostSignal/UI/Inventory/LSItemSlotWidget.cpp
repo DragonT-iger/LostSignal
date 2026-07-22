@@ -1358,14 +1358,8 @@ bool ULSItemSlotWidget::IsValidChipStationDropTarget(const UDragDropOperation* I
 
 UTexture2D* ULSItemSlotWidget::LoadIconTextureByRowName(const FName ItemRowName) const
 {
-	const FString IconObjectPath = BuildIconObjectPath(LSInventorySlotUtils::ResolveIconAssetNameFromRowName(ItemRowName), GetIconBaseFolderByRowName(ItemRowName));
-	UTexture2D* IconTexture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *IconObjectPath));
-	if (!IconTexture)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Failed to load item icon '%s' for row '%s'."), *IconObjectPath, *ItemRowName.ToString());
-	}
-
-	return IconTexture;
+	// 아이콘 경로 규칙은 LSInventorySlotUtils가 단일 출처다(인벤토리 슬롯·퀵슬롯 공용).
+	return LSInventorySlotUtils::LoadItemIconTexture(ItemRowName);
 }
 
 UTexture2D* ULSItemSlotWidget::LoadDefaultIconTexture() const
@@ -1378,42 +1372,4 @@ UTexture2D* ULSItemSlotWidget::LoadDefaultIconTexture() const
 	}
 
 	return DefaultIconTexture;
-}
-
-FString ULSItemSlotWidget::BuildIconObjectPath(const FString& IconNameOrPath, const FString& BaseFolder)
-{
-	if (IconNameOrPath.StartsWith(TEXT("/Game/")))
-	{
-		if (IconNameOrPath.Contains(TEXT(".")))
-		{
-			return IconNameOrPath;
-		}
-
-		FString AssetName;
-		IconNameOrPath.Split(TEXT("/"), nullptr, &AssetName, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
-		return FString::Printf(TEXT("%s.%s"), *IconNameOrPath, *AssetName);
-	}
-
-	return FString::Printf(TEXT("%s%s.%s"), *BaseFolder, *IconNameOrPath, *IconNameOrPath);
-}
-
-FString ULSItemSlotWidget::GetIconBaseFolderByRowName(const FName ItemRowName)
-{
-	const FString RowNameString = ItemRowName.ToString();
-	if (RowNameString.StartsWith(TEXT("Chip_")))
-	{
-		return TEXT("/Game/LostSignal/UI/Icons/Chips/");
-	}
-
-	if (RowNameString.StartsWith(TEXT("Weapon_")))
-	{
-		return TEXT("/Game/LostSignal/UI/Icons/Weapons/");
-	}
-
-	if (RowNameString.StartsWith(TEXT("Armor_")))
-	{
-		return TEXT("/Game/LostSignal/UI/Icons/Armors/");
-	}
-
-	return TEXT("/Game/LostSignal/UI/Icons/Items/");
 }

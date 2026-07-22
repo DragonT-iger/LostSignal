@@ -72,6 +72,8 @@
 | [Docs/Systems/CombatProtocolUI.md](Docs/Systems/CombatProtocolUI.md) | 전투 프로토콜 단계별 UI 해금·표시 구조 |
 | [Docs/Systems/SkillSystemStructure.md](Docs/Systems/SkillSystemStructure.md) | 스킬·GAS·DataAsset·쿨타임·강화 구조 |
 | [Docs/Systems/ChipSystem.md](Docs/Systems/ChipSystem.md) | 칩 데이터·장착·신호 게이지·프로토콜·칩 전투 스탯 GAS 연동 |
+| [Docs/Systems/ConsumableSystem.md](Docs/Systems/ConsumableSystem.md) | 소모품 데이터 구조·효과 성질 분리(즉발 GE/상태이상)·GAS 적용 경로 |
+| [Docs/Systems/QuickSlotSystem.md](Docs/Systems/QuickSlotSystem.md) | 퀵슬롯 소모품 등록(드래그앤드랍)·인벤토리 합산 개수 표시·세이브 영속·갱신 funnel |
 | [Docs/Systems/MonsterAIControlStructure.md](Docs/Systems/MonsterAIControlStructure.md) | 몬스터 AI 제어·StateTree 전이 구조 |
 | [Docs/Systems/MinimapSystem.md](Docs/Systems/MinimapSystem.md) | 미니맵 표시 대상·지형 도형·탐색 프로토콜 연동 구조 |
 | [Docs/Systems/UILayerStructure.md](Docs/Systems/UILayerStructure.md) | UI 레이어 Z-order·공유 풀스크린 블러 표시 규칙 |

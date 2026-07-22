@@ -24,5 +24,11 @@ public:
 	TSoftObjectPtr<UDataTable> StatusEffectTable;
 
 	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
+	TSoftObjectPtr<UDataTable> ConsumableTable;
+
+	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
+	TSoftObjectPtr<UDataTable> ConsumableEffectTable;
+
+	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
 	TSoftObjectPtr<UDataTable> ProtocolUnlockTable;
 };

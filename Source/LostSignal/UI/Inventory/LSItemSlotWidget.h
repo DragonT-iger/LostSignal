@@ -257,6 +257,4 @@ private:
 	bool IsValidChipStationDropTarget(const UDragDropOperation* InOperation) const;
 	UTexture2D* LoadIconTextureByRowName(FName ItemRowName) const;
 	UTexture2D* LoadDefaultIconTexture() const;
-	static FString BuildIconObjectPath(const FString& IconNameOrPath, const FString& BaseFolder);
-	static FString GetIconBaseFolderByRowName(FName ItemRowName);
 };

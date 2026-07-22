@@ -3,6 +3,7 @@
 #include "Data/LSCharacterPassiveSkillRow.h"
 #include "Data/LSCharacterSkillRow.h"
 #include "Data/LSComboAttackRow.h"
+#include "Data/LSConsumableRow.h"
 #include "Data/LSGameDataSettings.h"
 #include "Data/LSProtocolUnlockRow.h"
 #include "Data/LSStatusEffectRow.h"
@@ -177,6 +178,26 @@ const FLSStatusEffectRow* ULSGameDataSubsystem::FindStatusEffectRowByID(const in
 	}
 
 	return FindStatusEffectRow(FName(*FString::FromInt(StatusID)), Context);
+}
+
+const FLSConsumableRow* ULSGameDataSubsystem::FindConsumableRow(const FName RowName, const TCHAR* Context) const
+{
+	if (!ConsumableTable || RowName.IsNone())
+	{
+		return nullptr;
+	}
+
+	return ConsumableTable->FindRow<FLSConsumableRow>(RowName, Context);
+}
+
+const FLSConsumableEffectRow* ULSGameDataSubsystem::FindConsumableEffectRow(const FName RowName, const TCHAR* Context) const
+{
+	if (!ConsumableEffectTable || RowName.IsNone())
+	{
+		return nullptr;
+	}
+
+	return ConsumableEffectTable->FindRow<FLSConsumableEffectRow>(RowName, Context);
 }
 
 const FLSProtocolUnlockRow* ULSGameDataSubsystem::FindProtocolUnlockRow(const FName RowName, const TCHAR* Context) const
@@ -368,6 +389,8 @@ void ULSGameDataSubsystem::LoadTables()
 	CharacterPassiveSkillTable = Settings->CharacterPassiveSkillTable.LoadSynchronous();
 	ComboAttackTable = Settings->ComboAttackTable.LoadSynchronous();
 	StatusEffectTable = Settings->StatusEffectTable.LoadSynchronous();
+	ConsumableTable = Settings->ConsumableTable.LoadSynchronous();
+	ConsumableEffectTable = Settings->ConsumableEffectTable.LoadSynchronous();
 	ProtocolUnlockTable = Settings->ProtocolUnlockTable.LoadSynchronous();
 
 	NormalizeActiveSkillRows();
@@ -387,6 +410,16 @@ void ULSGameDataSubsystem::LoadTables()
 	if (!StatusEffectTable)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[GameData] StatusEffectTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!ConsumableTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] ConsumableTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!ConsumableEffectTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] ConsumableEffectTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
 	}
 
 	if (!ProtocolUnlockTable)
