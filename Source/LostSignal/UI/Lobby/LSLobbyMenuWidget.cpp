@@ -296,14 +296,12 @@ FReply ULSLobbyMenuWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, c
 	{
 		if (TabSwitcher && TabSwitcher->GetActiveWidgetIndex() != static_cast<int32>(ELSLobbyTab::Play))
 		{
-			// 개인정비에서 콘텐츠가 열려 있으면 먼저 내부 탭 목록으로, 그 외에는 플레이 페이지로 돌아온다.
+			// 개인정비의 가장 안쪽 화면부터 한 단계씩 닫고, 탭 목록에서는 플레이 페이지로 돌아온다.
 			const bool bLoadoutActive =
 				TabSwitcher->GetActiveWidgetIndex() == static_cast<int32>(ELSLobbyTab::LoadoutPreparation);
-			if (bLoadoutActive && WBP_LoadoutPreparation && WBP_LoadoutPreparation->IsContentOpen())
-			{
-				WBP_LoadoutPreparation->ResetToTabs();
-			}
-			else
+			const bool bHandledLoadoutBack =
+				bLoadoutActive && WBP_LoadoutPreparation && WBP_LoadoutPreparation->TryHandleBack();
+			if (!bHandledLoadoutBack)
 			{
 				ShowTab(ELSLobbyTab::Play);
 			}
@@ -344,14 +342,11 @@ void ULSLobbyMenuWidget::ToggleStoragePage() const
 		return;
 	}
 
-	// 개인정비에서 콘텐츠(칩 연구소/물품창고 등)가 열려 있으면 먼저 탭 목록으로 되돌린다.
-	// 그 상태에서 TAB을 한 번 더 누르면 아래 분기로 내려와 물품창고가 열린다. 플레이로는 돌아가지 않는다.
-	const bool bLoadoutContentOpen =
-		TabSwitcher->GetActiveWidgetIndex() == static_cast<int32>(ELSLobbyTab::LoadoutPreparation)
-		&& WBP_LoadoutPreparation->IsContentOpen();
-	if (bLoadoutContentOpen)
+	// 개인정비에서는 자판기/제작대 같은 가장 안쪽 화면부터 한 단계씩 되돌린다.
+	const bool bLoadoutActive =
+		TabSwitcher->GetActiveWidgetIndex() == static_cast<int32>(ELSLobbyTab::LoadoutPreparation);
+	if (bLoadoutActive && WBP_LoadoutPreparation->TryHandleBack())
 	{
-		WBP_LoadoutPreparation->ResetToTabs();
 		return;
 	}
 

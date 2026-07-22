@@ -108,6 +108,36 @@ void ULSStoreWidget::ResetStore()
 	ShowState(ELSStoreState::FunctionSelect);
 }
 
+bool ULSStoreWidget::TryHandleBack()
+{
+	if (VendingPanel && VendingPanel->IsVisible())
+	{
+		HandleVendingBackRequested();
+		return true;
+	}
+	if (CraftingPanel && CraftingPanel->IsVisible())
+	{
+		SetCraftingVisible(false);
+		ShowState(ELSStoreState::FunctionSelect);
+		return true;
+	}
+	return false;
+}
+
+void ULSStoreWidget::SetConfirmDialogClass(const TSubclassOf<ULSConfirmDialogWidget> InConfirmDialogClass)
+{
+	ConfirmDialogClass = InConfirmDialogClass;
+	if (VendingPanel)
+	{
+		VendingPanel->SetConfirmDialogClass(ConfirmDialogClass);
+	}
+}
+
+bool ULSStoreWidget::HasActiveConfirmDialog() const
+{
+	return VendingPanel && VendingPanel->HasActiveConfirmDialog();
+}
+
 void ULSStoreWidget::SetVendingVisible(const bool bVisible)
 {
 	// 자판기 위젯은 처음 열 때만 생성한다. 닫기 경로에서는 이미 있는 위젯만 숨긴다.
@@ -167,6 +197,7 @@ ULSVendingWidget* ULSStoreWidget::EnsureVendingWidget()
 		UE_LOG(LogLS, Warning, TEXT("[Store] Failed to create vending widget on %s."), *GetNameSafe(this));
 		return nullptr;
 	}
+	VendingPanel->SetConfirmDialogClass(ConfirmDialogClass);
 
 	VendingPanel->OnBackRequested.AddDynamic(this, &ULSStoreWidget::HandleVendingBackRequested);
 

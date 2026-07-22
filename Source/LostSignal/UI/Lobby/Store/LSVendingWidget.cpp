@@ -5,11 +5,14 @@
 #include "Components/WrapBox.h"
 #include "Data/LSDropSettings.h"
 #include "Data/LSStoreStockRow.h"
+#include "GameFramework/PlayerController.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "TimerManager.h"
+#include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
+#include "UI/LSUILayer.h"
 #include "UI/Lobby/Store/LSVendingButtonWidget.h"
 #include "UI/Lobby/Store/LSVendingSlotWidget.h"
 
@@ -125,6 +128,14 @@ void ULSVendingWidget::NativeDestruct()
 	{
 		World->GetTimerManager().ClearTimer(RefreshTimerHandle);
 	}
+	bNotificationPending = false;
+	if (ActiveConfirmDialog)
+	{
+		ActiveConfirmDialog->OnConfirmed.RemoveAll(this);
+		ActiveConfirmDialog->OnCancelled.RemoveAll(this);
+		ActiveConfirmDialog->RemoveFromParent();
+		ActiveConfirmDialog = nullptr;
+	}
 
 	Super::NativeDestruct();
 }
@@ -136,6 +147,16 @@ void ULSVendingWidget::OpenVending()
 	RefreshGoldText();
 	RebuildStockList();
 	RebuildOwnedPanels();
+}
+
+void ULSVendingWidget::SetConfirmDialogClass(const TSubclassOf<ULSConfirmDialogWidget> InConfirmDialogClass)
+{
+	ConfirmDialogClass = InConfirmDialogClass;
+}
+
+bool ULSVendingWidget::HasActiveConfirmDialog() const
+{
+	return ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport();
 }
 
 FReply ULSVendingWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
@@ -195,6 +216,7 @@ void ULSVendingWidget::HandleSlotDropped(ULSVendingSlotWidget* SourceSlot, ULSVe
 	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
 	if (!SaveSubsystem)
 	{
+		ShowNotification(LOCTEXT("TradeUnavailable", "거래 정보를 불러오지 못했습니다."));
 		return;
 	}
 
@@ -204,6 +226,7 @@ void ULSVendingWidget::HandleSlotDropped(ULSVendingSlotWidget* SourceSlot, ULSVe
 		UE_LOG(LogLS, Log, TEXT("[Store] Owned slot drop rejected. From %d/%d To %d/%d"),
 			static_cast<int32>(SourceSlot->GetArea()), SourceSlot->GetSlotIndex(),
 			static_cast<int32>(TargetSlot->GetArea()), TargetSlot->GetSlotIndex());
+		ShowNotification(LOCTEXT("OwnedSlotMoveRejected", "아이템을 해당 슬롯으로 이동할 수 없습니다."));
 		return;
 	}
 
@@ -222,6 +245,7 @@ void ULSVendingWidget::HandleTradeClicked()
 	const ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
 	if (!SaveSubsystem)
 	{
+		ShowNotification(LOCTEXT("TradeUnavailable", "거래 정보를 불러오지 못했습니다."));
 		return;
 	}
 
@@ -233,6 +257,7 @@ void ULSVendingWidget::HandleTradeClicked()
 		if (Stock <= 0)
 		{
 			UE_LOG(LogLS, Log, TEXT("[Store] %s is sold out."), *SelectedRowName.ToString());
+			ShowNotification(LOCTEXT("SoldOut", "상품이 품절되었습니다."));
 			return;
 		}
 		const int32 Affordable = SelectedUnitPrice > 0 ? SaveSubsystem->GetGold() / SelectedUnitPrice : 0;
@@ -241,6 +266,13 @@ void ULSVendingWidget::HandleTradeClicked()
 		{
 			UE_LOG(LogLS, Log, TEXT("[Store] Not enough gold to buy %s (price %d, gold %d)."),
 				*SelectedRowName.ToString(), SelectedUnitPrice, SaveSubsystem->GetGold());
+			ShowNotification(LOCTEXT("NotEnoughGold", "골드가 부족합니다."));
+			return;
+		}
+		MaxQuantity = CalculateBuyCapacity(*SaveSubsystem, MaxQuantity);
+		if (MaxQuantity <= 0)
+		{
+			ShowNotification(LOCTEXT("InventoryFull", "인벤토리가 가득 찼습니다."));
 			return;
 		}
 	}
@@ -655,6 +687,7 @@ void ULSVendingWidget::ExecuteBuy(const int32 Quantity)
 	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
 	if (!SaveSubsystem || SelectedUnitPrice <= 0)
 	{
+		ShowNotification(LOCTEXT("TradeUnavailable", "거래 정보를 불러오지 못했습니다."));
 		return;
 	}
 
@@ -664,6 +697,7 @@ void ULSVendingWidget::ExecuteBuy(const int32 Quantity)
 	if (BuyQuantity <= 0)
 	{
 		UE_LOG(LogLS, Log, TEXT("[Store] Buy canceled. Not enough gold or stock for %s."), *SelectedRowName.ToString());
+		ShowNotification(LOCTEXT("BuyConditionChanged", "골드 또는 상품 재고가 부족합니다."));
 		return;
 	}
 
@@ -675,18 +709,40 @@ void ULSVendingWidget::ExecuteBuy(const int32 Quantity)
 	if (AddedAmount <= 0)
 	{
 		UE_LOG(LogLS, Log, TEXT("[Store] Buy canceled. Inventory is full for %s."), *SelectedRowName.ToString());
+		ShowNotification(LOCTEXT("InventoryFull", "인벤토리가 가득 찼습니다."));
 		return;
 	}
 
 	if (!SaveSubsystem->TrySpendGold(AddedAmount * SelectedUnitPrice))
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Store] Gold spend failed after adding items: %s x%d."), *SelectedRowName.ToString(), AddedAmount);
+		ShowNotification(LOCTEXT("TradeFailed", "거래 처리에 실패했습니다. 다시 시도해 주세요."));
 	}
 
 	// 실제로 지급된 수량만큼 재고를 줄인다.
 	CurrentStockByRow.Add(SelectedRowName, FMath::Max(0, GetCurrentStock(SelectedRowName) - AddedAmount));
 	UE_LOG(LogLS, Log, TEXT("[Store] Bought %s x%d for %d gold. Stock left: %d"),
 		*SelectedRowName.ToString(), AddedAmount, AddedAmount * SelectedUnitPrice, GetCurrentStock(SelectedRowName));
+	NotifyPartialBuy(Quantity, BuyQuantity, AddedAmount);
+}
+
+void ULSVendingWidget::NotifyPartialBuy(
+	const int32 RequestedQuantity,
+	const int32 BuyQuantity,
+	const int32 AddedAmount)
+{
+	if (AddedAmount < BuyQuantity)
+	{
+		ShowNotification(FText::Format(
+			LOCTEXT("PartialBuyInventory", "인벤토리 공간이 부족해 {0}개만 구매했습니다."),
+			FText::AsNumber(AddedAmount)));
+	}
+	else if (BuyQuantity < RequestedQuantity)
+	{
+		ShowNotification(FText::Format(
+			LOCTEXT("PartialBuyConditionChanged", "골드 또는 재고가 변경되어 {0}개만 구매했습니다."),
+			FText::AsNumber(AddedAmount)));
+	}
 }
 
 void ULSVendingWidget::ExecuteSell(const int32 Quantity)
@@ -694,6 +750,7 @@ void ULSVendingWidget::ExecuteSell(const int32 Quantity)
 	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
 	if (!SaveSubsystem)
 	{
+		ShowNotification(LOCTEXT("TradeUnavailable", "거래 정보를 불러오지 못했습니다."));
 		return;
 	}
 
@@ -703,29 +760,127 @@ void ULSVendingWidget::ExecuteSell(const int32 Quantity)
 		|| SlotItem.ItemRowName != SelectedRowName)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Store] Sell canceled. Slot changed: %s."), *SelectedRowName.ToString());
+		ShowNotification(LOCTEXT("SellSlotChanged", "판매할 아이템 정보가 변경되었습니다. 다시 선택해 주세요."));
 		return;
 	}
 
 	const int32 SellQuantity = FMath::Min(Quantity, SlotItem.Amount);
 	if (SellQuantity <= 0)
 	{
+		ShowNotification(LOCTEXT("TradeFailed", "거래 처리에 실패했습니다. 다시 시도해 주세요."));
 		return;
 	}
 
-	if (SellQuantity >= SlotItem.Amount)
+	if (!RemoveSoldItem(*SaveSubsystem, SlotItem, SellQuantity))
 	{
-		SaveSubsystem->ClearStoredSlot(SelectedArea, SelectedSlotIndex);
-	}
-	else
-	{
-		FLSSessionItem NewItem = SlotItem;
-		NewItem.Amount = SlotItem.Amount - SellQuantity;
-		FLSSessionItem PreviousItem;
-		SaveSubsystem->ReplaceStoredSlotItem(SelectedArea, SelectedSlotIndex, NewItem, PreviousItem);
+		UE_LOG(LogLS, Warning, TEXT("[Store] Sell canceled. Failed to remove item: %s x%d."),
+			*SelectedRowName.ToString(), SellQuantity);
+		ShowNotification(LOCTEXT("TradeFailed", "거래 처리에 실패했습니다. 다시 시도해 주세요."));
+		return;
 	}
 
 	SaveSubsystem->AddGold(SellQuantity * SelectedUnitPrice);
 	UE_LOG(LogLS, Log, TEXT("[Store] Sold %s x%d for %d gold."), *SelectedRowName.ToString(), SellQuantity, SellQuantity * SelectedUnitPrice);
+}
+
+int32 ULSVendingWidget::CalculateBuyCapacity(
+	const ULSSaveSubsystem& SaveSubsystem,
+	const int32 MaxQuantity) const
+{
+	TArray<FLSSessionItem> PreviewInventory = SaveSubsystem.GetInventory();
+	FLSSessionItem RemainingItem;
+	LSInventorySlotUtils::TryAddItemsToSlotArray(
+		PreviewInventory,
+		SelectedRowName,
+		MaxQuantity,
+		SaveSubsystem.GetMaxInventorySlotCount(),
+		TArray<FLSChipResolvedStat>(),
+		RemainingItem);
+	const int32 RemainingAmount = LSInventorySlotUtils::IsFilled(RemainingItem) ? RemainingItem.Amount : 0;
+	return FMath::Max(0, MaxQuantity - RemainingAmount);
+}
+
+bool ULSVendingWidget::RemoveSoldItem(
+	ULSSaveSubsystem& SaveSubsystem,
+	const FLSSessionItem& SlotItem,
+	const int32 SellQuantity) const
+{
+	if (SellQuantity >= SlotItem.Amount)
+	{
+		return SaveSubsystem.ClearStoredSlot(SelectedArea, SelectedSlotIndex);
+	}
+
+	FLSSessionItem NewItem = SlotItem;
+	NewItem.Amount = SlotItem.Amount - SellQuantity;
+	FLSSessionItem PreviousItem;
+	return SaveSubsystem.ReplaceStoredSlotItem(SelectedArea, SelectedSlotIndex, NewItem, PreviousItem);
+}
+
+void ULSVendingWidget::ShowNotification(const FText& Message)
+{
+	if (HasActiveConfirmDialog())
+	{
+		ActiveConfirmDialog->SetMessage(Message);
+		return;
+	}
+
+	PendingNotificationMessage = Message;
+	if (bNotificationPending)
+	{
+		return;
+	}
+	bNotificationPending = true;
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		PresentNotification();
+		return;
+	}
+	TWeakObjectPtr<ULSVendingWidget> WeakThis(this);
+	World->GetTimerManager().SetTimerForNextTick([WeakThis]()
+	{
+		if (ULSVendingWidget* StrongThis = WeakThis.Get())
+		{
+			StrongThis->PresentNotification();
+		}
+	});
+}
+
+void ULSVendingWidget::PresentNotification()
+{
+	bNotificationPending = false;
+	if (HasActiveConfirmDialog())
+	{
+		ActiveConfirmDialog->SetMessage(PendingNotificationMessage);
+		return;
+	}
+	if (!ConfirmDialogClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] ConfirmDialogClass is not set on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	APlayerController* OwningPlayer = GetOwningPlayer();
+	ULSConfirmDialogWidget* Dialog = OwningPlayer
+		? CreateWidget<ULSConfirmDialogWidget>(OwningPlayer, ConfirmDialogClass)
+		: CreateWidget<ULSConfirmDialogWidget>(this, ConfirmDialogClass);
+	if (!Dialog)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] Failed to create notification dialog on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	Dialog->SetMessage(PendingNotificationMessage);
+	Dialog->OnConfirmed.AddDynamic(this, &ULSVendingWidget::HandleNotificationDialogClosed);
+	Dialog->OnCancelled.AddDynamic(this, &ULSVendingWidget::HandleNotificationDialogClosed);
+	Dialog->AddToViewport(LSUILayer::ModalPanelDialog);
+	ActiveConfirmDialog = Dialog;
+}
+
+void ULSVendingWidget::HandleNotificationDialogClosed()
+{
+	ActiveConfirmDialog = nullptr;
 }
 
 ULSSaveSubsystem* ULSVendingWidget::GetSaveSubsystem() const

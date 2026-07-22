@@ -8,6 +8,7 @@ class UButton;
 class UTextBlock;
 class UVerticalBox;
 class ULSCraftingWidget;
+class ULSConfirmDialogWidget;
 class ULSStoreButtonWidget;
 class ULSVendingWidget;
 
@@ -52,6 +53,14 @@ public:
 
 	// 초기 상태(기능 선택 + 대기 대사)로 되돌린다. 개인정비에서 보급소 페이지를 열 때마다 호출한다.
 	void ResetStore();
+
+	// 자판기/제작대가 열려 있으면 기능 선택 화면으로 한 단계만 되돌린다.
+	// 처리할 하위 화면이 없으면 상위 개인정비 화면이 입력을 처리하도록 false를 반환한다.
+	bool TryHandleBack();
+
+	// 개인정비에 매핑된 공용 확인 다이얼로그를 자판기에 전달한다.
+	void SetConfirmDialogClass(TSubclassOf<ULSConfirmDialogWidget> InConfirmDialogClass);
+	bool HasActiveConfirmDialog() const;
 
 protected:
 	// 기능 선택/대화 화면 전체(CASHIER-9 이미지·버튼·대사창 묶음) 컨테이너. 자판기를 열면 통째로 숨긴다.
@@ -156,6 +165,9 @@ private:
 	// 지연 생성한 제작 화면. 보급소를 닫았다 다시 열 때 재사용한다.
 	UPROPERTY(Transient)
 	TObjectPtr<ULSCraftingWidget> CraftingPanel;
+
+	UPROPERTY(Transient)
+	TSubclassOf<ULSConfirmDialogWidget> ConfirmDialogClass;
 
 	ELSStoreState CurrentState = ELSStoreState::FunctionSelect;
 };

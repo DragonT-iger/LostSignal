@@ -244,6 +244,28 @@ bool ULSLoadoutPreparationWidget::IsContentOpen() const
 	return ContentSwitcher && ContentSwitcher->GetVisibility() == ESlateVisibility::Visible;
 }
 
+bool ULSLoadoutPreparationWidget::TryHandleBack() const
+{
+	if (!IsContentOpen())
+	{
+		return false;
+	}
+
+	if (ContentSwitcher->GetActiveWidgetIndex() == static_cast<int32>(ELSLoadoutTab::Supply))
+	{
+		if (ULSStoreWidget* Store = FindLoadoutStoreWidget(ContentSwitcher->GetActiveWidget()))
+		{
+			if (Store->TryHandleBack())
+			{
+				return true;
+			}
+		}
+	}
+
+	ResetToTabs();
+	return true;
+}
+
 bool ULSLoadoutPreparationWidget::HasActiveConfirmDialog() const
 {
 	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
@@ -256,6 +278,13 @@ bool ULSLoadoutPreparationWidget::HasActiveConfirmDialog() const
 	// (보고하지 않으면 다이얼로그가 매 틱 포커스를 뺏겨 확인 버튼 첫 클릭이 씹힌다.)
 	if (ContentSwitcher)
 	{
+		if (const ULSStoreWidget* Store = FindLoadoutStoreWidget(ContentSwitcher->GetActiveWidget()))
+		{
+			if (Store->HasActiveConfirmDialog())
+			{
+				return true;
+			}
+		}
 		if (const ULSChipStationWidget* ChipStation = FindLoadoutChipStationWidget(ContentSwitcher->GetActiveWidget()))
 		{
 			return ChipStation->HasActiveConfirmDialog();
@@ -267,7 +296,7 @@ bool ULSLoadoutPreparationWidget::HasActiveConfirmDialog() const
 
 void ULSLoadoutPreparationWidget::CloseActiveConfirmDialog()
 {
-	if (HasActiveConfirmDialog())
+	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
 	{
 		// Cancel이 OnCancelled를 브로드캐스트해 HandleNotImplementedDialogClosed에서 참조 정리까지 이어진다.
 		ActiveConfirmDialog->Cancel();
@@ -353,6 +382,7 @@ void ULSLoadoutPreparationWidget::ShowTab(const ELSLoadoutTab Tab) const
 	{
 		if (ULSStoreWidget* Store = FindLoadoutStoreWidget(ContentSwitcher->GetActiveWidget()))
 		{
+			Store->SetConfirmDialogClass(ConfirmDialogClass);
 			Store->ResetStore();
 		}
 		else

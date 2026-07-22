@@ -6,6 +6,8 @@
 
 화면 레이아웃은 `WBP_Crafting`과 그 하위 WBP들이 소유하고, 목록 생성·필터·선택·제작 처리는 `Source/LostSignal/UI/Lobby/Crafting/`의 C++ 부모 클래스가 담당한다. 제작 가능 표시용 별 아이콘은 현재 범위에 포함하지 않는다.
 
+제작 화면에서 `Esc` 또는 `Tab`을 누르면 보급소 기능 선택 화면으로 한 단계 돌아간다. 다음 입력에서 개인정비 탭 목록으로 돌아가며, 한 입력으로 두 단계를 건너뛰지 않는다.
+
 ## 데이터 소유권
 
 - 레시피 Row 구조는 `Source/LostSignal/Data/LSCraftingRecipeRow.h`가 단일 출처다.

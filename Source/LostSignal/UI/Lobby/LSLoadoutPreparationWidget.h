@@ -44,6 +44,10 @@ public:
 	// 내부 콘텐츠(ContentSwitcher)가 열려 있는지. TAB/ESC 단계별 뒤로가기 판단용.
 	bool IsContentOpen() const;
 
+	// 현재 콘텐츠의 가장 안쪽 화면부터 한 단계만 되돌린다.
+	// 탭 목록이 이미 표시 중이면 상위 로비 화면이 처리하도록 false를 반환한다.
+	bool TryHandleBack() const;
+
 	// 미구현 안내창이 떠 있는지. 로비 루트의 포커스 회수 가드가 안내창의 키 입력(ESC/TAB)을 뺏지 않게 참조한다.
 	bool HasActiveConfirmDialog() const;
 

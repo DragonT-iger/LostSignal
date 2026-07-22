@@ -10,6 +10,7 @@ class UButton;
 class UTextBlock;
 class UWrapBox;
 class ULSItemSlotWidget;
+class ULSConfirmDialogWidget;
 class ULSSaveSubsystem;
 class ULSVendingButtonWidget;
 class ULSVendingSlotWidget;
@@ -29,7 +30,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FLSVendingBackRequested);
 // 자판기(구매/판매) 화면(WBP_Vending)의 부모 클래스. WBP_Store 안에 배치되어 기능 선택에서 자판기를 고르면 열린다.
 // 좌측 내 아이템(가방/안전슬롯/창고), 중앙 상세+거래 버튼, 우측 자판기 목록을 모두 이 위젯이 채운다.
 // 판매 목록은 DT_StoreStock(StoreStockTable)에서 읽고, 가격은 각 아이템 테이블의 Item_Cost가 단일 출처다.
-// 1차 범위: 구매/판매만. 재고 수량/새로고침 타이머/잠금·퀘스트 아이템 판매 불가 팝업은 2차에서 구현한다.
+// 구매/판매·재고 수량·새로고침 타이머를 제공한다. 잠금·퀘스트 아이템 판매 제한은 아직 구현하지 않는다.
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSVendingWidget : public UUserWidget
 {
@@ -44,6 +45,10 @@ public:
 
 	// 자판기 화면을 초기 상태로 열 준비를 한다(골드/목록/내 아이템 갱신, 선택 해제).
 	void OpenVending();
+
+	// 개인정비에 매핑된 공용 확인 다이얼로그 클래스를 전달받는다.
+	void SetConfirmDialogClass(TSubclassOf<ULSConfirmDialogWidget> InConfirmDialogClass);
+	bool HasActiveConfirmDialog() const;
 
 	// 뒤로가기 버튼. 상점 위젯이 구독해 기능 선택 화면으로 되돌린다.
 	UPROPERTY(BlueprintAssignable, Category="LS/UI|Store")
@@ -108,8 +113,7 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Store")
 	TObjectPtr<UTextBlock> DetailNameText;
 
-	// 재고/보유 수량 표시. 판매(내 아이템) 선택 시 보유 수량을 보여준다.
-	// 구매(자판기 상품) 선택 시에는 숨긴다 — 재고 추적이 2차 범위라 아직 표시할 값이 없다.
+	// 재고/보유 수량 표시. 구매 상품은 현재/최대 재고, 판매 아이템은 해당 슬롯 보유량을 보여준다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Store")
 	TObjectPtr<UTextBlock> DetailStockText;
 
@@ -180,6 +184,7 @@ private:
 	UFUNCTION() void HandleIncreaseClicked();
 	UFUNCTION() void HandleYesClicked();
 	UFUNCTION() void HandleNoClicked();
+	UFUNCTION() void HandleNotificationDialogClosed();
 
 	// 골드 변경 구독 콜백. 상단 골드 표시를 갱신한다.
 	void HandleGoldChanged();
@@ -220,6 +225,11 @@ private:
 	void ClearSelection();
 	void ExecuteBuy(int32 Quantity);
 	void ExecuteSell(int32 Quantity);
+	int32 CalculateBuyCapacity(const ULSSaveSubsystem& SaveSubsystem, int32 MaxQuantity) const;
+	void NotifyPartialBuy(int32 RequestedQuantity, int32 BuyQuantity, int32 AddedAmount);
+	bool RemoveSoldItem(ULSSaveSubsystem& SaveSubsystem, const FLSSessionItem& SlotItem, int32 SellQuantity) const;
+	void ShowNotification(const FText& Message);
+	void PresentNotification();
 	ULSSaveSubsystem* GetSaveSubsystem() const;
 	// Row Name 접두사와 Item_Type으로 상품 카테고리를 판정한다.
 	static ELSVendingCategory ResolveCategory(FName ItemRowName);
@@ -249,6 +259,15 @@ private:
 
 	// 다음 자동 새로고침까지 남은 시간(초). 1초 타이머로 감소한다.
 	float RemainingRefreshSeconds = 0.0f;
+
+	UPROPERTY(Transient)
+	TSubclassOf<ULSConfirmDialogWidget> ConfirmDialogClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ULSConfirmDialogWidget> ActiveConfirmDialog;
+
+	FText PendingNotificationMessage;
+	bool bNotificationPending = false;
 
 	FTimerHandle RefreshTimerHandle;
 };
