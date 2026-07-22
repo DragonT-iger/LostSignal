@@ -2,16 +2,21 @@
 
 #include "Engine/DataTable.h"
 #include "FileHelpers.h"
+#include "Framework/Docking/TabManager.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/MessageDialog.h"
 #include "Misc/Paths.h"
+#include "SLSMapTileEditor.h"
 #include "ToolMenus.h"
+#include "Widgets/Docking/SDockTab.h"
 
 #define LOCTEXT_NAMESPACE "LostSignalEditorDataTools"
 
 namespace
 {
+	const FName GLSMapTileEditorTabId(TEXT("LSMapTileEditor"));
+
 	struct FLSDataTableImportTarget
 	{
 		const TCHAR* AssetName;
@@ -37,12 +42,20 @@ namespace
 
 void FLostSignalEditorDataToolsModule::StartupModule()
 {
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(
+		GLSMapTileEditorTabId,
+		FOnSpawnTab::CreateRaw(this, &FLostSignalEditorDataToolsModule::SpawnMapTileEditorTab))
+		.SetDisplayName(LOCTEXT("MapTileEditorTabName", "맵 타일 편집기"))
+		.SetMenuType(ETabSpawnerMenuType::Hidden);
+
 	UToolMenus::RegisterStartupCallback(
 		FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FLostSignalEditorDataToolsModule::RegisterMenus));
 }
 
 void FLostSignalEditorDataToolsModule::ShutdownModule()
 {
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(GLSMapTileEditorTabId);
+
 	if (UToolMenus* ToolMenus = UToolMenus::TryGet())
 	{
 		UToolMenus::UnRegisterStartupCallback(this);
@@ -66,6 +79,28 @@ void FLostSignalEditorDataToolsModule::RegisterMenus()
 		FUIAction(FExecuteAction::CreateRaw(this, &FLostSignalEditorDataToolsModule::ReimportDataTables))
 	);
 
+	ToolsSection.AddMenuEntry(
+		"LSMapTilePlacement",
+		LOCTEXT("MapTilePlacementLabel", "맵 타일 편집기"),
+		LOCTEXT("MapTilePlacementTooltip", "2D 맵 캔버스에서 팔레트 타일을 칠해 실제 레벨 바닥을 교체합니다."),
+		FSlateIcon(),
+		FUIAction(FExecuteAction::CreateRaw(this, &FLostSignalEditorDataToolsModule::OpenMapTileEditor))
+	);
+
+}
+
+void FLostSignalEditorDataToolsModule::OpenMapTileEditor()
+{
+	FGlobalTabmanager::Get()->TryInvokeTab(GLSMapTileEditorTabId);
+}
+
+TSharedRef<SDockTab> FLostSignalEditorDataToolsModule::SpawnMapTileEditorTab(const FSpawnTabArgs& SpawnTabArgs)
+{
+	return SNew(SDockTab)
+		.TabRole(ETabRole::NomadTab)
+		[
+			SNew(SLSMapTileEditor)
+		];
 }
 
 void FLostSignalEditorDataToolsModule::ReimportDataTables()

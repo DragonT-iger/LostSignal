@@ -6,11 +6,20 @@ public class LostSignalEditorDataTools : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PrivateDependencyModuleNames.AddRange(new string[]
+		PublicDependencyModuleNames.AddRange(new string[]
 		{
 			"Core",
 			"CoreUObject",
-			"Engine",
+			"Engine"
+		});
+
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"AssetRegistry",
+			"AssetTools",
+			"InputCore",
+			"LevelEditor",
+			"PropertyEditor",
 			"Slate",
 			"SlateCore",
 			"ToolMenus",

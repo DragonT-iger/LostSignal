@@ -2,6 +2,9 @@
 
 #include "Modules/ModuleManager.h"
 
+class SDockTab;
+class FSpawnTabArgs;
+
 class FLostSignalEditorDataToolsModule : public IModuleInterface
 {
 public:
@@ -11,4 +14,6 @@ public:
 private:
 	void RegisterMenus();
 	void ReimportDataTables();
+	void OpenMapTileEditor();
+	TSharedRef<SDockTab> SpawnMapTileEditorTab(const FSpawnTabArgs& SpawnTabArgs);
 };
