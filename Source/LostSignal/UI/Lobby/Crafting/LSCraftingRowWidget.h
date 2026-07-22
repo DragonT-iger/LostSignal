@@ -18,6 +18,14 @@ class LOSTSIGNAL_API ULSCraftingRowWidget : public UUserWidget
 
 public:
 	virtual void NativeConstruct() override;
+	virtual int32 NativePaint(
+		const FPaintArgs& Args,
+		const FGeometry& AllottedGeometry,
+		const FSlateRect& MyCullingRect,
+		FSlateWindowElementList& OutDrawElements,
+		int32 LayerId,
+		const FWidgetStyle& InWidgetStyle,
+		bool bParentEnabled) const override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 	UPROPERTY(BlueprintAssignable, Category="LS/UI|Crafting")
@@ -46,13 +54,19 @@ protected:
 	TObjectPtr<UTextBlock> OwnedCountText;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Crafting")
-	FLinearColor SelectedBorderColor = FLinearColor(0.35f, 0.85f, 1.0f, 1.0f);
+	FLinearColor SelectedBorderColor = FLinearColor(1.0f, 0.42f, 0.08f, 1.0f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Crafting", meta=(ClampMin="0.0"))
+	float SelectedBorderWidth = 4.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Crafting", meta=(ClampMin="0.0"))
+	float SelectedBorderRadius = 8.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Crafting")
 	FLinearColor CraftableBorderColor = FLinearColor(0.22f, 0.85f, 0.35f, 1.0f);
 
 private:
-	void RefreshBorderColor() const;
+	void RefreshBackgroundColor() const;
 
 	FName RecipeRowName;
 	FLinearColor NormalBorderColor = FLinearColor::White;

@@ -4,6 +4,8 @@
 #include "Components/TextBlock.h"
 #include "InputCoreTypes.h"
 #include "LostSignal.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
+#include "Rendering/DrawElements.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
 
 void ULSCraftingRowWidget::NativeConstruct()
@@ -23,8 +25,42 @@ void ULSCraftingRowWidget::NativeConstruct()
 	if (SelectionBorder)
 	{
 		NormalBorderColor = SelectionBorder->GetBrushColor();
-		RefreshBorderColor();
+		RefreshBackgroundColor();
 	}
+}
+
+int32 ULSCraftingRowWidget::NativePaint(
+	const FPaintArgs& Args,
+	const FGeometry& AllottedGeometry,
+	const FSlateRect& MyCullingRect,
+	FSlateWindowElementList& OutDrawElements,
+	const int32 LayerId,
+	const FWidgetStyle& InWidgetStyle,
+	const bool bParentEnabled) const
+{
+	const int32 MaxLayer = Super::NativePaint(
+		Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+	if (!bIsSelected || SelectedBorderWidth <= 0.0f)
+	{
+		return MaxLayer;
+	}
+
+	const FSlateRoundedBoxBrush OutlineBrush(
+		FLinearColor::Transparent,
+		SelectedBorderRadius,
+		FSlateColor(SelectedBorderColor),
+		SelectedBorderWidth);
+	const ESlateDrawEffect DrawEffect = bParentEnabled && GetIsEnabled()
+		? ESlateDrawEffect::None
+		: ESlateDrawEffect::DisabledEffect;
+	FSlateDrawElement::MakeBox(
+		OutDrawElements,
+		MaxLayer + 1,
+		AllottedGeometry.ToPaintGeometry(),
+		&OutlineBrush,
+		DrawEffect,
+		OutlineBrush.GetTint(InWidgetStyle));
+	return MaxLayer + 1;
 }
 
 FReply ULSCraftingRowWidget::NativeOnMouseButtonDown(
@@ -62,20 +98,23 @@ void ULSCraftingRowWidget::SetRecipe(
 	{
 		OwnedCountText->SetText(FText::AsNumber(OwnedAmount));
 	}
-	RefreshBorderColor();
+	RefreshBackgroundColor();
 }
 
 void ULSCraftingRowWidget::SetSelected(const bool bSelected)
 {
+	if (bIsSelected == bSelected)
+	{
+		return;
+	}
 	bIsSelected = bSelected;
-	RefreshBorderColor();
+	Invalidate(EInvalidateWidgetReason::Paint);
 }
 
-void ULSCraftingRowWidget::RefreshBorderColor() const
+void ULSCraftingRowWidget::RefreshBackgroundColor() const
 {
 	if (SelectionBorder)
 	{
-		SelectionBorder->SetBrushColor(
-			bIsSelected ? SelectedBorderColor : (bCraftable ? CraftableBorderColor : NormalBorderColor));
+		SelectionBorder->SetBrushColor(bCraftable ? CraftableBorderColor : NormalBorderColor);
 	}
 }
