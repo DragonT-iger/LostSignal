@@ -37,5 +37,6 @@ private:
 	UFUNCTION()
 	void OnRep_CurrentHealth(const FGameplayAttributeData& OldCurrentHealth) const;
 
+	float GetMinimumHealth() const;
 	void ClampCurrentHealth();
 };

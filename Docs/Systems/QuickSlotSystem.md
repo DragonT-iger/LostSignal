@@ -22,7 +22,7 @@
 
 ## 위젯
 
-- [`ULSQuickSlotWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotWidget.h) — 개별 칸. 드롭 타겟(`NativeOnDrop`)이며 **우클릭으로 등록 해제**한다(더블클릭 해제는 두지 않음). `Refresh`에서 아이콘(공용 `LSInventorySlotUtils::LoadItemIconTexture`)과 인벤토리 합산 개수를 그린다. 마우스 호버 시 `ULSItemSlotWidget`과 같은 방식으로 아이콘·배경(`SlotBackgroundImage`) 틴트 + 스케일을 강조한다(`HoveredIconTint`/`HoveredRenderScale`, 에디터 조정 가능). **호버가 아닐 때 배경 색은 WBP가 지정한 색을 그대로 보인다** — `InitializeSlot`에서 배경 색을 1회 캡처해 호버 해제 시 그 색으로 복원한다(하드코딩 흰색으로 덮어쓰지 않음). 호버 반응은 **인벤토리 패널이 열려 있을 때만** 준다(`ALSPlayerControllerBase::IsInventoryUIOpen` — 로비/레이드 공통 판정). HUD에 상시 떠 있는 바는 전투 중 호버해도 반응하지 않는다.
+- [`ULSQuickSlotWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotWidget.h) — 개별 칸. 드롭 타겟(`NativeOnDrop`)이며 **우클릭으로 등록 해제**한다(더블클릭 해제는 두지 않음). 등록 해제도 호버와 마찬가지로 **인벤토리 패널이 열려 있을 때만** 동작한다(`IsInventoryUIOpen`). `Refresh`에서 아이콘(공용 `LSInventorySlotUtils::LoadItemIconTexture`)과 인벤토리 합산 개수를 그린다. 마우스 호버 시 `ULSItemSlotWidget`과 같은 방식으로 아이콘·배경(`SlotBackgroundImage`) 틴트 + 스케일을 강조한다(`HoveredIconTint`/`HoveredRenderScale`, 에디터 조정 가능). **호버가 아닐 때 배경 색은 WBP가 지정한 색을 그대로 보인다** — `InitializeSlot`에서 배경 색을 1회 캡처해 호버 해제 시 그 색으로 복원한다(하드코딩 흰색으로 덮어쓰지 않음). 호버 반응은 **인벤토리 패널이 열려 있을 때만** 준다(`ALSPlayerControllerBase::IsInventoryUIOpen` — 로비/레이드 공통 판정). HUD에 상시 떠 있는 바는 전투 중 호버해도 반응하지 않는다.
 - [`ULSQuickSlotBarWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotBarWidget.h) — 고정 6칸(`QuickSlot1~6` `BindWidget`) 컨테이너. 로비/레이드 HUD 양쪽에서 재사용한다. 생성 시 스스로 `PlayerController`에 등록하고 `OnQuickSlotsChanged`를 구독한다.
 
 개수 합산은 툴팁 "현재 아이템 개수"와 동일 소스를 쓴다: 레이드 활성이면 `ULSRaidInventoryComponent`의 세션(일반+Safe), 아니면 `ULSSaveSubsystem`의 세이브(일반+Safe). 합산 함수는 `LSCraftingUtils::CountItem`을 재사용한다.

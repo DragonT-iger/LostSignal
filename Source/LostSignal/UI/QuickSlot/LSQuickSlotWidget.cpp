@@ -62,8 +62,8 @@ void ULSQuickSlotWidget::Refresh()
 
 FReply ULSQuickSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	// 우클릭으로 등록 해제.
-	if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
+	// 우클릭으로 등록 해제. 인벤토리 패널이 열려 있을 때만 허용한다(HUD 상시 바는 전투 중 해제 방지).
+	if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton && IsInventoryContextOpen())
 	{
 		if (ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem())
 		{

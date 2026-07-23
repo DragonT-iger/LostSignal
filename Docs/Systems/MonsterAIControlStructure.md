@@ -141,6 +141,16 @@ Action_Group
 
 `ULSMonsterCombatComponent`는 몬스터 기본 공격 데미지에 컴포넌트 공격력 fallback을 사용하지 않는다. `FLSMonsterArchetypeRow`가 적용되지 않으면 공격 Ability 요청 또는 실제 히트 적용을 차단하고 `UE_LOG(LogLS, Warning, ...)`를 남긴다.
 
+### 훈련용 허수아비
+
+`ALSTrainingDummyCharacter`는 `ALSEnemyCharacter`의 피격·체력 UI·GAS 경로를 재사용하되 AIController, StateTree, 공격 Ability, 사망 루트 드랍을 사용하지 않는 샌드백 전용 클래스다.
+
+- 최대 체력은 일반 몬스터와 동일하게 `DT_MonsterStat`의 기존 `Monster_HP`를 사용한다.
+- 회복력은 DataTable 스키마에 새 컬럼을 만들지 않고 클래스의 `RecoveryPerSecond`가 소유한다. 이 값은 `ULSCharacterAttributeSet::Recovery`에 초기화된다.
+- `ULSGE_TrainingDummyRecovery`가 서버에서 1초마다 Recovery만큼 CurrentHealth를 회복한다. 체력을 직접 대입하지 않는다.
+- 허수아비만 `LS.State.CannotDie`를 ASC에 부여한다. `ULSCombatAttributeSet`은 이 태그가 있을 때 CurrentHealth 최솟값을 1로 제한하므로 Dead 상태·숨김·루트 스폰·수명 제거에 진입하지 않는다.
+- 일반 플레이어와 몬스터는 해당 태그를 부여받지 않아 기존 체력 0 및 사망 흐름이 유지된다.
+
 ## Transition 데이터 규칙
 
 Transition Condition은 Evaluator의 InstanceData만 읽는다.
@@ -601,6 +611,9 @@ AI 전이에 영향을 주는 상태는 GAS Tag를 기준으로 한다.
 ```text
 LS.State.Dead
 - 사망 터미널 전이
+
+LS.State.CannotDie
+- 허수아비 전용 체력 최솟값 1 보장. AI 전이용 태그가 아니라 AttributeSet의 사망 방지 조건으로만 사용
 
 LS.State.Knockback
 - 넉백 일시 중단 전이

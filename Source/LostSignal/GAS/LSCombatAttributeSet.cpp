@@ -1,6 +1,7 @@
 #include "GAS/LSCombatAttributeSet.h"
 
 #include "GameplayEffectExtension.h"
+#include "GAS/LSGameplayTags.h"
 #include "Net/UnrealNetwork.h"
 
 void ULSCombatAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -17,7 +18,7 @@ void ULSCombatAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribu
 
 	if (Attribute == GetCurrentHealthAttribute())
 	{
-		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxHealth());
+		NewValue = FMath::Clamp(NewValue, GetMinimumHealth(), GetMaxHealth());
 	}
 	else if (Attribute == GetMaxHealthAttribute())
 	{
@@ -51,9 +52,16 @@ void ULSCombatAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCa
 	}
 }
 
+float ULSCombatAttributeSet::GetMinimumHealth() const
+{
+	const UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
+	const bool bCannotDie = ASC && ASC->HasMatchingGameplayTag(LSGameplayTags::State_CannotDie);
+	return bCannotDie ? FMath::Min(1.0f, GetMaxHealth()) : 0.0f;
+}
+
 void ULSCombatAttributeSet::ClampCurrentHealth()
 {
-	SetCurrentHealth(FMath::Clamp(GetCurrentHealth(), 0.0f, GetMaxHealth()));
+	SetCurrentHealth(FMath::Clamp(GetCurrentHealth(), GetMinimumHealth(), GetMaxHealth()));
 }
 
 void ULSCombatAttributeSet::OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth) const
