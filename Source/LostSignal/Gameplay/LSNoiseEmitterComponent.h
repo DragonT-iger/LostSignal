@@ -4,7 +4,6 @@
 #include "Components/ActorComponent.h"
 #include "LSNoiseEmitterComponent.generated.h"
 
-class UDataTable;
 struct FLSNoiseProfileRow;
 
 /** Emits character gameplay noise events for monster sensing. */
@@ -34,11 +33,6 @@ private:
 	bool IsOwnerMoving() const;
 	bool IsOwnerRunning() const;
 	void DrawNoiseDebug(const FVector& Location, float RadiusCm) const;
-	void LogMissingNoiseProfileTableOnce();
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Noise")
-	TObjectPtr<UDataTable> NoiseProfileTable;
-
 	UPROPERTY(EditDefaultsOnly, Category="LS/Noise")
 	FName WalkNoiseRowName = TEXT("Walk");
 
@@ -66,5 +60,4 @@ private:
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Noise")
 	float MovementNoiseElapsedSeconds = 0.0f;
 
-	bool bLoggedMissingNoiseProfileTable = false;
 };

@@ -31,4 +31,13 @@ public:
 
 	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
 	TSoftObjectPtr<UDataTable> ProtocolUnlockTable;
+
+	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
+	TSoftObjectPtr<UDataTable> MonsterArchetypeTable;
+
+	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
+	TSoftObjectPtr<UDataTable> MonsterActionTable;
+
+	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
+	TSoftObjectPtr<UDataTable> NoiseProfileTable;
 };

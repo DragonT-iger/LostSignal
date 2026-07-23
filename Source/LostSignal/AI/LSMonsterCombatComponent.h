@@ -6,7 +6,6 @@
 #include "GameplayTagContainer.h"
 #include "LSMonsterCombatComponent.generated.h"
 
-class UDataTable;
 class UGameplayEffect;
 class UMaterialInterface;
 class UPrimitiveComponent;
@@ -138,16 +137,7 @@ private:
 	static ELSBreakPowerTier ToBreakPowerTier(int32 Impact);
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
-	TObjectPtr<UDataTable> MonsterActionTable;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat|Telegraph")
-	TObjectPtr<UMaterialInterface> TelegraphCircleMaterial;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/Combat|Telegraph")
-	TObjectPtr<UMaterialInterface> TelegraphBoxMaterial;
 
 	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
 	float LeashDistance = 2000.0f;
@@ -164,6 +154,12 @@ private:
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Combat")
 	FName ActiveActionRowName;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> ResolvedTelegraphCircleMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> ResolvedTelegraphBoxMaterial;
 
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Combat")
 	TWeakObjectPtr<AActor> ActiveTarget;

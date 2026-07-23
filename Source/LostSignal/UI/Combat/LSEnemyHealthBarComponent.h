@@ -24,9 +24,6 @@ protected:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Combat")
-	TSubclassOf<ULSEnemyHealthBarWidget> HealthBarWidgetClass;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Combat")
 	FVector WidgetOffset = FVector(0.0f, 0.0f, 160.0f);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Combat")
@@ -63,6 +60,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UWidgetComponent> HealthBarWidgetComponent;
+
+	UPROPERTY(Transient)
+	TSubclassOf<ULSEnemyHealthBarWidget> ResolvedHealthBarWidgetClass;
 
 	TWeakObjectPtr<ALSEnemyCharacter> ObservedEnemy;
 	TWeakObjectPtr<UAbilitySystemComponent> ObservedASC;

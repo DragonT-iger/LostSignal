@@ -3,6 +3,7 @@
 #include "Combat/LSCharacterCombatComponent.h"
 #include "Components/PoseableMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Data/LSMonsterPresentationSettings.h"
 #include "GameFramework/Character.h"
 #include "LostSignal.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -36,6 +37,11 @@ void ULSVisionGhostComponent::BeginPlay()
 	if (GetNetMode() == NM_DedicatedServer)
 	{
 		return;
+	}
+
+	if (const ULSMonsterPresentationSettings* Settings = GetDefault<ULSMonsterPresentationSettings>())
+	{
+		ResolvedGhostMaterial = Settings->GhostMaterial.LoadSynchronous();
 	}
 
 	ULSVisionTargetComponent* VisionTarget =
@@ -167,7 +173,7 @@ void ULSVisionGhostComponent::CreateGhostMaterialInstances(const USkeletalMeshCo
 	const int32 MaterialCount = FMath::Max(SourceMeshComponent->GetNumMaterials(), 1);
 	for (int32 MaterialIndex = 0; MaterialIndex < MaterialCount; ++MaterialIndex)
 	{
-		UMaterialInstanceDynamic* GhostMID = UMaterialInstanceDynamic::Create(GhostMaterial, this);
+		UMaterialInstanceDynamic* GhostMID = UMaterialInstanceDynamic::Create(ResolvedGhostMaterial, this);
 		if (GhostMID == nullptr)
 		{
 			continue;
@@ -216,11 +222,11 @@ void ULSVisionGhostComponent::BeginGhostFade()
 		}
 	}
 
-	if (GhostMaterial == nullptr)
+	if (ResolvedGhostMaterial == nullptr)
 	{
 		if (!bWarnedMissingGhostMaterial)
 		{
-			UE_LOG(LogLS, Warning, TEXT("LSVisionGhostComponent on '%s' has no GhostMaterial assigned. Ghost silhouette disabled."), *GetNameSafe(GetOwner()));
+			UE_LOG(LogLS, Warning, TEXT("LSVisionGhostComponent on '%s' has no GhostMaterial in LS Monster Presentation Settings. Ghost silhouette disabled."), *GetNameSafe(GetOwner()));
 			bWarnedMissingGhostMaterial = true;
 		}
 		return;

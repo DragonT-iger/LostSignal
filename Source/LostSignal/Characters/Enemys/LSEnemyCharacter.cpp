@@ -12,7 +12,8 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSMonsterArchetypeRow.h"
-#include "Engine/DataTable.h"
+#include "Data/LSGameDataSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "GAS/Abilities/LSGA_MonsterAction.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSCombatAttributeSet.h"
@@ -243,12 +244,9 @@ void ALSEnemyCharacter::SpawnDeathLootBox()
 
 const FLSMonsterArchetypeRow* ALSEnemyCharacter::FindMonsterArchetypeRow() const
 {
-	if (!MonsterArchetypeTable || MonsterRowName.IsNone())
-	{
-		return nullptr;
-	}
-
-	return MonsterArchetypeTable->FindRow<FLSMonsterArchetypeRow>(MonsterRowName, TEXT("LSEnemyCharacter"));
+	const UGameInstance* GameInstance = GetGameInstance();
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	return GameData ? GameData->FindMonsterArchetypeRow(MonsterRowName, TEXT("LSEnemyCharacter")) : nullptr;
 }
 
 void ALSEnemyCharacter::InitializeMonsterArchetype()

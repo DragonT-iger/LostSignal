@@ -11,6 +11,9 @@ struct FLSCharacterPassiveSkillRow;
 struct FLSCharacterSkillRow;
 struct FLSConsumableRow;
 struct FLSConsumableEffectRow;
+struct FLSMonsterActionRow;
+struct FLSMonsterArchetypeRow;
+struct FLSNoiseProfileRow;
 struct FLSProtocolUnlockRow;
 struct FLSStatusEffectRow;
 
@@ -36,6 +39,9 @@ public:
 	const FLSStatusEffectRow* FindStatusEffectRowByID(int32 StatusID, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSConsumableRow* FindConsumableRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSConsumableEffectRow* FindConsumableEffectRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	const FLSMonsterArchetypeRow* FindMonsterArchetypeRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	const FLSMonsterActionRow* FindMonsterActionRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	const FLSNoiseProfileRow* FindNoiseProfileRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSProtocolUnlockRow* FindProtocolUnlockRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSProtocolUnlockRow* FindProtocolUnlockRowByEnableName(ELSProtocolType ProtocolType, FName EnableName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	void GetProtocolUnlockRows(ELSProtocolType ProtocolType, TArray<const FLSProtocolUnlockRow*>& OutRows, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
@@ -48,6 +54,7 @@ public:
 
 private:
 	void LoadTables();
+	void LogMissingTables() const;
 	void NormalizeActiveSkillRows() const;
 	void NormalizePassiveSkillRows() const;
 	void NormalizeComboAttackRows() const;
@@ -72,4 +79,13 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UDataTable> ProtocolUnlockTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> MonsterArchetypeTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> MonsterActionTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> NoiseProfileTable;
 };

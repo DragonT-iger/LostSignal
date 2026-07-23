@@ -7,7 +7,6 @@
 #include "LSEnemyCharacter.generated.h"
 
 class ALSLootBox;
-class UDataTable;
 class UGameplayAbility;
 class UStateTree;
 class UAnimMontage;
@@ -125,9 +124,6 @@ protected:
 	// 몬스터 행동 StateTree(BP에서 매핑). 컨트롤러가 아니라 캐릭터가 소유한다 — AIController는 몬스터 공통 1종 유지.
 	UPROPERTY(EditDefaultsOnly, Category="LS/AI|StateTree", meta=(RequiredAssetDataTags="Schema=/Script/GameplayStateTreeModule.StateTreeAIComponentSchema"))
 	TObjectPtr<UStateTree> DefaultStateTree;
-
-	UPROPERTY(EditDefaultsOnly, Category="LS/AI|DataTable")
-	TObjectPtr<UDataTable> MonsterArchetypeTable;
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/AI|DataTable")
 	FName MonsterRowName;

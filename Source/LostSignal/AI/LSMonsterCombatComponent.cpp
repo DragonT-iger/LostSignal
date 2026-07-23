@@ -9,6 +9,9 @@
 #include "Components/PrimitiveComponent.h"
 #include "Data/LSMonsterActionRow.h"
 #include "Data/LSMonsterArchetypeRow.h"
+#include "Data/LSGameDataSubsystem.h"
+#include "Data/LSMonsterPresentationSettings.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/RootMotionSource.h"
@@ -29,6 +32,12 @@ ULSMonsterCombatComponent::ULSMonsterCombatComponent()
 void ULSMonsterCombatComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (const ULSMonsterPresentationSettings* Settings = GetDefault<ULSMonsterPresentationSettings>())
+	{
+		ResolvedTelegraphCircleMaterial = Settings->TelegraphCircleMaterial.LoadSynchronous();
+		ResolvedTelegraphBoxMaterial = Settings->TelegraphBoxMaterial.LoadSynchronous();
+	}
 
 	ALSCharacterBase* OwnerCharacter = Cast<ALSCharacterBase>(GetOwner());
 	if (OwnerCharacter && OwnerCharacter->HasAuthority())
@@ -56,8 +65,7 @@ void ULSMonsterCombatComponent::ApplyArchetype(const FLSMonsterArchetypeRow& Row
 	ActionGroup = Row.Action_Group;
 
 	// 진단: 공격 선택에 필요한 설정이 제대로 들어왔는지 초기화 때 1회 덤프.
-	UE_LOG(LogLS, Log, TEXT("ApplyArchetype %s: MonsterActionTable=%s, ActionGroup수=%d"),
-		*GetNameSafe(GetOwner()), *GetNameSafe(MonsterActionTable), ActionGroup.Num());
+	UE_LOG(LogLS, Log, TEXT("ApplyArchetype %s: ActionGroup수=%d"), *GetNameSafe(GetOwner()), ActionGroup.Num());
 	for (const FName& RowName : ActionGroup)
 	{
 		const FLSMonsterActionRow* ActionRow = FindActionRow(RowName);
@@ -630,7 +638,7 @@ void ULSMonsterCombatComponent::BeginActionTelegraph(float Duration, ELSMonsterT
 	// 텔레그래프는 위험 표시용 전용 재질을 오버라이드로 넘긴다(프리뷰 컴포넌트 기본 재질 미사용).
 	FLSSkillAreaPreviewSpec Spec;
 	Spec.LocationMode = ELSSkillPreviewLocationMode::CasterOrigin;
-	UMaterialInterface* TelegraphMaterial = TelegraphCircleMaterial;
+	UMaterialInterface* TelegraphMaterial = ResolvedTelegraphCircleMaterial;
 	switch (Row->Hitbox_Shape)
 	{
 	case ELSHitboxShape::Box:
@@ -638,7 +646,7 @@ void ULSMonsterCombatComponent::BeginActionTelegraph(float Duration, ELSMonsterT
 		Spec.BoxLength = X;
 		Spec.BoxWidth = Y;
 		Spec.OutlineThickness = 0.2f;
-		TelegraphMaterial = TelegraphBoxMaterial;
+		TelegraphMaterial = ResolvedTelegraphBoxMaterial;
 		break;
 	case ELSHitboxShape::Cone:
 		Spec.Shape = ELSSkillAreaShape::Circle;
@@ -713,12 +721,10 @@ bool ULSMonsterCombatComponent::HasValidDamageEffect() const
 
 const FLSMonsterActionRow* ULSMonsterCombatComponent::FindActionRow(FName RowName) const
 {
-	if (!MonsterActionTable || RowName.IsNone())
-	{
-		return nullptr;
-	}
-
-	return MonsterActionTable->FindRow<FLSMonsterActionRow>(RowName, TEXT("LSMonsterCombatComponent"));
+	const UWorld* World = GetWorld();
+	const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	return GameData ? GameData->FindMonsterActionRow(RowName, TEXT("LSMonsterCombatComponent")) : nullptr;
 }
 
 FName ULSMonsterCombatComponent::SelectActionForDistance(float Distance) const

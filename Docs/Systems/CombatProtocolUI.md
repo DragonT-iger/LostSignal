@@ -123,7 +123,7 @@ Protocol_Required_Level = 3
 
 적 체력바는 `WBP_PlayerHUD` 뷰포트 위젯이 아니라 `ALSEnemyCharacter`에 붙은 `ULSEnemyHealthBarComponent`가 월드 스페이스 `UWidgetComponent`로 표시한다. 컴포넌트는 로컬 플레이어 기준으로 전투 프로토콜 5단계 표시 여부를 확인하고, 적의 AbilitySystemComponent에서 `ULSCombatAttributeSet::CurrentHealth`와 `MaxHealth` 변경 delegate를 구독해 채움 비율을 갱신한다. 화면 텍스트는 표시하지 않는다.
 
-체력바 위젯은 `ULSEnemyHealthBarWidget`이 담당하며, 필수 바인딩은 `HealthProgressBar` 하나다. `ULSEnemyHealthBarComponent`는 `HealthBarWidgetClass`, `WidgetOffset`, `DrawSize`, `Pivot`, `WidgetSpace`를 에디터에서 설정할 수 있게 열어 둔다. `WidgetSpace`가 `World`이고 `bFaceCamera`가 켜져 있으면 Tick에서 로컬 카메라를 향하도록 위젯 컴포넌트만 회전시킨다.
+체력바 위젯은 `ULSEnemyHealthBarWidget`이 담당하며, 필수 바인딩은 `HealthProgressBar` 하나다. 모든 몬스터가 공유하는 위젯 클래스는 `ULSMonsterPresentationSettings::EnemyHealthBarWidgetClass`에서 한 번만 설정한다. `ULSEnemyHealthBarComponent`는 몬스터별 배치값인 `WidgetOffset`, `DrawSize`, `Pivot`, `WidgetSpace`만 에디터에 노출한다. `WidgetSpace`가 `World`이고 `bFaceCamera`가 켜져 있으면 Tick에서 로컬 카메라를 향하도록 위젯 컴포넌트만 회전시킨다.
 
 `DT_ProtocolUnlock`에는 다음 의미의 row를 둔다.
 

@@ -1,9 +1,10 @@
 #include "Gameplay/LSNoiseEmitterComponent.h"
 
 #include "Characters/LSPlayerCharacter.h"
+#include "Data/LSGameDataSubsystem.h"
 #include "Data/LSNoiseProfileRow.h"
 #include "DrawDebugHelpers.h"
-#include "Engine/DataTable.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "Gameplay/LSNoiseSubsystem.h"
@@ -101,18 +102,10 @@ void ULSNoiseEmitterComponent::EmitNoiseFromProfile(const FLSNoiseProfileRow& Pr
 
 const FLSNoiseProfileRow* ULSNoiseEmitterComponent::FindNoiseProfile(FName NoiseRowName) const
 {
-	if (!NoiseProfileTable)
-	{
-		const_cast<ULSNoiseEmitterComponent*>(this)->LogMissingNoiseProfileTableOnce();
-		return nullptr;
-	}
-
-	if (NoiseRowName.IsNone())
-	{
-		return nullptr;
-	}
-
-	return NoiseProfileTable->FindRow<FLSNoiseProfileRow>(NoiseRowName, TEXT("LSNoiseEmitterComponent"));
+	const UWorld* World = GetWorld();
+	const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	return GameData ? GameData->FindNoiseProfileRow(NoiseRowName, TEXT("LSNoiseEmitterComponent")) : nullptr;
 }
 
 bool ULSNoiseEmitterComponent::IsOwnerMoving() const
@@ -144,15 +137,4 @@ void ULSNoiseEmitterComponent::DrawNoiseDebug(const FVector& Location, float Rad
 	const FVector DebugLocation = Location + FVector(0.0f, 0.0f, NoiseDebugDrawHeight);
 	DrawDebugCircle(World, DebugLocation, RadiusCm, 48, FColor::Cyan, false, NoiseDebugDuration, 0, 2.0f, FVector::ForwardVector, FVector::RightVector, false);
 	DrawDebugSphere(World, DebugLocation, 16.0f, 8, FColor::Cyan, false, NoiseDebugDuration);
-}
-
-void ULSNoiseEmitterComponent::LogMissingNoiseProfileTableOnce()
-{
-	if (bLoggedMissingNoiseProfileTable)
-	{
-		return;
-	}
-
-	bLoggedMissingNoiseProfileTable = true;
-	UE_LOG(LogLS, Warning, TEXT("NoiseProfileTable is not set on %s."), *GetNameSafe(this));
 }

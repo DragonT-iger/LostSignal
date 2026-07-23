@@ -5,6 +5,9 @@
 #include "Data/LSComboAttackRow.h"
 #include "Data/LSConsumableRow.h"
 #include "Data/LSGameDataSettings.h"
+#include "Data/LSMonsterActionRow.h"
+#include "Data/LSMonsterArchetypeRow.h"
+#include "Data/LSNoiseProfileRow.h"
 #include "Data/LSProtocolUnlockRow.h"
 #include "Data/LSStatusEffectRow.h"
 #include "Engine/DataTable.h"
@@ -200,6 +203,27 @@ const FLSConsumableEffectRow* ULSGameDataSubsystem::FindConsumableEffectRow(cons
 	return ConsumableEffectTable->FindRow<FLSConsumableEffectRow>(RowName, Context);
 }
 
+const FLSMonsterArchetypeRow* ULSGameDataSubsystem::FindMonsterArchetypeRow(const FName RowName, const TCHAR* Context) const
+{
+	return MonsterArchetypeTable && !RowName.IsNone()
+		? MonsterArchetypeTable->FindRow<FLSMonsterArchetypeRow>(RowName, Context)
+		: nullptr;
+}
+
+const FLSMonsterActionRow* ULSGameDataSubsystem::FindMonsterActionRow(const FName RowName, const TCHAR* Context) const
+{
+	return MonsterActionTable && !RowName.IsNone()
+		? MonsterActionTable->FindRow<FLSMonsterActionRow>(RowName, Context)
+		: nullptr;
+}
+
+const FLSNoiseProfileRow* ULSGameDataSubsystem::FindNoiseProfileRow(const FName RowName, const TCHAR* Context) const
+{
+	return NoiseProfileTable && !RowName.IsNone()
+		? NoiseProfileTable->FindRow<FLSNoiseProfileRow>(RowName, Context)
+		: nullptr;
+}
+
 const FLSProtocolUnlockRow* ULSGameDataSubsystem::FindProtocolUnlockRow(const FName RowName, const TCHAR* Context) const
 {
 	if (!ProtocolUnlockTable || RowName.IsNone())
@@ -392,11 +416,18 @@ void ULSGameDataSubsystem::LoadTables()
 	ConsumableTable = Settings->ConsumableTable.LoadSynchronous();
 	ConsumableEffectTable = Settings->ConsumableEffectTable.LoadSynchronous();
 	ProtocolUnlockTable = Settings->ProtocolUnlockTable.LoadSynchronous();
+	MonsterArchetypeTable = Settings->MonsterArchetypeTable.LoadSynchronous();
+	MonsterActionTable = Settings->MonsterActionTable.LoadSynchronous();
+	NoiseProfileTable = Settings->NoiseProfileTable.LoadSynchronous();
 
 	NormalizeActiveSkillRows();
 	NormalizePassiveSkillRows();
 	NormalizeComboAttackRows();
+	LogMissingTables();
+}
 
+void ULSGameDataSubsystem::LogMissingTables() const
+{
 	if (!CharacterActiveSkillTable)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[GameData] CharacterActiveSkillTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
@@ -425,6 +456,21 @@ void ULSGameDataSubsystem::LoadTables()
 	if (!ProtocolUnlockTable)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[GameData] ProtocolUnlockTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!MonsterArchetypeTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] MonsterArchetypeTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!MonsterActionTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] MonsterActionTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!NoiseProfileTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] NoiseProfileTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
 	}
 }
 

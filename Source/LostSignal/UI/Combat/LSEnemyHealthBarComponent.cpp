@@ -5,6 +5,7 @@
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
+#include "Data/LSMonsterPresentationSettings.h"
 #include "Data/LSProtocolUnlockRow.h"
 #include "Data/LSProtocolTypes.h"
 #include "Engine/GameInstance.h"
@@ -104,14 +105,19 @@ void ULSEnemyHealthBarComponent::ConfigureWidgetComponent()
 	HealthBarWidgetComponent->SetRelativeLocation(WidgetOffset);
 	HealthBarWidgetComponent->SetHiddenInGame(true);
 
-	if (HealthBarWidgetClass)
+	if (const ULSMonsterPresentationSettings* Settings = GetDefault<ULSMonsterPresentationSettings>())
 	{
-		HealthBarWidgetComponent->SetWidgetClass(HealthBarWidgetClass);
+		ResolvedHealthBarWidgetClass = Settings->EnemyHealthBarWidgetClass.LoadSynchronous();
+	}
+
+	if (ResolvedHealthBarWidgetClass)
+	{
+		HealthBarWidgetComponent->SetWidgetClass(ResolvedHealthBarWidgetClass);
 		HealthBarWidgetComponent->InitWidget();
 	}
 	else if (!bWarnedMissingWidgetClass)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s cannot show enemy health bar because HealthBarWidgetClass is not set."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("%s cannot show enemy health bar because EnemyHealthBarWidgetClass is not set in LS Monster Presentation Settings."), *GetNameSafe(this));
 		bWarnedMissingWidgetClass = true;
 	}
 }
@@ -204,7 +210,7 @@ void ULSEnemyHealthBarComponent::SetHealthBarVisible(const bool bShouldBeVisible
 	float MaxHealth = 0.0f;
 	const bool bShouldShow = bShouldBeVisible &&
 		HealthBarWidgetComponent &&
-		HealthBarWidgetClass &&
+		ResolvedHealthBarWidgetClass &&
 		ResolveHealth(CurrentHealth, MaxHealth) &&
 		CurrentHealth > 0.0f;
 	if (bHealthBarVisible == bShouldShow)

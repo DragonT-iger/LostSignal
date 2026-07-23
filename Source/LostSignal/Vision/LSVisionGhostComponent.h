@@ -41,11 +41,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-public:
-	// 잔상 실루엣 머티리얼. 미할당 시 기능 비활성(원본 머티리얼 폴백 금지 — 살아있는 적으로 오독됨).
-	UPROPERTY(EditDefaultsOnly, Category = "LS/Vision|Ghost")
-	TObjectPtr<UMaterialInterface> GhostMaterial;
-
+	// 잔상 실루엣 머티리얼은 LS Monster Presentation Settings에서 전역으로 공급한다.
 	UPROPERTY(EditAnywhere, Category = "LS/Vision|Ghost", meta = (ClampMin = "0.01"))
 	float FadeDuration = 1.5f;
 
@@ -91,6 +87,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> GhostMaterialInstances;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> ResolvedGhostMaterial;
 
 	FDelegateHandle VisibilityChangedHandle;
 	float FadeElapsed = 0.0f;
