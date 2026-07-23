@@ -39,7 +39,8 @@
 
 - **클라 진입**(`TryUseQuickSlot`): 퀵슬롯 RowName 조회 → `ULSGameDataSubsystem::FindConsumableRow` → 클라 미러 세션 인벤토리 보유 수량 확인 → 시전 시작.
 - **시전**(클라 구동): `Item_Cast_Time`>0이면 HUD 시전 게이지(`ALSPlayerControllerBase::ShowCastGauge`, 스킬 캐스팅 게이지 재사용) + 타이머. 시전 중 `Item_Can_Move=false`인데 이동 입력이 들어오면 취소(`Move` 훅). 완료 후 `Item_Trigger_Delay`만큼 더 대기(이 구간은 취소 불가).
-- **확정**(서버 권한, `UseConsumableAuthoritative`): `HasAuthority`면 직접, 아니면 `ServerUseConsumable` RPC. 서버에서 수량 재검증 → `ULSCharacterCombatComponent::ApplyConsumableEffects`(대상=Self) → `ULSRaidInventoryComponent::ConsumeSessionItem(RowName, 1)`(일반 인벤토리만 차감) → `SyncRaidInventoryToClient`로 미러+갱신.
+- **차감(시전 완료 시점, 모든 소모품 공통)**: 시전이 끝나면 `Item_Trigger_Delay`를 기다리기 **전에** 서버에서 수량 1을 차감한다(`ConsumeConsumableAuthoritative`, `ServerConsumeConsumable`). 서버에서 보유 수량 재검증 → `ULSRaidInventoryComponent::ConsumeSessionItem(RowName, 1)`(일반 인벤토리만 차감) → `SyncRaidInventoryToClient`로 미러+갱신(퀵슬롯 개수 즉시 반영). 차감은 발동 지연 시점이 아니라 **시전 완료 시점**이다.
+- **효과 적용(발동 지연 뒤)**: 직접 사용은 `UseConsumableAuthoritative`(`ServerUseConsumable` RPC, 대상=Self, `ApplyConsumableEffects`), 투척은 아래 투척 절(`UseThrownConsumableAuthoritative`). 이 단계는 효과만 적용하고 **재차감하지 않는다**.
 
 ### 투척(Throwable) — 범위 인디케이터 조준
 
@@ -48,8 +49,9 @@
 - **조준 시작**(`BeginThrowAim`): 소모품 Row 도형을 `FLSSkillAreaPreviewSpec`으로 변환(`Sphere→Circle 360°`, `Cone→Circle+Degrees`, `Box→Box`) 후 `BeginAreaPreview`.
 - **매 틱**(`UpdateThrowAim`, Tick): 마우스 월드 지점을 `Item_Cast_Range`로 clamp해 착탄 지점/인디케이터를 갱신.
 - **확정/취소 입력(스킬과 동일)**: 좌클릭(Attack)=`ConfirmThrowAim`, 취소키(SkillCancel)·우클릭(Skill1)·대시=`CancelThrowAim`, 아이템 키 재입력=취소.
-- **확정 시**: 착탄 지점을 확정하고 시전(`Item_Cast_Time`)→발동 지연(`Item_Trigger_Delay`)을 거쳐 `ServerUseThrownConsumable(RowName, 착탄지점)`.
-- **서버 처리**(`UseThrownConsumableAuthoritative`): 착탄 지점 기준 도형 안의 적(`ALSEnemyCharacter`)을 수집(`CollectThrowTargets`, 2D 판정) → `ULSCharacterCombatComponent::ApplyConsumableEffectsInArea`(Self 효과는 소유자 1회, Enemy 효과는 대상별) → 수량 차감 → 미러.
+- **확정 시**: 착탄 지점을 확정하고 시전(`Item_Cast_Time`) → 발동 지연(`Item_Trigger_Delay`) 순으로 진행한다.
+- **수량 차감은 시전 완료 시점**(모든 소모품 공통, 아래 "사용(소비)" 절 참고) — 발동 지연 시점이 아니다.
+- **효과 적용은 발동 지연 뒤**(`ServerUseThrownConsumable` → `UseThrownConsumableAuthoritative`): 착탄 지점 기준 도형 안의 적(`ALSEnemyCharacter`)을 수집(`CollectThrowTargets`, 2D 판정) → `ULSCharacterCombatComponent::ApplyConsumableEffectsInArea`(Self 효과는 소유자 1회, Enemy 효과는 대상별). 이 단계는 재차감하지 않는다.
 
 효과 적용 규칙·미지원 조합은 [ConsumableSystem.md](ConsumableSystem.md)가 소유한다.
 

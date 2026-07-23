@@ -527,7 +527,35 @@ bool ULSCharacterCombatComponent::ApplyConsumableAttributeEffect(AActor* EffectA
 	}
 
 	SpecHandle.Data->SetSetByCallerMagnitude(DataTag, SignedMagnitude);
+
+	// 적 대상 체력 감소(투척/광역 데미지)는 근접 공격과 동일하게 플로팅 데미지 넘버를 띄운다.
+	// 자기 회복(EffectActor==Instigator)이나 체력 외 어트리뷰트에는 띄우지 않는다.
+	const bool bEnemyHealthDamage = EffectActor != Instigator
+		&& EffectDef.Consumable_Effect_Attribute == ELSConsumableAttribute::Health
+		&& EffectDef.Consumable_Effect_Operation == ELSConsumableEffectOperation::Subtract;
+	const float BeforeHealth = bEnemyHealthDamage
+		? ASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute())
+		: 0.0f;
+
 	ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+
+	if (bEnemyHealthDamage)
+	{
+		const float AfterHealth = ASC->GetNumericAttribute(ULSCombatAttributeSet::GetCurrentHealthAttribute());
+		const float ActualDamage = FMath::Max(0.0f, BeforeHealth - AfterHealth);
+		if (ActualDamage > 0.0f)
+		{
+			if (ULSCharacterCombatComponent* TargetCombat = EffectActor->FindComponentByClass<ULSCharacterCombatComponent>())
+			{
+				FLSDamageNumberPayload Payload;
+				Payload.DamageAmount = ActualDamage;
+				Payload.WorldLocation = FVector_NetQuantize(EffectActor->GetActorLocation() + TargetCombat->DamageNumberWorldOffset);
+				Payload.bCritical = false;
+				TargetCombat->BroadcastDamageNumberToPlayers(Payload);
+			}
+		}
+	}
+
 	return true;
 }
 

@@ -537,6 +537,19 @@ void ALSPlayerCharacter::HandleConsumableCastComplete()
 		PlayerController->HideCastGauge();
 	}
 
+	// 모든 소모품은 시전 완료 시점에 수량을 차감한다(효과는 이후 발동 지연 뒤 적용).
+	if (!CastingConsumableRowName.IsNone())
+	{
+		if (HasAuthority())
+		{
+			ConsumeConsumableAuthoritative(CastingConsumableRowName);
+		}
+		else
+		{
+			ServerConsumeConsumable(CastingConsumableRowName);
+		}
+	}
+
 	if (PendingTriggerDelay > 0.0f)
 	{
 		GetWorldTimerManager().SetTimer(ConsumableTriggerDelayTimer, this, &ALSPlayerCharacter::FinishConsumableUse, PendingTriggerDelay, false);
@@ -628,13 +641,7 @@ void ALSPlayerCharacter::UseConsumableAuthoritative(const FName ItemRowName)
 		return;
 	}
 
-	// 그새 소진돼 없으면 사용하지 않는다(서버 재검증).
-	if (LSCraftingUtils::CountItem(RaidInventory->GetSessionInventory(), ItemRowName) < 1)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Consumable] 사용 실패: '%s' 보유 수량 없음."), *ItemRowName.ToString());
-		return;
-	}
-
+	// 수량 차감은 시전 완료 시점(ConsumeConsumableAuthoritative)에서 이미 끝났다. 여기서는 효과만 적용한다.
 	// 효과 적용(대상=자기 자신). 소모품 효과 코어가 서버 권한을 다시 검증한다.
 	bool bApplied = false;
 	if (ULSCharacterCombatComponent* CombatComponent = GetCharacterCombatComponent())
@@ -642,11 +649,7 @@ void ALSPlayerCharacter::UseConsumableAuthoritative(const FName ItemRowName)
 		bApplied = CombatComponent->ApplyConsumableEffects(*ConsumableDef);
 	}
 
-	// 수량 1 차감 후 클라로 미러(퀵슬롯/인벤토리 개수 갱신).
-	RaidInventory->ConsumeSessionItem(ItemRowName, 1);
-	PlayerController->SyncRaidInventoryToClient();
-
-	UE_LOG(LogLS, Log, TEXT("[Consumable] 사용 성공: '%s'%s."), *ItemRowName.ToString(), bApplied ? TEXT("") : TEXT(" (적용된 효과 없음)"));
+	UE_LOG(LogLS, Log, TEXT("[Consumable] 사용 발동: '%s'%s."), *ItemRowName.ToString(), bApplied ? TEXT("") : TEXT(" (적용된 효과 없음)"));
 }
 
 namespace
@@ -823,18 +826,8 @@ void ALSPlayerCharacter::UseThrownConsumableAuthoritative(const FName ItemRowNam
 		return;
 	}
 
-	ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>();
-	ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
-	if (!RaidInventory || !RaidInventory->IsRaidActive())
-	{
-		return;
-	}
-
-	if (LSCraftingUtils::CountItem(RaidInventory->GetSessionInventory(), ItemRowName) < 1)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Consumable] 투척 실패: '%s' 보유 수량 없음."), *ItemRowName.ToString());
-		return;
-	}
+	// 수량 차감은 시전 완료 시점(ConsumeConsumableAuthoritative)에서 이미 끝났다.
+	// 여기서는 발동 지연 뒤 효과만 적용한다(재차감/재검사 없음).
 
 	// 착탄 지점 범위 내 적을 수집해 효과 적용(Self 효과는 소유자 1회).
 	TArray<AActor*> AreaTargets;
@@ -846,10 +839,38 @@ void ALSPlayerCharacter::UseThrownConsumableAuthoritative(const FName ItemRowNam
 		bApplied = CombatComponent->ApplyConsumableEffectsInArea(*ConsumableDef, AreaTargets);
 	}
 
+	UE_LOG(LogLS, Log, TEXT("[Consumable] 투척 발동: '%s' 착탄 대상 %d명%s."), *ItemRowName.ToString(), AreaTargets.Num(), bApplied ? TEXT("") : TEXT(" (적용된 효과 없음)"));
+}
+
+void ALSPlayerCharacter::ServerConsumeConsumable_Implementation(const FName ItemRowName)
+{
+	ConsumeConsumableAuthoritative(ItemRowName);
+}
+
+void ALSPlayerCharacter::ConsumeConsumableAuthoritative(const FName ItemRowName)
+{
+	if (!HasAuthority() || ItemRowName.IsNone())
+	{
+		return;
+	}
+
+	ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>();
+	ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
+	if (!RaidInventory || !RaidInventory->IsRaidActive())
+	{
+		return;
+	}
+
+	if (LSCraftingUtils::CountItem(RaidInventory->GetSessionInventory(), ItemRowName) < 1)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Consumable] 차감 실패: '%s' 보유 수량 없음."), *ItemRowName.ToString());
+		return;
+	}
+
+	// 시전 완료 시점 차감(효과는 발동 지연 뒤 별도 적용). 차감 즉시 클라 미러로 개수 갱신.
 	RaidInventory->ConsumeSessionItem(ItemRowName, 1);
 	PlayerController->SyncRaidInventoryToClient();
-
-	UE_LOG(LogLS, Log, TEXT("[Consumable] 투척 성공: '%s' 착탄 대상 %d명%s."), *ItemRowName.ToString(), AreaTargets.Num(), bApplied ? TEXT("") : TEXT(" (적용된 효과 없음)"));
+	UE_LOG(LogLS, Log, TEXT("[Consumable] 차감: '%s' (시전 완료)."), *ItemRowName.ToString());
 }
 
 void ALSPlayerCharacter::CollectThrowTargets(const FLSConsumableRow& ConsumableDef, const FVector& Center, TArray<AActor*>& OutTargets) const

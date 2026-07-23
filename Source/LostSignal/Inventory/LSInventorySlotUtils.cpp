@@ -5,6 +5,7 @@
 #include "Data/LSDropSettings.h"
 #include "Data/LSItemRow.h"
 #include "Data/LSWeaponRow.h"
+//#include "Data/LSConsumableRow.h"
 #include "Engine/DataTable.h"
 #include "Engine/Texture2D.h"
 #include "LostSignal.h"
@@ -242,6 +243,10 @@ int32 ResolveItemMaxStack(const FName ItemRowName, const TCHAR* Context)
 	{
 		MaxStack = ResolveMaxStackFromTable<FLSItemRow>(Settings->ItemTable, ItemRowName, Context, TEXT("Item"));
 	}
+	/*else if (RowNameString.StartsWith(TEXT("Consumable_")))
+	{ //데이터 테이블 구조 완성되면 추가
+		MaxStack = ResolveMaxStackFromTable<FLSConsumableRow>(Settings->ConsumableTable, ItemRowName, Context, TEXT("Consumable"));
+	}*/
 	else
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Inventory] Unknown item row prefix for max stack: %s"), *ItemRowName.ToString());

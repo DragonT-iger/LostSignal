@@ -373,9 +373,13 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerUseConsumable(FName ItemRowName);
 
-	// 투척 소모품 사용 요청(클라 → 서버). 확정된 착탄 지점을 함께 보낸다.
+	// 투척 소모품 사용 요청(클라 → 서버). 확정된 착탄 지점을 함께 보낸다. 발동 지연 뒤 효과만 적용한다.
 	UFUNCTION(Server, Reliable)
 	void ServerUseThrownConsumable(FName ItemRowName, FVector_NetQuantize TargetLocation);
+
+	// 소모품 수량 차감 요청(클라 → 서버). 모든 소모품이 시전 완료 시점에 호출한다(효과 적용과 분리).
+	UFUNCTION(Server, Reliable)
+	void ServerConsumeConsumable(FName ItemRowName);
 
 	FVector GetDashDirection() const;
 	bool ResolveMouseWorldPoint(FVector& OutMouseWorldPoint) const;
@@ -386,11 +390,11 @@ private:
 	void BeginConsumableCast(FName ItemRowName, const struct FLSConsumableRow& ConsumableDef);
 	// 시전 완료. Trigger_Delay가 있으면 그만큼 더 기다린 뒤 확정한다.
 	void HandleConsumableCastComplete();
-	// 사용 확정: 서버 권한이면 직접, 아니면 서버 RPC로 효과 적용 + 수량 차감을 실행한다.
+	// 사용 확정(발동 지연 뒤): 서버 권한이면 직접, 아니면 서버 RPC로 효과만 적용한다.
 	void FinishConsumableUse();
 	// 시전 취소(이동 중단 등). 효과·차감 없이 상태/게이지만 정리한다.
 	void CancelConsumableCast();
-	// 서버 권한에서 효과 적용 + 인벤토리 수량 1 차감 + 클라 미러를 실행한다.
+	// 서버 권한에서 효과만 적용한다(수량 차감은 시전 완료 시점에 별도 처리).
 	void UseConsumableAuthoritative(FName ItemRowName);
 
 	// 투척 소모품 조준 시작(범위 인디케이터 표시). 이미 조준/시전 중이면 무시한다.
@@ -401,8 +405,10 @@ private:
 	bool ConfirmThrowAim();
 	// 조준 취소: 인디케이터를 내리고 상태를 리셋한다. 투척/차감 없음.
 	bool CancelThrowAim();
-	// 서버 권한에서 착탄 지점 주변 적을 수집해 효과 적용 + 수량 차감 + 클라 미러를 실행한다.
+	// 서버 권한에서 착탄 지점 주변 적을 수집해 효과만 적용한다(수량 차감은 시전 완료 시점에 별도 처리).
 	void UseThrownConsumableAuthoritative(FName ItemRowName, const FVector& TargetLocation);
+	// 서버 권한에서 소모품 수량 1 차감 + 클라 미러를 실행한다(모든 소모품, 시전 완료 시점 호출).
+	void ConsumeConsumableAuthoritative(FName ItemRowName);
 	// 착탄 지점 기준 도형(Sphere/Cone/Box) 안의 적(ALSEnemyCharacter)을 수집한다.
 	void CollectThrowTargets(const struct FLSConsumableRow& ConsumableDef, const FVector& Center, TArray<AActor*>& OutTargets) const;
 	class ULSSkillPreviewComponent* ResolveSkillPreviewComponent() const;

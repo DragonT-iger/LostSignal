@@ -32,6 +32,9 @@ public:
 	UPROPERTY(config, EditAnywhere, Category="DataTables")
 	TSoftObjectPtr<UDataTable> ItemTable;
 
+	UPROPERTY(config, EditAnywhere, Category = "DataTables")
+	TSoftObjectPtr<UDataTable> ConsumableTable;
+
 	UPROPERTY(config, EditAnywhere, Category="DataTables")
 	TSoftObjectPtr<UDataTable> ChipStatTable;
 

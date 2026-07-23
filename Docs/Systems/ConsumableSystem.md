@@ -38,11 +38,12 @@
 서버 권위에서 [`ULSCharacterCombatComponent::ApplyConsumableEffects`](../../Source/LostSignal/Combat/LSCharacterCombatComponent.h)가 `Item_Effects`를 순회한다.
 각 원소의 `Effect_ID`로 사전 Row를 조회해 `Consumable_Effect_Type`으로 라우팅하고, **수치는 원소의 `Effect_Value`, 나머지(Operation/Target/Attribute/Duration 등)는 사전 Row**에서 읽는다.
 `Consumable_Effect_Target`은 `Self`=사용자, `Enemy`=대상에 적용한다(`Friendly`/`All`은 진영/광역 정책이 정해지면 확장).
+`Enemy` 대상 체력 감소(Subtract)는 근접 공격과 동일하게 대상 위에 플로팅 데미지 넘버를 띄운다(`BroadcastDamageNumberToPlayers`). 자기 회복(Self)이나 체력 외 어트리뷰트에는 띄우지 않는다.
 `Periodic`(주기 Attribute)·`Percent`(비율 즉발)·즉발 Attack/Defense/MoveSpeed 조합은 현재 미지원으로 경고 후 스킵한다(후속).
 
 ## 사용(소비) 흐름
 
-퀵슬롯 키 입력으로 소모품을 사용하는 경로는 [QuickSlotSystem.md](QuickSlotSystem.md)가 소유한다(입력→시전→서버 적용→수량 차감). 시전 시간(`Item_Cast_Time`)·이동 중단(`Item_Can_Move`)·발동 지연(`Item_Trigger_Delay`)을 반영하며, 시전은 클라 구동(HUD 시전 게이지)·완료 시 서버 RPC로 효과 적용 + 인벤토리 수량 1 차감을 실행한다. 직접 사용(`Direct`)은 자기 자신(Self)에게, 투척(`Throwable`)은 조준한 착탄 지점 범위 내 적에게 `ApplyConsumableEffectsInArea`로 적용한다(Self 효과는 소유자 1회).
+퀵슬롯 키 입력으로 소모품을 사용하는 경로는 [QuickSlotSystem.md](QuickSlotSystem.md)가 소유한다(입력→시전→차감→발동 지연→효과 적용). 시전 시간(`Item_Cast_Time`)·이동 중단(`Item_Can_Move`)·발동 지연(`Item_Trigger_Delay`)을 반영하며, 시전은 클라 구동(HUD 시전 게이지)이다. **수량 1 차감은 모든 소모품 공통으로 시전 완료 시점**에 실행하고(발동 지연 전), **효과 적용은 발동 지연 뒤**에 실행한다. 직접 사용(`Direct`)은 자기 자신(Self)에게, 투척(`Throwable`)은 조준한 착탄 지점 범위 내 적에게 `ApplyConsumableEffectsInArea`로 적용한다(Self 효과는 소유자 1회).
 
 ## 조회
 
