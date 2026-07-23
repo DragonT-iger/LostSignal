@@ -61,6 +61,7 @@ private:
 	void PopulateWeaponTooltip(FName ItemRowName);
 	void PopulateArmorTooltip(FName ItemRowName);
 	void PopulateItemTooltip(FName ItemRowName, int32 HoveredSlotAmount);
+	void PopulateConsumableTooltip(FName ItemRowName, int32 HoveredSlotAmount);
 
 	static FText GetGradeText(const FString& ItemGrade);
 	static FText GetEquipmentDisplayText(const FString& EquipmentName);

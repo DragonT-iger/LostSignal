@@ -2,10 +2,10 @@
 
 #include "Data/LSArmorRow.h"
 #include "Data/LSChipRow.h"
+#include "Data/LSConsumableRow.h"
 #include "Data/LSDropSettings.h"
 #include "Data/LSItemRow.h"
 #include "Data/LSWeaponRow.h"
-//#include "Data/LSConsumableRow.h"
 #include "Engine/DataTable.h"
 #include "Engine/Texture2D.h"
 #include "LostSignal.h"
@@ -37,6 +37,7 @@ const TMap<FString, FString>& GetChipFunctionIconNames()
 constexpr int32 SortGroupWeaponOffset = 100000;
 constexpr int32 SortGroupArmorOffset = 200000;
 constexpr int32 SortGroupItemOffset = 300000;
+constexpr int32 SortGroupConsumableOffset = 400000;
 
 // 아이콘 에셋명/경로를 완전한 오브젝트 경로로 조립한다. (/Game/ 절대경로면 그대로, 아니면 폴더+이름.이름)
 FString BuildItemIconObjectPath(const FString& IconNameOrPath, const FString& BaseFolder)
@@ -73,6 +74,11 @@ FString GetItemIconBaseFolderByRowName(const FName ItemRowName)
 	if (RowNameString.StartsWith(TEXT("Armor_")))
 	{
 		return TEXT("/Game/LostSignal/UI/Icons/Armors/");
+	}
+
+	if (RowNameString.StartsWith(TEXT("Consumable_")))
+	{
+		return TEXT("/Game/LostSignal/UI/Icons/Consumables/");
 	}
 
 	return TEXT("/Game/LostSignal/UI/Icons/Items/");
@@ -117,6 +123,11 @@ int32 ResolveItemSortKey(const FName ItemRowName)
 	if (RowNameString.StartsWith(TEXT("Item_")))
 	{
 		return SortGroupItemOffset + FindRowOrder(Settings->ItemTable.LoadSynchronous(), ItemRowName);
+	}
+
+	if (RowNameString.StartsWith(TEXT("Consumable_")))
+	{
+		return SortGroupConsumableOffset + FindRowOrder(Settings->ConsumableTable.LoadSynchronous(), ItemRowName);
 	}
 
 	return MAX_int32;
@@ -243,10 +254,10 @@ int32 ResolveItemMaxStack(const FName ItemRowName, const TCHAR* Context)
 	{
 		MaxStack = ResolveMaxStackFromTable<FLSItemRow>(Settings->ItemTable, ItemRowName, Context, TEXT("Item"));
 	}
-	/*else if (RowNameString.StartsWith(TEXT("Consumable_")))
-	{ //데이터 테이블 구조 완성되면 추가
+	else if (RowNameString.StartsWith(TEXT("Consumable_")))
+	{
 		MaxStack = ResolveMaxStackFromTable<FLSConsumableRow>(Settings->ConsumableTable, ItemRowName, Context, TEXT("Consumable"));
-	}*/
+	}
 	else
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Inventory] Unknown item row prefix for max stack: %s"), *ItemRowName.ToString());
@@ -291,6 +302,17 @@ FLSItemTradeInfo ResolveItemTradeInfo(const FName ItemRowName)
 		{
 			UDataTable* ItemTable = Settings->ItemTable.LoadSynchronous();
 			const FLSItemRow* Row = ItemTable ? ItemTable->FindRow<FLSItemRow>(ItemRowName, TEXT("ResolveItemTradeInfo")) : nullptr;
+			Info.ItemType = Row ? Row->Item_Type : 0;
+		}
+		return Info;
+	}
+	if (RowNameString.StartsWith(TEXT("Consumable_")))
+	{
+		Info = ResolveTradeInfoFromTable<FLSConsumableRow>(Settings->ConsumableTable, ItemRowName, TEXT("Consumable"));
+		if (Info.bValid)
+		{
+			UDataTable* ConsumableTable = Settings->ConsumableTable.LoadSynchronous();
+			const FLSConsumableRow* Row = ConsumableTable ? ConsumableTable->FindRow<FLSConsumableRow>(ItemRowName, TEXT("ResolveItemTradeInfo")) : nullptr;
 			Info.ItemType = Row ? Row->Item_Type : 0;
 		}
 		return Info;

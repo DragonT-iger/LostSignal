@@ -7,13 +7,13 @@
 
 구조체는 모두 [`LSConsumableRow.h`](../../Source/LostSignal/Data/LSConsumableRow.h)가 소유한다.
 
-- **`DT_Consumable`**(`FLSConsumableRow`) — "무엇을 / 어떻게 쓰나". 사용방식·입력·시전·범위 + 효과 목록.
-  Weapon/Armor/Chip Row와 동일하게 아이템 정의(`FLSItemRow`, `Item_Type 4~9`)와 **같은 RowName**으로 조회한다.
-  `Effects`는 `FLSConsumableEffectValue{ Effect_ID(FName), Effect_Value(float) }` 배열이다 — 사전 참조 + 아이템별 수치("얼마나")만 담고, 복합 효과(응급키트 = 회복 + 출혈 제거)를 위해 배열이다.
+- **`DT_Consumable`**(`FLSConsumableRow`) — 소모품의 **표시 정보 + 거동**을 함께 소유한다. RowName은 `Consumable_` 접두사(Weapon/Armor/Chip Row와 동일한 타입별 분리 컨벤션).
+  - **표시 컬럼**(`Item_Text/Item_Type/Item_Max/Item_Description/Item_Cost`)은 `FLSItemRow`와 같은 구조로 미러한다. 무기/방어구/칩 Row가 각자 표시 컬럼을 갖는 것과 동일하게, 아이템슬롯·툴팁이 접두사 분기로 이 테이블에서 직접 조회한다. `FLSItemRow`는 수정하지 않고(관리 영역 아님) 필드만 미러한 것이다.
+  - **거동 컬럼** — 사용방식·입력·시전·범위 + 효과 목록. `Effects`는 `FLSConsumableEffectValue{ Effect_ID(FName), Effect_Value(float) }` 배열이다 — 사전 참조 + 아이템별 수치("얼마나")만 담고, 복합 효과(응급키트 = 회복 + 출혈 제거)를 위해 배열이다.
 - **`DT_ConsumableEffect`**(`FLSConsumableEffectRow`) — 적용효과 사전, "어떻게 작동하나". RowName이 효과 ID(예: `Heal`).
   여러 소모품이 같은 효과 정의를 재사용하고, 수치는 각 소모품이 전달한다.
 - **`DT_StatusEffect`**(`FLSStatusEffectRow`) — 지속형·상태 효과의 규칙(지속시간·스택·stat modifier). 사전의 상태 효과가 `Status_ID`로 참조한다. [SkillSystemStructure.md](SkillSystemStructure.md) 상태이상 절이 단일 출처.
-- 아이템 공통 정의(이름/설명/가격/최대 수량/타입)는 [`FLSItemRow`](../../Source/LostSignal/Data/LSItemRow.h)가 소유한다. `FLSItemRow`는 프로그래머 관리 영역이 아니라 건드리지 않고, 같은 RowName으로 조회만 한다.
+- 소모품의 표시 정보(이름/설명/가격/최대 수량/타입)는 위처럼 `DT_Consumable`/`FLSConsumableRow`가 소유한다. (옛 방식은 소모품을 `Item_` 행으로 두고 `FLSItemRow`가 표시를 소유했으나, 소모품이 `Consumable_` 접두사 + 자체 테이블을 갖게 되며 소유처가 이동했다.) 일반 아이템·무기·방어구·칩은 각자 테이블/구조체가 표시 정보를 소유한다.
 
 ## 효과는 성질로 분리한다
 
@@ -47,8 +47,9 @@
 
 ## 조회
 
-DataTable 조회는 [`ULSGameDataSubsystem`](../../Source/LostSignal/Data/LSGameDataSubsystem.h)의 `FindConsumableRow`/`FindConsumableEffectRow`가 담당한다.
-테이블 참조는 `ULSGameDataSettings`의 `ConsumableTable`/`ConsumableEffectTable`(프로젝트 설정 > LS Game Data Settings)에서 매핑한다.
+- **거동 조회:** [`ULSGameDataSubsystem`](../../Source/LostSignal/Data/LSGameDataSubsystem.h)의 `FindConsumableRow`/`FindConsumableEffectRow`. 테이블 참조는 `ULSGameDataSettings`의 `ConsumableTable`/`ConsumableEffectTable`(프로젝트 설정 > LS Game Data Settings).
+- **표시 조회:** 아이템슬롯·툴팁은 `LSInventorySlotUtils`·`ULSItemTooltipWidget`이 RowName 접두사(`Consumable_`)로 분기해 조회하며, 테이블 참조는 `ULSDropSettings`의 `ConsumableTable`(프로젝트 설정 > LS Drop Settings)에서 매핑한다.
+- 두 설정(`ULSGameDataSettings`·`ULSDropSettings`)의 `ConsumableTable`은 **같은 `DT_Consumable` 에셋**을 가리킨다(표시+거동 단일 에셋).
 
 ## 미구현(후속 과제)
 

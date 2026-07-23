@@ -5,6 +5,7 @@
 #include "Data/LSArmorRow.h"
 #include "Data/LSChipRow.h"
 #include "Data/LSChipStats.h"
+#include "Data/LSConsumableRow.h"
 #include "Data/LSDropSettings.h"
 #include "Data/LSItemRow.h"
 #include "Data/LSWeaponRow.h"
@@ -45,6 +46,10 @@ void ULSItemTooltipWidget::SetItem(const FName ItemRowName, const int32 HoveredS
 	else if (RowNameString.StartsWith(TEXT("Item_")))
 	{
 		PopulateItemTooltip(ItemRowName, HoveredSlotAmount);
+	}
+	else if (RowNameString.StartsWith(TEXT("Consumable_")))
+	{
+		PopulateConsumableTooltip(ItemRowName, HoveredSlotAmount);
 	}
 	else
 	{
@@ -318,6 +323,38 @@ void ULSItemTooltipWidget::PopulateItemTooltip(const FName ItemRowName, const in
 	}
 
 	SetCommonTexts(LOCTEXT("ItemTooltipType", "일반 아이템 설명창"), Row->Item_Text, LSInventorySlotUtils::ResolveItemGradeFromRowName(ItemRowName), Row->Item_Description, Row->Item_Cost);
+	AddExtraInfo(LOCTEXT("CurrentItemCountExtraInfo", "현재 아이템 개수"), FText::AsNumber(CurrentCount));
+	AddExtraInfo(LOCTEXT("StashItemCountExtraInfo", "창고 아이템 개수"), FText::AsNumber(0));
+}
+
+void ULSItemTooltipWidget::PopulateConsumableTooltip(const FName ItemRowName, const int32 HoveredSlotAmount)
+{
+	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
+	UDataTable* ConsumableTable = Settings ? Settings->ConsumableTable.LoadSynchronous() : nullptr;
+	if (!ConsumableTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot set consumable tooltip because ConsumableTable is not set."));
+		return;
+	}
+
+	const FLSConsumableRow* Row = ConsumableTable->FindRow<FLSConsumableRow>(ItemRowName, TEXT("PopulateConsumableTooltip"));
+	if (!Row)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot set consumable tooltip because row '%s' is missing."), *ItemRowName.ToString());
+		return;
+	}
+
+	int32 CurrentCount = HoveredSlotAmount;
+	if (const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
+	{
+		if (const ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
+		{
+			CurrentCount = CountItems(RaidInventory->GetSessionInventory(), ItemRowName);
+			CurrentCount += CountItems(RaidInventory->GetSessionSafeInventory(), ItemRowName);
+		}
+	}
+
+	SetCommonTexts(LOCTEXT("ConsumableTooltipType", "소모품 설명창"), Row->Item_Text, LSInventorySlotUtils::ResolveItemGradeFromRowName(ItemRowName), Row->Item_Description, Row->Item_Cost);
 	AddExtraInfo(LOCTEXT("CurrentItemCountExtraInfo", "현재 아이템 개수"), FText::AsNumber(CurrentCount));
 	AddExtraInfo(LOCTEXT("StashItemCountExtraInfo", "창고 아이템 개수"), FText::AsNumber(0));
 }

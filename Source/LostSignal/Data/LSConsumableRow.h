@@ -160,15 +160,38 @@ struct LOSTSIGNAL_API FLSConsumableEffectValue
 };
 
 /**
- * 소모품 거동 DataTable Row(DT_Consumable).
- * RowName은 대응 DT_Item 소모품(Item_Type 4~9) 아이템의 RowName과 맞춰, 아이템 -> 거동을 같은 키로 조회한다.
- * (Weapon/Armor/Chip Row와 동일한 타입별 분리 컨벤션.)
+ * 소모품 DataTable Row(DT_Consumable) — 표시 정보 + 거동을 함께 소유한다.
+ * RowName은 `Consumable_` 접두사(Weapon/Armor/Chip Row와 동일한 타입별 분리 컨벤션).
+ * 표시 컬럼(Item_Text/Type/Max/Description/Cost)은 FLSItemRow와 같은 구조로 미러해,
+ * 아이템슬롯·툴팁이 접두사 분기로 이 테이블에서 직접 조회한다(더는 DT_Item에 의존하지 않음).
  * 수치는 이 테이블이 단일 출처이며, 효과 규칙은 DT_StatusEffect가 소유한다.
  */
 USTRUCT(BlueprintType)
 struct LOSTSIGNAL_API FLSConsumableRow : public FTableRowBase
 {
 	GENERATED_BODY()
+
+	// --- 아이템 공통 표시 정보 (FLSItemRow와 동일 구조; 무기/방어구/칩 Row와 같은 컨벤션) ---
+
+	// 아이템 이름 출력용 텍스트
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Consumable")
+	FText Item_Text;
+
+	// 아이템 타입(소모품 분류값). 기획 데이터가 지정한다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Consumable")
+	int32 Item_Type = 3;
+
+	// 최대 스택 수량
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Consumable")
+	int32 Item_Max = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Consumable")
+	FText Item_Description;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Consumable")
+	int32 Item_Cost = 0;
+
+	// --- 소모품 거동 ---
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Consumable")
 	ELSConsumableUseType Item_Use_Type = ELSConsumableUseType::Direct;
