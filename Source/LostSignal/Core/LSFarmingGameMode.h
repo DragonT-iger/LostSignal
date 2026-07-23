@@ -31,7 +31,7 @@ public:
 
 	void NotifyRaidResultSaved(ALSPlayerControllerBase* PlayerController);
 
-	// 신호 게이지가 다음 10% 단계(= 칩 1칸)로 떨어지기까지 남은 초. 드레인 타이머가 멈춰 있으면 음수.
+	// 다음 장착 칩이 비활성화되기까지 남은 초. 드레인 타이머가 멈춰 있으면 음수.
 	// HUD 생존 링이 자체 추정 대신 실제 잔여시간을 읽도록 노출한다(서버 권한에서만 유효).
 	float GetSignalGaugeDrainRemainingSeconds() const;
 
@@ -51,7 +51,7 @@ private:
 	void TravelToResultLevel();
 	void ClearRaidResultSaveWait();
 
-	// 레이드 진입 후 신호 게이지를 시간에 따라 자동 감소시킨다(1분에 10%씩, 0%에서 정지).
+	// 레이드 진입 후 1분마다 다음 장착 칩까지 빈 슬롯을 건너뛰며 신호 게이지를 감소시킨다.
 	void StartSignalGaugeDrain();
 	void TickSignalGaugeDrain();
 	void StopSignalGaugeDrain();

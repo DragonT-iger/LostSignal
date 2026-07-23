@@ -1,5 +1,9 @@
 #include "Core/LSFarmingGameMode.h"
+#include "Engine/DataTable.h"
+#include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Data/LSChipStats.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
@@ -11,7 +15,6 @@ namespace
 {
 constexpr float RaidResultSaveTimeoutSeconds = 10.0f;
 constexpr float SignalGaugeDrainIntervalSeconds = 60.0f;
-constexpr float SignalGaugeDrainStepPercent = 0.1f;
 }
 
 void ALSFarmingGameMode::StartPlay()
@@ -319,6 +322,24 @@ void ALSFarmingGameMode::ClearRaidResultSaveWait()
 
 void ALSFarmingGameMode::StartSignalGaugeDrain()
 {
+	ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] Cannot start signal gauge drain because SaveSubsystem is missing."));
+		return;
+	}
+
+	float NextPercent = 0.0f;
+	if (!LSChipStats::TryResolveNextSignalGaugePercent(
+		SaveSubsystem->GetChipEquipmentSlots(),
+		SaveSubsystem->GetChipSignalGaugePercent(),
+		NextPercent))
+	{
+		SaveSubsystem->SetChipSignalGaugePercent(0.0f);
+		StopSignalGaugeDrain();
+		return;
+	}
+
 	const float Speed = FMath::Max(SignalGaugeDrainDebugSpeed, KINDA_SMALL_NUMBER);
 	const float Interval = FMath::Max(SignalGaugeDrainIntervalSeconds / Speed, 0.01f);
 	GetWorldTimerManager().SetTimer(
@@ -339,10 +360,14 @@ void ALSFarmingGameMode::TickSignalGaugeDrain()
 		return;
 	}
 
-	const float NextPercent = FMath::Max(SaveSubsystem->GetChipSignalGaugePercent() - SignalGaugeDrainStepPercent, 0.0f);
+	float NextPercent = 0.0f;
+	const bool bHasNextChip = LSChipStats::TryResolveNextSignalGaugePercent(
+		SaveSubsystem->GetChipEquipmentSlots(),
+		SaveSubsystem->GetChipSignalGaugePercent(),
+		NextPercent);
 	SaveSubsystem->SetChipSignalGaugePercent(NextPercent);
 
-	if (NextPercent <= 0.0f)
+	if (!bHasNextChip || NextPercent <= 0.0f)
 	{
 		StopSignalGaugeDrain();
 	}

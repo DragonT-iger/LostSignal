@@ -143,12 +143,41 @@ TArray<FLSChipResolvedStat> RollChipStats(const FName ChipRowName)
 int32 ResolveInactiveSignalSlotCount(const float SignalGaugePercent)
 {
 	const float ClampedPercent = FMath::Clamp(SignalGaugePercent, 0.0f, 1.0f);
-	if (ClampedPercent > 0.9f)
+	const float SignalPercent100 = ClampedPercent * 100.0f;
+	return FMath::Clamp(FMath::FloorToInt((100.0f - SignalPercent100 + KINDA_SMALL_NUMBER) / 10.0f), 0, 10);
+}
+
+bool TryResolveNextSignalGaugePercent(const TArray<FLSSessionItem>& Items, const float CurrentPercent, float& OutNextPercent)
+{
+	OutNextPercent = 0.0f;
+	const int32 InactiveSlotCount = ResolveInactiveSignalSlotCount(CurrentPercent);
+
+	int32 NextFilledSlotIndex = INDEX_NONE;
+	for (int32 SlotIndex = InactiveSlotCount; SlotIndex < Items.Num(); ++SlotIndex)
 	{
-		return 0;
+		if (LSInventorySlotUtils::IsFilled(Items[SlotIndex]))
+		{
+			NextFilledSlotIndex = SlotIndex;
+			break;
+		}
 	}
 
-	return FMath::Clamp(FMath::FloorToInt((0.9f - ClampedPercent) / 0.1f) + 1, 0, 10);
+	if (NextFilledSlotIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	// 마지막 장착 칩이면 뒤의 빈 슬롯도 함께 건너뛰어 이번 주기에 게이지를 완전히 비운다.
+	for (int32 SlotIndex = NextFilledSlotIndex + 1; SlotIndex < Items.Num(); ++SlotIndex)
+	{
+		if (LSInventorySlotUtils::IsFilled(Items[SlotIndex]))
+		{
+			OutNextPercent = FMath::Clamp(1.0f - (static_cast<float>(NextFilledSlotIndex + 1) * 0.1f), 0.0f, 1.0f);
+			break;
+		}
+	}
+
+	return true;
 }
 
 TArray<FLSSessionItem> BuildSignalActiveEquipmentItems(const TArray<FLSSessionItem>& Items, const int32 InactiveSlotCount)
