@@ -11,10 +11,16 @@
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
+#include "UI/LootDrop/LSLootDropWidget.h"
 
 void ULSQuickSlotWidget::InitializeSlot(const int32 InSlotIndex)
 {
 	SlotIndex = InSlotIndex;
+	// WBP가 지정한 배경 색을 캡처한다(호버 해제 시 이 색으로 복원). Refresh 전에 1회만.
+	if (SlotBackgroundImage)
+	{
+		NormalBackgroundColor = SlotBackgroundImage->GetColorAndOpacity();
+	}
 	Refresh();
 }
 
@@ -38,6 +44,7 @@ void ULSQuickSlotWidget::Refresh()
 	{
 		IconImage->SetVisibility(ESlateVisibility::Collapsed);
 		AmountText->SetText(FText::GetEmpty());
+		ApplyHoverVisual();
 		return;
 	}
 
@@ -48,6 +55,9 @@ void ULSQuickSlotWidget::Refresh()
 	IconImage->SetVisibility(ESlateVisibility::HitTestInvisible);
 
 	AmountText->SetText(FText::AsNumber(CountOwnedAmount(ItemRowName)));
+
+	// 리드로 후에도 현재 호버 상태의 강조를 유지한다.
+	ApplyHoverVisual();
 }
 
 FReply ULSQuickSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -73,7 +83,19 @@ bool ULSQuickSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDr
 		return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 	}
 
-	// 소모품 여부/등록 성공 여부와 무관하게 드롭을 소비(true)한다. 이 위젯은 아이템을 옮기지 않으므로
+	// 루팅 박스에서 온 드롭이면 먼저 인벤토리로 루팅한다. 퀵슬롯은 참조만 저장하므로
+	// 루팅하지 않으면 인벤토리에 없는 아이템을 가리켜 개수 0으로 표시된다.
+	// 루팅 실패(인벤토리 가득 등)면 등록하지 않고 아이템은 박스에 유지한다.
+	if (ULSLootDropWidget* LootSource = DragOp->SourceLootDropWidget)
+	{
+		if (!LootSource->TransferLootSlotToInventory(DragOp->SourceSlotIndex))
+		{
+			UE_LOG(LogLS, Warning, TEXT("[QuickSlot] 루팅 실패로 등록 취소: '%s' (인벤토리 가득?)."), *DragOp->DragItemRowName.ToString());
+			return true;
+		}
+	}
+
+	// 소모품 여부/등록 성공 여부와 무관하게 드롭을 소비(true)한다. 이 위젯은 인벤토리 슬롯을 옮기지 않으므로
 	// 인벤토리 원본은 그대로 남고, SetQuickSlot이 소모품이 아니면 내부에서 거부 로그를 남긴다.
 	if (ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem())
 	{
@@ -81,6 +103,40 @@ bool ULSQuickSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDr
 	}
 
 	return true;
+}
+
+void ULSQuickSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
+	// 인벤토리 패널이 열려 있을 때만 호버 강조한다(HUD에 상시 떠 있는 바는 전투 중 무반응).
+	bIsHovered = IsInventoryContextOpen();
+	ApplyHoverVisual();
+}
+
+void ULSQuickSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseLeave(InMouseEvent);
+	bIsHovered = false;
+	ApplyHoverVisual();
+}
+
+void ULSQuickSlotWidget::ApplyHoverVisual()
+{
+	SetRenderScale(bIsHovered ? HoveredRenderScale : FVector2D::UnitVector);
+	if (IconImage)
+	{
+		IconImage->SetColorAndOpacity(bIsHovered ? HoveredIconTint : FLinearColor::White);
+	}
+	if (SlotBackgroundImage)
+	{
+		SlotBackgroundImage->SetColorAndOpacity(bIsHovered ? HoveredIconTint : NormalBackgroundColor);
+	}
+}
+
+bool ULSQuickSlotWidget::IsInventoryContextOpen() const
+{
+	const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
+	return PlayerController && PlayerController->IsInventoryUIOpen();
 }
 
 ULSSaveSubsystem* ULSQuickSlotWidget::ResolveSaveSubsystem() const

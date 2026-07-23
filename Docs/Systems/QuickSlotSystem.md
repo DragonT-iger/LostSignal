@@ -8,6 +8,8 @@
 - **등록:** 인벤토리 슬롯에서 퀵슬롯 칸으로 드래그앤드랍하면 그 소모품이 그 칸에 등록된다.
 - **개수 표시:** 각 칸은 등록된 소모품(같은 RowName)이 **현재 인벤토리에 몇 개 있는지 실시간 합산**해 표시한다.
 
+퀵슬롯은 참조만 저장하므로 인벤토리에 없는 아이템을 등록하면 개수가 0으로 표시된다. 그래서 **루팅 박스에서 바로 퀵슬롯으로 드래그하면 먼저 인벤토리로 루팅한 뒤 등록**한다(기존 자동-루팅 경로 `ULSLootDropWidget::TransferLootSlotToInventory` 재사용). 인벤토리가 가득 차 루팅이 실패하면 등록하지 않고 아이템은 박스에 그대로 둔다(경고 로그).
+
 칸이 스택을 갖지 않으므로 서버 권한·RPC가 필요 없다. 순수 클라이언트 UI + 클라이언트 세이브다.
 
 ## 저장 (영구)
@@ -20,7 +22,7 @@
 
 ## 위젯
 
-- [`ULSQuickSlotWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotWidget.h) — 개별 칸. 드롭 타겟(`NativeOnDrop`)이며 우클릭으로 등록 해제한다. `Refresh`에서 아이콘(공용 `LSInventorySlotUtils::LoadItemIconTexture`)과 인벤토리 합산 개수를 그린다.
+- [`ULSQuickSlotWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotWidget.h) — 개별 칸. 드롭 타겟(`NativeOnDrop`)이며 **우클릭으로 등록 해제**한다(더블클릭 해제는 두지 않음). `Refresh`에서 아이콘(공용 `LSInventorySlotUtils::LoadItemIconTexture`)과 인벤토리 합산 개수를 그린다. 마우스 호버 시 `ULSItemSlotWidget`과 같은 방식으로 아이콘·배경(`SlotBackgroundImage`) 틴트 + 스케일을 강조한다(`HoveredIconTint`/`HoveredRenderScale`, 에디터 조정 가능). **호버가 아닐 때 배경 색은 WBP가 지정한 색을 그대로 보인다** — `InitializeSlot`에서 배경 색을 1회 캡처해 호버 해제 시 그 색으로 복원한다(하드코딩 흰색으로 덮어쓰지 않음). 호버 반응은 **인벤토리 패널이 열려 있을 때만** 준다(`ALSPlayerControllerBase::IsInventoryUIOpen` — 로비/레이드 공통 판정). HUD에 상시 떠 있는 바는 전투 중 호버해도 반응하지 않는다.
 - [`ULSQuickSlotBarWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotBarWidget.h) — 고정 6칸(`QuickSlot1~6` `BindWidget`) 컨테이너. 로비/레이드 HUD 양쪽에서 재사용한다. 생성 시 스스로 `PlayerController`에 등록하고 `OnQuickSlotsChanged`를 구독한다.
 
 개수 합산은 툴팁 "현재 아이템 개수"와 동일 소스를 쓴다: 레이드 활성이면 `ULSRaidInventoryComponent`의 세션(일반+Safe), 아니면 `ULSSaveSubsystem`의 세이브(일반+Safe). 합산 함수는 `LSCraftingUtils::CountItem`을 재사용한다.
@@ -53,7 +55,7 @@
 
 ## 에디터/아트 매핑
 
-- `WBP_QuickSlot`(`ULSQuickSlotWidget` 상속): `IconImage`(UImage), `AmountText`(UTextBlock) 바인딩. 루트는 드롭을 받도록 Visible.
+- `WBP_QuickSlot`(`ULSQuickSlotWidget` 상속): `IconImage`(UImage), `AmountText`(UTextBlock), `SlotBackgroundImage`(UImage, 호버 시 색 변경) 바인딩. 루트는 드롭을 받도록 Visible.
 - `WBP_QuickSlotBar`(`ULSQuickSlotBarWidget` 상속): `QuickSlot1~QuickSlot6` 배치.
 - 바는 두 곳에 둘 수 있고 서로 동기화된다: (1) **`WBP_Inventory` 안에 자식으로 배치**해 인벤토리를 열면 함께 표시·세팅(로비·인게임 공통, 둘 다 같은 `ULSInventoryWidget`), (2) **`WBP_PlayerHUD`에 배치**해 전투 중 상시 표시. 각 바는 생성 시 스스로 등록되며 개수/등록 변경 시 모두 함께 갱신된다.
 - `Item1~6Action`(UInputAction)을 `IMC_Default`에 매핑한다(아트/기획).
