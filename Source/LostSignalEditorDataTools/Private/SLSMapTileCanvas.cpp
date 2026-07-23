@@ -5,11 +5,6 @@
 #include "LSMapTileEditorModel.h"
 #include "Styling/AppStyle.h"
 
-namespace
-{
-	constexpr float GLSMapTileCanvasBaseCellPixels = 22.0f;
-}
-
 void SLSMapTileCanvas::Construct(const FArguments& InArgs)
 {
 	Model = InArgs._Model;
@@ -23,10 +18,10 @@ void SLSMapTileCanvas::FitToView()
 		return;
 	}
 
-	const FVector2D Size = GetCachedGeometry().GetLocalSize();
+	const FVector2D Size = GetCachedGeometry().GetLocalSize() - FVector2D(RulerSizePixels);
 	const FIntPoint CellCount = Model->GetMaxCell() - Model->GetMinCell() + FIntPoint(1, 1);
-	const float FitX = Size.X / FMath::Max(1.0f, CellCount.X * GLSMapTileCanvasBaseCellPixels);
-	const float FitY = Size.Y / FMath::Max(1.0f, CellCount.Y * GLSMapTileCanvasBaseCellPixels);
+	const float FitX = Size.X / FMath::Max(1.0f, CellCount.X * BaseCellPixels);
+	const float FitY = Size.Y / FMath::Max(1.0f, CellCount.Y * BaseCellPixels);
 	Zoom = FMath::Clamp(FMath::Min(FitX, FitY) * 0.9f, 0.2f, 4.0f);
 	PanOffset = FVector2D::ZeroVector;
 	Invalidate(EInvalidateWidgetReason::Paint);
@@ -60,6 +55,11 @@ int32 SLSMapTileCanvas::OnPaint(
 		return LayerId + 1;
 	}
 
+	const FVector2D ContentSize = AllottedGeometry.GetLocalSize() - FVector2D(RulerSizePixels);
+	const FGeometry ContentGeometry = AllottedGeometry.MakeChild(
+		ContentSize.ComponentMax(FVector2D(1.0f)),
+		FSlateLayoutTransform(FVector2D(RulerSizePixels)));
+	OutDrawElements.PushClip(FSlateClippingZone(ContentGeometry.GetLayoutBoundingRect()));
 	for (int32 Y = Model->GetMinCell().Y; Y <= Model->GetMaxCell().Y; ++Y)
 	{
 		for (int32 X = Model->GetMinCell().X; X <= Model->GetMaxCell().X; ++X)
@@ -67,7 +67,9 @@ int32 SLSMapTileCanvas::OnPaint(
 			DrawCell(AllottedGeometry, OutDrawElements, LayerId + 1, FIntPoint(X, Y));
 		}
 	}
-	return LayerId + 2;
+	OutDrawElements.PopClip();
+	DrawRulers(AllottedGeometry, OutDrawElements, LayerId + 4);
+	return LayerId + 5;
 }
 
 FReply SLSMapTileCanvas::OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent)
@@ -204,17 +206,24 @@ void SLSMapTileCanvas::OnMouseCaptureLost(const FCaptureLostEvent& CaptureLostEv
 	Invalidate(EInvalidateWidgetReason::Paint);
 }
 
+FSlateRect SLSMapTileCanvas::GetContentRect(const FGeometry& Geometry) const
+{
+	const FVector2D Size = Geometry.GetLocalSize();
+	return FSlateRect(RulerSizePixels, RulerSizePixels, Size.X, Size.Y);
+}
+
 FVector2D SLSMapTileCanvas::GetMapOrigin(const FGeometry& Geometry) const
 {
 	const FIntPoint CellCount = Model->GetMaxCell() - Model->GetMinCell() + FIntPoint(1, 1);
 	const FVector2D MapSize(CellCount.X * GetCellPixelSize(), CellCount.Y * GetCellPixelSize());
-	return (Geometry.GetLocalSize() - MapSize) * 0.5f + PanOffset;
+	const FVector2D ContentSize = Geometry.GetLocalSize() - FVector2D(RulerSizePixels);
+	return FVector2D(RulerSizePixels) + (ContentSize - MapSize) * 0.5f + PanOffset;
 }
 
 FVector2D SLSMapTileCanvas::CellToLocal(const FGeometry& Geometry, const FIntPoint& Cell) const
 {
 	const int32 Column = Cell.X - Model->GetMinCell().X;
-	const int32 Row = Model->GetMaxCell().Y - Cell.Y;
+	const int32 Row = Cell.Y - Model->GetMinCell().Y;
 	return GetMapOrigin(Geometry) + FVector2D(Column, Row) * GetCellPixelSize();
 }
 
@@ -226,11 +235,15 @@ TOptional<FIntPoint> SLSMapTileCanvas::LocalToCell(
 	{
 		return TOptional<FIntPoint>();
 	}
+	if (!GetContentRect(Geometry).ContainsPoint(LocalPosition))
+	{
+		return TOptional<FIntPoint>();
+	}
 
 	const FVector2D Relative = LocalPosition - GetMapOrigin(Geometry);
 	const int32 Column = FMath::FloorToInt(Relative.X / GetCellPixelSize());
 	const int32 Row = FMath::FloorToInt(Relative.Y / GetCellPixelSize());
-	const FIntPoint Cell(Model->GetMinCell().X + Column, Model->GetMaxCell().Y - Row);
+	const FIntPoint Cell(Model->GetMinCell().X + Column, Model->GetMinCell().Y + Row);
 	if (Cell.X < Model->GetMinCell().X || Cell.X > Model->GetMaxCell().X
 		|| Cell.Y < Model->GetMinCell().Y || Cell.Y > Model->GetMaxCell().Y)
 	{
@@ -254,10 +267,12 @@ void SLSMapTileCanvas::UpdatePaintAtPosition(const FGeometry& Geometry, const FV
 			RectangleStartCell = Cell;
 		}
 		RectangleEndCell = Cell;
+		Model->FocusViewportOnSelection(RectangleStartCell.GetValue(), RectangleEndCell.GetValue());
 	}
 	else
 	{
 		PaintBrushToCell(Cell.GetValue());
+		Model->FocusViewportOnSelection(Cell.GetValue(), Cell.GetValue());
 	}
 	Invalidate(EInvalidateWidgetReason::Paint);
 }
@@ -328,56 +343,4 @@ bool SLSMapTileCanvas::IsCellInRectangle(const FIntPoint& Cell) const
 		&& Cell.X <= FMath::Max(RectangleStartCell->X, RectangleEndCell->X)
 		&& Cell.Y >= FMath::Min(RectangleStartCell->Y, RectangleEndCell->Y)
 		&& Cell.Y <= FMath::Max(RectangleStartCell->Y, RectangleEndCell->Y);
-}
-
-void SLSMapTileCanvas::DrawCell(
-	const FGeometry& Geometry,
-	FSlateWindowElementList& OutDrawElements,
-	int32 LayerId,
-	const FIntPoint& Cell) const
-{
-	const FVector2D Position = CellToLocal(Geometry, Cell);
-	const float CellSize = GetCellPixelSize();
-	const bool bHovered = HoveredCell.IsSet() && HoveredCell.GetValue() == Cell;
-	const bool bInRectangle = IsCellInRectangle(Cell);
-	const FLinearColor BorderColor = bInRectangle
-		? FLinearColor(0.12f, 0.72f, 1.0f, 1.0f)
-		: bHovered ? FLinearColor(1.0f, 0.82f, 0.18f, 1.0f) : FLinearColor(0.08f, 0.09f, 0.11f, 1.0f);
-	FSlateDrawElement::MakeBox(
-		OutDrawElements,
-		LayerId,
-		Geometry.ToPaintGeometry(FVector2D(CellSize, CellSize), FSlateLayoutTransform(Position)),
-		FAppStyle::GetBrush("WhiteBrush"),
-		ESlateDrawEffect::None,
-		BorderColor);
-
-	const FVector2D InnerPosition = Position + FVector2D(1.0f);
-	const FVector2D InnerSize(FMath::Max(1.0f, CellSize - 2.0f));
-	FSlateDrawElement::MakeBox(
-		OutDrawElements,
-		LayerId + 1,
-		Geometry.ToPaintGeometry(InnerSize, FSlateLayoutTransform(InnerPosition)),
-		FAppStyle::GetBrush("WhiteBrush"),
-		ESlateDrawEffect::None,
-		Model->HasCell(Cell) ? Model->GetCellColor(Cell) : FLinearColor(0.035f, 0.04f, 0.05f, 1.0f));
-}
-
-void SLSMapTileCanvas::DrawEmptyMessage(
-	const FGeometry& Geometry,
-	FSlateWindowElementList& OutDrawElements,
-	int32 LayerId) const
-{
-	FSlateDrawElement::MakeText(
-		OutDrawElements,
-		LayerId,
-		Geometry.ToPaintGeometry(FVector2D(520.0f, 30.0f), FSlateLayoutTransform(FVector2D(24.0f))),
-		Model.IsValid() ? Model->GetStatusText() : FText::GetEmpty(),
-		FAppStyle::GetFontStyle("NormalFont"),
-		ESlateDrawEffect::None,
-		FLinearColor::White);
-}
-
-float SLSMapTileCanvas::GetCellPixelSize() const
-{
-	return GLSMapTileCanvasBaseCellPixels * Zoom;
 }

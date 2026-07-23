@@ -37,6 +37,7 @@ public:
 	void SetPaintYawDegrees(float InYawDegrees);
 	void SetHoveredCell(const TOptional<FIntPoint>& InHoveredCell);
 	void SetPaintTool(ELSMapTilePaintTool InPaintTool) { PaintTool = InPaintTool; }
+	void SetLockViewportToSelection(bool bInLockViewport) { bLockViewportToSelection = bInLockViewport; }
 
 	ULSMapTilePalette* GetPalette() const { return Palette.Get(); }
 	int32 GetActivePaletteIndex() const { return ActivePaletteIndex; }
@@ -45,6 +46,7 @@ public:
 	bool ShouldAlignTopSurface() const { return bAlignTopSurface; }
 	float GetPaintYawDegrees() const { return PaintYawDegrees; }
 	ELSMapTilePaintTool GetPaintTool() const { return PaintTool; }
+	bool ShouldLockViewportToSelection() const { return bLockViewportToSelection; }
 	const FText& GetStatusText() const { return StatusText; }
 
 	void RefreshFromEditorWorld();
@@ -59,6 +61,7 @@ public:
 	bool PaintCell(const FIntPoint& Cell);
 	void EndPaintStroke();
 	int32 PickCellPaletteIndex(const FIntPoint& Cell) const;
+	void FocusViewportOnSelection(const FIntPoint& StartCell, const FIntPoint& EndCell) const;
 
 private:
 	UWorld* GetEditorWorld() const;
@@ -90,5 +93,6 @@ private:
 	ELSMapTilePaintTool PaintTool = ELSMapTilePaintTool::Brush;
 	int32 StrokeChangeCount = 0;
 	bool bAlignTopSurface = true;
+	bool bLockViewportToSelection = false;
 	FText StatusText;
 };

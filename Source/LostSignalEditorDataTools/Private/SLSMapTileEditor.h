@@ -14,6 +14,7 @@ struct FAssetData;
 struct FLSMapTilePaletteListItem
 {
 	int32 PaletteIndex = INDEX_NONE;
+	TStrongObjectPtr<UStaticMesh> PreviewMesh;
 	TSharedPtr<FAssetThumbnail> Thumbnail;
 };
 
@@ -46,6 +47,7 @@ private:
 	FReply OnFitMap();
 	void CollectSelectedTilePresets(TArray<FLSMapTilePaletteEntry>& OutPresets) const;
 	bool AddTilePresetToPalette(ULSMapTilePalette& TilePalette, const FLSMapTilePaletteEntry& Preset) const;
+	UStaticMesh* CreateTileThumbnailMesh(const FLSMapTilePaletteEntry& Entry) const;
 	FLinearColor MakePreviewColor(const FLSMapTilePaletteEntry& Preset) const;
 
 	TSharedPtr<FLSMapTileEditorModel> Model;

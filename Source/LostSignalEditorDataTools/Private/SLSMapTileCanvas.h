@@ -4,6 +4,7 @@
 #include "Widgets/SLeafWidget.h"
 
 class FLSMapTileEditorModel;
+class FAssetThumbnail;
 
 DECLARE_DELEGATE_TwoParams(FOnLSMapTilePresetPicked, int32, float);
 
@@ -17,6 +18,7 @@ public:
 
 	void Construct(const FArguments& InArgs);
 	void FitToView();
+	void SetTileThumbnails(TArray<TSharedPtr<FAssetThumbnail>> InTileThumbnails);
 
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 	virtual FVector2D ComputeDesiredSize(float LayoutScaleMultiplier) const override;
@@ -38,6 +40,10 @@ public:
 	virtual void OnMouseCaptureLost(const FCaptureLostEvent& CaptureLostEvent) override;
 
 private:
+	static constexpr float BaseCellPixels = 22.0f;
+	static constexpr float RulerSizePixels = 24.0f;
+
+	FSlateRect GetContentRect(const FGeometry& Geometry) const;
 	FVector2D GetMapOrigin(const FGeometry& Geometry) const;
 	FVector2D CellToLocal(const FGeometry& Geometry, const FIntPoint& Cell) const;
 	TOptional<FIntPoint> LocalToCell(const FGeometry& Geometry, const FVector2D& LocalPosition) const;
@@ -46,10 +52,14 @@ private:
 	void ApplyRectanglePaint();
 	bool IsCellInRectangle(const FIntPoint& Cell) const;
 	void DrawCell(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FIntPoint& Cell) const;
+	void DrawRulers(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId) const;
 	void DrawEmptyMessage(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId) const;
+	TSharedPtr<FAssetThumbnail> GetCellThumbnail(const FIntPoint& Cell) const;
+	TSharedPtr<FAssetThumbnail> GetActiveTileThumbnail() const;
 	float GetCellPixelSize() const;
 
 	TSharedPtr<FLSMapTileEditorModel> Model;
+	TArray<TSharedPtr<FAssetThumbnail>> TileThumbnails;
 	FOnLSMapTilePresetPicked OnPresetPicked;
 	TOptional<FIntPoint> HoveredCell;
 	TOptional<FIntPoint> LastPaintedCell;

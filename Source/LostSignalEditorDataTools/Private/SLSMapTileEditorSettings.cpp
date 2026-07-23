@@ -94,6 +94,16 @@ TSharedRef<SWidget> SLSMapTileEditor::BuildSettingsPanel()
 				.OnCheckStateChanged_Lambda([this](ECheckBoxState State) { Model->SetAlignTopSurface(State == ECheckBoxState::Checked); })
 				[SNew(STextBlock).Text(LOCTEXT("AlignTopLabel", "기존 윗면 높이 유지"))]
 			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 8.0f)
+			[
+				SNew(SCheckBox)
+				.IsChecked_Lambda([this]() { return Model->ShouldLockViewportToSelection() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+				.OnCheckStateChanged_Lambda([this](ECheckBoxState State)
+				{
+					Model->SetLockViewportToSelection(State == ECheckBoxState::Checked);
+				})
+				[SNew(STextBlock).Text(LOCTEXT("LockViewportLabel", "선택 위치에 뷰포트 고정 (탑뷰)"))]
+			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.0f, 10.0f)
 			[
 				SNew(STextBlock).Text_Lambda([this]() { return Model->GetStatusText(); }).AutoWrapText(true)

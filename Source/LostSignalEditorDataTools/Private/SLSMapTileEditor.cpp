@@ -13,6 +13,7 @@
 #include "ScopedTransaction.h"
 #include "SLSMapTileCanvas.h"
 #include "Styling/AppStyle.h"
+#include "ThumbnailRendering/SceneThumbnailInfo.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
@@ -24,6 +25,23 @@
 #include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "SLSMapTileEditor"
+
+namespace
+{
+	void ConfigureMapTileTopViewThumbnail(UStaticMesh& PreviewMesh)
+	{
+		USceneThumbnailInfo* ThumbnailInfo = NewObject<USceneThumbnailInfo>(&PreviewMesh, NAME_None, RF_Transient);
+		ThumbnailInfo->OrbitPitch = -90.0f;
+		ThumbnailInfo->OrbitYaw = 180.0f;
+
+		const FBoxSphereBounds Bounds = PreviewMesh.GetBounds();
+		const float HalfFOVRadians = FMath::DegreesToRadians(15.0f);
+		const float DefaultHalfSize = static_cast<float>(Bounds.SphereRadius * 1.15);
+		const float TopViewHalfSize = static_cast<float>(FMath::Max(Bounds.BoxExtent.X, Bounds.BoxExtent.Y) * 1.05);
+		ThumbnailInfo->OrbitZoom = (TopViewHalfSize - DefaultHalfSize) / FMath::Tan(HalfFOVRadians);
+		PreviewMesh.SetThumbnailInfo(ThumbnailInfo);
+	}
+}
 
 void SLSMapTileEditor::Construct(const FArguments& InArgs)
 {
@@ -200,18 +218,10 @@ void SLSMapTileEditor::RebuildPaletteItems()
 			FPaletteItemPtr Item = MakeShared<FLSMapTilePaletteListItem>();
 			Item->PaletteIndex = Index;
 			const FLSMapTilePaletteEntry& Entry = TilePalette->Tiles[Index];
-			UObject* ThumbnailAsset = Entry.Mesh.Get();
-			for (UMaterialInterface* Material : Entry.Materials)
+			Item->PreviewMesh.Reset(CreateTileThumbnailMesh(Entry));
+			if (Item->PreviewMesh.IsValid())
 			{
-				if (Material != nullptr)
-				{
-					ThumbnailAsset = Material;
-					break;
-				}
-			}
-			if (ThumbnailAsset != nullptr)
-			{
-				Item->Thumbnail = MakeShared<FAssetThumbnail>(ThumbnailAsset, 56, 56, ThumbnailPool);
+				Item->Thumbnail = MakeShared<FAssetThumbnail>(Item->PreviewMesh.Get(), 128, 128, ThumbnailPool);
 			}
 			PaletteItems.Add(Item);
 		}
@@ -219,6 +229,16 @@ void SLSMapTileEditor::RebuildPaletteItems()
 	if (PaletteListView.IsValid())
 	{
 		PaletteListView->RequestListRefresh();
+	}
+	if (Canvas.IsValid())
+	{
+		TArray<TSharedPtr<FAssetThumbnail>> TileThumbnails;
+		TileThumbnails.Reserve(PaletteItems.Num());
+		for (const FPaletteItemPtr& Item : PaletteItems)
+		{
+			TileThumbnails.Add(Item.IsValid() ? Item->Thumbnail : nullptr);
+		}
+		Canvas->SetTileThumbnails(MoveTemp(TileThumbnails));
 	}
 }
 
@@ -314,6 +334,38 @@ FReply SLSMapTileEditor::OnFitMap()
 		Canvas->FitToView();
 	}
 	return FReply::Handled();
+}
+
+UStaticMesh* SLSMapTileEditor::CreateTileThumbnailMesh(const FLSMapTilePaletteEntry& Entry) const
+{
+	if (Entry.Mesh == nullptr)
+	{
+		return nullptr;
+	}
+
+	const FName PreviewName = MakeUniqueObjectName(
+		GetTransientPackage(),
+		UStaticMesh::StaticClass(),
+		TEXT("LSMapTileThumbnailMesh"));
+	UStaticMesh* PreviewMesh = DuplicateObject<UStaticMesh>(Entry.Mesh.Get(), GetTransientPackage(), PreviewName);
+	if (PreviewMesh == nullptr)
+	{
+		return nullptr;
+	}
+
+	PreviewMesh->ClearFlags(RF_Public | RF_Standalone);
+	PreviewMesh->SetFlags(RF_Transient);
+	TArray<FStaticMaterial>& PreviewMaterials = PreviewMesh->GetStaticMaterials();
+	const int32 MaterialCount = FMath::Min(PreviewMaterials.Num(), Entry.Materials.Num());
+	for (int32 Index = 0; Index < MaterialCount; ++Index)
+	{
+		if (Entry.Materials[Index] != nullptr)
+		{
+			PreviewMaterials[Index].MaterialInterface = Entry.Materials[Index].Get();
+		}
+	}
+	ConfigureMapTileTopViewThumbnail(*PreviewMesh);
+	return PreviewMesh;
 }
 
 FLinearColor SLSMapTileEditor::MakePreviewColor(const FLSMapTilePaletteEntry& Preset) const
