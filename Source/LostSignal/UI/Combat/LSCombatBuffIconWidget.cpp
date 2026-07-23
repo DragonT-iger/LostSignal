@@ -1,22 +1,29 @@
 #include "UI/Combat/LSCombatBuffIconWidget.h"
 
 #include "Components/Image.h"
-#include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Engine/Texture2D.h"
 #include "LostSignal.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 void ULSCombatBuffIconWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (!IconImage || !StackText || !DurationBar)
+	if (!IconImage || !StackText || !DurationMaskImage)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s is missing required combat buff icon binding. Icon=%s Stack=%s Bar=%s"),
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required combat buff icon binding. Icon=%s Stack=%s DurationMaskImage=%s"),
 			*GetNameSafe(this),
 			*GetNameSafe(IconImage),
 			*GetNameSafe(StackText),
-			*GetNameSafe(DurationBar));
+			*GetNameSafe(DurationMaskImage));
+		return;
+	}
+
+	DurationMaskMaterial = DurationMaskImage->GetDynamicMaterial();
+	if (!DurationMaskMaterial)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot create buff duration mask material. Check DurationMaskImage brush material."), *GetNameSafe(this));
 	}
 }
 
@@ -37,11 +44,12 @@ void ULSCombatBuffIconWidget::SetBuffDisplay(const FLSCombatBuffDisplayData& InD
 		StackText->SetText(InDisplayData.StackCount > 1 ? FText::AsNumber(InDisplayData.StackCount) : FText::GetEmpty());
 	}
 
-	if (DurationBar)
+	if (DurationMaskMaterial)
 	{
-		const float Percent = InDisplayData.TotalDuration > 0.0f
+		const float RemainingRatio = InDisplayData.TotalDuration > 0.0f
 			? FMath::Clamp(InDisplayData.RemainingTime / InDisplayData.TotalDuration, 0.0f, 1.0f)
 			: 0.0f;
-		DurationBar->SetPercent(Percent);
+		const float FillProgress = bBuffFillByElapsed ? (1.0f - RemainingRatio) : RemainingRatio;
+		DurationMaskMaterial->SetScalarParameterValue(BuffProgressParameterName, FillProgress);
 	}
 }

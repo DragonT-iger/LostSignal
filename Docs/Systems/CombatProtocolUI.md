@@ -64,7 +64,7 @@ Protocol_Required_Level = 1
 
 스킬 범위는 기존 `ULSPlayerSkillComponent`의 스킬 타겟팅 흐름과 `ULSSkillPreviewComponent`를 사용한다. 전투 프로토콜 2단계 미만에서는 스킬 타겟팅과 확정 입력은 유지하되, 월드 범위 메시만 표시하지 않는다. 즉 프로토콜은 조작 가능 여부가 아니라 정보 표시량만 제어한다.
 
-쿨타임 숫자는 `ULSSkillSlotWidget`의 `CooldownText`만 제어한다. 3단계 기능인 쿨타임 게이지바는 `CooldownBar`로 분리하고, 2단계에서는 표시하지 않는다.
+쿨타임 숫자는 `ULSSkillSlotWidget`의 `CooldownText`만 제어한다. 3단계 기능인 쿨타임 게이지는 `CooldownMaskImage`로 분리하고, 2단계에서는 표시하지 않는다.
 
 `DT_ProtocolUnlock`에는 다음 의미의 row를 추가한다.
 
@@ -97,9 +97,9 @@ Protocol_Required_Level = 3
 
 3단계에서 해금되는 기능은 스킬 캐스팅 게이지바, 버프 지속 시간 표시, 스킬 쿨타임 게이지바 표시다.
 
-스킬 쿨타임 게이지바는 `ULSSkillSlotWidget`의 `CooldownBar`가 담당한다. 2단계의 `Skill_Cooldown`은 숫자만 표시하고, 3단계의 `Skill_Cooldown_Gauge`가 열려야 게이지바가 표시된다.
+스킬 쿨타임 게이지는 `ULSSkillSlotWidget`의 `CooldownMaskImage`(UImage)가 담당한다. 선형 진행바가 아니라 아이콘과 같은 크기로 겹쳐 아이콘 위를 덮는 방사형(시계방향 파이 와이프) 마스크이며, 브러시 머티리얼의 `Progress` 스칼라 파라미터(0~1)를 `GetDynamicMaterial()`로 얻은 MID에 매 틱 넣어 구동한다. 기본은 남은시간/총시간(부채꼴이 줄어듦), `bCooldownFillByElapsed`로 진행도 방향(차오름) 전환. 2단계의 `Skill_Cooldown`은 숫자만 표시하고, 3단계의 `Skill_Cooldown_Gauge`가 열려야 게이지가 표시된다.
 
-버프 지속 시간은 `ULSCombatBuffListWidget`이 플레이어의 AbilitySystemComponent에서 지속 중인 `LS.Buff.*` 계열 GameplayEffect를 조회해 표시한다. 현재 표시 대상은 `LS.Buff.CombatAcceleration`, `LS.Buff.AttackSpeed`다. 버프 이름/설명/아이콘 같은 표시 정보는 위젯 로컬 텍스처가 아니라 활성 GameplayEffect의 SourceObject에 들어 있는 `ULSSkillDataAssetBase` DataAsset에서 먼저 읽고, SourceObject가 없는 예외만 태그별 fallback DataAsset을 쓴다. 개별 버프 표시는 `ULSCombatBuffIconWidget`이 담당한다.
+버프 지속 시간은 `ULSCombatBuffListWidget`이 플레이어의 AbilitySystemComponent에서 지속 중인 `LS.Buff.*` 계열 GameplayEffect를 조회해 표시한다. 현재 표시 대상은 `LS.Buff.CombatAcceleration`, `LS.Buff.AttackSpeed`다. 버프 이름/설명/아이콘 같은 표시 정보는 위젯 로컬 텍스처가 아니라 활성 GameplayEffect의 SourceObject에 들어 있는 `ULSSkillDataAssetBase` DataAsset에서 먼저 읽고, SourceObject가 없는 예외만 태그별 fallback DataAsset을 쓴다. 개별 버프 표시는 `ULSCombatBuffIconWidget`이 담당한다. 남은시간 게이지는 스킬 쿨타임과 동일하게 `DurationMaskImage`(UImage) + MID의 `Progress` 파라미터로 구동하는 방사형(시계방향 파이 와이프) 마스크다.
 
 스킬 캐스팅 게이지바는 `ULSSkillCastGaugeWidget`이 담당한다. 아직 실제 캐스팅 시스템이 없으므로 HUD의 `ShowSkillCastGauge`/`HideSkillCastGauge` API와 디버그 명령 `LSTestSkillCastGauge <Duration>`으로 표시 경로를 먼저 열어 둔다.
 
@@ -162,11 +162,11 @@ Protocol_Required_Level = 5
 | `ULSDamageNumberWidget` | 숫자 하나의 텍스트, 투영 위치, 상승/페이드 수명을 담당한다. |
 | `FLSDamageNumberPayload` | 데미지량, 월드 위치, 치명타 여부 같은 표시 입력값을 담는다. |
 | `ULSSkillBarWidget` | `Skill_Slot` 해금 여부에 따라 스킬 슬롯 UI 표시 여부를 결정한다. |
-| `ULSSkillSlotWidget` | `Skill_Cooldown`/`Skill_Cooldown_Gauge` 해금 여부에 따라 쿨타임 숫자와 게이지바를 분리 표시한다. |
+| `ULSSkillSlotWidget` | `Skill_Cooldown`/`Skill_Cooldown_Gauge` 해금 여부에 따라 쿨타임 숫자(`CooldownText`)와 방사형 게이지(`CooldownMaskImage`+MID)를 분리 표시한다. |
 | `ULSPlayerSkillComponent` | `Skill_Range` 해금 여부에 따라 스킬 범위 메시 표시 여부를 결정한다. |
 | `ULSChipStationWidget` | 디버그 패널이 떠 있고 오버라이드가 설정됐을 때만 그 값을, 아니면 장착 칩 프로토콜 합산값을 프리뷰로 전달한다. |
 | `ULSCombatBuffListWidget` | `Buff_Duration` 해금 여부에 따라 플레이어 버프 지속 시간 목록을 표시한다. |
-| `ULSCombatBuffIconWidget` | 버프 하나의 아이콘 이미지, 스택 텍스트, 남은 시간 게이지를 표시한다. |
+| `ULSCombatBuffIconWidget` | 버프 하나의 아이콘 이미지, 스택 텍스트, 남은 시간 방사형 게이지(`DurationMaskImage`+MID)를 표시한다. |
 | `ULSSkillCastGaugeWidget` | `Skill_Casting_Gauge` 해금 여부에 따라 캐스팅 진행률을 표시한다. |
 | `ULSEnemyHealthBarComponent` | 전투 프로토콜 5단계 해금 여부에 따라 적 머리 위 월드 스페이스 위젯 체력바를 표시한다. |
 | `ULSEnemyHealthBarWidget` | 텍스트 없이 `HealthProgressBar`의 체력 비율만 표시한다. |

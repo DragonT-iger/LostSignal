@@ -2,8 +2,8 @@
 
 #include "Characters/LSPlayerCharacter.h"
 #include "Components/Image.h"
-#include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
@@ -55,20 +55,30 @@ void ULSSkillSlotWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (!IconImage || !ShortcutText || !CooldownText || !CooldownBar)
+	if (!IconImage || !ShortcutText || !CooldownText || !CooldownMaskImage)
 	{
-		UE_LOG(LogLS, Warning, TEXT("%s is missing required skill slot widget binding. Icon=%s ShortcutText=%s CooldownText=%s CooldownBar=%s"),
+		UE_LOG(LogLS, Warning, TEXT("%s is missing required skill slot widget binding. Icon=%s ShortcutText=%s CooldownText=%s CooldownMaskImage=%s"),
 			*GetNameSafe(this),
 			*GetNameSafe(IconImage),
 			*GetNameSafe(ShortcutText),
 			*GetNameSafe(CooldownText),
-			*GetNameSafe(CooldownBar));
+			*GetNameSafe(CooldownMaskImage));
 		return;
+	}
+
+	CooldownMaskMaterial = CooldownMaskImage->GetDynamicMaterial();
+	if (!CooldownMaskMaterial)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot create cooldown mask material. Check CooldownMaskImage brush material."), *GetNameSafe(this));
 	}
 
 	RefreshShortcutText();
 	CooldownText->SetVisibility(ESlateVisibility::Collapsed);
-	CooldownBar->SetVisibility(ESlateVisibility::Collapsed);
+	CooldownMaskImage->SetVisibility(ESlateVisibility::Collapsed);
+	if (CooldownMaskMaterial)
+	{
+		CooldownMaskMaterial->SetScalarParameterValue(CooldownProgressParameterName, 0.0f);
+	}
 }
 
 void ULSSkillSlotWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -184,7 +194,7 @@ FText ULSSkillSlotWidget::GetShortcutTextForSlot(const ELSPlayerSkillSlot InSlot
 
 void ULSSkillSlotWidget::RefreshCooldown()
 {
-	if (!CooldownText || !CooldownBar)
+	if (!CooldownText || !CooldownMaskImage)
 	{
 		return;
 	}
@@ -195,22 +205,30 @@ void ULSSkillSlotWidget::RefreshCooldown()
 	if (!SkillData || Remaining <= 0.0f || Total <= 0.0f)
 	{
 		CooldownText->SetVisibility(ESlateVisibility::Collapsed);
-		CooldownBar->SetVisibility(ESlateVisibility::Collapsed);
-		CooldownBar->SetPercent(0.0f);
+		CooldownMaskImage->SetVisibility(ESlateVisibility::Collapsed);
+		if (CooldownMaskMaterial)
+		{
+			CooldownMaskMaterial->SetScalarParameterValue(CooldownProgressParameterName, 0.0f);
+		}
 		return;
 	}
 
 	const bool bShowCooldownNumber = IsCooldownNumberProtocolVisible();
 	const bool bShowCooldownGauge = IsCooldownGaugeProtocolVisible();
 	CooldownText->SetVisibility(bShowCooldownNumber ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	CooldownBar->SetVisibility(bShowCooldownGauge ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	CooldownMaskImage->SetVisibility(bShowCooldownGauge ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	// 0.1초 단위로 올림해 소수 첫째 자리까지 표시한다(쿨타임 중엔 0.0으로 떨어지지 않게 올림).
 	const float DisplayRemaining = FMath::CeilToFloat(Remaining * 10.0f) / 10.0f;
 	FNumberFormattingOptions NumberFormat;
 	NumberFormat.MinimumFractionalDigits = 1;
 	NumberFormat.MaximumFractionalDigits = 1;
 	CooldownText->SetText(FText::AsNumber(DisplayRemaining, &NumberFormat));
-	CooldownBar->SetPercent(FMath::Clamp(Remaining / Total, 0.0f, 1.0f));
+	if (CooldownMaskMaterial)
+	{
+		const float RemainingRatio = FMath::Clamp(Remaining / Total, 0.0f, 1.0f);
+		const float FillProgress = bCooldownFillByElapsed ? (1.0f - RemainingRatio) : RemainingRatio;
+		CooldownMaskMaterial->SetScalarParameterValue(CooldownProgressParameterName, FillProgress);
+	}
 }
 
 bool ULSSkillSlotWidget::IsCooldownNumberProtocolVisible() const
