@@ -61,7 +61,6 @@ void ULSMonsterCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 void ULSMonsterCombatComponent::ApplyArchetype(const FLSMonsterArchetypeRow& Row)
 {
 	bCombatArchetypeApplied = true;
-	AlertMoveSpeedMultiplier = FMath::Max(0.0f, Row.Chase_Speed);
 	ActionGroup = Row.Action_Group;
 
 	// 진단: 공격 선택에 필요한 설정이 제대로 들어왔는지 초기화 때 1회 덤프.
@@ -615,11 +614,6 @@ void ULSMonsterCombatComponent::EndActionDash()
 
 void ULSMonsterCombatComponent::BeginActionTelegraph(float Duration, ELSMonsterTelegraphOrigin OriginMode)
 {
-	if (!ShouldShowActionTelegraph())
-	{
-		return;
-	}
-
 	// fill 차오름 기준 시간(윈드업 NotifyState 윈도우). 매 Tick 경과 비율로 0→1.
 	TelegraphDuration = Duration;
 	TelegraphElapsed = 0.0f;
@@ -714,11 +708,6 @@ const FLSMonsterActionRow* ULSMonsterCombatComponent::GetActiveActionRow() const
 	return FindActionRow(ActiveActionRowName);
 }
 
-bool ULSMonsterCombatComponent::HasValidDamageEffect() const
-{
-	return bCombatArchetypeApplied && DamageEffectClass != nullptr;
-}
-
 const FLSMonsterActionRow* ULSMonsterCombatComponent::FindActionRow(FName RowName) const
 {
 	const UWorld* World = GetWorld();
@@ -790,12 +779,6 @@ ULSSkillPreviewComponent* ULSMonsterCombatComponent::GetPreviewComponent() const
 {
 	const AActor* OwnerActor = GetOwner();
 	return OwnerActor ? OwnerActor->FindComponentByClass<ULSSkillPreviewComponent>() : nullptr;
-}
-
-bool ULSMonsterCombatComponent::ShouldShowActionTelegraph() const
-{
-	// 확장점: 추후 전투 프로토콜 레벨/관전 조건에 따라 false를 반환하도록 게이팅할 수 있다.
-	return true;
 }
 
 ELSBreakPowerTier ULSMonsterCombatComponent::ToBreakPowerTier(int32 Impact)

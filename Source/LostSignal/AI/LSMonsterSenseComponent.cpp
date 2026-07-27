@@ -207,11 +207,6 @@ void ULSMonsterSenseComponent::SetReturnHomeMode(bool bInReturnHomeMode)
 	bReturnHomeMode = bInReturnHomeMode;
 }
 
-void ULSMonsterSenseComponent::ClearVisualTarget()
-{
-	ReleaseTarget();
-}
-
 void ULSMonsterSenseComponent::ClearInterest()
 {
 	ReleaseTarget();

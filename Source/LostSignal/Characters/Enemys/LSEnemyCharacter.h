@@ -57,24 +57,6 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/AI")
 	ULSMonsterCombatComponent* GetMonsterCombatComponent() const { return MonsterCombatComponent; }
 
-	UFUNCTION(BlueprintPure, Category="LS/Minimap")
-	ULSMinimapMarkerComponent* GetMinimapMarkerComponent() const { return MinimapMarkerComponent; }
-
-	UFUNCTION(BlueprintPure, Category="LS/Noise")
-	ULSNoiseEmitterComponent* GetNoiseEmitterComponent() const { return NoiseEmitterComponent; }
-
-	UFUNCTION(BlueprintPure, Category="LS/Vision")
-	ULSVisionTargetComponent* GetVisionTargetComponent() const { return VisionTargetComponent; }
-
-	UFUNCTION(BlueprintPure, Category="LS/Vision")
-	ULSVisionGhostComponent* GetVisionGhostComponent() const { return VisionGhostComponent; }
-
-	UFUNCTION(BlueprintPure, Category="LS/UI|Combat")
-	ULSEnemyHealthBarComponent* GetHealthBarComponent() const { return HealthBarComponent; }
-
-	UFUNCTION(BlueprintPure, Category="LS/GAS")
-	ULSCharacterAttributeSet* GetMonsterAttributeSet() const { return MonsterAttributeSet; }
-
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastPlayAbilityMontage(UAnimMontage* Montage);
 

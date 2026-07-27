@@ -40,12 +40,6 @@ public:
 
 	void ApplyArchetype(const FLSMonsterArchetypeRow& Row);
 
-	UFUNCTION(BlueprintPure, Category="LS/Combat")
-	float GetLeashDistance() const { return LeashDistance; }
-
-	UFUNCTION(BlueprintPure, Category="LS/Combat")
-	float GetAlertMoveSpeedMultiplier() const { return AlertMoveSpeedMultiplier; }
-
 	// 일반 어빌리티 태그 활성화/취소/조회(액션 어빌리티 활성화에도 사용).
 	UFUNCTION(BlueprintCallable, Category="LS/Combat")
 	bool RequestAbilityByTag(FGameplayTag AbilityTag) const;
@@ -102,12 +96,6 @@ public:
 	/** ULSGA_MonsterAction이 몽타주(Action_Ani) 등을 읽기 위해 활성 액션 row를 조회. */
 	const FLSMonsterActionRow* GetActiveActionRow() const;
 
-	UFUNCTION(BlueprintPure, Category="LS/Combat")
-	AActor* GetActiveTarget() const { return ActiveTarget.Get(); }
-
-	UFUNCTION(BlueprintPure, Category="LS/Combat")
-	bool HasValidDamageEffect() const;
-
 	FLSMonsterActionChargeStarted& OnActionChargeStarted() { return ActionChargeStartedDelegate; }
 	FLSMonsterActionChargeFinished& OnActionChargeFinished() { return ActionChargeFinishedDelegate; }
 
@@ -132,21 +120,13 @@ private:
 	UFUNCTION()
 	void HandleOwnerCapsuleHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit);
 	ULSSkillPreviewComponent* GetPreviewComponent() const;
-	/** 전투 프로토콜 레벨 게이팅을 끼울 확장점. 현재는 항상 표시. */
-	bool ShouldShowActionTelegraph() const;
 	static ELSBreakPowerTier ToBreakPowerTier(int32 Impact);
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/Combat")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 
-	UPROPERTY(EditAnywhere, Category="LS/Combat", meta=(ClampMin="0.0"))
-	float LeashDistance = 2000.0f;
-
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Combat")
 	bool bCombatArchetypeApplied = false;
-
-	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Combat")
-	float AlertMoveSpeedMultiplier = 0.0f;
 
 	// archetype의 Action_Group(DT_MonsterAction row 이름 목록) 캐시.
 	UPROPERTY(Transient, VisibleInstanceOnly, Category="LS/Combat")

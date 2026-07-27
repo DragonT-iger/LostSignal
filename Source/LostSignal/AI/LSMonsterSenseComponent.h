@@ -83,9 +83,6 @@ public:
 	void SetReturnHomeMode(bool bInReturnHomeMode);
 
 	UFUNCTION(BlueprintCallable, Category="AI|Sense")
-	void ClearVisualTarget();
-
-	UFUNCTION(BlueprintCallable, Category="AI|Sense")
 	void ClearInterest();
 
 	bool CanSeeActor(const AActor* Actor) const;

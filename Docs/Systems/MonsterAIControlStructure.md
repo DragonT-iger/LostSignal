@@ -368,7 +368,7 @@ Attack -> Dead / Knockback
 
 공격 중 이동·facing 고정: `ULSGA_MonsterAction` 활성 시 Chase에서 남은 AI `MoveTo`와 이동 속도를 먼저 정리해 선딜 중 플레이어를 계속 따라가지 않게 한다. `CharacterMovementComponent` 자체는 유지하므로 액션 Notify가 시작하는 도약/돌진 `RootMotionSource`는 정상 동작한다. Ability가 활성인 동안 `bUseControllerDesiredRotation`을 false로 꺼 **공격 시작 시점의 방향으로 body 회전을 고정**한다(어빌리티 종료 시 복원). 공격이 연속으로 이어지면 회전이 작동할 틈이 없으므로, `LS Request Monster Action`이 발동 전 `AttackAlignDuration` 동안 타겟 방향으로 yaw를 회전시켜 매 액션의 조준을 갱신한다(0이면 즉시 조준). `RequestAction`의 최종 yaw 보정은 보간 마지막 프레임 오차를 지우는 정밀 조준용이다 — "고정"은 그 조준된 방향 기준이다.
 
-텔레그래프 표시 여부는 `ULSMonsterCombatComponent::ShouldShowActionTelegraph()`가 게이팅한다(현재는 항상 true, 추후 전투 프로토콜 레벨 게이팅 확장점).
+텔레그래프는 현재 별도 프로토콜 게이팅 없이 항상 표시한다.
 
 `ULSANS_MonsterActionTelegraph`의 `OriginMode`는 텔레그래프 생성 위치 기준을 몽타주 NotifyState별로 선택한다. 기본값은 `Caster`이며 Notify Begin 시점의 시전자 위치·전방에 배치한다. `Target`이면 활성 타겟 위치에 배치하고 방향은 시전자에서 타겟을 향한다. 위치는 Begin에서 한 번 정하며 NotifyState Tick 동안 타겟을 추적하지 않는다. Box는 기존 판정 정렬 규칙대로 선택 원점에서 전방 절반만큼 중심을 보정한다.
 
