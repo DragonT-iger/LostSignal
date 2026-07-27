@@ -26,6 +26,7 @@ class ULSSurvivalOverheadWidget;
 class UUserWidget;
 class UWidgetComponent;
 class USpringArmComponent;
+class UStaticMeshComponent;
 struct FInputActionValue;
 
 UCLASS(Abstract)
@@ -38,6 +39,8 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
+	// 에디터 뷰포트에서도 무기가 소켓에 붙어 보이도록 편집 시점에 재어태치한다(오프셋 조절용).
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 	// 사망 시 서버에서 FarmingGameMode에 레이드 종료(Dead)를 알린다. 파밍 외 레벨에서는 아무것도 하지 않는다.
 	virtual void OnDeathStateChanged(bool bIsDead) override;
@@ -126,6 +129,14 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/UI", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UWidgetComponent> SurvivalOverheadWidgetComponent;
+
+	// 손 소켓에 붙는 무기(검) 외형 메쉬. 실제 Static Mesh 에셋은 캐릭터 BP에서 이 컴포넌트에 직접 매핑한다.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Weapon", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UStaticMeshComponent> WeaponMeshComponent;
+
+	// 무기를 붙일 스켈레톤 소켓 이름. 스켈레톤에 만든 소켓 이름과 일치해야 한다(불일치 시 BeginPlay에서 경고).
+	UPROPERTY(EditDefaultsOnly, Category="LS/Weapon")
+	FName WeaponSocketName = TEXT("WeaponSocket");
 
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
 	TSubclassOf<ULSSurvivalOverheadWidget> SurvivalOverheadWidgetClass;
@@ -352,6 +363,8 @@ private:
 	bool TrySpendRunStamina(float Amount);
 	void ApplyStaminaChange(float Amount);
 	void InitializeSurvivalOverheadWidget();
+	// 무기 메쉬를 WeaponSocketName 소켓에 붙인다(상대 트랜스폼 유지). 소켓이 없으면 아무것도 하지 않는다.
+	void AttachWeaponMeshToSocket();
 	bool ShouldSyncFacingRotation(float NewYaw) const;
 
 	UFUNCTION(Server, Reliable)

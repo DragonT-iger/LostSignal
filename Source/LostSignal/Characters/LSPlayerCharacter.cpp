@@ -46,6 +46,7 @@
 #include "Vision/LSPlayerXRayComponent.h"
 #include "Vision/LSVisionComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "UI/Survival/LSSurvivalOverheadWidget.h"
 
@@ -89,6 +90,12 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	SurvivalOverheadWidgetComponent->SetDrawSize(SurvivalOverheadDrawSize);
 	SurvivalOverheadWidgetComponent->SetRelativeLocation(SurvivalOverheadWidgetOffset);
 
+	WeaponMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMeshComponent"));
+	WeaponMeshComponent->SetupAttachment(GetMesh(), WeaponSocketName);
+	WeaponMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 외형 전용, 히트 판정은 전투 컴포넌트가 담당
+	WeaponMeshComponent->SetRenderCustomDepth(true); // 캐릭터 메쉬와 동일하게 커스텀 뎁스 스텐실 1 사용
+	WeaponMeshComponent->SetCustomDepthStencilValue(1);
+
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
 		MovementComponent->MaxWalkSpeed = WalkSpeed;
@@ -100,6 +107,15 @@ void ALSPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	InitializeSurvivalOverheadWidget();
+
+	// 생성자 SetupAttachment는 멤버 기본값 시점에 소켓을 굽는다. BP에서 바꾼 WeaponSocketName을
+	// 반영하려면 실제 값으로 다시 붙인다. 소켓이 없으면 여기서 경고를 남긴다(런타임 1회).
+	AttachWeaponMeshToSocket();
+	if (WeaponMeshComponent && GetMesh() && !GetMesh()->DoesSocketExist(WeaponSocketName))
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s: 무기 소켓 '%s'가 스켈레톤에 없음 — 무기 위치 어긋남"),
+			*GetNameSafe(this), *WeaponSocketName.ToString());
+	}
 
 	// 칩은 베이스 스탯 위에 얹는 GE이므로, 칩 적용 전에 파생 클래스의 베이스 어트리뷰트를 먼저 초기화한다.
 	InitializeBaseAttributes();
@@ -123,6 +139,27 @@ void ALSPlayerCharacter::BeginPlay()
 			.AddUObject(this, &ALSPlayerCharacter::HandleMoveSpeedChanged);
 	}
 	RefreshMaxWalkSpeed();
+}
+
+void ALSPlayerCharacter::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	// 에디터에서 BP를 컴파일/이동할 때마다 실행된다. 여기서 붙여야 뷰포트에서 소켓에 붙어 보여 오프셋을 잡을 수 있다.
+	AttachWeaponMeshToSocket();
+}
+
+void ALSPlayerCharacter::AttachWeaponMeshToSocket()
+{
+	if (!WeaponMeshComponent || !GetMesh() || !GetMesh()->DoesSocketExist(WeaponSocketName))
+	{
+		return;
+	}
+
+	WeaponMeshComponent->AttachToComponent(
+		GetMesh(),
+		FAttachmentTransformRules::KeepRelativeTransform,
+		WeaponSocketName);
 }
 
 void ALSPlayerCharacter::OnDeathStateChanged(bool bIsDead)
