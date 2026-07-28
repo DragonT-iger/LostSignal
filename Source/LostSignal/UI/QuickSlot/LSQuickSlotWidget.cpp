@@ -1,10 +1,14 @@
 #include "UI/QuickSlot/LSQuickSlotWidget.h"
 
+#include "Characters/LSPlayerCharacter.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "EnhancedActionKeyMapping.h"
 #include "Engine/GameInstance.h"
 #include "Engine/Texture2D.h"
+#include "InputCoreTypes.h"
+#include "InputMappingContext.h"
 #include "Inventory/LSCraftingUtils.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
@@ -12,6 +16,17 @@
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
+
+void ULSQuickSlotWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	if (!BindKeyText)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[QuickSlot] BindKeyText not bound on %s."), *GetNameSafe(this));
+	}
+	RefreshShortcutText();
+}
 
 void ULSQuickSlotWidget::InitializeSlot(const int32 InSlotIndex)
 {
@@ -21,6 +36,7 @@ void ULSQuickSlotWidget::InitializeSlot(const int32 InSlotIndex)
 	{
 		NormalBackgroundColor = SlotBackgroundImage->GetColorAndOpacity();
 	}
+	RefreshShortcutText();
 	Refresh();
 }
 
@@ -171,4 +187,63 @@ int32 ULSQuickSlotWidget::CountOwnedAmount(const FName ItemRowName) const
 	}
 
 	return 0;
+}
+
+void ULSQuickSlotWidget::RefreshShortcutText()
+{
+	if (!BindKeyText)
+	{
+		return;
+	}
+
+	BindKeyText->SetText(ResolveShortcutText());
+	BindKeyText->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+FText ULSQuickSlotWidget::ResolveShortcutText() const
+{
+	// 소비는 레이드 폰(ALSPlayerCharacter) 전용이라 매핑도 폰에서 조회한다.
+	// 로비 인벤토리엔 폰이 없어 매핑을 못 찾으므로 빈 텍스트로 둔다(잘못된 키를 표시하지 않는다).
+	const APlayerController* PlayerController = GetOwningPlayer();
+	const ALSPlayerCharacter* PlayerCharacter = PlayerController ? Cast<ALSPlayerCharacter>(PlayerController->GetPawn()) : nullptr;
+	const UInputAction* InputAction = PlayerCharacter ? PlayerCharacter->GetItemInputAction(SlotIndex) : nullptr;
+	return ResolveShortcutTextFromInputMappings(InputAction);
+}
+
+FText ULSQuickSlotWidget::ResolveShortcutTextFromInputMappings(const UInputAction* InputAction) const
+{
+	const ALSPlayerControllerBase* PlayerController = GetOwningPlayer<ALSPlayerControllerBase>();
+	if (!PlayerController || !InputAction)
+	{
+		return FText::GetEmpty();
+	}
+
+	FKey FirstValidKey;
+	for (const UInputMappingContext* MappingContext : PlayerController->GetDefaultMappingContexts())
+	{
+		if (!MappingContext)
+		{
+			continue;
+		}
+
+		for (const FEnhancedActionKeyMapping& Mapping : MappingContext->GetMappings())
+		{
+			if (Mapping.Action != InputAction || !Mapping.Key.IsValid())
+			{
+				continue;
+			}
+
+			if (!FirstValidKey.IsValid())
+			{
+				FirstValidKey = Mapping.Key;
+			}
+
+			if (!Mapping.Key.IsGamepadKey())
+			{
+				return Mapping.Key.GetDisplayName(false);
+			}
+		}
+	}
+
+	return FirstValidKey.IsValid() ? FirstValidKey.GetDisplayName(false) : FText::GetEmpty();
 }

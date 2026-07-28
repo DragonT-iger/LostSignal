@@ -347,6 +347,27 @@ UInputAction* ALSPlayerCharacter::GetSkillInputAction(const ELSPlayerSkillSlot S
 	}
 }
 
+UInputAction* ALSPlayerCharacter::GetItemInputAction(const int32 SlotIndex) const
+{
+	switch (SlotIndex)
+	{
+	case 0:
+		return Item1Action;
+	case 1:
+		return Item2Action;
+	case 2:
+		return Item3Action;
+	case 3:
+		return Item4Action;
+	case 4:
+		return Item5Action;
+	case 5:
+		return Item6Action;
+	default:
+		return nullptr;
+	}
+}
+
 void ALSPlayerCharacter::OnAttack()
 {
 	if (IsInputBlocked() || IsModalUIBlockingInput())

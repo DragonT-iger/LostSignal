@@ -7,12 +7,13 @@
 class UImage;
 class UTextBlock;
 class UDragDropOperation;
+class UInputAction;
 class ULSSaveSubsystem;
 
 /**
  * 퀵슬롯 한 칸. 소모품 RowName 참조 하나를 가리키며, 표시 개수는 인벤토리에서 실시간 합산한다.
  * 아이템 스택을 담지 않는다. 인벤토리 슬롯에서 드래그앤드랍하면 그 소모품이 이 칸에 등록된다.
- * WBP는 IconImage, AmountText, SlotBackgroundImage를 바인딩해야 한다.
+ * WBP는 IconImage, AmountText, SlotBackgroundImage, ShortcutText를 바인딩해야 한다.
  */
 UCLASS()
 class LOSTSIGNAL_API ULSQuickSlotWidget : public UUserWidget
@@ -27,6 +28,7 @@ public:
 	void Refresh();
 
 protected:
+	virtual void NativeConstruct() override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
@@ -42,6 +44,10 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|QuickSlot")
 	TObjectPtr<UImage> SlotBackgroundImage;
 
+	// 이 칸의 소비 바인딩 키(Item1~6Action)를 표시하는 텍스트. 스킬 슬롯의 ShortcutText와 동일 역할.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|QuickSlot")
+	TObjectPtr<UTextBlock> BindKeyText;
+
 	// 호버 강조 색/스케일(ItemSlot 기본값과 동일). 아트가 에디터에서 조정 가능.
 	UPROPERTY(EditAnywhere, Category="LS/UI|QuickSlot")
 	FLinearColor HoveredIconTint = FLinearColor(0.55f, 0.9f, 1.0f, 1.0f);
@@ -50,6 +56,12 @@ protected:
 	FVector2D HoveredRenderScale = FVector2D(1.1f, 1.1f);
 
 private:
+	// 이 칸의 바인딩 키를 다시 그린다. 레이드 HUD에선 실제 매핑 키, 폰이 없는 로비에선 빈 텍스트.
+	void RefreshShortcutText();
+	FText ResolveShortcutText() const;
+	// InputAction에 매핑된 첫 유효 키의 표시 이름(키보드 우선). 매핑이 없으면 빈 텍스트.
+	FText ResolveShortcutTextFromInputMappings(const UInputAction* InputAction) const;
+
 	ULSSaveSubsystem* ResolveSaveSubsystem() const;
 	// 등록된 소모품(RowName)이 현재 인벤토리에 몇 개 있는지 합산한다(레이드=세션, 로비=세이브).
 	int32 CountOwnedAmount(FName ItemRowName) const;

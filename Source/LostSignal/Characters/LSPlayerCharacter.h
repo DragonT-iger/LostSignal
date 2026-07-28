@@ -74,6 +74,9 @@ public:
 
 	UInputAction* GetSkillInputAction(ELSPlayerSkillSlot Slot) const;
 
+	// 퀵슬롯 0~5 인덱스에 대응하는 Item1~6Action. 범위를 벗어나면 nullptr.
+	UInputAction* GetItemInputAction(int32 SlotIndex) const;
+
 	UFUNCTION(BlueprintPure, Category="LS/Movement")
 	bool IsRunning() const { return bIsRunning; }
 

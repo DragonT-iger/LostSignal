@@ -22,7 +22,7 @@
 
 ## 위젯
 
-- [`ULSQuickSlotWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotWidget.h) — 개별 칸. 드롭 타겟(`NativeOnDrop`)이며 **우클릭으로 등록 해제**한다(더블클릭 해제는 두지 않음). 등록 해제도 호버와 마찬가지로 **인벤토리 패널이 열려 있을 때만** 동작한다(`IsInventoryUIOpen`). `Refresh`에서 아이콘(공용 `LSInventorySlotUtils::LoadItemIconTexture`)과 인벤토리 합산 개수를 그린다. 마우스 호버 시 `ULSItemSlotWidget`과 같은 방식으로 아이콘·배경(`SlotBackgroundImage`) 틴트 + 스케일을 강조한다(`HoveredIconTint`/`HoveredRenderScale`, 에디터 조정 가능). **호버가 아닐 때 배경 색은 WBP가 지정한 색을 그대로 보인다** — `InitializeSlot`에서 배경 색을 1회 캡처해 호버 해제 시 그 색으로 복원한다(하드코딩 흰색으로 덮어쓰지 않음). 호버 반응은 **인벤토리 패널이 열려 있을 때만** 준다(`ALSPlayerControllerBase::IsInventoryUIOpen` — 로비/레이드 공통 판정). HUD에 상시 떠 있는 바는 전투 중 호버해도 반응하지 않는다.
+- [`ULSQuickSlotWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotWidget.h) — 개별 칸. 드롭 타겟(`NativeOnDrop`)이며 **우클릭으로 등록 해제**한다(더블클릭 해제는 두지 않음). 등록 해제도 호버와 마찬가지로 **인벤토리 패널이 열려 있을 때만** 동작한다(`IsInventoryUIOpen`). `Refresh`에서 아이콘(공용 `LSInventorySlotUtils::LoadItemIconTexture`)과 인벤토리 합산 개수를 그린다. 마우스 호버 시 `ULSItemSlotWidget`과 같은 방식으로 아이콘·배경(`SlotBackgroundImage`) 틴트 + 스케일을 강조한다(`HoveredIconTint`/`HoveredRenderScale`, 에디터 조정 가능). **호버가 아닐 때 배경 색은 WBP가 지정한 색을 그대로 보인다** — `InitializeSlot`에서 배경 색을 1회 캡처해 호버 해제 시 그 색으로 복원한다(하드코딩 흰색으로 덮어쓰지 않음). 호버 반응은 **인벤토리 패널이 열려 있을 때만** 준다(`ALSPlayerControllerBase::IsInventoryUIOpen` — 로비/레이드 공통 판정). HUD에 상시 떠 있는 바는 전투 중 호버해도 반응하지 않는다. **바인딩 키 표시**(`ShortcutText`)는 스킬 슬롯과 동일하게 폰의 `Item1~6Action`을 `IMC_Default` 매핑에서 조회해 실제 키의 표시 이름을 넣는다(키보드 우선, 리바인딩 자동 반영). 소비가 레이드 폰 전용이라 매핑도 폰에서 조회하며, 폰이 없는 로비 인벤토리에선 빈 텍스트로 둔다.
 - [`ULSQuickSlotBarWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotBarWidget.h) — 고정 6칸(`QuickSlot1~6` `BindWidget`) 컨테이너. 로비/레이드 HUD 양쪽에서 재사용한다. 생성 시 스스로 `PlayerController`에 등록하고 `OnQuickSlotsChanged`를 구독한다.
 
 개수 합산은 툴팁 "현재 아이템 개수"와 동일 소스를 쓴다: 레이드 활성이면 `ULSRaidInventoryComponent`의 세션(일반+Safe), 아니면 `ULSSaveSubsystem`의 세이브(일반+Safe). 합산 함수는 `LSCraftingUtils::CountItem`을 재사용한다.
@@ -57,7 +57,7 @@
 
 ## 에디터/아트 매핑
 
-- `WBP_QuickSlot`(`ULSQuickSlotWidget` 상속): `IconImage`(UImage), `AmountText`(UTextBlock), `SlotBackgroundImage`(UImage, 호버 시 색 변경) 바인딩. 루트는 드롭을 받도록 Visible.
+- `WBP_QuickSlot`(`ULSQuickSlotWidget` 상속): `IconImage`(UImage), `AmountText`(UTextBlock), `SlotBackgroundImage`(UImage, 호버 시 색 변경), `ShortcutText`(UTextBlock, 소비 바인딩 키 표시) 바인딩. 루트는 드롭을 받도록 Visible.
 - `WBP_QuickSlotBar`(`ULSQuickSlotBarWidget` 상속): `QuickSlot1~QuickSlot6` 배치.
 - 바는 두 곳에 둘 수 있고 서로 동기화된다: (1) **`WBP_Inventory` 안에 자식으로 배치**해 인벤토리를 열면 함께 표시·세팅(로비·인게임 공통, 둘 다 같은 `ULSInventoryWidget`), (2) **`WBP_PlayerHUD`에 배치**해 전투 중 상시 표시. 각 바는 생성 시 스스로 등록되며 개수/등록 변경 시 모두 함께 갱신된다.
 - `Item1~6Action`(UInputAction)을 `IMC_Default`에 매핑한다(아트/기획).
