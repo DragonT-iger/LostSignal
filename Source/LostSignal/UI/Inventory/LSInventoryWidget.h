@@ -101,6 +101,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI", meta=(ClampMin="0"))
 	int32 ConfirmedStorageSlotCount = 4;
 
+	// 인벤토리 화면에서 사용하는 일반/보호/장비 슬롯의 레이아웃 크기.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI")
+	FVector2D InventoryItemSlotSize = FVector2D(80.f, 80.f);
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TSubclassOf<ALSWorldDroppedItem> DroppedItemActorClass;
 

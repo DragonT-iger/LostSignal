@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Components/Image.h"
+#include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Engine/Texture2D.h"
@@ -16,6 +17,7 @@
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -23,6 +25,30 @@ namespace
 const FName EmptySlotIconKey(TEXT("__LSEmptySlot__"));
 // 미공개 placeholder(미확인 아이콘)가 적용된 상태를 나타내는 예약 키.
 const FName PlaceholderIconKey(TEXT("__LSUnconfirmed__"));
+}
+
+ULSItemSlotWidget::ULSItemSlotWidget(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	// 모든 화면이 공유하는 슬롯 배경 프레임 기본값. WBP에서 다른 텍스처를 지정하면 그 값이 우선한다.
+	static ConstructorHelpers::FObjectFinder<UTexture2D> InventorySlotTextureFinder(TEXT("/Game/LostSignal/UI/Texture/Figma/InventorySlot.InventorySlot"));
+	if (InventorySlotTextureFinder.Succeeded())
+	{
+		DefaultSlotTexture = InventorySlotTextureFinder.Object;
+	}
+}
+
+void ULSItemSlotWidget::SetSlotLayoutSize(const FVector2D InSize)
+{
+	USizeBox* RootSizeBox = Cast<USizeBox>(GetRootWidget());
+	if (!RootSizeBox)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot set item slot layout size because the root widget is not a SizeBox on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	RootSizeBox->SetWidthOverride(FMath::Max(1.f, InSize.X));
+	RootSizeBox->SetHeightOverride(FMath::Max(1.f, InSize.Y));
 }
 
 void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats)
@@ -107,6 +133,15 @@ void ULSItemSlotWidget::ClearItem()
 	}
 
 	// 배경은 SlotBackgroundImage가 항상 표시하므로 빈 슬롯에서는 아이콘만 숨긴다.
+	// 단, 빈 칸 기본 아이콘이 지정된 슬롯(장비칸)은 숨기는 대신 그 아이콘을 표시한다.
+	// 캐시 키(DisplayedIconKey)가 아니라 브러시가 실제로 그 텍스처를 들고 있는지로 판정한다.
+	// 키로 판정하면 EmptySlotIconTexture를 나중에 교체했을 때(디자이너에서 값 할당 등) 갱신을 건너뛰어
+	// 이전 브러시가 그대로 드러난다.
+	const bool bShowEmptySlotIcon = EmptySlotIconTexture != nullptr;
+	if (bShowEmptySlotIcon && ItemIconImage->GetBrush().GetResourceObject() != EmptySlotIconTexture)
+	{
+		ItemIconImage->SetBrushFromTexture(EmptySlotIconTexture);
+	}
 	DisplayedIconKey = EmptySlotIconKey;
 	// 빈 슬롯은 등급색을 쓰지 않고 전용 빈 슬롯 배경색으로 되돌린다.
 	CurrentGradeBackgroundColor = EmptySlotBackgroundColor;
@@ -115,7 +150,7 @@ void ULSItemSlotWidget::ClearItem()
 	bIsPopInAnimating = false;
 
 	ApplyHoverVisual();
-	ItemIconImage->SetVisibility(ESlateVisibility::Collapsed);
+	ItemIconImage->SetVisibility(bShowEmptySlotIcon ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	AmountText->SetText(FText::GetEmpty());
 	AmountText->SetVisibility(ESlateVisibility::Collapsed);
 	bHasItem = false;
@@ -789,7 +824,12 @@ void ULSItemSlotWidget::ApplyHoverVisual()
 
 	if (ItemIconImage)
 	{
-		ItemIconImage->SetColorAndOpacity(Tint);
+		// 빈 칸 기본 아이콘은 실루엣이므로 특수 상태가 아닐 때만 전용 틴트로 흐리게 둔다.
+		// 특수 상태에서는 기존 피드백 틴트를 그대로 써서 빈 장비칸에서도 후보/거부 강조가 보이게 한다.
+		const bool bSpecialIconState = bIsDragTarget || bIsHovered || bIsEquipCandidate || bIsInvalidEquipDropTarget
+			|| bIsEquipRejectAnimating || bIsLocked;
+		const bool bShowingEmptySlotIcon = EmptySlotIconTexture != nullptr && DisplayedIconKey == EmptySlotIconKey;
+		ItemIconImage->SetColorAndOpacity(bShowingEmptySlotIcon && !bSpecialIconState ? EmptySlotIconTint : Tint);
 	}
 
 	// 틴트에 더해 호버/드래그 타겟 시 슬롯을 살짝 키워 강조한다(잠금·드래그 비주얼 제외).

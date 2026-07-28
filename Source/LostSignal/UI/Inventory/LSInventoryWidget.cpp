@@ -166,6 +166,7 @@ void ULSInventoryWidget::RebuildInventorySlots()
 			const bool bHasSlotItem = InventoryItems.IsValidIndex(SlotIndex) &&
 				!InventoryItems[SlotIndex].ItemRowName.IsNone() &&
 				InventoryItems[SlotIndex].Amount > 0;
+			SlotWidget.SetSlotLayoutSize(InventoryItemSlotSize);
 			SlotWidget.SetSlotContext(this, ELSInventorySlotArea::Inventory, SlotIndex, bHasSlotItem);
 
 			if (bHasSlotItem)
@@ -433,6 +434,7 @@ void ULSInventoryWidget::RebuildConfirmedStorageSlots()
 				!SafeItems[SlotIndex].ItemRowName.IsNone() &&
 				SafeItems[SlotIndex].Amount > 0;
 			const bool bIsLocked = IsSlotLocked(ELSInventorySlotArea::Safe, SlotIndex);
+			SlotWidget.SetSlotLayoutSize(InventoryItemSlotSize);
 			SlotWidget.SetSlotContext(this, ELSInventorySlotArea::Safe, SlotIndex, bHasSlotItem, bIsLocked);
 			if (bHasSlotItem)
 			{
@@ -581,6 +583,7 @@ void ULSInventoryWidget::RebuildEquipmentSlots()
 		const bool bHasSlotItem = EquipmentItems.IsValidIndex(SlotIndex) &&
 			!EquipmentItems[SlotIndex].ItemRowName.IsNone() &&
 			EquipmentItems[SlotIndex].Amount > 0;
+		SlotWidget->SetSlotLayoutSize(InventoryItemSlotSize);
 		SlotWidget->SetSlotContext(this, ELSInventorySlotArea::Equipment, SlotIndex, bHasSlotItem);
 		if (bHasSlotItem)
 		{

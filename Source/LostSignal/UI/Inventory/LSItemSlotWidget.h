@@ -21,6 +21,8 @@ class LOSTSIGNAL_API ULSItemSlotWidget : public ULSItemTooltipSlotWidget
 	GENERATED_BODY()
 
 public:
+	ULSItemSlotWidget(const FObjectInitializer& ObjectInitializer);
+
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void SetItem(FName ItemRowName, int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats);
 
@@ -32,6 +34,9 @@ public:
 
 	// 제작 목록처럼 수량을 별도 텍스트로 표시하는 화면에서 아이콘 위 수량만 숨긴다.
 	void SetAmountTextVisible(bool bVisible) const;
+
+	// 슬롯 루트 SizeBox의 레이아웃 크기를 변경한다. 렌더 스케일이 아니라 부모 패널이 사용하는 Desired Size가 바뀐다.
+	void SetSlotLayoutSize(FVector2D InSize);
 
 	// 드래그 중 이 슬롯이 "지금 끌고 있는 아이템이 장착될 장비칸"임을 알리는 후보 하이라이트를 켜고 끈다.
 	// 켜면 후보 색 틴트 + 스케일 펄스(NativeTick)로 강조한다. 장비 슬롯에만 쓴다.
@@ -102,12 +107,14 @@ protected:
 
 	// 아이템 등급별 슬롯 배경색. 등급은 Row Name 토큰에서 파싱한다(LSInventorySlotUtils::ResolveItemGradeFromRowName).
 	// 등급이 없거나 알 수 없는 아이템은 DefaultGradeColor, 아이템이 없는 빈 슬롯은 EmptySlotBackgroundColor를 쓴다.
-	// FColor(sRGB) → FLinearColor 변환 생성자를 써서 에디터 색 선택기와 동일한 색으로 표시한다. (#124B6B 짙은 청록 블루)
+	// FColor(sRGB) → FLinearColor 변환 생성자를 써서 에디터 색 선택기와 동일한 색으로 표시한다.
+	// DefaultGradeColor는 #124B6B 짙은 청록 블루.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
 	FLinearColor DefaultGradeColor = FLinearColor(FColor(0x12, 0x4B, 0x6B));
 
+	// 아이템이 없는 빈 슬롯 배경색. 슬롯 배경 텍스처 원본 색을 그대로 쓰도록 흰색이 기본이다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
-	FLinearColor EmptySlotBackgroundColor = FLinearColor(FColor(0x12, 0x4B, 0x6B));
+	FLinearColor EmptySlotBackgroundColor = FLinearColor::White;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
 	FLinearColor SupplyGradeColor = FLinearColor(0.62f, 0.62f, 0.62f, 1.0f);
@@ -160,6 +167,17 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTexture2D> DefaultSlotTexture;
+
+	// 빈 칸에 표시할 기본 아이콘. 인벤토리 장비칸처럼 슬롯 타입이 고정된 칸에서 아트가 WBP 인스턴스별로 매핑한다.
+	// 미지정이면 기존대로 빈 칸에서 아이콘을 숨긴다(룻박스·창고 등 일반 슬롯).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UTexture2D> EmptySlotIconTexture;
+
+	// 빈 칸 기본 아이콘 틴트. 기본은 텍스처 원본 그대로이며, 흐림 정도는 아트가 텍스처나 이 값으로 조정한다.
+	// 알파를 낮추면 아래 슬롯 배경색이 비쳐 올라와 아이콘이 배경색을 따라가는 것처럼 보인다.
+	// (호버·드래그 등 특수 상태에서는 기존 피드백 틴트가 우선)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
+	FLinearColor EmptySlotIconTint = FLinearColor::White;
 
 	// 루트 단계 공개 연출(전부 C++ NativeTick 구동). 수치는 연출 튜닝용이라 에디터에서 조정.
 	// 등장 pop-in 지속 시간(초)과 시작 스케일(1.0까지 커짐).

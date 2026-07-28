@@ -76,7 +76,7 @@ Source/LostSignal/Inventory/LSInventorySlotUtils.cpp
 
 `ULSInventoryWidget`은 인벤토리와 SafeStash 영역을 표시한다.
 
-또한 `WeaponSlot`, `ProcessorSlot`, `CoreSlot`, `ActuatorSlot`, `FrameSlot` 장비 장착 슬롯을 `ULSItemSlotWidget`으로 바인딩한다. BindWidget 이름은 장비 타입과 일치시킨다(순서는 `ELSEquipmentSlot`: 무기 / 프로세서(머리) / 코어(몸) / 구동계(손) / 프레임(발)). WBP 위젯 인스턴스 이름도 이 5개와 같아야 강제 BindWidget이 붙는다. 슬롯 배경 텍스처는 각 `ULSItemSlotWidget`의 `DefaultSlotTexture`에서 지정하며, 값이 없으면 WBP 디자이너의 배경 브러시를 그대로 쓴다(아래 "UI 표시 흐름" 참고).
+또한 `WeaponSlot`, `ProcessorSlot`, `CoreSlot`, `ActuatorSlot`, `FrameSlot` 장비 장착 슬롯을 `ULSItemSlotWidget`으로 바인딩한다. BindWidget 이름은 장비 타입과 일치시킨다(순서는 `ELSEquipmentSlot`: 무기 / 프로세서(머리) / 코어(몸) / 구동계(손) / 프레임(발)). WBP 위젯 인스턴스 이름도 이 5개와 같아야 강제 BindWidget이 붙는다. 슬롯 배경 텍스처는 각 `ULSItemSlotWidget`의 `DefaultSlotTexture`에서 지정하며, 값이 없으면 WBP 디자이너의 배경 브러시를 그대로 쓴다(아래 "UI 표시 흐름" 참고). 장비칸이 비었을 때 보여줄 타입별 기본 아이콘은 같은 위젯의 `EmptySlotIconTexture`에 슬롯 인스턴스별로 매핑한다.
 
 ### 장비 장착 (무기/방어구)
 
@@ -129,6 +129,8 @@ RefreshStorage
 
 공통 슬롯 위젯은 `ULSItemSlotWidget`이다. 슬롯 context에 따라 인벤토리 슬롯, 루트 박스 슬롯, 창고 슬롯으로 동작한다.
 
+`ULSInventoryWidget`은 일반 인벤토리·보호 슬롯·장비 슬롯에 `InventoryItemSlotSize`를 적용한다. 기본값은 `80×80`이며, 슬롯 루트 `SizeBox`의 Width/Height Override를 변경하므로 `WrapBox` 배치와 입력 영역도 같은 크기를 사용한다. 룻박스·창고 등 다른 화면에서 공통 슬롯 클래스를 사용할 때는 이 값을 적용하지 않아 각 화면의 기존 크기를 유지한다.
+
 ```text
 SetSlotContext
 -> Inventory / Safe
@@ -142,11 +144,13 @@ SetWarehouseSlotContext
 
 슬롯은 배경과 아이콘을 별도 위젯으로 겹쳐 표시한다. 슬롯 루트는 `Overlay`이고, 바닥에 `SlotBackgroundImage`(항상 표시되는 슬롯 배경 프레임), 그 위에 `ItemIconImage`(아이템 아이콘), 그 위에 `AmountText`를 둔다. `AmountText`는 DataTable의 최대 스택(`Item_Max`)이 2 이상인 아이템에서만 표시하고, 최대 스택이 1인 아이템은 수량 텍스트를 생략한다. 아이템 아이콘이 배경을 덮어쓰지 않으므로 아이템이 있어도 슬롯 배경이 유지된다.
 
-`SlotBackgroundImage` 브러시는 `DefaultSlotTexture`로 C++가 설정하며, `DefaultSlotTexture`가 미지정이면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다(이때 `UE_LOG(LogLS, Warning, ...)`). 호버/드래그 틴트는 배경과 아이콘 양쪽에 적용해 빈 슬롯에서도 피드백이 보인다. 잠금 틴트는 아이템이 있는 슬롯에서는 아이콘에만 적용하고 배경은 등급색을 유지한다. 아이템이 없는 잠금 슬롯은 배경에도 잠금 틴트를 적용한다.
+`SlotBackgroundImage` 브러시는 `DefaultSlotTexture`로 C++가 설정한다. 모든 화면이 공유하는 슬롯 프레임이라 `ULSItemSlotWidget` 생성자에서 공용 텍스처를 기본값으로 물려두며, WBP에서 다른 텍스처를 지정하면 그 값이 우선한다. 둘 다 비어 있으면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다(이때 `UE_LOG(LogLS, Warning, ...)`). 호버/드래그 틴트는 배경과 아이콘 양쪽에 적용해 빈 슬롯에서도 피드백이 보인다. 잠금 틴트는 아이템이 있는 슬롯에서는 아이콘에만 적용하고 배경은 등급색을 유지한다. 아이템이 없는 잠금 슬롯은 배경에도 잠금 틴트를 적용한다.
 
-평상시(특수 상태가 아닐 때) 배경 틴트는 아이템 등급색으로 칠한다. 등급은 Row Name 토큰에서 파싱하며(`LSInventorySlotUtils::ResolveItemGradeFromRowName`, 툴팁 등급 표기와 동일 출처), 6등급(`Supply/Standard/Precision/Tuning/Prototype/Masterpiece`)별 색은 `ULSItemSlotWidget`의 `*GradeColor` `UPROPERTY` 기본값으로 두고 디자이너가 조정한다. 등급이 없는 아이템은 `DefaultGradeColor`, 아이템이 없는 빈 슬롯은 `EmptySlotBackgroundColor`를 쓴다(둘 다 UI 시그니처 블루 `#124B6B` 기본값). 호버/드래그 등 특수 상태에서는 기존 피드백 틴트가 우선하고, 잠긴 아이템 슬롯은 아이콘만 흐리게 처리해 등급 배경을 유지한다.
+평상시(특수 상태가 아닐 때) 배경 틴트는 아이템 등급색으로 칠한다. 등급은 Row Name 토큰에서 파싱하며(`LSInventorySlotUtils::ResolveItemGradeFromRowName`, 툴팁 등급 표기와 동일 출처), 6등급(`Supply/Standard/Precision/Tuning/Prototype/Masterpiece`)별 색은 `ULSItemSlotWidget`의 `*GradeColor` `UPROPERTY` 기본값으로 두고 디자이너가 조정한다. 등급이 없는 아이템은 `DefaultGradeColor`(UI 시그니처 블루 `#124B6B` 기본값), 아이템이 없는 빈 슬롯은 `EmptySlotBackgroundColor`(흰색 기본값 = 슬롯 배경 텍스처 원본 색 그대로)를 쓴다. 호버/드래그 등 특수 상태에서는 기존 피드백 틴트가 우선하고, 잠긴 아이템 슬롯은 아이콘만 흐리게 처리해 등급 배경을 유지한다.
 
-아이콘은 슬롯의 `ItemRowName`을 기준으로 DataTable row를 찾고, row의 아이콘 경로를 로드한다. 아이콘 경로 문제로 로드에 실패하면 기본 아이콘 텍스처를 표시하고, 빈 슬롯은 `ItemIconImage`를 `Collapsed`로 숨겨 배경만 보이게 한다.
+아이콘은 슬롯의 `ItemRowName`을 기준으로 `LSInventorySlotUtils::LoadItemIconTexture`가 접두사별 폴더와 에셋 이름을 조합해 로드한다. 일반 아이템은 Row Name과 같은 에셋 이름을 쓰고, 칩은 Row Name의 기능 토큰을 공용 기능별 아이콘 이름으로 매핑한다. 아이콘 로드에 실패하면 기본 아이콘 텍스처를 표시하고, 빈 슬롯은 `ItemIconImage`를 `Collapsed`로 숨겨 배경만 보이게 한다.
+
+빈 칸 기본 아이콘(장비칸 실루엣)은 `ULSItemSlotWidget`의 `EmptySlotIconTexture`로 지정한다. 값이 있으면 `ClearItem()`이 아이콘을 숨기는 대신 그 텍스처를 표시하고, 미지정이면 기존대로 숨긴다(룻박스·창고 등 일반 슬롯은 영향 없음). 슬롯 타입이 고정된 칸에만 쓰므로 매핑은 WBP 위젯 인스턴스별로 아트가 담당한다(로직 아님). 표시 중인 기본 아이콘의 틴트는 `EmptySlotIconTint`이며, 호버·드래그 대상·장착 후보·타입 불일치·잠금 상태에서는 기존 피드백 틴트가 우선한다. 기본 아이콘은 장식이라 `bHasItem`은 계속 false이고 클릭·드래그·툴팁 대상이 아니다.
 
 ## 드래그 앤 드롭
 
