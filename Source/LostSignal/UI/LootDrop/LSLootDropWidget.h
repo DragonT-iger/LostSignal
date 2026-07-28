@@ -64,6 +64,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
 
+	// 루트드랍 화면에서 생성하는 아이템 슬롯의 레이아웃 크기. 인벤토리와 같은 크기로 맞춘다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI")
+	FVector2D LootItemSlotSize = FVector2D(80.f, 80.f);
+
 	// 등급명(Supply/Standard/Precision/Tuning/Prototype/Masterpiece) → 슬롯 공개 순간 재생할 사운드. WBP에서 매핑한다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
 	TMap<FName, TObjectPtr<USoundBase>> GradeRevealSounds;

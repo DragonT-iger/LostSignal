@@ -203,6 +203,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip")
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
 
+	// 칩 목록에서 생성하는 아이템 슬롯의 레이아웃 크기. 인벤토리·창고와 같은 크기로 맞춘다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Chip")
+	FVector2D ChipItemSlotSize = FVector2D(80.f, 80.f);
+
 	// 칩 장착 성공 시 재생할 사운드. WBP에서 매핑한다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Chip")
 	TObjectPtr<USoundBase> ChipEquipSound;

@@ -25,6 +25,11 @@ void ULSVendingSlotWidget::NativeConstruct()
 	{
 		NormalBorderColor = SlotBorder->GetBrushColor();
 	}
+
+	if (ItemSlot)
+	{
+		ItemSlot->SetSlotLayoutSize(VendingItemSlotSize);
+	}
 }
 
 FReply ULSVendingSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)

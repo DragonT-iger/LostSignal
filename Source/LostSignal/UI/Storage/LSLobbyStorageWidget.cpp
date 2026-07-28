@@ -108,7 +108,9 @@ void ULSLobbyStorageWidget::RefreshStorage()
 		LSSlotWidgetSync::SyncSlotWidgets(StorageSlotWrapBox, ItemSlotWidgetClass, OwningPlayer, World, SlotCountToBuild,
 			[this, &StashItems](const int32 VisualIndex, ULSItemSlotWidget& SlotWidget)
 			{
-				const bool bHasItemAtSlot = StashItems.IsValidIndex(VisualIndex) && LSInventorySlotUtils::IsFilled(StashItems[VisualIndex]);
+				SlotWidget.SetSlotLayoutSize(StorageItemSlotSize);
+
+				const bool bHasItemAtSlot =StashItems.IsValidIndex(VisualIndex) && LSInventorySlotUtils::IsFilled(StashItems[VisualIndex]);
 				if (bHasItemAtSlot)
 				{
 					SlotWidget.SetItem(StashItems[VisualIndex].ItemRowName, StashItems[VisualIndex].Amount, StashItems[VisualIndex].ChipStats);
@@ -137,6 +139,8 @@ void ULSLobbyStorageWidget::RefreshStorage()
 		LSSlotWidgetSync::SyncSlotWidgets(StorageSlotWrapBox, ItemSlotWidgetClass, OwningPlayer, World, IndexedItems.Num(),
 			[this, &IndexedItems](const int32 VisualIndex, ULSItemSlotWidget& SlotWidget)
 			{
+				SlotWidget.SetSlotLayoutSize(StorageItemSlotSize);
+
 				const TPair<int32, FLSSessionItem>& IndexedItem = IndexedItems[VisualIndex];
 				SlotWidget.SetItem(IndexedItem.Value.ItemRowName, IndexedItem.Value.Amount, IndexedItem.Value.ChipStats);
 				SlotWidget.SetWarehouseSlotContext(this, ELSInventorySlotArea::Warehouse, IndexedItem.Key, true);

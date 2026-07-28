@@ -112,9 +112,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
 	FLinearColor DefaultGradeColor = FLinearColor(FColor(0x12, 0x4B, 0x6B));
 
-	// 아이템이 없는 빈 슬롯 배경색. 슬롯 배경 텍스처 원본 색을 그대로 쓰도록 흰색이 기본이다.
+	// 아이템이 없는 빈 슬롯 배경색. 배경 텍스처가 흰색 베이스라 이 색이 그대로 슬롯 색이 된다. (#969696, 불투명도 66%)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
-	FLinearColor EmptySlotBackgroundColor = FLinearColor::White;
+	FLinearColor EmptySlotBackgroundColor = FLinearColor(FColor(0x96, 0x96, 0x96)).CopyWithNewOpacity(0.66f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|GradeColor")
 	FLinearColor SupplyGradeColor = FLinearColor(0.62f, 0.62f, 0.62f, 1.0f);
@@ -164,6 +164,11 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipReject", meta=(ClampMin="1"))
 	int32 EquipRejectShakeCount = 3;
+
+	// 슬롯 기본 레이아웃 크기. WBP 루트 SizeBox가 Width/Height Override를 지정하지 않은 경우에만 적용된다.
+	// 즉 아트가 WBP에서 크기를 잡아둔 슬롯(제작 재료칸·상점 슬롯 등)은 그 값이 그대로 유지된다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
+	FVector2D DefaultSlotLayoutSize = FVector2D(80.f, 80.f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTexture2D> DefaultSlotTexture;
@@ -245,6 +250,8 @@ private:
 	FName DisplayedIconKey;
 
 	void ApplyHoverVisual();
+	// WBP가 크기를 지정하지 않은 슬롯에만 DefaultSlotLayoutSize를 채워 넣는다.
+	void ApplyDefaultSlotLayoutSize();
 	void TickEquipDropRejectedFeedback(float InDeltaTime);
 	void ApplySlotBackground();
 	// 아이템 Row Name의 등급 토큰을 슬롯 배경색으로 매핑한다. 등급이 없으면 DefaultGradeColor를 반환.

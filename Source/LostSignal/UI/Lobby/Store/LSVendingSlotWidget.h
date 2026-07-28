@@ -81,6 +81,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Store")
 	FLinearColor SelectedBorderColor = FLinearColor(0.35f, 0.85f, 1.0f, 1.0f);
 
+	// 자판기 칸 안쪽 아이템 슬롯의 레이아웃 크기. 인벤토리·창고와 같은 크기로 맞춘다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Store")
+	FVector2D VendingItemSlotSize = FVector2D(80.f, 80.f);
+
 private:
 	// 아이템이 든 내 아이템 칸인지. 드래그 출발지 판정용.
 	bool CanDragFrom() const;

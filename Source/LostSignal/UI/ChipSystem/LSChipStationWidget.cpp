@@ -378,6 +378,8 @@ void ULSChipStationWidget::RefreshChipSlots()
 	LSSlotWidgetSync::SyncSlotWidgets(ChipSlotWrapBox, ItemSlotWidgetClass, GetOwningPlayer(), GetWorld(), TotalChipSlotCount,
 		[this, &ViewItems](const int32 SlotIndex, ULSItemSlotWidget& SlotWidget)
 		{
+			SlotWidget.SetSlotLayoutSize(ChipItemSlotSize);
+
 			if (!ViewItems.IsValidIndex(SlotIndex))
 			{
 				// 장착 칩 몫의 예비 빈 칸. 해제 시 InsertChipListSlot이 이 칸을 재사용한다.

@@ -121,6 +121,8 @@ void ULSLootDropWidget::RebuildLootSlots()
 	LSSlotWidgetSync::SyncSlotWidgets(LootItemWrapBox, ItemSlotWidgetClass, GetOwningPlayer(), GetWorld(), SlotCount,
 		[this, NextRevealSlotIndex](const int32 SlotIndex, ULSItemSlotWidget& SlotWidget)
 		{
+			SlotWidget.SetSlotLayoutSize(LootItemSlotSize);
+
 			if (LootItems.IsValidIndex(SlotIndex))
 			{
 				const FLSDropResult& Item = LootItems[SlotIndex];

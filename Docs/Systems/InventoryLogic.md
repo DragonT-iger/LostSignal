@@ -129,7 +129,19 @@ RefreshStorage
 
 공통 슬롯 위젯은 `ULSItemSlotWidget`이다. 슬롯 context에 따라 인벤토리 슬롯, 루트 박스 슬롯, 창고 슬롯으로 동작한다.
 
-`ULSInventoryWidget`은 일반 인벤토리·보호 슬롯·장비 슬롯에 `InventoryItemSlotSize`를 적용한다. 기본값은 `80×80`이며, 슬롯 루트 `SizeBox`의 Width/Height Override를 변경하므로 `WrapBox` 배치와 입력 영역도 같은 크기를 사용한다. 룻박스·창고 등 다른 화면에서 공통 슬롯 클래스를 사용할 때는 이 값을 적용하지 않아 각 화면의 기존 크기를 유지한다.
+슬롯 크기는 3단계로 결정된다. 가장 아래가 `ULSItemSlotWidget::DefaultSlotLayoutSize`(기본 `80×80`)로, `NativePreConstruct`에서 루트 `SizeBox`에 Width/Height Override가 **지정되지 않은 경우에만** 채워 넣는다. 따라서 아트가 WBP에서 크기를 잡아둔 슬롯(제작 재료칸·상점 슬롯 등)은 그 값이 그대로 유지된다. 그 위에 화면별 값이 있고, 마지막으로 `SetSlotLayoutSize` 호출이 항상 우선한다.
+
+화면별 값은 각 위젯이 슬롯을 채울 때 `SetSlotLayoutSize`로 적용한다. 전부 기본값 `80×80`이며, 슬롯 루트 `SizeBox`의 Width/Height Override를 변경하므로 `WrapBox` 배치와 입력 영역도 같은 크기를 사용한다.
+
+| 화면 | 위젯 | 프로퍼티 |
+|------|------|----------|
+| 인벤토리(일반·보호·장비) | `ULSInventoryWidget` | `InventoryItemSlotSize` |
+| 루트드랍 | `ULSLootDropWidget` | `LootItemSlotSize` |
+| 창고 | `ULSLobbyStorageWidget` | `StorageItemSlotSize` |
+| 칩 스테이션 목록 | `ULSChipStationWidget` | `ChipItemSlotSize` |
+| 자판기 칸 | `ULSVendingSlotWidget` | `VendingItemSlotSize` |
+
+위 표에 없는 슬롯(칩 장착칸 `ULSChipEquipmentSlotWidget`, 자판기 상세·수량 팝업 미리보기, 제작 화면 슬롯)은 화면별 값을 두지 않아 `DefaultSlotLayoutSize` 또는 WBP 지정 크기를 따른다.
 
 ```text
 SetSlotContext
@@ -146,7 +158,7 @@ SetWarehouseSlotContext
 
 `SlotBackgroundImage` 브러시는 `DefaultSlotTexture`로 C++가 설정한다. 모든 화면이 공유하는 슬롯 프레임이라 `ULSItemSlotWidget` 생성자에서 공용 텍스처를 기본값으로 물려두며, WBP에서 다른 텍스처를 지정하면 그 값이 우선한다. 둘 다 비어 있으면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다(이때 `UE_LOG(LogLS, Warning, ...)`). 호버/드래그 틴트는 배경과 아이콘 양쪽에 적용해 빈 슬롯에서도 피드백이 보인다. 잠금 틴트는 아이템이 있는 슬롯에서는 아이콘에만 적용하고 배경은 등급색을 유지한다. 아이템이 없는 잠금 슬롯은 배경에도 잠금 틴트를 적용한다.
 
-평상시(특수 상태가 아닐 때) 배경 틴트는 아이템 등급색으로 칠한다. 등급은 Row Name 토큰에서 파싱하며(`LSInventorySlotUtils::ResolveItemGradeFromRowName`, 툴팁 등급 표기와 동일 출처), 6등급(`Supply/Standard/Precision/Tuning/Prototype/Masterpiece`)별 색은 `ULSItemSlotWidget`의 `*GradeColor` `UPROPERTY` 기본값으로 두고 디자이너가 조정한다. 등급이 없는 아이템은 `DefaultGradeColor`(UI 시그니처 블루 `#124B6B` 기본값), 아이템이 없는 빈 슬롯은 `EmptySlotBackgroundColor`(흰색 기본값 = 슬롯 배경 텍스처 원본 색 그대로)를 쓴다. 호버/드래그 등 특수 상태에서는 기존 피드백 틴트가 우선하고, 잠긴 아이템 슬롯은 아이콘만 흐리게 처리해 등급 배경을 유지한다.
+평상시(특수 상태가 아닐 때) 배경 틴트는 아이템 등급색으로 칠한다. 등급은 Row Name 토큰에서 파싱하며(`LSInventorySlotUtils::ResolveItemGradeFromRowName`, 툴팁 등급 표기와 동일 출처), 6등급(`Supply/Standard/Precision/Tuning/Prototype/Masterpiece`)별 색은 `ULSItemSlotWidget`의 `*GradeColor` `UPROPERTY` 기본값으로 두고 디자이너가 조정한다. 등급이 없는 아이템은 `DefaultGradeColor`(UI 시그니처 블루 `#124B6B` 기본값), 아이템이 없는 빈 슬롯은 `EmptySlotBackgroundColor`(`#969696` 불투명도 66% 기본값)를 쓴다. 슬롯 배경 텍스처가 흰색 베이스라 이 틴트 값이 곧 화면에 보이는 슬롯 색이 된다. 호버/드래그 등 특수 상태에서는 기존 피드백 틴트가 우선하고, 잠긴 아이템 슬롯은 아이콘만 흐리게 처리해 등급 배경을 유지한다.
 
 아이콘은 슬롯의 `ItemRowName`을 기준으로 `LSInventorySlotUtils::LoadItemIconTexture`가 접두사별 폴더와 에셋 이름을 조합해 로드한다. 일반 아이템은 Row Name과 같은 에셋 이름을 쓰고, 칩은 Row Name의 기능 토큰을 공용 기능별 아이콘 이름으로 매핑한다. 아이콘 로드에 실패하면 기본 아이콘 텍스처를 표시하고, 빈 슬롯은 `ItemIconImage`를 `Collapsed`로 숨겨 배경만 보이게 한다.
 

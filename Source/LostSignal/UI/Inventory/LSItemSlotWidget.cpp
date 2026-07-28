@@ -51,6 +51,27 @@ void ULSItemSlotWidget::SetSlotLayoutSize(const FVector2D InSize)
 	RootSizeBox->SetHeightOverride(FMath::Max(1.f, InSize.Y));
 }
 
+void ULSItemSlotWidget::ApplyDefaultSlotLayoutSize()
+{
+	// 루트가 SizeBox가 아닌 슬롯은 기본 크기를 적용할 수단이 없으므로 조용히 넘어간다.
+	// (명시적으로 크기를 요구하는 SetSlotLayoutSize 쪽에서 경고를 남긴다)
+	USizeBox* RootSizeBox = Cast<USizeBox>(GetRootWidget());
+	if (!RootSizeBox)
+	{
+		return;
+	}
+
+	if (!RootSizeBox->IsWidthOverride())
+	{
+		RootSizeBox->SetWidthOverride(FMath::Max(1.f, DefaultSlotLayoutSize.X));
+	}
+
+	if (!RootSizeBox->IsHeightOverride())
+	{
+		RootSizeBox->SetHeightOverride(FMath::Max(1.f, DefaultSlotLayoutSize.Y));
+	}
+}
+
 void ULSItemSlotWidget::SetItem(const FName ItemRowName, const int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats)
 {
 	if (!ItemIconImage)
@@ -283,6 +304,7 @@ void ULSItemSlotWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
 
+	ApplyDefaultSlotLayoutSize();
 	ApplySlotBackground();
 
 	if (!bHasItem)

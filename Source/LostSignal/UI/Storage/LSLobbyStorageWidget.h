@@ -83,6 +83,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Storage")
 	TSubclassOf<ULSItemSlotWidget> ItemSlotWidgetClass;
 
+	// 창고 화면에서 생성하는 아이템 슬롯의 레이아웃 크기. 인벤토리·루트드랍과 같은 크기로 맞춘다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI|Storage")
+	FVector2D StorageItemSlotSize = FVector2D(80.f, 80.f);
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Storage")
 	TSubclassOf<ALSWorldDroppedItem> DroppedItemActorClass;
 
