@@ -59,7 +59,8 @@
 
 - `WBP_QuickSlot`(`ULSQuickSlotWidget` 상속): `IconImage`(UImage), `AmountText`(UTextBlock), `SlotBackgroundImage`(UImage, 호버 시 색 변경), `ShortcutText`(UTextBlock, 소비 바인딩 키 표시) 바인딩. 루트는 드롭을 받도록 Visible.
 - `WBP_QuickSlotBar`(`ULSQuickSlotBarWidget` 상속): `QuickSlot1~QuickSlot6` 배치.
-- 바는 두 곳에 둘 수 있고 서로 동기화된다: (1) **`WBP_Inventory` 안에 자식으로 배치**해 인벤토리를 열면 함께 표시·세팅(로비·인게임 공통, 둘 다 같은 `ULSInventoryWidget`), (2) **`WBP_PlayerHUD`에 배치**해 전투 중 상시 표시. 각 바는 생성 시 스스로 등록되며 개수/등록 변경 시 모두 함께 갱신된다.
+- 바는 두 곳에 둘 수 있고 서로 동기화된다: (1) **`WBP_Inventory` 안에 자식으로 배치**하고 이름을 `QuickSlotBar`로 맞춘다(`ULSInventoryWidget`의 강제 `BindWidget`, 로비·인게임 공통 같은 `ULSInventoryWidget`), (2) **`WBP_PlayerHUD`에 배치**해 전투 중 상시 표시. 각 바는 생성 시 스스로 등록되며 개수/등록 변경 시 모두 함께 갱신된다.
+- **인벤토리 자식 바 표시 규칙:** `QuickSlotBar`는 여는 경로에 따라 켜지고 꺼진다(`ULSInventoryWidget::SetQuickSlotBarVisible`). 기본값은 **표시**(`NativeConstruct`에서 `SelfHitTestInvisible`). 폰이 있는 레이드는 `ALSPlayerCharacter::ShowInventoryWidgetInternal`이 **매 오픈 시** 값을 덮어써 **Tab 단독**(`ShowInventoryWidgetStandalone`)·**로비 창고 동반**(`ALSLobbyStorageActor`)은 표시, **레이드 루팅 박스**(`ALSLootBox`)만 숨김(`Collapsed`)으로 만든다. 폰 없이 열리는 로비 인벤토리는 이 폰 경로를 타지 않으므로 기본 표시로 남아 Tab/메뉴로 열면 바가 보인다(루팅 박스는 레이드 전용이라 폰 없는 경로에서 기본 표시가 잘못 켜질 일은 없다). (2)의 HUD 상시 바는 이 규칙과 무관하게 항상 떠 있다.
 - `Item1~6Action`(UInputAction)을 `IMC_Default`에 매핑한다(아트/기획).
 
 ## 범위 밖 (후속)

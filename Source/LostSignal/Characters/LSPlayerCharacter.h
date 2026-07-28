@@ -336,7 +336,7 @@ private:
 	void OnMenu();
 	// 열려 있는 모달 패널(칩스테이션/인벤토리)을 우선순위대로 하나 닫는다. 닫았으면 true.
 	bool TryCloseOpenModalPanel();
-	bool ShowInventoryWidgetInternal(bool bShowStoreAllButton);
+	bool ShowInventoryWidgetInternal(bool bShowStoreAllButton, bool bShowQuickSlotBar);
 	void ShowInventoryWidgetForTarget(AActor* Target);
 	void ShowInventoryWidgetStandalone();
 	void HideInventoryWidget();

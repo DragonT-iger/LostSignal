@@ -51,6 +51,17 @@ void ULSInventoryWidget::NativeConstruct()
 		SortButton->OnClicked.AddDynamic(this, &ULSInventoryWidget::HandleSortButtonClicked);
 	}
 
+	if (!QuickSlotBar)
+	{
+		UE_LOG(LogLS, Warning, TEXT("QuickSlotBar is not bound on %s."), *GetNameSafe(this));
+	}
+	else
+	{
+		// 기본은 표시. 폰 경로(ShowInventoryWidgetInternal)를 타는 레이드는 매 오픈 시 값을 덮어써 루팅 박스에서만 숨긴다.
+		// 폰 없이 열리는 로비 인벤토리는 이 경로를 안 타므로 기본 표시로 남아 Tab/메뉴로 열어도 바가 보인다.
+		SetQuickSlotBarVisible(true);
+	}
+
 	RebuildInventorySlots();
 	RebuildConfirmedStorageSlots();
 	RebuildEquipmentSlots();
@@ -456,6 +467,18 @@ void ULSInventoryWidget::SetStoreAllButtonVisible(const bool bVisible)
 	}
 
 	StoreAllButton->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+}
+
+void ULSInventoryWidget::SetQuickSlotBarVisible(const bool bVisible)
+{
+	if (!QuickSlotBar)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot update QuickSlotBar visibility because QuickSlotBar is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	// 숨길 때는 Collapsed로 자리도 차지하지 않게 한다. 보일 때는 자식 슬롯이 드롭/클릭을 받도록 SelfHitTestInvisible.
+	QuickSlotBar->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 }
 
 void ULSInventoryWidget::HandleStoreAllButtonClicked()

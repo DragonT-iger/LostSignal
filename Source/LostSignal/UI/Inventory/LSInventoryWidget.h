@@ -14,6 +14,7 @@ class ULSConfirmDialogWidget;
 class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
 class ULSLootDropWidget;
+class ULSQuickSlotBarWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSInventoryWidget : public ULSLayoutRevealWidget
@@ -47,6 +48,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void SetStoreAllButtonVisible(bool bVisible);
 
+	// 인벤토리에 배치된 퀵슬롯 바 표시를 켜고 끈다. Tab 인벤토리에서만 켜고 루팅 박스로 연 인벤토리에선 끈다.
+	void SetQuickSlotBarVisible(bool bVisible);
+
 	bool HandleInventorySlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 	bool HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 	bool TryDropInventoryDragToWorld(const ULSInventoryDragDropOperation& DragOperation, const FPointerEvent& PointerEvent);
@@ -74,6 +78,10 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UButton> SortButton;
+
+	// 인벤토리 안에 배치되는 퀵슬롯 바(소모품 6칸). 여는 경로에 따라 표시가 켜지고 꺼진다.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UUserWidget> QuickSlotBar;
 
 	// 장비 장착 슬롯. BindWidget 이름은 장비 타입과 일치시킨다(ELSEquipmentSlot 순서).
 	// 무기=Weapon, 프로세서(머리)=Processor, 코어(몸)=Core, 구동계(손)=Actuator, 프레임(발)=Frame.

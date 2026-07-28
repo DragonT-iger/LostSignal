@@ -1170,7 +1170,7 @@ void ALSPlayerCharacter::RebuildInventoryWidgetSlots()
 	}
 }
 
-bool ALSPlayerCharacter::ShowInventoryWidgetInternal(bool bShowStoreAllButton)
+bool ALSPlayerCharacter::ShowInventoryWidgetInternal(bool bShowStoreAllButton, bool bShowQuickSlotBar)
 {
 	if (!IsLocallyControlled())
 	{
@@ -1210,6 +1210,8 @@ bool ALSPlayerCharacter::ShowInventoryWidgetInternal(bool bShowStoreAllButton)
 		LSInventoryWidget->RebuildInventorySlots();
 		LSInventoryWidget->RebuildConfirmedStorageSlots();
 		LSInventoryWidget->SetStoreAllButtonVisible(bShowStoreAllButton);
+		// 퀵슬롯 바는 Tab 인벤토리(및 로비 창고 동반)에서만 켠다. 레이드 루팅 박스로 연 인벤토리에선 숨긴다.
+		LSInventoryWidget->SetQuickSlotBarVisible(bShowQuickSlotBar);
 	}
 	else
 	{
@@ -1237,7 +1239,9 @@ void ALSPlayerCharacter::ShowInventoryWidgetForTarget(AActor* Target)
 		return;
 	}
 
-	if (!ShowInventoryWidgetInternal(Target->IsA<ALSLobbyStorageActor>()))
+	// 루팅 박스로 연 인벤토리는 퀵슬롯 바를 숨긴다. 로비 창고와 함께 연 경우엔 표시한다(Tab로 연 것으로 취급).
+	const bool bShowQuickSlotBar = !Target->IsA<ALSLootBox>();
+	if (!ShowInventoryWidgetInternal(Target->IsA<ALSLobbyStorageActor>(), bShowQuickSlotBar))
 	{
 		return;
 	}
@@ -1253,8 +1257,8 @@ void ALSPlayerCharacter::ShowInventoryWidgetStandalone()
 		return;
 	}
 
-	// 단독 인벤토리는 컨테이너가 없으므로 전부 보관 버튼을 숨긴다.
-	if (!ShowInventoryWidgetInternal(false))
+	// 단독 인벤토리는 컨테이너가 없으므로 전부 보관 버튼을 숨긴다. Tab로 연 것이므로 퀵슬롯 바는 표시한다.
+	if (!ShowInventoryWidgetInternal(false, true))
 	{
 		return;
 	}
