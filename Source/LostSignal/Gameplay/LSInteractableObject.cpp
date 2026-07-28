@@ -9,6 +9,7 @@
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
 #include "TimerManager.h"
+#include "UI/Interact/LSDistanceMarkerComponent.h"
 #include "UI/LSInteractHintWidget.h"
 
 ALSInteractableObject::ALSInteractableObject()
@@ -30,6 +31,9 @@ ALSInteractableObject::ALSInteractableObject()
 	InteractWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	InteractWidget->SetDrawSize(FVector2D(200.f, 60.f));
 	InteractWidget->SetHiddenInGame(true);
+
+	DistanceMarkerComponent = CreateDefaultSubobject<ULSDistanceMarkerComponent>(TEXT("DistanceMarkerComponent"));
+	DistanceMarkerComponent->SetupAttachment(RootComponent);
 }
 
 void ALSInteractableObject::BeginPlay()

@@ -8,6 +8,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Session/LSSaveSubsystem.h"
 #include "TimerManager.h"
+#include "UI/Interact/LSDistanceMarkerComponent.h"
 
 ALSLootBox::ALSLootBox()
 {
@@ -63,6 +64,10 @@ void ALSLootBox::Interact_Implementation(APawn* Interactor)
 		{
 			MinimapMarkerComponent->SetMinimapVisible(false);
 		}
+		if (DistanceMarkerComponent)
+		{
+			DistanceMarkerComponent->SetMarkerSuppressed(true);
+		}
 		RefreshWidgetVisibility();
 		OnLootResultReceived(PendingLootResults);
 		// 리슨서버 호스트는 OnRep_IsOpened가 호출되지 않으므로 오픈 비주얼을 여기서 직접 띄운다.
@@ -100,6 +105,10 @@ void ALSLootBox::OnRep_IsOpened()
 	if (MinimapMarkerComponent)
 	{
 		MinimapMarkerComponent->SetMinimapVisible(!bIsOpened);
+	}
+	if (DistanceMarkerComponent)
+	{
+		DistanceMarkerComponent->SetMarkerSuppressed(bIsOpened);
 	}
 	RefreshWidgetVisibility();
 	if (bIsOpened)

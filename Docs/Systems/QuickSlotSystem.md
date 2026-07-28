@@ -23,9 +23,23 @@
 ## 위젯
 
 - [`ULSQuickSlotWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotWidget.h) — 개별 칸. 드롭 타겟(`NativeOnDrop`)이며 **우클릭으로 등록 해제**한다(더블클릭 해제는 두지 않음). 등록 해제도 호버와 마찬가지로 **인벤토리 패널이 열려 있을 때만** 동작한다(`IsInventoryUIOpen`). `Refresh`에서 아이콘(공용 `LSInventorySlotUtils::LoadItemIconTexture`)과 인벤토리 합산 개수를 그린다. 마우스 호버 시 `ULSItemSlotWidget`과 같은 방식으로 아이콘·배경(`SlotBackgroundImage`) 틴트 + 스케일을 강조한다(`HoveredIconTint`/`HoveredRenderScale`, 에디터 조정 가능). **호버가 아닐 때 배경 색은 WBP가 지정한 색을 그대로 보인다** — `InitializeSlot`에서 배경 색을 1회 캡처해 호버 해제 시 그 색으로 복원한다(하드코딩 흰색으로 덮어쓰지 않음). 호버 반응은 **인벤토리 패널이 열려 있을 때만** 준다(`ALSPlayerControllerBase::IsInventoryUIOpen` — 로비/레이드 공통 판정). HUD에 상시 떠 있는 바는 전투 중 호버해도 반응하지 않는다. **바인딩 키 표시**(`ShortcutText`)는 스킬 슬롯과 동일하게 폰의 `Item1~6Action`을 `IMC_Default` 매핑에서 조회해 실제 키의 표시 이름을 넣는다(키보드 우선, 리바인딩 자동 반영). 소비가 레이드 폰 전용이라 매핑도 폰에서 조회하며, 폰이 없는 로비 인벤토리에선 빈 텍스트로 둔다.
-- [`ULSQuickSlotBarWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotBarWidget.h) — 고정 6칸(`QuickSlot1~6` `BindWidget`) 컨테이너. 로비/레이드 HUD 양쪽에서 재사용한다. 생성 시 스스로 `PlayerController`에 등록하고 `OnQuickSlotsChanged`를 구독한다.
+- [`ULSQuickSlotBarWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotBarWidget.h) — 고정 6칸(`QuickSlot1~6` `BindWidget`) 컨테이너. 로비/레이드 HUD 양쪽에서 재사용한다. 생성 시 스스로 `PlayerController`에 등록하고 `OnQuickSlotsChanged`·`OnChipLoadoutChanged`를 구독한다.
 
 개수 합산은 툴팁 "현재 아이템 개수"와 동일 소스를 쓴다: 레이드 활성이면 `ULSRaidInventoryComponent`의 세션(일반+Safe), 아니면 `ULSSaveSubsystem`의 세이브(일반+Safe). 합산 함수는 `LSCraftingUtils::CountItem`을 재사용한다.
+
+## 적재 프로토콜 해금 (표시·사용 게이트)
+
+퀵슬롯 사용 가능 칸 수는 **적재 프로토콜(`ELSProtocolType::Carrying`) 레벨**로 해금된다. 인벤토리 슬롯 용량과 **동일 메커니즘**이다: `DT_Protocol`의 `Protocol_Enable_Name = "Quick"`(`UI_Slot`) 행들을 `ULSGameDataSubsystem::GetVisibleProtocolEnableValueSum`으로 합산한 값이 해금 칸 수다. 레벨/칸 수는 **DT가 단일 출처**(수치는 [ChipSystem.md](ChipSystem.md)의 적재 프로토콜 정의와 `DT_Protocol`가 소유) — 코드엔 하드코딩하지 않는다.
+
+- **단일 출처 함수:** [`ULSSaveSubsystem::GetUnlockedQuickSlotCount`](../../Source/LostSignal/Session/LSSaveSubsystem.h) — `GetCarryingProtocolSlotBonus("Quick")`를 `QuickSlotCount`로 클램프. UI 표시와 사용 게이트 **양쪽이 이 값 하나**를 쓴다(항상 일치). 세이브/신호-활성 칩 집계 기반이라 인벤토리 용량과 동일하게 **디버그 패널 테스트 레벨 오버라이드는 반영하지 않는다**(실제 칩 장착 기준).
+- **사용 게이트:** `TryUseQuickSlot(index)` 상단에서 `index >= 해금 칸 수`면 거부(인덱스 0~5 = 1~6번 칸과 1:1). 등록(드래그앤드랍)은 잠긴 칸에도 허용 — 해금 시 바로 쓰인다.
+- **표시 게이트(바별로 다름):** `ULSQuickSlotBarWidget::bHideLockedSlots`(`EditAnywhere`)로 인스턴스마다 분기.
+  - **HUD 바**(기본 `true`): 잠긴 칸을 `Collapsed`로 접어 표시 영역이 해금 수만큼(예: 3→6칸) 리플로우.
+  - **인벤토리 바**(아트가 `false`로 설정): 레벨 무관 6칸 항상 표시, 잠금 표시 없음. (사용 자체는 여전히 게이트됨.)
+- **실시간 갱신:** 칩 장착/해제·신호 게이지 변경은 `OnChipLoadoutChanged`로 브로드캐스트되어 바의 `RefreshAll`(→ `ApplyProtocolVisibility`)을 태운다. 레이드 중 신호 하락으로 적재 레벨이 떨어지면 `IsProtocolUnlockVisible`의 current/previous·`Protocol_Protected_Level`(정보 유지) 규칙대로 표시가 갱신된다.
+
+> **아트 매핑:** `WBP_QuickSlotBar`의 **인벤토리 인스턴스**는 Details에서 `bHideLockedSlots`를 **해제**, **HUD 인스턴스**는 기본값 `true` 유지.
+> **기획 데이터:** `DT_Protocol`에 적재 행 추가 필요 — 예) 레벨 2에서 `Quick` +3, 레벨 5에서 +3(합산 0/3/6). 값·`Protocol_Protected_Level`은 기획 조정.
 
 ## 갱신 경로 (단일 funnel)
 

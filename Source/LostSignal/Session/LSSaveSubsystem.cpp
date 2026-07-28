@@ -1516,6 +1516,13 @@ int32 ULSSaveSubsystem::GetCarryingProtocolSlotBonus(const FName EnableName) con
 	return SaveData ? ComputeCarryingProtocolSlotBonus(SaveData->ChipEquipmentSlots, EnableName) : 0;
 }
 
+int32 ULSSaveSubsystem::GetUnlockedQuickSlotCount() const
+{
+	// 인벤토리 용량과 동일하게 적재 프로토콜 "Quick" 행 합산으로 해금 칸 수를 구한다.
+	// 상한은 실제 퀵슬롯 칸 수(단일 출처).
+	return FMath::Clamp(GetCarryingProtocolSlotBonus(TEXT("Quick")), 0, LSInventorySlotUtils::QuickSlotCount);
+}
+
 int32 ULSSaveSubsystem::ComputeCarryingProtocolSlotBonus(const TArray<FLSSessionItem>& EquipmentSlots, const FName EnableName) const
 {
 	if (!SaveData || EnableName.IsNone())

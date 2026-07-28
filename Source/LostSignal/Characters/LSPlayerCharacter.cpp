@@ -521,6 +521,15 @@ void ALSPlayerCharacter::TryUseQuickSlot(const int32 QuickSlotIndex)
 	{
 		return;
 	}
+
+	// 적재 프로토콜로 해금되지 않은 칸은 사용할 수 없다(인덱스 0~5 = 1~6번 칸과 1:1).
+	const int32 UnlockedQuickSlotCount = SaveSubsystem->GetUnlockedQuickSlotCount();
+	if (QuickSlotIndex >= UnlockedQuickSlotCount)
+	{
+		UE_LOG(LogLS, Verbose, TEXT("[QuickSlot] 잠긴 슬롯 %d 사용 시도 (해금=%d)."), QuickSlotIndex, UnlockedQuickSlotCount);
+		return;
+	}
+
 	const FName ItemRowName = SaveSubsystem->GetQuickSlots()[QuickSlotIndex];
 	if (ItemRowName.IsNone())
 	{

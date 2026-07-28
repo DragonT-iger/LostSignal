@@ -145,6 +145,11 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	const TArray<FName>& GetQuickSlots() const;
 
+	// 적재 프로토콜로 해금된 퀵슬롯 칸 수(0~QuickSlotCount). 인벤토리 슬롯 용량과 동일 메커니즘
+	// (Carrying 프로토콜 + DT_Protocol의 "Quick" UI_Slot 행). UI 표시·사용 게이트의 단일 출처.
+	UFUNCTION(BlueprintPure, Category="LS/Save")
+	int32 GetUnlockedQuickSlotCount() const;
+
 	// SlotIndex 칸에 소모품 ItemRowName을 등록한다. 소모품(Item_Type 4~9)이 아니거나 인덱스가 범위 밖이면 false.
 	// 같은 아이템이 다른 칸에 이미 있으면 그 칸을 비운다(이동). 성공 시 저장 후 OnQuickSlotsChanged 발행.
 	UFUNCTION(BlueprintCallable, Category="LS/Save")

@@ -44,13 +44,22 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|QuickSlot")
 	TObjectPtr<ULSQuickSlotWidget> QuickSlot6;
 
+	// true면 적재 프로토콜로 해금되지 않은 칸을 접어 표시 영역을 줄인다(HUD 바 기본값).
+	// false면 레벨과 무관하게 6칸을 항상 표시한다(인벤토리 바 — 아트가 인스턴스에서 해제).
+	UPROPERTY(EditAnywhere, Category="LS/UI|QuickSlot")
+	bool bHideLockedSlots = true;
+
 private:
 	// 바인딩된 6칸을 인덱스 순서대로 모아 InitializeSlot(0..5)을 호출한다.
 	void InitializeBar();
+	// 적재 프로토콜 해금 칸 수에 맞춰 각 칸의 가시성을 적용한다(bHideLockedSlots에 따라 동작 분기).
+	void ApplyProtocolVisibility();
 	ULSSaveSubsystem* ResolveSaveSubsystem() const;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULSQuickSlotWidget>> Slots;
 
 	FDelegateHandle QuickSlotsChangedHandle;
+	// 칩 장착/신호 게이지 변경(=적재 프로토콜 레벨 변동) 구독 핸들. 변경 시 RefreshAll로 가시성 재평가.
+	FDelegateHandle ChipLoadoutChangedHandle;
 };

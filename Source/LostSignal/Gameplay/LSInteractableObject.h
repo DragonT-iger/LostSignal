@@ -9,6 +9,7 @@ class USphereComponent;
 class UWidgetComponent;
 class UMeshComponent;
 class ULSInteractHintWidget;
+class ULSDistanceMarkerComponent;
 
 UCLASS(Abstract, BlueprintType)
 class LOSTSIGNAL_API ALSInteractableObject : public AActor, public ILSInteractable
@@ -40,6 +41,10 @@ protected:
 	// 상호작용 힌트 UI (블루프린트에서 WidgetClass 설정)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Interact")
 	TObjectPtr<UWidgetComponent> InteractWidget;
+
+	// 거리 기반 빌보드 마커(원 UI 등). MarkerWidgetClass를 BP에서 지정한 오브젝트만 표시된다.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Interact")
+	TObjectPtr<ULSDistanceMarkerComponent> DistanceMarkerComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact")
 	FText InteractText;
