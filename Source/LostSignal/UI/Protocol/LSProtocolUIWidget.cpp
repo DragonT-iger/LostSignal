@@ -2,36 +2,20 @@
 
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
-#include "Data/LSGameDataSubsystem.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Protocol/LSProtocolWidget.h"
 
 namespace
 {
-void SetProtocolWidgetFromData(
-	ULSProtocolWidget* ProtocolWidget,
-	const ELSProtocolType ProtocolType,
-	const int32 CurrentLevel,
-	const int32 PreviousLevel,
-	UGameInstance* GameInstance)
+void ApplyProtocolUIWidgetLevels(ULSProtocolWidget* ProtocolWidget, const int32 CurrentLevel, const int32 PreviousLevel)
 {
 	if (!ProtocolWidget)
 	{
 		return;
 	}
 
-	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
-	TArray<int32> StageLevels;
-	if (GameDataSubsystem)
-	{
-		GameDataSubsystem->GetProtocolRequiredLevels(ProtocolType, StageLevels, TEXT("ProtocolUI"));
-	}
-
-	if (!StageLevels.IsEmpty())
-	{
-		ProtocolWidget->SetProtocolStageLevels(StageLevels);
-	}
+	// 단계 칸은 순번 고정(1~7)이라 현재 레벨 이하 순번까지 해금 표시한다.
 	ProtocolWidget->SetProtocolLevels(CurrentLevel, PreviousLevel, CurrentLevel);
 }
 }
@@ -94,8 +78,8 @@ void ULSProtocolUIWidget::RefreshProtocolUI()
 		}
 	}
 
-	SetProtocolWidgetFromData(Protocol_Survival, ELSProtocolType::Survival, ProtocolTotals.Survival, ProtocolTotals.Survival, GameInstance);
-	SetProtocolWidgetFromData(Protocol_Carrying, ELSProtocolType::Carrying, ProtocolTotals.Carrying, ProtocolTotals.Carrying, GameInstance);
-	SetProtocolWidgetFromData(Protocol_Battle, ELSProtocolType::Battle, ProtocolTotals.Battle, ProtocolTotals.Battle, GameInstance);
-	SetProtocolWidgetFromData(Protocol_Navigation, ELSProtocolType::Navigation, ProtocolTotals.Navigation, ProtocolTotals.Navigation, GameInstance);
+	ApplyProtocolUIWidgetLevels(Protocol_Survival, ProtocolTotals.Survival, ProtocolTotals.Survival);
+	ApplyProtocolUIWidgetLevels(Protocol_Carrying, ProtocolTotals.Carrying, ProtocolTotals.Carrying);
+	ApplyProtocolUIWidgetLevels(Protocol_Battle, ProtocolTotals.Battle, ProtocolTotals.Battle);
+	ApplyProtocolUIWidgetLevels(Protocol_Navigation, ProtocolTotals.Navigation, ProtocolTotals.Navigation);
 }

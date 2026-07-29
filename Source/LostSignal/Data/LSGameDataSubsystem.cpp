@@ -291,23 +291,6 @@ void ULSGameDataSubsystem::GetProtocolUnlockRows(const ELSProtocolType ProtocolT
 	});
 }
 
-void ULSGameDataSubsystem::GetProtocolRequiredLevels(const ELSProtocolType ProtocolType, TArray<int32>& OutRequiredLevels, const TCHAR* Context) const
-{
-	OutRequiredLevels.Reset();
-
-	TArray<const FLSProtocolUnlockRow*> Rows;
-	GetProtocolUnlockRows(ProtocolType, Rows, Context);
-	for (const FLSProtocolUnlockRow* Row : Rows)
-	{
-		if (Row && Row->Protocol_Required_Level > 0)
-		{
-			OutRequiredLevels.AddUnique(Row->Protocol_Required_Level);
-		}
-	}
-
-	OutRequiredLevels.Sort();
-}
-
 int32 ULSGameDataSubsystem::CountProtocolUnlockRows(const ELSProtocolType ProtocolType, const TCHAR* Context) const
 {
 	TArray<const FLSProtocolUnlockRow*> Rows;

@@ -4,12 +4,11 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/Image.h"
-#include "Components/RichTextBlock.h"
-#include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
 #include "UI/LSUILayer.h"
+#include "UI/Protocol/LSProtocolStageWidget.h"
 #include "UI/Protocol/LSProtocolTooltipWidget.h"
 
 void ULSProtocolWidget::NativePreConstruct()
@@ -40,6 +39,15 @@ void ULSProtocolWidget::NativeConstruct()
 		UE_LOG(LogLS, Warning, TEXT("ProtocolNameTexture is not set on %s."), *GetNameSafe(this));
 	}
 
+	const TArray<ULSProtocolStageWidget*> StageWidgets = GetProtocolStageWidgets();
+	for (int32 Index = 0; Index < StageWidgets.Num(); ++Index)
+	{
+		if (!StageWidgets[Index])
+		{
+			UE_LOG(LogLS, Warning, TEXT("ProtocolStage_%d is not bound on %s."), Index + 1, *GetNameSafe(this));
+		}
+	}
+
 	ApplyProtocolBorderColor(ProtocolBorderColor);
 	EnsureHoverHitTestable();
 }
@@ -55,8 +63,9 @@ void ULSProtocolWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FP
 {
 	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
 
-	// 툴팁만 뜨고 상호작용 피드백이 없어, 호버 시 한 줄 전체에 틴트를 입혀 강조한다.
-	SetColorAndOpacity(HoveredTint);
+	// 툴팁만 뜨고 상호작용 피드백이 없어, 호버 시 한 줄 전체를 강조한다.
+	// 위젯 ColorAndOpacity 는 자식 색에 곱해지므로, RGB 에 균일한 배수만 넣어 원래 색조를 유지한다.
+	SetColorAndOpacity(FLinearColor(HoveredColorMultiplier, HoveredColorMultiplier, HoveredColorMultiplier, 1.0f));
 	ShowProtocolTooltip();
 }
 
@@ -83,38 +92,10 @@ void ULSProtocolWidget::SetProtocol(int32 Level, int32 SynergyStage)
 
 void ULSProtocolWidget::SetProtocolLevels(const int32 CurrentLevel, const int32 PreviousLevel, const int32 SynergyStage)
 {
-	if (LevelText)
-	{
-		LevelText->SetText(FText::AsNumber(CurrentLevel));
-	}
-	if (SynergyStageText)
-	{
-		SynergyStageText->SetText(FText::FromString(BuildSynergyMarkup(SynergyStage)));
-	}
+	RefreshProtocolStages(SynergyStage);
 
 	CurrentProtocolLevel = CurrentLevel;
 	PreviousProtocolLevel = PreviousLevel;
-}
-
-void ULSProtocolWidget::SetProtocolStageCount(const int32 InSynergyStageCount)
-{
-	SynergyStageCount = FMath::Max(0, InSynergyStageCount);
-	SynergyStageLevels.Reset();
-}
-
-void ULSProtocolWidget::SetProtocolStageLevels(const TArray<int32>& InSynergyStageLevels)
-{
-	SynergyStageLevels.Reset();
-	for (const int32 StageLevel : InSynergyStageLevels)
-	{
-		if (StageLevel > 0)
-		{
-			SynergyStageLevels.AddUnique(StageLevel);
-		}
-	}
-
-	SynergyStageLevels.Sort();
-	SynergyStageCount = SynergyStageLevels.Num();
 }
 
 void ULSProtocolWidget::SetProtocolType(const ELSProtocolType InProtocolType)
@@ -128,69 +109,29 @@ void ULSProtocolWidget::SetProtocolBorderColor(const FLinearColor& InColor)
 	ApplyProtocolBorderColor(ProtocolBorderColor);
 }
 
-FString ULSProtocolWidget::BuildSynergyMarkup(int32 ActiveStage) const
+TArray<ULSProtocolStageWidget*> ULSProtocolWidget::GetProtocolStageWidgets() const
 {
-	const int32 Count = FMath::Max(0, SynergyStageCount);
-	const int32 Active = FMath::Clamp(ActiveStage, 0, SynergyStageLevels.IsEmpty() ? Count : MAX_int32);
+	return {
+		ProtocolStage_1.Get(),
+		ProtocolStage_2.Get(),
+		ProtocolStage_3.Get(),
+		ProtocolStage_4.Get(),
+		ProtocolStage_5.Get(),
+		ProtocolStage_6.Get(),
+		ProtocolStage_7.Get()};
+}
 
-	FString Markup;
-
-	TArray<int32> DisplayLevels;
-	if (SynergyStageLevels.IsEmpty())
+void ULSProtocolWidget::RefreshProtocolStages(const int32 UnlockedStageCount) const
+{
+	const TArray<ULSProtocolStageWidget*> StageWidgets = GetProtocolStageWidgets();
+	for (int32 Index = 0; Index < StageWidgets.Num(); ++Index)
 	{
-		for (int32 i = 1; i <= Count; ++i)
+		if (ULSProtocolStageWidget* StageWidget = StageWidgets[Index])
 		{
-			DisplayLevels.Add(i);
+			const int32 StageOrder = Index + 1;
+			StageWidget->SetProtocolStage(StageOrder, StageOrder <= UnlockedStageCount);
 		}
 	}
-	else
-	{
-		DisplayLevels = SynergyStageLevels;
-	}
-
-	TArray<int32> ActiveLevels;
-	TArray<int32> InactiveLevels;
-	for (const int32 DisplayLevel : DisplayLevels)
-	{
-		if (DisplayLevel <= Active)
-		{
-			ActiveLevels.Add(DisplayLevel);
-		}
-		else
-		{
-			InactiveLevels.Add(DisplayLevel);
-		}
-	}
-
-	if (!ActiveLevels.IsEmpty())
-	{
-		Markup += TEXT("<Bold>");
-		for (int32 Index = 0; Index < ActiveLevels.Num(); ++Index)
-		{
-			if (Index > 0)
-			{
-				Markup += TEXT("/");
-			}
-			Markup += FString::FromInt(ActiveLevels[Index]);
-		}
-		Markup += TEXT("</>");
-	}
-
-	if (!InactiveLevels.IsEmpty())
-	{
-		Markup += TEXT("<Light>");
-		for (int32 Index = 0; Index < InactiveLevels.Num(); ++Index)
-		{
-			if (!ActiveLevels.IsEmpty() || Index > 0)
-			{
-				Markup += TEXT("/");
-			}
-			Markup += FString::FromInt(InactiveLevels[Index]);
-		}
-		Markup += TEXT("</>");
-	}
-
-	return Markup;
 }
 
 ULSProtocolTooltipWidget* ULSProtocolWidget::CreateProtocolTooltipWidget()
@@ -217,7 +158,8 @@ ULSProtocolTooltipWidget* ULSProtocolWidget::CreateProtocolTooltipWidget()
 		return nullptr;
 	}
 
-	ProtocolTooltipWidget->SetProtocolTooltipLevels(ProtocolType, TooltipIconTexture, CurrentProtocolLevel, PreviousProtocolLevel);
+	// 툴팁 아이콘은 프로토콜 이름 이미지와 같은 텍스처를 쓴다.
+	ProtocolTooltipWidget->SetProtocolTooltipLevels(ProtocolType, ProtocolNameTexture, CurrentProtocolLevel, PreviousProtocolLevel);
 	return ProtocolTooltipWidget;
 }
 

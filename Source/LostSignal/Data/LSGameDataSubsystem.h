@@ -45,7 +45,6 @@ public:
 	const FLSProtocolUnlockRow* FindProtocolUnlockRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSProtocolUnlockRow* FindProtocolUnlockRowByEnableName(ELSProtocolType ProtocolType, FName EnableName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	void GetProtocolUnlockRows(ELSProtocolType ProtocolType, TArray<const FLSProtocolUnlockRow*>& OutRows, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
-	void GetProtocolRequiredLevels(ELSProtocolType ProtocolType, TArray<int32>& OutRequiredLevels, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	int32 CountProtocolUnlockRows(ELSProtocolType ProtocolType, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	int32 GetMaxProtocolRequiredLevel(ELSProtocolType ProtocolType, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	int32 CountVisibleProtocolUnlockRows(ELSProtocolType ProtocolType, int32 CurrentLevel, int32 PreviousLevel, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;

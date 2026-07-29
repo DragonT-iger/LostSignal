@@ -70,7 +70,7 @@ public:
 protected:
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
-	void SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, const TCHAR* ProtocolName, ELSProtocolType ProtocolType, int32 CurrentLevel, int32 PreviousLevel) const;
+	void SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, const TCHAR* ProtocolName, int32 CurrentLevel, int32 PreviousLevel) const;
 	void RefreshChipSlots();
 	void RefreshEquipmentSlots();
 	void RefreshEquippedChipSummary();

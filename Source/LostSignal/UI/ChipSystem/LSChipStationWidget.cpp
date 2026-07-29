@@ -9,7 +9,6 @@
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipRow.h"
 #include "Data/LSChipStats.h"
-#include "Data/LSGameDataSubsystem.h"
 #include "Data/LSDropSettings.h"
 #include "Engine/DataTable.h"
 #include "Inventory/LSInventorySlotUtils.h"
@@ -645,10 +644,10 @@ void ULSChipStationWidget::RefreshEquippedChipSummary()
 	SetPreviewSurvivalStatus(SurvivalCurrent, SurvivalPrevious);
 	SetPreviewSignalChip(EquipmentItems, GetSignalGaugePercent());
 	SetPreviewBattleProtocol(BattleCurrent, BattlePrevious);
-	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), ELSProtocolType::Survival, SurvivalCurrent, SurvivalPrevious);
-	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), ELSProtocolType::Carrying, CarryingCurrent, CarryingPrevious);
-	SetProtocolWidget(Protocol_Battle, TEXT("Protocol_Battle"), ELSProtocolType::Battle, BattleCurrent, BattlePrevious);
-	SetProtocolWidget(Protocol_Navigation, TEXT("Protocol_Navigation"), ELSProtocolType::Navigation, NavigationCurrent, NavigationPrevious);
+	SetProtocolWidget(Protocol_Survival, TEXT("Protocol_Survival"), SurvivalCurrent, SurvivalPrevious);
+	SetProtocolWidget(Protocol_Carrying, TEXT("Protocol_Carrying"), CarryingCurrent, CarryingPrevious);
+	SetProtocolWidget(Protocol_Battle, TEXT("Protocol_Battle"), BattleCurrent, BattlePrevious);
+	SetProtocolWidget(Protocol_Navigation, TEXT("Protocol_Navigation"), NavigationCurrent, NavigationPrevious);
 }
 
 void ULSChipStationWidget::QueueRefreshChipStation()
@@ -1392,7 +1391,7 @@ int32 ULSChipStationWidget::GetInactiveSignalSlotCount() const
 	return CalculateInactiveSignalSlotCount(GetSignalGaugePercent());
 }
 
-void ULSChipStationWidget::SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, const TCHAR* ProtocolName, const ELSProtocolType ProtocolType, const int32 CurrentLevel, const int32 PreviousLevel) const
+void ULSChipStationWidget::SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, const TCHAR* ProtocolName, const int32 CurrentLevel, const int32 PreviousLevel) const
 {
 	if (!ProtocolWidget)
 	{
@@ -1400,18 +1399,7 @@ void ULSChipStationWidget::SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, 
 		return;
 	}
 
-	UGameInstance* GameInstance = GetGameInstance();
-	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
-	TArray<int32> StageLevels;
-	if (GameDataSubsystem)
-	{
-		GameDataSubsystem->GetProtocolRequiredLevels(ProtocolType, StageLevels, TEXT("ChipStation"));
-	}
-
-	if (!StageLevels.IsEmpty())
-	{
-		ProtocolWidget->SetProtocolStageLevels(StageLevels);
-	}
+	// 단계 칸은 순번 고정(1~7)이라 현재 레벨 이하 순번까지 해금 표시한다.
 	ProtocolWidget->SetProtocolLevels(CurrentLevel, PreviousLevel, CurrentLevel);
 }
 
