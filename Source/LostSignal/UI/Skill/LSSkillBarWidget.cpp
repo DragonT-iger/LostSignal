@@ -128,6 +128,29 @@ void ULSSkillBarWidget::NativeConstruct()
 			*GetNameSafe(Skill4Slot),
 			*GetNameSafe(DashSlot));
 	}
+
+	// 칩 장착/신호 게이지 변경은 적재 전투 프로토콜 레벨을 바꾸므로, 게임 시스템 경로에서도
+	// 스킬 슬롯 바의 해금 가시성을 즉시 다시 평가한다. (디버그 경로는 RefreshProtocolTestTargets가 담당)
+	UGameInstance* GameInstance = GetGameInstance();
+	if (ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr)
+	{
+		ChipLoadoutChangedHandle = SaveSubsystem->OnChipLoadoutChanged.AddUObject(this, &ULSSkillBarWidget::RefreshProtocolVisibility);
+	}
+}
+
+void ULSSkillBarWidget::NativeDestruct()
+{
+	if (ChipLoadoutChangedHandle.IsValid())
+	{
+		UGameInstance* GameInstance = GetGameInstance();
+		if (ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr)
+		{
+			SaveSubsystem->OnChipLoadoutChanged.Remove(ChipLoadoutChangedHandle);
+		}
+		ChipLoadoutChangedHandle.Reset();
+	}
+
+	Super::NativeDestruct();
 }
 
 void ULSSkillBarWidget::ApplyTextOverridesToSlots()

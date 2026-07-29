@@ -58,6 +58,8 @@ Protocol_Required_Level = 1
 
 테스트 중에는 `LSTestBattleProtocol 1`로 1단계 표시 여부를 확인한다.
 
+스킬 슬롯 바의 표시/숨김은 초기화 시점뿐 아니라 게임 실행 중 적재 전투 프로토콜 레벨이 바뀔 때도 다시 평가되어야 한다. `ULSSkillBarWidget`은 `ULSSaveSubsystem::OnChipLoadoutChanged`(칩 장착/해제·신호 게이지 변경 시 브로드캐스트)를 구독해 `RefreshProtocolVisibility`를 태운다. 이 구독이 없으면 레이드 중 신호 하락으로 전투 프로토콜이 0이 돼도 바가 마지막 표시 상태(보임)로 남는다. 디버그 경로(`LSTestBattleProtocol`)는 `ALSPlayerControllerBase::RefreshProtocolTestTargets`가 HUD를 다시 초기화해 같은 갱신을 태운다.
+
 ## 2단계: 스킬 범위와 쿨타임 숫자
 
 2단계에서 해금되는 기능은 스킬 사용 전 범위 표시와 스킬 슬롯의 쿨타임 남은 시간 숫자 표시다.

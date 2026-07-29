@@ -33,6 +33,7 @@ public:
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/UI|Skill|Text")
 	bool bTextOverride = false;
@@ -79,4 +80,7 @@ private:
 	int32 PreviewCurrentBattleProtocol = 0;
 	int32 PreviewPreviousBattleProtocol = 0;
 	bool bUsePreviewBattleProtocolLevels = false;
+
+	// 칩 장착/신호 게이지 변경(적재 프로토콜 레벨 변동) 시 표시 가시성을 재평가하기 위한 구독 핸들.
+	FDelegateHandle ChipLoadoutChangedHandle;
 };
