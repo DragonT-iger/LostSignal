@@ -105,9 +105,9 @@ GroupTable (Group_XXX_숫자)
 | 1 | 무기 | 무기 슬롯 장착 (캐릭터별 다름) |
 | 2 | 방어구 | 방어구 슬롯 장착 |
 | 3 | 일반 아이템 | 판매용 |
-| 4~9 | 소모품 | 퀵슬롯 장착, 회복/일회용 |
 | 11~19 | 퀘스트 아이템 | 일회성 수집, 인벤토리 합산 안 됨 |
 | 20~ | 재료 아이템 | 합성, 강화 등 |
+| 30 | 소모품 | 별도 `DT_Consumable`, `Consumable_` 접두사 사용 |
 
 ### Item_Grade 등급
 
@@ -178,18 +178,9 @@ Item_Equipment 값: `Processor`(머리), `Core`(몸), `Actuator`(손), `Frame`(�
 
 파일: `Source/LostSignal/Data/LSItemRow.h`
 
-접두사: `Item_`. Item_Type=3(판매), 4~9(소모품), 11~19(퀘스트), 20~(재료).
+접두사: `Item_`. 현재 `DT_Item` CSV는 재료·일반 루트 아이템을 `Item_Type=20`으로 관리한다.
 
-소모품 전용 필드 (Item_Type 4~9):
-
-| 변수명 | 설명 |
-|--------|------|
-| Item_Target_Status | 영향을 받는 스탯/UI 이름 |
-| Item_Target_Status_Value | 스탯 변화 수치 |
-| Item_Target_Buff | 상태이상 이름 (회복/디버프) |
-| Item_Target_Buff_Value | 상태이상 수치 |
-| Item_Cast_Time | 사용까지 걸리는 시간 (초) |
-| Item_Duration | 효과 지속 시간 (초) |
+소모품은 `Item_` 행이 아니라 별도 `DT_Consumable`의 `Consumable_` 행이다. 표시·거동 구조는 [ConsumableSystem.md](ConsumableSystem.md)가 단일 출처다.
 
 ### ChipStat (칩 스탯 범위 테이블)
 
@@ -424,4 +415,4 @@ Unreal Editor Python 환경에서 실행하면 스크립트의 `TARGETS`에 등�
 - 새 아이템 카테고리 추가 시 `FindItemText` + `LSDropSettings` + 정렬 키(`LSInventorySlotUtils`) 3곳 수정
 - 가중치 합이 0이면 드랍이 조용히 실패한다 — CSV에서 Group_Weight를 비워두면 발생
 - `LSCharacterStatRow`와 `LSMonsterArchetypeRow`는 드랍 시스템과 무관 (각각 캐릭터 스탯, AI 감지용)
-- 소모품 시스템은 기획 진행 중이며 현재 테이블에는 예시 데이터만 있다
+- 소모품의 현재 데이터 구조와 효과 적용 흐름은 [ConsumableSystem.md](ConsumableSystem.md)를 기준으로 한다

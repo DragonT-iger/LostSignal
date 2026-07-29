@@ -2,13 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Styling/SlateBrush.h"
 #include "UI/Lobby/LSLobbyPanelTypes.h"
 #include "LSLobbyMenuWidget.generated.h"
 
 class UBorder;
 class UButton;
-class UImage;
 class UOverlay;
 class UTextBlock;
 class UWidgetSwitcher;
@@ -109,17 +107,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Lobby")
 	TSubclassOf<ULSLobbyQuestWidget> QuestPanelClass;
 
-	// --- 배경 / 프로필 ---
-	// 로비 배경 이미지. 패널이 열렸을 때 배경을 교체하기 위해 바인딩한다.
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
-	TObjectPtr<UImage> BackgroundImage;
-
-	// 패널이 열렸을 때 깔 배경 브러시. BP 클래스 디폴트에서 텍스처/머티리얼을 매핑한다.
-	// 리소스가 비어 있으면 교체하지 않고 기본 배경을 유지한다.
-	// (이름은 개인정비 계층 시절 것을 유지한다 — 개명하면 아트가 매핑한 값이 날아간다.)
-	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Lobby")
-	FSlateBrush LoadoutPreparationBackgroundBrush;
-
+	// --- 프로필 ---
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
 	TObjectPtr<UTextBlock> PlayerNameText;
 
@@ -163,9 +151,6 @@ private:
 
 	// 임무 시작 버튼은 로비 기본 상태에서만 표시한다.
 	void UpdateMissionStartVisibility(bool bVisible) const;
-
-	// 패널이 열렸으면 패널 배경, 로비면 기본 배경으로 복원한다.
-	void UpdateBackground(ELSLobbyPanel Panel) const;
 
 	UFUNCTION()
 	void HandleLobbyTabClicked(ULSLobbyTabWidget* ClickedTab);
@@ -254,8 +239,4 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULSLobbyQuestWidget> QuestPanelInstance;
-
-	// WBP에서 설정한 기본 배경 브러시. NativeConstruct에서 캐시해 로비로 돌아올 때 복원한다.
-	UPROPERTY(Transient)
-	FSlateBrush DefaultBackgroundBrush;
 };

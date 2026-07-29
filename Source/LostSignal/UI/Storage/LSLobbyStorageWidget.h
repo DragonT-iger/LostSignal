@@ -121,7 +121,6 @@ private:
 	void ApplyFilterButtonState() const;
 	void BuildFilteredItems(const TArray<FLSSessionItem>& StashItems, TArray<TPair<int32, FLSSessionItem>>& OutIndexedItems) const;
 	bool DoesItemMatchCurrentFilter(FName ItemRowName) const;
-	bool IsConsumableItem(FName ItemRowName) const;
 	bool IsPointerOverUserWidget(const FPointerEvent& PointerEvent) const;
 	ULSSaveSubsystem* GetSaveSubsystem() const;
 };

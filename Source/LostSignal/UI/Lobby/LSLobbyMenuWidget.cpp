@@ -4,7 +4,6 @@
 
 #include "Components/Border.h"
 #include "Components/Button.h"
-#include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/TextBlock.h"
@@ -221,16 +220,6 @@ void ULSLobbyMenuWidget::ValidateDisplayBindings()
 	{
 		UE_LOG(LogLS, Warning, TEXT("GoldText is not bound on %s."), *GetNameSafe(this));
 	}
-
-	// 패널이 열렸을 때 배경을 교체하기 위해 WBP 기본 배경 브러시를 캐시한다.
-	if (BackgroundImage)
-	{
-		DefaultBackgroundBrush = BackgroundImage->GetBrush();
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("BackgroundImage is not bound on %s."), *GetNameSafe(this));
-	}
 }
 
 void ULSLobbyMenuWidget::InitializeLobbyView()
@@ -246,7 +235,6 @@ void ULSLobbyMenuWidget::InitializeLobbyView()
 		QuestPanelHost->SetVisibility(ESlateVisibility::Collapsed);
 	}
 	UpdateSelectedTab(ELSLobbyPanel::None);
-	UpdateBackground(ELSLobbyPanel::None);
 }
 
 void ULSLobbyMenuWidget::NativeDestruct()

@@ -3,6 +3,7 @@
 #include "Components/Border.h"
 #include "LostSignal.h"
 #include "Components/Button.h"
+#include "Components/TextBlock.h"
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Gameplay/LSWorldDroppedItem.h"
@@ -31,6 +32,11 @@ void AppendSlotItems(TArray<FLSSessionItem>& Items, const TArray<FLSSessionItem>
 void ULSInventoryWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	if (!InventoryCountText)
+	{
+		UE_LOG(LogLS, Warning, TEXT("InventoryCountText is not bound on %s."), *GetNameSafe(this));
+	}
 
 	if (!StoreAllButton)
 	{
@@ -173,6 +179,8 @@ void ULSInventoryWidget::RebuildInventorySlots()
 
 	UE_LOG(LogLS, Log, TEXT("InventoryWidget rebuilt with %d slot items on %s."), InventoryItems.Num(), *GetNameSafe(this));
 
+	UpdateInventoryCountText(InventoryItems, SlotCountToBuild);
+
 	LSSlotWidgetSync::SyncSlotWidgets(InventoryWrapBox, ItemSlotWidgetClass, OwningPlayer, World, SlotCountToBuild,
 		[this, &InventoryItems](const int32 SlotIndex, ULSItemSlotWidget& SlotWidget)
 		{
@@ -191,6 +199,29 @@ void ULSInventoryWidget::RebuildInventorySlots()
 				SlotWidget.ClearItem();
 			}
 		});
+}
+
+void ULSInventoryWidget::UpdateInventoryCountText(const TArray<FLSSessionItem>& InventoryItems, const int32 MaxSlotCount) const
+{
+	if (!InventoryCountText)
+	{
+		return;
+	}
+
+	const int32 SafeMaxSlotCount = FMath::Max(0, MaxSlotCount);
+	int32 FilledSlotCount = 0;
+	for (int32 SlotIndex = 0; SlotIndex < SafeMaxSlotCount; ++SlotIndex)
+	{
+		if (InventoryItems.IsValidIndex(SlotIndex) && LSInventorySlotUtils::IsFilled(InventoryItems[SlotIndex]))
+		{
+			++FilledSlotCount;
+		}
+	}
+
+	InventoryCountText->SetText(FText::Format(
+		NSLOCTEXT("LSInventory", "InventoryCountFormat", "({0}/{1})"),
+		FText::AsNumber(FilledSlotCount),
+		FText::AsNumber(SafeMaxSlotCount)));
 }
 
 bool ULSInventoryWidget::HandleInventorySlotDrop(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex, const ELSInventorySlotArea ToSlotArea, const int32 ToSlotIndex)

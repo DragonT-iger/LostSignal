@@ -44,7 +44,7 @@
 
 1. 떠나는 패널이 별도 레이어에 띄운 다이얼로그를 닫는다.
 2. 대상 페이지를 포인터로 활성화하고 현재 패널 상태를 갱신한다.
-3. 선택 탭과 배경을 갱신한다.
+3. 선택 탭을 갱신한다.
 4. `RefreshPanelOnOpen`에서 대상 패널의 최신 데이터를 다시 읽는다.
 
 같은 패널 재클릭은 현재 스크롤·필터 상태를 보존하기 위해 무시한다. 다른 패널을 거쳐 돌아오면 반드시
@@ -98,5 +98,5 @@
 - `MissionStartButton`은 `LobbyTab`의 로비 기본 상태에서만 `Visible`이고 다른 패널·지도 안내·설정에서는 `Collapsed`다.
 - `BackButton`, `InventoryButton`, `DestinationButton`은 사용하지 않는다. 뒤로가기와 가방 토글은 키 입력,
   목적지 선택은 `MapTab`이 소유한다.
-- `ConfirmDialogClass`, `SettingsWidgetClass`, 패널 WBP 클래스 4개, 가방 내부 WBP 클래스 2개, 패널 배경 브러시는
+- `ConfirmDialogClass`, `SettingsWidgetClass`, 패널 WBP 클래스 4개, 가방 내부 WBP 클래스 2개는
   `WBP_LobbyMenu` 클래스 디폴트에서 매핑한다.

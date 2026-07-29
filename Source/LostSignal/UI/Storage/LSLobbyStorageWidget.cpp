@@ -4,9 +4,6 @@
 #include "Components/TextBlock.h"
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
-#include "Data/LSDropSettings.h"
-#include "Data/LSItemRow.h"
-#include "Engine/DataTable.h"
 #include "Gameplay/LSWorldDroppedItem.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Layout/WidgetPath.h"
@@ -537,38 +534,14 @@ bool ULSLobbyStorageWidget::DoesItemMatchCurrentFilter(const FName ItemRowName) 
 	case ELSStorageFilter::Armor:
 		return RowNameString.StartsWith(TEXT("Armor_"));
 	case ELSStorageFilter::Consumable:
-		return IsConsumableItem(ItemRowName);
+		return RowNameString.StartsWith(TEXT("Consumable_"));
 	case ELSStorageFilter::Misc:
-		return RowNameString.StartsWith(TEXT("Item_")) && !IsConsumableItem(ItemRowName);
+		return RowNameString.StartsWith(TEXT("Item_"));
 	case ELSStorageFilter::Chip:
 		return RowNameString.StartsWith(TEXT("Chip_"));
 	default:
 		return false;
 	}
-}
-
-bool ULSLobbyStorageWidget::IsConsumableItem(const FName ItemRowName) const
-{
-	const FString RowNameString = ItemRowName.ToString();
-	if (!RowNameString.StartsWith(TEXT("Item_")))
-	{
-		return false;
-	}
-
-	const ULSDropSettings* Settings = GetDefault<ULSDropSettings>();
-	if (!Settings)
-	{
-		return false;
-	}
-
-	UDataTable* ItemTable = Settings->ItemTable.LoadSynchronous();
-	const FLSItemRow* Row = ItemTable ? ItemTable->FindRow<FLSItemRow>(ItemRowName, TEXT("LSLobbyStorageFilter")) : nullptr;
-	if (!Row)
-	{
-		return false;
-	}
-
-	return Row->Item_Type >= 4 && Row->Item_Type <= 9;
 }
 
 bool ULSLobbyStorageWidget::IsPointerOverUserWidget(const FPointerEvent& PointerEvent) const

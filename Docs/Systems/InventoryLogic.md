@@ -125,6 +125,8 @@ RefreshStorage
 
 슬롯 수는 `ULSSaveSubsystem::GetMaxInventorySlotCount`, `ULSSaveSubsystem::GetMaxSafeStashSlotCount`, `ULSSaveSubsystem::GetMaxWarehouseSlotCount`, `ULSRaidInventoryComponent::GetMaxInventorySlotCount`, `ULSRaidInventoryComponent::GetMaxSafeSlotCount`를 통해 조회한다. 창고 최대 슬롯 수는 `ULSSaveSettings`의 `MaxWarehouseSlotCount`가 단일 출처이며 기본값은 100이다. UI에서 보이는 슬롯 수와 저장/레이드 드래그, 루팅, 월드 픽업 제한은 같은 값을 사용해야 한다.
 
+`WBP_Inventory`의 용량 텍스트는 이름을 `InventoryCountText`로 두고 강제 `BindWidget`한다. `ULSInventoryWidget::RebuildInventorySlots`가 현재 데이터에서 채워진 슬롯 수를 세고, 위 최대 슬롯 수와 함께 `({사용 슬롯 수}/{최대 슬롯 수})` 형식으로 갱신한다. 따라서 로비·레이드와 적재 프로토콜 용량 변경이 같은 표시 경로를 사용한다.
+
 기존 세이브에 창고 최대 슬롯 인덱스 밖의 아이템이 있으면 아이템을 자르거나 숨기지 않는다. 창고 UI와 자판기는 저장 배열 길이까지 임시 표시하고 `사용 슬롯 수/설정 최대 슬롯 수`로 초과 상태를 드러낸다. 초과 아이템은 창고 밖으로 반출하거나 최대 슬롯 범위 안으로 옮길 수 있지만, 초과 상태가 해소될 때까지 창고로 들어오는 신규 이동·칩 해제·전부 보관은 차단한다.
 
 공통 슬롯 위젯은 `ULSItemSlotWidget`이다. 슬롯 context에 따라 인벤토리 슬롯, 루트 박스 슬롯, 창고 슬롯으로 동작한다.

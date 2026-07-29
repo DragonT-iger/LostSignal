@@ -9,6 +9,7 @@ class ALSWorldDroppedItem;
 class UBorder;
 class UButton;
 class UDragDropOperation;
+class UTextBlock;
 class UWrapBox;
 class ULSConfirmDialogWidget;
 class ULSInventoryDragDropOperation;
@@ -74,6 +75,10 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UWrapBox> InventoryWrapBox;
 
+	// 채워진 인벤토리 슬롯 수 / 현재 최대 슬롯 수를 표시한다.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<UTextBlock> InventoryCountText;
+
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UWrapBox> ConfirmedStorageSlotWrapBox;
 
@@ -137,6 +142,8 @@ private:
 
 	// ShowInventoryFullNotification이 다음 틱에 호출하는 실제 다이얼로그 생성부.
 	void PresentInventoryFullNotification();
+
+	void UpdateInventoryCountText(const TArray<FLSSessionItem>& InventoryItems, int32 MaxSlotCount) const;
 
 	// 장비 슬롯(무기/방어구) 드롭 처리. 로비=SaveSubsystem::MoveEquipmentSlot, 레이드=서버 DropInventorySlot 라우팅.
 	bool HandleEquipmentSlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);

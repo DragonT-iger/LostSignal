@@ -4,7 +4,6 @@
 
 #include "Components/Border.h"
 #include "Components/Button.h"
-#include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/WidgetSwitcher.h"
 #include "LostSignal.h"
@@ -50,7 +49,6 @@ void ULSLobbyMenuWidget::ShowPanel(const ELSLobbyPanel Panel)
 
 	ActivePanel = Panel;
 	UpdateSelectedTab(Panel);
-	UpdateBackground(Panel);
 
 	// 리프레시는 ActivePanel을 갱신한 뒤에 한다(리프레시 중 현재 패널을 조회하는 경로 대비).
 	RefreshPanelOnOpen(Panel);
@@ -232,19 +230,6 @@ void ULSLobbyMenuWidget::UpdateMissionStartVisibility(const bool bVisible) const
 	{
 		MissionStartButton->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
-}
-
-void ULSLobbyMenuWidget::UpdateBackground(const ELSLobbyPanel Panel) const
-{
-	if (!BackgroundImage)
-	{
-		return;
-	}
-
-	// 패널이 열렸고 전용 배경 리소스가 지정돼 있으면 교체하고, 로비(패널 없음)에서는 기본 배경으로 복원한다.
-	const bool bUsePanelBackground = Panel != ELSLobbyPanel::None
-		&& LoadoutPreparationBackgroundBrush.GetResourceObject() != nullptr;
-	BackgroundImage->SetBrush(bUsePanelBackground ? LoadoutPreparationBackgroundBrush : DefaultBackgroundBrush);
 }
 
 void ULSLobbyMenuWidget::HandleLobbyTabClicked(ULSLobbyTabWidget* ClickedTab)
