@@ -248,6 +248,18 @@ void ULSItemSlotWidget::SetAmountTextVisible(const bool bVisible) const
 	}
 }
 
+void ULSItemSlotWidget::SetDisplayedAmount(const int32 Amount, const bool bVisible) const
+{
+	if (!AmountText)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot set displayed amount because AmountText is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	AmountText->SetText(bVisible ? FText::AsNumber(Amount) : FText::GetEmpty());
+	AmountText->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+}
+
 void ULSItemSlotWidget::SetEquipCandidateHighlight(const bool bInIsCandidate)
 {
 	if (bIsEquipCandidate == bInIsCandidate)
@@ -298,6 +310,12 @@ void ULSItemSlotWidget::SetDisplayOnlySlotContext()
 	EquipmentSlotIndex = INDEX_NONE;
 	bHasItem = false;
 	bIsLocked = false;
+}
+
+void ULSItemSlotWidget::SetExternalHoverState(const bool bInHovered)
+{
+	bIsHovered = bInHovered;
+	ApplyHoverVisual();
 }
 
 void ULSItemSlotWidget::NativePreConstruct()

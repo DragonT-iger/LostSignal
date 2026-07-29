@@ -22,7 +22,7 @@
 
 ## 위젯
 
-- [`ULSQuickSlotWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotWidget.h) — 개별 칸. 드롭 타겟(`NativeOnDrop`)이며 **우클릭으로 등록 해제**한다(더블클릭 해제는 두지 않음). 등록 해제도 호버와 마찬가지로 **인벤토리 패널이 열려 있을 때만** 동작한다(`IsInventoryUIOpen`). `Refresh`에서 아이콘(공용 `LSInventorySlotUtils::LoadItemIconTexture`)과 인벤토리 합산 개수를 그린다. 마우스 호버 시 `ULSItemSlotWidget`과 같은 방식으로 아이콘·배경(`SlotBackgroundImage`) 틴트 + 스케일을 강조한다(`HoveredIconTint`/`HoveredRenderScale`, 에디터 조정 가능). **호버가 아닐 때 배경 색은 WBP가 지정한 색을 그대로 보인다** — `InitializeSlot`에서 배경 색을 1회 캡처해 호버 해제 시 그 색으로 복원한다(하드코딩 흰색으로 덮어쓰지 않음). 호버 반응은 **인벤토리 패널이 열려 있을 때만** 준다(`ALSPlayerControllerBase::IsInventoryUIOpen` — 로비/레이드 공통 판정). HUD에 상시 떠 있는 바는 전투 중 호버해도 반응하지 않는다. **바인딩 키 표시**(`ShortcutText`)는 스킬 슬롯과 동일하게 폰의 `Item1~6Action`을 `IMC_Default` 매핑에서 조회해 실제 키의 표시 이름을 넣는다(키보드 우선, 리바인딩 자동 반영). 소비가 레이드 폰 전용이라 매핑도 폰에서 조회하며, 폰이 없는 로비 인벤토리에선 빈 텍스트로 둔다.
+- [`ULSQuickSlotWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotWidget.h) — 개별 칸. 드롭 타겟(`NativeOnDrop`)이며 **우클릭으로 등록 해제**한다(더블클릭 해제는 두지 않음). 등록 해제도 호버와 마찬가지로 **인벤토리 패널이 열려 있을 때만** 동작한다(`IsInventoryUIOpen`). 아이콘·합산 개수·등급/빈 슬롯 배경·호버 연출은 내부의 표시 전용 `ULSItemSlotWidget`에 위임한다. 내부 슬롯은 `SetDisplayOnlySlotContext`로 이동 컨텍스트를 제거하고 `HitTestInvisible`로 고정하므로 드래그·드롭과 우클릭 입력은 바깥 퀵슬롯이 계속 소유한다. 퀵슬롯은 외부 호버 상태만 내부 슬롯에 전달하므로 아이템 슬롯의 배경색 우선순위와 연출 값이 단일 출처다. 호버 반응은 **인벤토리 패널이 열려 있을 때만** 준다(`ALSPlayerControllerBase::IsInventoryUIOpen` — 로비/레이드 공통 판정). HUD에 상시 떠 있는 바는 전투 중 호버해도 반응하지 않는다. **바인딩 키 표시**(`BindKeyText`)는 스킬 슬롯과 동일하게 폰의 `Item1~6Action`을 `IMC_Default` 매핑에서 조회해 실제 키의 표시 이름을 넣는다(키보드 우선, 리바인딩 자동 반영). 소비가 레이드 폰 전용이라 매핑도 폰에서 조회하며, 폰이 없는 로비 인벤토리에선 빈 텍스트로 둔다.
 - [`ULSQuickSlotBarWidget`](../../Source/LostSignal/UI/QuickSlot/LSQuickSlotBarWidget.h) — 고정 6칸(`QuickSlot1~6` `BindWidget`) 컨테이너. 로비/레이드 HUD 양쪽에서 재사용한다. 생성 시 스스로 `PlayerController`에 등록하고 `OnQuickSlotsChanged`·`OnChipLoadoutChanged`를 구독한다.
 
 개수 합산은 툴팁 "현재 아이템 개수"와 동일 소스를 쓴다: 레이드 활성이면 `ULSRaidInventoryComponent`의 세션(일반+Safe), 아니면 `ULSSaveSubsystem`의 세이브(일반+Safe). 합산 함수는 `LSCraftingUtils::CountItem`을 재사용한다.
@@ -71,7 +71,7 @@
 
 ## 에디터/아트 매핑
 
-- `WBP_QuickSlot`(`ULSQuickSlotWidget` 상속): `IconImage`(UImage), `AmountText`(UTextBlock), `SlotBackgroundImage`(UImage, 호버 시 색 변경), `ShortcutText`(UTextBlock, 소비 바인딩 키 표시) 바인딩. 루트는 드롭을 받도록 Visible.
+- `WBP_QuickSlot`(`ULSQuickSlotWidget` 상속): 루트 `Overlay` 안에 `WBP_ItemSlot` 인스턴스를 `ItemSlot` 이름으로 배치하고 `BindKeyText`(UTextBlock, 소비 바인딩 키 표시)를 그 위에 둔다. 개별 퀵슬롯은 호버·드롭을 직접 받도록 바의 `ApplyProtocolVisibility`가 `Visible`로 설정한다. 내부 `ItemSlot`과 장식 자식은 입력을 가로채지 않도록 C++가 `HitTestInvisible`로 강제한다.
 - `WBP_QuickSlotBar`(`ULSQuickSlotBarWidget` 상속): `QuickSlot1~QuickSlot6` 배치.
 - 바는 두 곳에 둘 수 있고 서로 동기화된다: (1) **`WBP_Inventory` 안에 자식으로 배치**하고 이름을 `QuickSlotBar`로 맞춘다(`ULSInventoryWidget`의 강제 `BindWidget`, 로비·인게임 공통 같은 `ULSInventoryWidget`), (2) **`WBP_PlayerHUD`에 배치**해 전투 중 상시 표시. 각 바는 생성 시 스스로 등록되며 개수/등록 변경 시 모두 함께 갱신된다.
 - **인벤토리 자식 바 표시 규칙:** `QuickSlotBar`는 여는 경로에 따라 켜지고 꺼진다(`ULSInventoryWidget::SetQuickSlotBarVisible`). 기본값은 **표시**(`NativeConstruct`에서 `SelfHitTestInvisible`). 폰이 있는 레이드는 `ALSPlayerCharacter::ShowInventoryWidgetInternal`이 **매 오픈 시** 값을 덮어써 **Tab 단독**(`ShowInventoryWidgetStandalone`)·**로비 창고 동반**(`ALSLobbyStorageActor`)은 표시, **레이드 루팅 박스**(`ALSLootBox`)만 숨김(`Collapsed`)으로 만든다. 폰 없이 열리는 로비 인벤토리는 이 폰 경로를 타지 않으므로 기본 표시로 남아 Tab/메뉴로 열면 바가 보인다(루팅 박스는 레이드 전용이라 폰 없는 경로에서 기본 표시가 잘못 켜질 일은 없다). (2)의 HUD 상시 바는 이 규칙과 무관하게 항상 떠 있다.

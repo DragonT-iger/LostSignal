@@ -90,7 +90,8 @@ void ULSQuickSlotBarWidget::ApplyProtocolVisibility()
 		{
 			if (SlotWidget)
 			{
-				SlotWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+				// 바는 입력을 통과시키되 개별 퀵슬롯은 호버·드롭을 직접 받아야 한다.
+				SlotWidget->SetVisibility(ESlateVisibility::Visible);
 			}
 		}
 		return;
@@ -103,7 +104,7 @@ void ULSQuickSlotBarWidget::ApplyProtocolVisibility()
 	{
 		if (Slots[Index])
 		{
-			Slots[Index]->SetVisibility(Index < UnlockedCount ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+			Slots[Index]->SetVisibility(Index < UnlockedCount ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 		}
 	}
 }

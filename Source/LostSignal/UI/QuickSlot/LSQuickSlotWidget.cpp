@@ -1,25 +1,33 @@
 #include "UI/QuickSlot/LSQuickSlotWidget.h"
 
 #include "Characters/LSPlayerCharacter.h"
-#include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "EnhancedActionKeyMapping.h"
 #include "Engine/GameInstance.h"
-#include "Engine/Texture2D.h"
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 #include "Inventory/LSCraftingUtils.h"
-#include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
+#include "UI/Inventory/LSItemSlotWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 
 void ULSQuickSlotWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	if (ItemSlot)
+	{
+		ItemSlot->SetDisplayOnlySlotContext();
+		ItemSlot->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("[QuickSlot] ItemSlot not bound on %s."), *GetNameSafe(this));
+	}
 
 	if (!BindKeyText)
 	{
@@ -31,20 +39,15 @@ void ULSQuickSlotWidget::NativeConstruct()
 void ULSQuickSlotWidget::InitializeSlot(const int32 InSlotIndex)
 {
 	SlotIndex = InSlotIndex;
-	// WBP가 지정한 배경 색을 캡처한다(호버 해제 시 이 색으로 복원). Refresh 전에 1회만.
-	if (SlotBackgroundImage)
-	{
-		NormalBackgroundColor = SlotBackgroundImage->GetColorAndOpacity();
-	}
 	RefreshShortcutText();
 	Refresh();
 }
 
 void ULSQuickSlotWidget::Refresh()
 {
-	if (!IconImage || !AmountText)
+	if (!ItemSlot)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[QuickSlot] IconImage/AmountText not bound on %s."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("[QuickSlot] ItemSlot not bound on %s."), *GetNameSafe(this));
 		return;
 	}
 
@@ -58,19 +61,15 @@ void ULSQuickSlotWidget::Refresh()
 	// 빈 칸: 아이콘/개수 숨김.
 	if (ItemRowName.IsNone())
 	{
-		IconImage->SetVisibility(ESlateVisibility::Collapsed);
-		AmountText->SetText(FText::GetEmpty());
+		ItemSlot->ClearItem();
 		ApplyHoverVisual();
 		return;
 	}
 
-	if (UTexture2D* IconTexture = LSInventorySlotUtils::LoadItemIconTexture(ItemRowName))
-	{
-		IconImage->SetBrushFromTexture(IconTexture);
-	}
-	IconImage->SetVisibility(ESlateVisibility::HitTestInvisible);
-
-	AmountText->SetText(FText::AsNumber(CountOwnedAmount(ItemRowName)));
+	const int32 OwnedAmount = CountOwnedAmount(ItemRowName);
+	ItemSlot->SetItem(ItemRowName, OwnedAmount, {});
+	// 퀵슬롯은 등록 참조를 유지하므로 미보유 상태도 숫자 0을 명시한다.
+	ItemSlot->SetDisplayedAmount(OwnedAmount);
 
 	// 리드로 후에도 현재 호버 상태의 강조를 유지한다.
 	ApplyHoverVisual();
@@ -138,14 +137,9 @@ void ULSQuickSlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 
 void ULSQuickSlotWidget::ApplyHoverVisual()
 {
-	SetRenderScale(bIsHovered ? HoveredRenderScale : FVector2D::UnitVector);
-	if (IconImage)
+	if (ItemSlot)
 	{
-		IconImage->SetColorAndOpacity(bIsHovered ? HoveredIconTint : FLinearColor::White);
-	}
-	if (SlotBackgroundImage)
-	{
-		SlotBackgroundImage->SetColorAndOpacity(bIsHovered ? HoveredIconTint : NormalBackgroundColor);
+		ItemSlot->SetExternalHoverState(bIsHovered);
 	}
 }
 

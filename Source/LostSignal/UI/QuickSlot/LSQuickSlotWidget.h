@@ -4,7 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "LSQuickSlotWidget.generated.h"
 
-class UImage;
+class ULSItemSlotWidget;
 class UTextBlock;
 class UDragDropOperation;
 class UInputAction;
@@ -13,7 +13,7 @@ class ULSSaveSubsystem;
 /**
  * 퀵슬롯 한 칸. 소모품 RowName 참조 하나를 가리키며, 표시 개수는 인벤토리에서 실시간 합산한다.
  * 아이템 스택을 담지 않는다. 인벤토리 슬롯에서 드래그앤드랍하면 그 소모품이 이 칸에 등록된다.
- * WBP는 IconImage, AmountText, SlotBackgroundImage, ShortcutText를 바인딩해야 한다.
+ * WBP는 표시 전용 ItemSlot과 BindKeyText를 바인딩해야 한다.
  */
 UCLASS()
 class LOSTSIGNAL_API ULSQuickSlotWidget : public UUserWidget
@@ -34,26 +34,14 @@ protected:
 	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
 
+	// 아이콘·수량·등급/빈 슬롯 배경·호버 연출을 담당하는 표시 전용 WBP_ItemSlot.
+	// 입력은 퀵슬롯 루트가 받도록 NativeConstruct에서 HitTestInvisible로 고정한다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|QuickSlot")
-	TObjectPtr<UImage> IconImage;
-
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|QuickSlot")
-	TObjectPtr<UTextBlock> AmountText;
-
-	// 호버 시 색이 바뀌는 배경(ItemSlot의 SlotBackgroundImage와 동일 역할).
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|QuickSlot")
-	TObjectPtr<UImage> SlotBackgroundImage;
+	TObjectPtr<ULSItemSlotWidget> ItemSlot;
 
 	// 이 칸의 소비 바인딩 키(Item1~6Action)를 표시하는 텍스트. 스킬 슬롯의 ShortcutText와 동일 역할.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|QuickSlot")
 	TObjectPtr<UTextBlock> BindKeyText;
-
-	// 호버 강조 색/스케일(ItemSlot 기본값과 동일). 아트가 에디터에서 조정 가능.
-	UPROPERTY(EditAnywhere, Category="LS/UI|QuickSlot")
-	FLinearColor HoveredIconTint = FLinearColor(0.55f, 0.9f, 1.0f, 1.0f);
-
-	UPROPERTY(EditAnywhere, Category="LS/UI|QuickSlot")
-	FVector2D HoveredRenderScale = FVector2D(1.1f, 1.1f);
 
 private:
 	// 이 칸의 바인딩 키를 다시 그린다. 레이드 HUD에선 실제 매핑 키, 폰이 없는 로비에선 빈 텍스트.
@@ -72,6 +60,4 @@ private:
 
 	int32 SlotIndex = INDEX_NONE;
 	bool bIsHovered = false;
-	// WBP가 SlotBackgroundImage에 지정한 색. InitializeSlot에서 1회 캡처해 호버 해제 시 이 색으로 복원한다.
-	FLinearColor NormalBackgroundColor = FLinearColor::White;
 };

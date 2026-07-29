@@ -35,6 +35,9 @@ public:
 	// 제작 목록처럼 수량을 별도 텍스트로 표시하는 화면에서 아이콘 위 수량만 숨긴다.
 	void SetAmountTextVisible(bool bVisible) const;
 
+	// 퀵슬롯처럼 실제 스택이 아닌 합산 수량을 표시하는 화면에서 수량 텍스트를 직접 지정한다.
+	void SetDisplayedAmount(int32 Amount, bool bVisible = true) const;
+
 	// 슬롯 루트 SizeBox의 레이아웃 크기를 변경한다. 렌더 스케일이 아니라 부모 패널이 사용하는 Desired Size가 바뀐다.
 	void SetSlotLayoutSize(FVector2D InSize);
 
@@ -45,6 +48,8 @@ public:
 	void PlayEquipDropRejectedFeedback();
 
 	void SetDisplayOnlySlotContext();
+	// HitTestInvisible 표시 전용 슬롯의 호버 상태를 입력을 소유한 부모 위젯이 전달한다.
+	void SetExternalHoverState(bool bInHovered);
 	void SetSlotContext(ULSInventoryWidget* InInventoryWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem, bool bInLocked = false);
 	void SetLootSlotContext(ULSLootDropWidget* InLootDropWidget, int32 InSlotIndex, bool bInHasItem);
 	void SetWarehouseSlotContext(ULSLobbyStorageWidget* InStorageWidget, ELSInventorySlotArea InSlotArea, int32 InSlotIndex, bool bInHasItem);
