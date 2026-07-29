@@ -46,8 +46,10 @@
 #include "Vision/LSPlayerXRayComponent.h"
 #include "Vision/LSVisionComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
+#include "UI/Interact/LSDistanceMarkerComponent.h"
 #include "UI/Survival/LSSurvivalOverheadWidget.h"
 
 ALSPlayerCharacter::ALSPlayerCharacter()
@@ -89,6 +91,16 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	SurvivalOverheadWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
 	SurvivalOverheadWidgetComponent->SetDrawSize(SurvivalOverheadDrawSize);
 	SurvivalOverheadWidgetComponent->SetRelativeLocation(SurvivalOverheadWidgetOffset);
+
+	MarkerActivationSphere = CreateDefaultSubobject<USphereComponent>(TEXT("MarkerActivationSphere"));
+	MarkerActivationSphere->SetupAttachment(RootComponent);
+	MarkerActivationSphere->InitSphereRadius(MarkerActivationRadius);
+	MarkerActivationSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 로컬 폰에서만 BeginPlay/빙의 시 켠다
+	MarkerActivationSphere->SetCollisionObjectType(ECC_WorldDynamic);
+	MarkerActivationSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
+	MarkerActivationSphere->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Overlap); // InteractMarker 채널만 감지
+	MarkerActivationSphere->SetGenerateOverlapEvents(false);
+	MarkerActivationSphere->CanCharacterStepUpOn = ECB_No;
 
 	WeaponMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMeshComponent"));
 	WeaponMeshComponent->SetupAttachment(GetMesh(), WeaponSocketName);
@@ -139,6 +151,76 @@ void ALSPlayerCharacter::BeginPlay()
 			.AddUObject(this, &ALSPlayerCharacter::HandleMoveSpeedChanged);
 	}
 	RefreshMaxWalkSpeed();
+
+	if (MarkerActivationSphere)
+	{
+		MarkerActivationSphere->OnComponentBeginOverlap.AddDynamic(this, &ALSPlayerCharacter::OnMarkerActivationBeginOverlap);
+		MarkerActivationSphere->OnComponentEndOverlap.AddDynamic(this, &ALSPlayerCharacter::OnMarkerActivationEndOverlap);
+		MarkerActivationSphere->SetSphereRadius(MarkerActivationRadius);
+		UpdateMarkerActivationEnabled();
+	}
+}
+
+void ALSPlayerCharacter::NotifyControllerChanged()
+{
+	Super::NotifyControllerChanged();
+	UpdateMarkerActivationEnabled();
+}
+
+void ALSPlayerCharacter::UpdateMarkerActivationEnabled()
+{
+	if (!MarkerActivationSphere)
+	{
+		return;
+	}
+
+	// 로컬 폰만 마커를 켠다. 시뮬레이션 프록시(타 플레이어)에서 켜지면 그 주변 마커가 잘못 뜬다.
+	const bool bEnable = IsLocallyControlled();
+	MarkerActivationSphere->SetGenerateOverlapEvents(bEnable);
+	MarkerActivationSphere->SetCollisionEnabled(bEnable ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+	if (bEnable)
+	{
+		MarkerActivationSphere->UpdateOverlaps();
+		ActivateOverlappingMarkers();
+	}
+}
+
+void ALSPlayerCharacter::ActivateOverlappingMarkers()
+{
+	if (!MarkerActivationSphere)
+	{
+		return;
+	}
+
+	// 스피어를 켜는 시점에 이미 겹쳐 있던 마커는 BeginOverlap이 (델리게이트 바인딩 전에 소진돼) 안 온다.
+	// 스폰 시 이미 반경 안이던 박스가 여기 해당하므로, 현재 겹친 마커를 직접 활성화해 유실을 막는다.
+	TArray<UPrimitiveComponent*> OverlappingComponents;
+	MarkerActivationSphere->GetOverlappingComponents(OverlappingComponents);
+	for (UPrimitiveComponent* OverlappingComponent : OverlappingComponents)
+	{
+		if (ULSDistanceMarkerComponent* Marker = Cast<ULSDistanceMarkerComponent>(OverlappingComponent))
+		{
+			Marker->SetActivatedByProximity(true);
+		}
+	}
+}
+
+void ALSPlayerCharacter::OnMarkerActivationBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (ULSDistanceMarkerComponent* Marker = Cast<ULSDistanceMarkerComponent>(OtherComp))
+	{
+		Marker->SetActivatedByProximity(true);
+	}
+}
+
+void ALSPlayerCharacter::OnMarkerActivationEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if (ULSDistanceMarkerComponent* Marker = Cast<ULSDistanceMarkerComponent>(OtherComp))
+	{
+		Marker->SetActivatedByProximity(false);
+	}
 }
 
 void ALSPlayerCharacter::OnConstruction(const FTransform& Transform)

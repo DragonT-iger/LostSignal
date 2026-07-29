@@ -4,23 +4,45 @@
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
 #include "UI/Interact/LSDistanceMarkerWidget.h"
+#include "UI/Interact/LSInteractMarkerSettings.h"
 
 ULSDistanceMarkerComponent::ULSDistanceMarkerComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.bStartWithTickEnabled = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 	SetIsReplicatedByDefault(false);
+
+	// 기본은 감지 off. BeginPlay에서 마커가 유효할 때만 콜리전을 켠다.
+	SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetGenerateOverlapEvents(false);
 }
 
 void ULSDistanceMarkerComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 데디케이티드 서버나 위젯 클래스 미지정이면 마커 기능 전체를 끈다(무비용).
-	const UWorld* World = GetWorld();
-	const bool bIsDedicatedServer = World && World->GetNetMode() == NM_DedicatedServer;
-	if (bIsDedicatedServer || !MarkerWidgetClass)
+	if (!IsMarkerFeatureEnabled())
 	{
+		SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		SetComponentTickEnabled(false);
+		return;
+	}
+
+	// 위젯 클래스·머티리얼은 전역 설정에서 받아 쓴다. 클래스 미설정이면 마커를 켤 수 없다.
+	if (const ULSInteractMarkerSettings* Settings = GetDefault<ULSInteractMarkerSettings>())
+	{
+		ResolvedMarkerWidgetClass = Settings->DistanceMarkerWidgetClass.LoadSynchronous();
+		ResolvedMarkerMaterial = Settings->DistanceMarkerWidgetMaterial.LoadSynchronous();
+	}
+	if (!ResolvedMarkerWidgetClass)
+	{
+		if (!bWarnedMissingWidgetClass)
+		{
+			UE_LOG(LogLS, Warning, TEXT("%s: 거리 마커가 켜졌지만 LS Interact Marker Settings의 DistanceMarkerWidgetClass가 비어 있어 표시할 수 없습니다."),
+				*GetNameSafe(GetOwner()));
+			bWarnedMissingWidgetClass = true;
+		}
+		SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		SetComponentTickEnabled(false);
 		return;
 	}
@@ -28,7 +50,9 @@ void ULSDistanceMarkerComponent::BeginPlay()
 	// 정적 박스 + 탑다운 고정 카메라라 매 프레임 갱신이 불필요하므로 주기적으로만 돈다.
 	PrimaryComponentTick.TickInterval = MarkerUpdateInterval;
 
+	ConfigureDetectionCollision();
 	CreateWidgetComponent();
+	SetComponentTickEnabled(false);
 	SetMarkerVisible(false);
 }
 
@@ -50,7 +74,7 @@ void ULSDistanceMarkerComponent::TickComponent(
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (!MarkerWidgetComponent || bSuppressed)
+	if (!MarkerWidgetComponent)
 	{
 		SetMarkerVisible(false);
 		return;
@@ -64,6 +88,25 @@ void ULSDistanceMarkerComponent::TickComponent(
 	}
 
 	UpdateMarker(LocalPlayerController);
+}
+
+bool ULSDistanceMarkerComponent::IsMarkerFeatureEnabled() const
+{
+	// 데디케이티드 서버거나 이 오브젝트가 마커를 끈 상태면 기능 전체를 끈다(무비용).
+	const UWorld* World = GetWorld();
+	const bool bIsDedicatedServer = World && World->GetNetMode() == NM_DedicatedServer;
+	return !bIsDedicatedServer && bEnableMarker;
+}
+
+void ULSDistanceMarkerComponent::ConfigureDetectionCollision()
+{
+	// 캐릭터 MarkerActivationSphere(ECC_WorldDynamic)만 이 콜라이더를 Overlap하도록 InteractMarker 채널로 둔다.
+	SetSphereRadius(DetectionRadius);
+	SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	SetCollisionObjectType(ECC_GameTraceChannel1);
+	SetCollisionResponseToAllChannels(ECR_Ignore);
+	SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
+	SetGenerateOverlapEvents(true);
 }
 
 void ULSDistanceMarkerComponent::CreateWidgetComponent()
@@ -97,11 +140,53 @@ void ULSDistanceMarkerComponent::ConfigureWidgetComponent()
 	MarkerWidgetComponent->SetWidgetSpace(EWidgetSpace::World);
 	MarkerWidgetComponent->SetDrawSize(DrawSize);
 	MarkerWidgetComponent->SetPivot(FVector2D(0.5f, 0.5f));
-	MarkerWidgetComponent->SetTwoSided(true);
+	// 카메라를 향해 도는 빌보드라 뒷면은 안 보인다. 평면 노멀(+X)이 항상 카메라를 향하므로 단면으로 충분.
+	MarkerWidgetComponent->SetTwoSided(false);
 	MarkerWidgetComponent->SetRelativeLocation(WidgetOffset);
-	MarkerWidgetComponent->SetWidgetClass(MarkerWidgetClass);
+	MarkerWidgetComponent->SetWidgetClass(ResolvedMarkerWidgetClass);
 	MarkerWidgetComponent->InitWidget();
+
+	// 뎁스 테스트 off 등 커스텀 렌더가 필요하면 바깥 쿼드 머티리얼을 교체한다(SlateUI 렌더타깃 바인딩은 유지됨).
+	if (ResolvedMarkerMaterial)
+	{
+		MarkerWidgetComponent->SetMaterial(0, ResolvedMarkerMaterial);
+	}
+
 	MarkerWidgetComponent->SetHiddenInGame(true);
+}
+
+void ULSDistanceMarkerComponent::SetActivatedByProximity(const bool bInActivated)
+{
+	if (bActivatedByProximity == bInActivated)
+	{
+		return;
+	}
+
+	bActivatedByProximity = bInActivated;
+	RefreshActiveState();
+}
+
+void ULSDistanceMarkerComponent::SetMarkerSuppressed(const bool bInSuppressed)
+{
+	bSuppressed = bInSuppressed;
+
+	// 억제되면 감지 콜리전까지 꺼 캐릭터 스피어가 다시 활성화하지 못하게 한다(예: 열린 룻박스).
+	if (bSuppressed && GetCollisionEnabled() != ECollisionEnabled::NoCollision)
+	{
+		SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	RefreshActiveState();
+}
+
+void ULSDistanceMarkerComponent::RefreshActiveState()
+{
+	const bool bActive = bActivatedByProximity && !bSuppressed && MarkerWidgetComponent != nullptr;
+	SetComponentTickEnabled(bActive);
+	if (!bActive)
+	{
+		SetMarkerVisible(false);
+	}
 }
 
 void ULSDistanceMarkerComponent::UpdateMarker(APlayerController* LocalPlayerController)
@@ -171,18 +256,6 @@ void ULSDistanceMarkerComponent::SetMarkerVisible(const bool bShouldBeVisible)
 		MarkerWidgetComponent->SetHiddenInGame(!bShouldBeVisible);
 		MarkerWidgetComponent->SetVisibility(bShouldBeVisible);
 	}
-}
-
-void ULSDistanceMarkerComponent::SetMarkerSuppressed(const bool bInSuppressed)
-{
-	bSuppressed = bInSuppressed;
-	if (bSuppressed)
-	{
-		SetMarkerVisible(false);
-	}
-
-	// 억제되면 틱까지 멈춰 완전 idle로 만든다(예: 열린 룻박스). 위젯이 없으면 애초에 비활성 유지.
-	SetComponentTickEnabled(!bSuppressed && MarkerWidgetComponent != nullptr);
 }
 
 APlayerController* ULSDistanceMarkerComponent::FindLocalPlayerController() const

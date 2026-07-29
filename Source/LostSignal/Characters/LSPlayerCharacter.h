@@ -27,6 +27,7 @@ class UUserWidget;
 class UWidgetComponent;
 class USpringArmComponent;
 class UStaticMeshComponent;
+class USphereComponent;
 struct FInputActionValue;
 
 UCLASS(Abstract)
@@ -41,6 +42,8 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	// 에디터 뷰포트에서도 무기가 소켓에 붙어 보이도록 편집 시점에 재어태치한다(오프셋 조절용).
 	virtual void OnConstruction(const FTransform& Transform) override;
+	// 빙의 변경 시 로컬 폰에서만 마커 활성화 스피어가 켜지도록 갱신한다.
+	virtual void NotifyControllerChanged() override;
 
 	// 사망 시 서버에서 FarmingGameMode에 레이드 종료(Dead)를 알린다. 파밍 외 레벨에서는 아무것도 하지 않는다.
 	virtual void OnDeathStateChanged(bool bIsDead) override;
@@ -208,6 +211,15 @@ protected:
 	// ESC(메뉴/백): 열린 UI가 있으면 닫고, 닫을 게 없으면 설정 메뉴를 연다
 	UPROPERTY(EditAnywhere, Category="LS/Input")
 	TObjectPtr<UInputAction> MenuAction;
+
+	// 거리 기반 빌보드 마커를 활성화하는 감지 스피어. 로컬 폰에서만 켜지며, 이 안에 든 룻박스 등의
+	// 마커 컴포넌트(InteractMarker 채널)만 갱신·표시된다. 밖의 마커는 완전 idle.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Interact", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<USphereComponent> MarkerActivationSphere;
+
+	// 마커 활성화 스피어 반경(cm). 마커의 MaxVisibleDistance와 같거나 크게 둔다.
+	UPROPERTY(EditAnywhere, Category="LS/Interact", meta=(ClampMin="0.0"))
+	float MarkerActivationRadius = 3000.0f;
 
 	// 상호작용 감지 최대 거리 (cm)
 	UPROPERTY(EditAnywhere, Category="LS/Interact", meta=(ClampMin="50.0"))
@@ -399,6 +411,20 @@ private:
 
 	FVector GetDashDirection() const;
 	bool ResolveMouseWorldPoint(FVector& OutMouseWorldPoint) const;
+
+	// 로컬 폰 여부에 따라 마커 활성화 스피어의 콜리전을 켜고 끈다.
+	void UpdateMarkerActivationEnabled();
+
+	// 스피어를 켜는 시점에 이미 겹쳐 있던 마커를 직접 활성화한다(BeginOverlap 유실 보완).
+	void ActivateOverlappingMarkers();
+
+	UFUNCTION()
+	void OnMarkerActivationBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnMarkerActivationEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 	// 퀵슬롯 인덱스(0~5)의 소모품 사용을 시도한다(클라 진입점). 등록/보유/시전 여부를 검사한다.
 	void TryUseQuickSlot(int32 QuickSlotIndex);

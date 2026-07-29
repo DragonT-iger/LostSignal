@@ -15,6 +15,12 @@ ALSLootBox::ALSLootBox()
 	MinimapMarkerComponent = CreateDefaultSubobject<ULSMinimapMarkerComponent>(TEXT("MinimapMarkerComponent"));
 	MinimapMarkerComponent->SetMarkerType(ELSMinimapMarkerType::Loot);
 	MinimapMarkerComponent->SetMarkerColor(FLinearColor(1.0f, 0.82f, 0.18f, 1.0f));
+
+	// 룻박스는 거리 기반 빌보드 마커를 기본으로 켠다. 위젯 UI는 전역 설정에서 받아 쓴다.
+	if (DistanceMarkerComponent)
+	{
+		DistanceMarkerComponent->SetMarkerEnabled(true);
+	}
 }
 
 void ALSLootBox::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
