@@ -2,7 +2,6 @@
 
 #include "AbilitySystemComponent.h"
 #include "Characters/LSCharacterBase.h"
-#include "Components/Image.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Core/LSFarmingGameMode.h"
@@ -11,53 +10,20 @@
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
 #include "Data/LSProtocolUnlockRow.h"
-#include "Engine/Texture2D.h"
 #include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "LostSignal.h"
-#include "Materials/MaterialInstanceDynamic.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSubsystem.h"
-#include "Inventory/LSInventorySlotUtils.h"
 
 #define LOCTEXT_NAMESPACE "LSSurvivalStatusWidget"
 
 namespace
 {
-const FName ProgressParameterName(TEXT("Progress"));
-const FName IconTextureParameterName(TEXT("IconTexture"));
 constexpr int32 HealthProgressFillProtocolLevel = 2;
 constexpr int32 HealthPreviewFillProtocolLevel = 3;
 constexpr int32 StaminaProgressFillProtocolLevel = 2;
-
-FString BuildChipIconObjectPath(const FName ChipItemRowName)
-{
-	const FString IconName = LSInventorySlotUtils::ResolveIconAssetNameFromRowName(ChipItemRowName);
-	return FString::Printf(TEXT("/Game/LostSignal/UI/Icons/Chips/%s.%s"), *IconName, *IconName);
-}
-
-int32 CalculateSurvivalDisappearingSignalSlotIndex(const float SignalPercent)
-{
-	const float ClampedPercent = FMath::Clamp(SignalPercent, 0.0f, 1.0f);
-	if (ClampedPercent <= 0.0f)
-	{
-		return INDEX_NONE;
-	}
-
-	return FMath::Clamp(FMath::FloorToInt((1.0f - ClampedPercent) * 10.0f + KINDA_SMALL_NUMBER), 0, 9);
-}
-
-float CalculateSurvivalSignalSlotDisappearProgress(const float SignalPercent, const int32 SlotIndex)
-{
-	if (SlotIndex == INDEX_NONE)
-	{
-		return 0.0f;
-	}
-
-	const float ClampedPercent = FMath::Clamp(SignalPercent, 0.0f, 1.0f);
-	const float SlotInactiveThreshold = 1.0f - (static_cast<float>(SlotIndex + 1) * 0.1f);
-	return FMath::Clamp((ClampedPercent - SlotInactiveThreshold) / 0.1f, 0.0f, 1.0f);
-}
+constexpr int32 SignalProgressBarCount = 10;
 
 FText BuildSurvivalStatusValueText(const float CurrentValue, const float MaxValue)
 {
@@ -92,42 +58,16 @@ void ULSSurvivalStatusWidget::NativeConstruct()
 	{
 		UE_LOG(LogLS, Warning, TEXT("%s is missing required survival widget binding: StaminaProgressBar."), *GetNameSafe(this));
 	}
-	if (!SurvivalCooldownRingImage)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s is missing required survival widget binding: SurvivalCooldownRingImage."), *GetNameSafe(this));
-	}
-	if (!ChipImage)
-	{
-		UE_LOG(LogLS, Warning, TEXT("%s is missing required survival widget binding: ChipImage."), *GetNameSafe(this));
-	}
+	InitializeSignalProgressBars();
 
-	if (SurvivalCooldownRingImage)
+	if (bStartPreviewSignalCooldownOnConstruct)
 	{
-		SurvivalCooldownRingMaterial = SurvivalCooldownRingImage->GetDynamicMaterial();
-		if (!SurvivalCooldownRingMaterial)
-		{
-			UE_LOG(LogLS, Warning, TEXT("%s cannot create survival cooldown ring material. Check SurvivalCooldownRingImage brush material."), *GetNameSafe(this));
-		}
-	}
-	if (ChipImage)
-	{
-		ChipImageMaterial = ChipImage->GetDynamicMaterial();
-		if (!ChipImageMaterial)
-		{
-			UE_LOG(LogLS, Warning, TEXT("%s cannot create chip image material. Check ChipImage brush material uses M_UI_CircleIcon."), *GetNameSafe(this));
-		}
-	}
-
-	if (bStartPreviewRingCooldownOnConstruct)
-	{
-		StartPreviewRingCooldown(PreviewRingCooldownDuration);
+		StartPreviewSignalCooldown(PreviewSignalCooldownDuration);
 	}
 	else
 	{
-		SetRingCooldownProgress(0.0f);
+		SetSignalProgress(0.0f);
 	}
-	ClearPreviewSignalChip();
-
 	RefreshDisplay();
 }
 
@@ -142,7 +82,6 @@ void ULSSurvivalStatusWidget::NativeDestruct()
 void ULSSurvivalStatusWidget::InitializeSurvivalStatusForPawn(APawn* InPawn)
 {
 	bUsePreviewSurvivalStatus = false;
-	ActiveSignalSlotIndex = INDEX_NONE;
 	ALSCharacterBase* NewCharacter = Cast<ALSCharacterBase>(InPawn);
 	if (ObservedCharacter.Get() == NewCharacter)
 	{
@@ -180,8 +119,8 @@ void ULSSurvivalStatusWidget::SetPreviewSurvivalStatus(
 	PreviewCurrentHealth = FMath::Clamp(CurrentHealth, 0.0f, PreviewMaxHealth);
 	PreviewMaxStamina = FMath::Max(0.0f, MaxStamina);
 	PreviewCurrentStamina = FMath::Clamp(CurrentStamina, 0.0f, PreviewMaxStamina);
-	PreviewRingCooldownRemaining = 0.0f;
-	SetRingCooldownProgress(1.0f);
+	PreviewSignalCooldownRemaining = 0.0f;
+	SetSignalProgress(1.0f);
 
 	RefreshDisplay();
 }
@@ -214,54 +153,27 @@ void ULSSurvivalStatusWidget::ClearHealthPreview()
 	RefreshDisplay();
 }
 
-void ULSSurvivalStatusWidget::StartPreviewRingCooldown(float Duration)
+void ULSSurvivalStatusWidget::StartPreviewSignalCooldown(float Duration)
 {
-	PreviewRingCooldownDuration = FMath::Max(Duration, 0.0f);
-	PreviewRingCooldownRemaining = PreviewRingCooldownDuration;
-	SetRingCooldownProgress(PreviewRingCooldownDuration > 0.0f ? 1.0f : 0.0f);
+	PreviewSignalCooldownDuration = FMath::Max(Duration, 0.0f);
+	PreviewSignalCooldownRemaining = PreviewSignalCooldownDuration;
+	SetSignalProgress(PreviewSignalCooldownDuration > 0.0f ? 1.0f : 0.0f);
 }
 
-void ULSSurvivalStatusWidget::SetPreviewSignalChip(const FName ChipItemRowName, const float DisappearProgress)
+void ULSSurvivalStatusWidget::SetPreviewSignalProgress(const float SignalProgress)
 {
-	if (ChipItemRowName.IsNone())
-	{
-		ClearPreviewSignalChip();
-		return;
-	}
-
-	SetSignalChipIcon(ChipItemRowName);
-
-	PreviewRingCooldownRemaining = 0.0f;
-	SetRingCooldownProgress(DisappearProgress);
-}
-
-void ULSSurvivalStatusWidget::SetSignalChipIcon(const FName ChipItemRowName)
-{
-	if (PreviewSignalChipRowName != ChipItemRowName)
-	{
-		UTexture2D* IconTexture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *BuildChipIconObjectPath(ChipItemRowName)));
-		if (!IconTexture)
-		{
-			UE_LOG(LogLS, Warning, TEXT("Failed to load preview signal chip icon for row '%s' on %s."), *ChipItemRowName.ToString(), *GetNameSafe(this));
-		}
-
-		SetChipImageTexture(IconTexture);
-		PreviewSignalChipRowName = IconTexture ? ChipItemRowName : NAME_None;
-	}
-	else if (ChipImage)
-	{
-		ChipImage->SetVisibility(ShouldShowSignalIndicator() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	}
+	PreviewSignalCooldownRemaining = 0.0f;
+	SetSignalProgress(SignalProgress);
 }
 
 void ULSSurvivalStatusWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	RefreshPreviewRingCooldown(InDeltaTime);
+	RefreshPreviewSignalCooldown(InDeltaTime);
 	if (!bUsePreviewSurvivalStatus)
 	{
-		RefreshSignalChipFromSave();
+		RefreshSignalProgressFromSave();
 	}
 	if (HealthPreviewRemaining > 0.0f && HealthPreviewDuration > 0.0f)
 	{
@@ -385,58 +297,54 @@ void ULSSurvivalStatusWidget::RefreshVisibility()
 	SetWidgetVisibility(StaminaProgressBar, bShowStaminaBar);
 }
 
-void ULSSurvivalStatusWidget::RefreshPreviewRingCooldown(float InDeltaTime)
+void ULSSurvivalStatusWidget::InitializeSignalProgressBars()
 {
-	if (PreviewRingCooldownRemaining <= 0.0f || PreviewRingCooldownDuration <= 0.0f)
+	SignalProgressBars = {
+		SignalProgressBar1,
+		SignalProgressBar2,
+		SignalProgressBar3,
+		SignalProgressBar4,
+		SignalProgressBar5,
+		SignalProgressBar6,
+		SignalProgressBar7,
+		SignalProgressBar8,
+		SignalProgressBar9,
+		SignalProgressBar10
+	};
+
+	for (int32 Index = 0; Index < SignalProgressBars.Num(); ++Index)
+	{
+		if (!SignalProgressBars[Index])
+		{
+			UE_LOG(LogLS, Warning, TEXT("%s is missing required survival widget binding: SignalProgressBar%d."),
+				*GetNameSafe(this),
+				Index + 1);
+		}
+	}
+}
+
+void ULSSurvivalStatusWidget::RefreshPreviewSignalCooldown(float InDeltaTime)
+{
+	if (PreviewSignalCooldownRemaining <= 0.0f || PreviewSignalCooldownDuration <= 0.0f)
 	{
 		return;
 	}
 
-	PreviewRingCooldownRemaining = FMath::Max(PreviewRingCooldownRemaining - InDeltaTime, 0.0f);
-	SetRingCooldownProgress(PreviewRingCooldownRemaining / PreviewRingCooldownDuration);
+	PreviewSignalCooldownRemaining = FMath::Max(PreviewSignalCooldownRemaining - InDeltaTime, 0.0f);
+	SetSignalProgress(PreviewSignalCooldownRemaining / PreviewSignalCooldownDuration);
 }
 
-void ULSSurvivalStatusWidget::RefreshSignalChipFromSave()
+void ULSSurvivalStatusWidget::RefreshSignalProgressFromSave()
 {
 	UGameInstance* GameInstance = GetGameInstance();
 	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
 	if (!SaveSubsystem)
 	{
-		ClearPreviewSignalChip();
+		SetSignalProgress(0.0f);
 		return;
 	}
 
 	const float SignalPercent = SaveSubsystem->GetChipSignalGaugePercent();
-	const int32 DisappearingSlotIndex = CalculateSurvivalDisappearingSignalSlotIndex(SignalPercent);
-	const TArray<FLSSessionItem>& EquipmentItems = SaveSubsystem->GetChipEquipmentSlots();
-
-	// 비활성화는 슬롯 번호 순이라 DisappearingSlotIndex가 "다음에 비활성화될 첫 활성 슬롯"이다.
-	// 그 슬롯이 비어 있으면 다음으로 채워진 칩까지 건너뛴다(= 실제로 다음에 사라질 칩).
-	int32 TargetSlotIndex = INDEX_NONE;
-	if (DisappearingSlotIndex != INDEX_NONE)
-	{
-		for (int32 SlotIndex = DisappearingSlotIndex; SlotIndex < EquipmentItems.Num(); ++SlotIndex)
-		{
-			if (LSInventorySlotUtils::IsFilled(EquipmentItems[SlotIndex]))
-			{
-				TargetSlotIndex = SlotIndex;
-				break;
-			}
-		}
-	}
-
-	// 더 이상 사라질 칩이 없으면(전부 비활성화됐거나 장착 칩 없음) 아이콘은 숨기고,
-	// 데모 카운트다운은 끈 뒤 시간이 다 지난 링(0)만 남긴다.
-	if (TargetSlotIndex == INDEX_NONE)
-	{
-		ClearPreviewSignalChip();
-		PreviewRingCooldownRemaining = 0.0f;
-		SetRingCooldownProgress(0.0f);
-		ActiveSignalSlotIndex = INDEX_NONE;
-		return;
-	}
-
-	const FLSSessionItem& DisappearingItem = EquipmentItems[TargetSlotIndex];
 
 	// 신호 게이지는 드레인 타이머가 도는 곳(= ALSFarmingGameMode 가 있는 레이드/테스트 레벨)에서만
 	// 시간에 따라 감소한다. 로비/결과 등 다른 게임모드에서는 캐스트가 실패하고, 타이머가 멈춰 있으면
@@ -449,64 +357,31 @@ void ULSSurvivalStatusWidget::RefreshSignalChipFromSave()
 	// 타이머가 멈춰 있으면(게이지 0%) 실제 잔여시간이 없으므로 구간 위치를 정적으로 표시한다.
 	if (DrainRemaining < 0.0f || DrainInterval <= 0.0f)
 	{
-		SetPreviewSignalChip(DisappearingItem.ItemRowName, CalculateSurvivalSignalSlotDisappearProgress(SignalPercent, TargetSlotIndex));
-		ActiveSignalSlotIndex = INDEX_NONE;
+		SetSignalProgress(SignalPercent);
 		return;
 	}
 
-	// 레이드: 게이지는 1분마다 10% 단계로만 떨어지므로, 링은 자체 추정 대신 게임모드 드레인 타이머의
-	// 실제 잔여시간(1.0→0.0)을 매 틱 그대로 반영한다. 구간이 바뀐 순간에만 아이콘을 교체한다.
-	if (TargetSlotIndex != ActiveSignalSlotIndex)
-	{
-		SetSignalChipIcon(DisappearingItem.ItemRowName);
-		ActiveSignalSlotIndex = TargetSlotIndex;
-	}
-	PreviewRingCooldownRemaining = 0.0f;
-	SetRingCooldownProgress(DrainRemaining / DrainInterval);
+	// 레이드: 게이지는 1분마다 10% 단계로만 떨어지므로, 10칸 바는 자체 추정 대신 게임모드 드레인 타이머의
+	// 실제 잔여시간을 현재 10% 구간에 보간해 매 틱 반영한다.
+	const float StepRemaining = FMath::Clamp(DrainRemaining / DrainInterval, 0.0f, 1.0f);
+	const float NextSignalPercent = FMath::Max(SignalPercent - 0.1f, 0.0f);
+	PreviewSignalCooldownRemaining = 0.0f;
+	SetSignalProgress(NextSignalPercent + (0.1f * StepRemaining));
 }
 
-void ULSSurvivalStatusWidget::SetRingCooldownProgress(float Progress)
+void ULSSurvivalStatusWidget::SetSignalProgress(float Progress)
 {
-	if (SurvivalCooldownRingImage)
-	{
-		// 생존 프로토콜이 0이면 신호 유실 링을 숨긴다(HP/스태미나 바 게이팅과 동일 기준).
-		SurvivalCooldownRingImage->SetVisibility(ShouldShowSignalIndicator() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	}
-	if (SurvivalCooldownRingMaterial)
-	{
-		SurvivalCooldownRingMaterial->SetScalarParameterValue(ProgressParameterName, FMath::Clamp(Progress, 0.0f, 1.0f));
-	}
-}
+	const bool bShowSignalProgress = ShouldShowSignalIndicator();
+	const float ScaledProgress = FMath::Clamp(Progress, 0.0f, 1.0f) * SignalProgressBarCount;
 
-void ULSSurvivalStatusWidget::SetChipImageTexture(UTexture2D* Texture)
-{
-	if (!ChipImage)
+	for (int32 Index = 0; Index < SignalProgressBars.Num(); ++Index)
 	{
-		return;
+		if (UProgressBar* ProgressBar = SignalProgressBars[Index])
+		{
+			ProgressBar->SetPercent(FMath::Clamp(ScaledProgress - Index, 0.0f, 1.0f));
+			ProgressBar->SetVisibility(bShowSignalProgress ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		}
 	}
-
-	if (!Texture)
-	{
-		ChipImage->SetVisibility(ESlateVisibility::Collapsed);
-		return;
-	}
-
-	if (ChipImageMaterial)
-	{
-		ChipImageMaterial->SetTextureParameterValue(IconTextureParameterName, Texture);
-	}
-	else
-	{
-		ChipImage->SetBrushFromTexture(Texture);
-	}
-	// 생존 프로토콜이 0이면 링 안의 칩 아이콘도 함께 숨긴다.
-	ChipImage->SetVisibility(ShouldShowSignalIndicator() ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-}
-
-void ULSSurvivalStatusWidget::ClearPreviewSignalChip()
-{
-	PreviewSignalChipRowName = NAME_None;
-	SetChipImageTexture(nullptr);
 }
 
 void ULSSurvivalStatusWidget::ResolveSurvivalProtocolLevels(int32& OutCurrentLevel, int32& OutPreviousLevel) const
