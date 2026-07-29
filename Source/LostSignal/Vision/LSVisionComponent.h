@@ -42,8 +42,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	float MaxRayDistance = 2500.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision", meta = (ClampMin = "0.01"))
-	float UpdateInterval = 0.016f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision", meta = (ClampMin = "0.001"))
+	float UpdateInterval = 0.008f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision", meta = (ClampMin = "0.01"))
 	float DivideAngleDegree = 0.5f;
