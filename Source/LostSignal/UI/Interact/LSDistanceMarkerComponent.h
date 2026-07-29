@@ -40,7 +40,7 @@ protected:
 
 	// 오브젝트 루트 기준 위젯 표시 높이 오프셋.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact|Marker")
-	FVector WidgetOffset = FVector(0.0f, 0.0f, 120.0f);
+	FVector WidgetOffset = FVector(0.0f, 0.0f, 80.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact|Marker")
 	FVector2D DrawSize = FVector2D(32.0f, 32.0f);
@@ -51,11 +51,11 @@ protected:
 
 	// 이 거리를 넘으면 완전히 숨긴다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact|Marker", meta=(ClampMin="0.0"))
-	float MaxVisibleDistance = 3000.0f;
+	float MaxVisibleDistance = 800.0f;
 
 	// 이 거리 이하에서는 완전 불투명. FadeInDistance~MaxVisibleDistance 구간에서 알파가 1→0으로 보간된다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact|Marker", meta=(ClampMin="0.0"))
-	float FadeInDistance = 1500.0f;
+	float FadeInDistance = 600.0f;
 
 	// 근거리 스케일. 거리 비율 0(가까움)에서 적용.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/Interact|Marker", meta=(ClampMin="0.01"))
