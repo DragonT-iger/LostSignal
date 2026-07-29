@@ -1279,7 +1279,7 @@ bool ULSItemSlotWidget::TryHandleChipStationQuickTransfer()
 		return false;
 	}
 
-	// 칩 리스트는 재정렬/리빌드하지 않고 이 소스 슬롯 한 칸만 비운다(정렬은 스테이션을 다시 열 때만).
+	// 칩 리스트는 재정렬/리빌드하지 않고 이 소스 슬롯 한 칸만 비운다.
 	ClearItem();
 	return true;
 }
@@ -1308,7 +1308,9 @@ void ULSItemSlotWidget::RefreshChipStationSlotFromStored()
 		? SaveSubsystem->GetWarehouseItems()
 		: SaveSubsystem->GetInventory();
 	const FLSSessionItem* SlotItem = Slots.IsValidIndex(SlotIndex) ? &Slots[SlotIndex] : nullptr;
-	if (SlotItem && LSInventorySlotUtils::IsFilled(*SlotItem))
+	if (SlotItem
+		&& LSInventorySlotUtils::IsFilled(*SlotItem)
+		&& ChipStationWidget->IsChipVisibleForCurrentFilter(SlotItem->ItemRowName))
 	{
 		SetItem(SlotItem->ItemRowName, SlotItem->Amount, SlotItem->ChipStats);
 		SetChipStationSlotContext(ChipStationWidget.Get(), SlotArea, SlotIndex, SlotItem->ItemRowName, SlotItem->Amount, SlotItem->ChipStats);

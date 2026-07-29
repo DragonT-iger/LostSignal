@@ -183,6 +183,11 @@ int32 GetProtocolTotalByType(const FLSChipProtocolTotals& Totals, const ELSProto
 	}
 }
 
+bool DoesChipMatchProtocolFilter(const FLSChipProtocolTotals& Protocols, const TOptional<ELSProtocolType>& FilterProtocol)
+{
+	return !FilterProtocol.IsSet() || GetProtocolTotalByType(Protocols, FilterProtocol.GetValue()) > 0;
+}
+
 void AddChipViewItems(
 	const TArray<FLSSessionItem>& Items,
 	const ELSInventorySlotArea SourceArea,
@@ -207,22 +212,11 @@ void AddChipViewItems(
 	}
 }
 
-// SortProtocol이 지정되면 그 프로토콜 수치 내림차순이 최우선 키가 된다(값이 0인 칩도 빠지지 않고 뒤로 밀린다).
-// 동값이거나 미지정(ALL)이면 기존 기준 — 가격 내림차순 → 출처(인벤토리 우선) → 슬롯 인덱스.
-void SortChipViewItems(TArray<FLSChipStationViewItem>& ViewItems, const TOptional<ELSProtocolType>& SortProtocol)
+// 필터를 통과한 칩은 기존 기준 — 가격 내림차순 → 출처(인벤토리 우선) → 슬롯 인덱스 — 으로 정렬한다.
+void SortChipViewItems(TArray<FLSChipStationViewItem>& ViewItems)
 {
-	ViewItems.Sort([&SortProtocol](const FLSChipStationViewItem& Left, const FLSChipStationViewItem& Right)
+	ViewItems.Sort([](const FLSChipStationViewItem& Left, const FLSChipStationViewItem& Right)
 	{
-		if (SortProtocol.IsSet())
-		{
-			const int32 LeftProtocol = GetProtocolTotalByType(Left.Protocols, SortProtocol.GetValue());
-			const int32 RightProtocol = GetProtocolTotalByType(Right.Protocols, SortProtocol.GetValue());
-			if (LeftProtocol != RightProtocol)
-			{
-				return LeftProtocol > RightProtocol;
-			}
-		}
-
 		if (Left.Price != Right.Price)
 		{
 			return Left.Price > Right.Price;
@@ -428,12 +422,12 @@ void ULSChipStationWidget::ApplySortButtonState() const
 {
 	const auto IsProtocolSelected = [this](const ELSProtocolType ProtocolType)
 	{
-		return ChipSortProtocol.IsSet() && ChipSortProtocol.GetValue() == ProtocolType;
+		return ChipFilterProtocol.IsSet() && ChipFilterProtocol.GetValue() == ProtocolType;
 	};
 
 	if (SortButton1)
 	{
-		SortButton1->SetSelected(!ChipSortProtocol.IsSet());
+		SortButton1->SetSelected(!ChipFilterProtocol.IsSet());
 	}
 
 	if (SortButton2)
@@ -457,41 +451,41 @@ void ULSChipStationWidget::ApplySortButtonState() const
 	}
 }
 
-void ULSChipStationWidget::SetChipSortProtocol(TOptional<ELSProtocolType> NewSortProtocol)
+void ULSChipStationWidget::SetChipFilterProtocol(TOptional<ELSProtocolType> NewFilterProtocol)
 {
-	if (ChipSortProtocol == NewSortProtocol)
+	if (ChipFilterProtocol == NewFilterProtocol)
 	{
 		return;
 	}
 
-	ChipSortProtocol = NewSortProtocol;
+	ChipFilterProtocol = NewFilterProtocol;
 	ApplySortButtonState();
 	RefreshChipSlots();
 }
 
 void ULSChipStationWidget::HandleSortButtonAllClicked()
 {
-	SetChipSortProtocol(TOptional<ELSProtocolType>());
+	SetChipFilterProtocol(TOptional<ELSProtocolType>());
 }
 
 void ULSChipStationWidget::HandleSortButtonSurvivalClicked()
 {
-	SetChipSortProtocol(ELSProtocolType::Survival);
+	SetChipFilterProtocol(ELSProtocolType::Survival);
 }
 
 void ULSChipStationWidget::HandleSortButtonCarryingClicked()
 {
-	SetChipSortProtocol(ELSProtocolType::Carrying);
+	SetChipFilterProtocol(ELSProtocolType::Carrying);
 }
 
 void ULSChipStationWidget::HandleSortButtonNavigationClicked()
 {
-	SetChipSortProtocol(ELSProtocolType::Navigation);
+	SetChipFilterProtocol(ELSProtocolType::Navigation);
 }
 
 void ULSChipStationWidget::HandleSortButtonBattleClicked()
 {
-	SetChipSortProtocol(ELSProtocolType::Battle);
+	SetChipFilterProtocol(ELSProtocolType::Battle);
 }
 
 void ULSChipStationWidget::RefreshChipStation_Implementation()
@@ -529,14 +523,21 @@ void ULSChipStationWidget::RefreshChipSlots()
 	TArray<FLSChipStationViewItem> ViewItems;
 	AddChipViewItems(SaveSubsystem->GetInventory(), ELSInventorySlotArea::Inventory, ChipTable, this, ViewItems);
 	AddChipViewItems(SaveSubsystem->GetWarehouseItems(), ELSInventorySlotArea::Warehouse, ChipTable, this, ViewItems);
-	SortChipViewItems(ViewItems, ChipSortProtocol);
+	ViewItems.RemoveAll([this](const FLSChipStationViewItem& ViewItem)
+	{
+		return !DoesChipMatchProtocolFilter(ViewItem.Protocols, ChipFilterProtocol);
+	});
+	SortChipViewItems(ViewItems);
 
-	// 칩 리스트는 총 칩 개수(미장착 + 장착)만큼 고정 크기로 잡는다. 장착하면 그 칸이 빈 칸(hole)으로 남고,
+	// 칩 리스트는 현재 필터에 맞는 총 칩 개수(미장착 + 장착)만큼 고정 크기로 잡는다. 장착하면 그 칸이 빈 칸(hole)으로 남고,
 	// 해제하면 빈 칸에 다시 채워지므로 스테이션 조작 중에는 위젯을 추가/삭제할 필요가 없다(InsertChipListSlot 참고).
 	int32 EquippedChipCount = 0;
 	for (const FLSSessionItem& EquipmentItem : SaveSubsystem->GetChipEquipmentSlots())
 	{
-		if (LSInventorySlotUtils::IsFilled(EquipmentItem))
+		if (LSInventorySlotUtils::IsFilled(EquipmentItem)
+			&& DoesChipMatchProtocolFilter(
+				ResolveChipStationProtocolValues(ChipTable, EquipmentItem.ItemRowName, this),
+				ChipFilterProtocol))
 		{
 			++EquippedChipCount;
 		}
@@ -731,8 +732,8 @@ bool ULSChipStationWidget::EquipChipToHardwareSlot(const ULSInventoryDragDropOpe
 	{
 		PlayChipSound(ChipEquipSound, TEXT("ChipEquipSound"));
 		RecordChipOrigin(EquipmentSlotIndex, DragOperation.SourceSlotArea, DragOperation.SourceSlotIndex);
-		// 정렬은 스테이션을 다시 열 때만 한다. 드래그한 소스 리스트 칸만 제자리 갱신하고
-		// (장착칸이 비어 있었으면 hole, 차 있어 스왑됐으면 돌아온 칩 표시) 장착칸·요약·용량만 경량 갱신한다.
+		// 드래그한 소스 리스트 칸만 제자리 갱신하고, 돌아온 칩이 현재 필터와 다르면 hole로 남긴다.
+		// 장착칸·요약·용량만 경량 갱신한다.
 		if (ULSItemSlotWidget* SourceSlotWidget = DragOperation.SourceSlotWidget)
 		{
 			SourceSlotWidget->RefreshChipStationSlotFromStored();
@@ -842,7 +843,7 @@ bool ULSChipStationWidget::SwapEquippedChipWithStoredSlot(const ULSInventoryDrag
 		PlayChipSound(ChipEquipSound, TEXT("ChipEquipSound"));
 		// 밀려난 칩은 대상 저장 슬롯으로 갔으므로, 이 장착칸의 출처는 새로 들어온 칩의 저장 슬롯으로 덮어쓴다.
 		RecordChipOrigin(DragOperation.SourceEquipmentSlotIndex, TargetArea, TargetSlotIndex);
-		// 정렬은 스테이션을 다시 열 때만 한다. 드롭 대상 리스트 칸만 제자리 갱신한다(스왑으로 이 칸엔 방금 해제된 칩이 들어온다).
+		// 드롭 대상 리스트 칸만 제자리 갱신한다. 스왑으로 돌아온 칩이 현재 필터와 다르면 hole로 남긴다.
 		if (TargetStoredSlotWidget)
 		{
 			TargetStoredSlotWidget->RefreshChipStationSlotFromStored();
@@ -1010,7 +1011,7 @@ bool ULSChipStationWidget::UnequipChipToWarehouseWithListUpdate(ULSSaveSubsystem
 
 	PlayChipSound(ChipUnequipSound, TEXT("ChipUnequipSound"));
 
-	// 칩 리스트는 재정렬/리빌드하지 않고, 돌아온 칩을 빈 칸(빠른 장착으로 생긴 hole) 또는 맨 뒤에 꽂는다.
+	// 칩 리스트는 재정렬/리빌드하지 않고, 필터에 맞는 돌아온 칩만 빈 칸에 꽂는다.
 	const TArray<FLSSessionItem>& WarehouseAfter = SaveSubsystem.GetWarehouseItems();
 	const int32 ReturnedWarehouseIndex = FindFirstNewlyFilledIndex(WarehouseAfter, FilledBeforeUnequip);
 	if (ReturnedWarehouseIndex != INDEX_NONE)
@@ -1137,8 +1138,13 @@ void ULSChipStationWidget::InsertChipListSlot(const FLSSessionItem& Chip, const 
 		return;
 	}
 
-	// 장착으로 비워진 슬롯(hole)을 앞에서부터 재사용한다. 칩 리스트는 총 칩 개수만큼 고정 크기로
-	// 만들어지므로(RefreshChipSlots 참고) 장착 칩이 돌아올 빈 칸은 항상 존재한다.
+	if (!IsChipVisibleForCurrentFilter(Chip.ItemRowName))
+	{
+		return;
+	}
+
+	// 장착으로 비워진 슬롯(hole)을 앞에서부터 재사용한다. 칩 리스트는 현재 필터에 맞는 총 칩 개수만큼
+	// 고정 크기로 만들어지므로(RefreshChipSlots 참고) 필터에 맞는 장착 칩이 돌아올 빈 칸은 항상 존재한다.
 	ULSItemSlotWidget* TargetSlot = nullptr;
 	for (int32 ChildIndex = 0; ChildIndex < ChipSlotWrapBox->GetChildrenCount(); ++ChildIndex)
 	{
@@ -1162,6 +1168,18 @@ void ULSChipStationWidget::InsertChipListSlot(const FLSSessionItem& Chip, const 
 	TargetSlot->SetItem(Chip.ItemRowName, Chip.Amount, Chip.ChipStats);
 	TargetSlot->SetChipStationSlotContext(this, SourceArea, SourceSlotIndex, Chip.ItemRowName, Chip.Amount, Chip.ChipStats);
 	TargetSlot->RefreshHoverStateFromCursor();
+}
+
+bool ULSChipStationWidget::IsChipVisibleForCurrentFilter(const FName ItemRowName) const
+{
+	if (!ChipFilterProtocol.IsSet())
+	{
+		return true;
+	}
+
+	return DoesChipMatchProtocolFilter(
+		ResolveChipStationProtocolValues(LoadChipTable(this), ItemRowName, this),
+		ChipFilterProtocol);
 }
 
 void ULSChipStationWidget::InitializeEquipmentSlots()

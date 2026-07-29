@@ -77,7 +77,8 @@ void ULSStoreWidget::NativeConstruct()
 
 void ULSStoreWidget::NativeDestruct()
 {
-	for (ULSStoreButtonWidget* StoreButton : ActiveButtons)
+	// 숨겨져 ActiveButtons에 없는 버튼까지 풀 전체를 해제한다.
+	for (ULSStoreButtonWidget* StoreButton : ButtonPool)
 	{
 		if (StoreButton)
 		{
@@ -445,34 +446,143 @@ void ULSStoreWidget::HandleQuestOfferSelected(const bool bAccepted)
 	}
 }
 
-void ULSStoreWidget::RebuildButtons(const int32 Count)
+void ULSStoreWidget::EnsureButtonPool()
 {
-	if (!ButtonBox || !StoreButtonClass)
+	if (bButtonPoolInitialized || !ButtonBox)
+	{
+		return;
+	}
+	bButtonPoolInitialized = true;
+
+	// 화살표(UButton)는 타입이 달라 자연히 걸러진다.
+	for (int32 ChildIndex = 0; ChildIndex < ButtonBox->GetChildrenCount(); ++ChildIndex)
+	{
+		if (ULSStoreButtonWidget* StoreButton = Cast<ULSStoreButtonWidget>(ButtonBox->GetChildAt(ChildIndex)))
+		{
+			ButtonPool.Add(StoreButton);
+		}
+	}
+
+	if (ButtonPool.IsEmpty())
+	{
+		UE_LOG(LogLS, Warning,
+			TEXT("[Store] ButtonBox has no designer-placed store buttons on %s. Runtime buttons fall back to default slots."),
+			*GetNameSafe(this));
+		return;
+	}
+
+	// 아트가 디자이너에서 잡은 슬롯 값을 원본으로 캡처한다. 이후 상태 전환은 이 값으로 되돌린다.
+	if (const UVerticalBoxSlot* TemplateSlot = Cast<UVerticalBoxSlot>(ButtonPool[0]->Slot))
+	{
+		ButtonSlotSize = TemplateSlot->GetSize();
+		ButtonSlotPadding = TemplateSlot->GetPadding();
+		ButtonSlotHAlign = TemplateSlot->GetHorizontalAlignment();
+		ButtonSlotVAlign = TemplateSlot->GetVerticalAlignment();
+		bSlotTemplateCaptured = true;
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Store] Failed to capture the button slot template on %s."), *GetNameSafe(this));
+	}
+
+	const ESlateVisibility DesignerVisibility = ButtonPool[0]->GetVisibility();
+	ButtonVisibleState = (DesignerVisibility == ESlateVisibility::Collapsed || DesignerVisibility == ESlateVisibility::Hidden)
+		? ESlateVisibility::Visible
+		: DesignerVisibility;
+}
+
+int32 ULSStoreWidget::GetButtonInsertIndex() const
+{
+	if (!ButtonPool.IsEmpty())
+	{
+		const int32 LastPoolIndex = ButtonBox->GetChildIndex(ButtonPool.Last());
+		if (LastPoolIndex != INDEX_NONE)
+		{
+			return LastPoolIndex + 1;
+		}
+	}
+
+	// 풀이 비어 있을 때만 쓰는 경로. 아래 화살표가 박스 안에 있으면 그 앞에 넣는다.
+	if (TalkDownButton)
+	{
+		const int32 DownIndex = ButtonBox->GetChildIndex(TalkDownButton);
+		if (DownIndex != INDEX_NONE)
+		{
+			return DownIndex;
+		}
+	}
+	return ButtonBox->GetChildrenCount();
+}
+
+void ULSStoreWidget::ApplyButtonSlotTemplate(ULSStoreButtonWidget* StoreButton) const
+{
+	if (!bSlotTemplateCaptured || !StoreButton)
 	{
 		return;
 	}
 
-	for (ULSStoreButtonWidget* StoreButton : ActiveButtons)
+	if (UVerticalBoxSlot* BoxSlot = Cast<UVerticalBoxSlot>(StoreButton->Slot))
 	{
-		if (StoreButton)
-		{
-			StoreButton->OnClicked.RemoveAll(this);
-		}
+		BoxSlot->SetSize(ButtonSlotSize);
+		BoxSlot->SetPadding(ButtonSlotPadding);
+		BoxSlot->SetHorizontalAlignment(ButtonSlotHAlign);
+		BoxSlot->SetVerticalAlignment(ButtonSlotVAlign);
 	}
-	ActiveButtons.Reset();
-	ButtonBox->ClearChildren();
+}
 
-	for (int32 Index = 0; Index < Count; ++Index)
+void ULSStoreWidget::BindStoreButton(ULSStoreButtonWidget* StoreButton)
+{
+	if (StoreButton)
+	{
+		StoreButton->OnClicked.AddUniqueDynamic(this, &ULSStoreWidget::HandleStoreButtonClicked);
+	}
+}
+
+void ULSStoreWidget::RebuildButtons(const int32 Count)
+{
+	if (!ButtonBox)
+	{
+		return;
+	}
+
+	EnsureButtonPool();
+
+	// 디자이너 버튼이 모자랄 때만(퀘스트가 여러 개 쌓인 대화 목록 등) 부족분을 만들어 같은 슬롯으로 끼운다.
+	while (ButtonPool.Num() < Count && StoreButtonClass)
 	{
 		ULSStoreButtonWidget* NewButton = CreateWidget<ULSStoreButtonWidget>(this, StoreButtonClass);
 		if (!NewButton)
 		{
 			UE_LOG(LogLS, Warning, TEXT("[Store] Failed to create store button on %s."), *GetNameSafe(this));
+			break;
+		}
+		ButtonBox->InsertChildAt(GetButtonInsertIndex(), NewButton);
+		ButtonPool.Add(NewButton);
+		ApplyButtonSlotTemplate(NewButton);
+	}
+
+	// 남는 버튼은 지우지 않고 숨긴다. 지우면 디자이너가 잡아둔 슬롯 설정과 화살표 배치를 잃는다.
+	ActiveButtons.Reset();
+	for (int32 PoolIndex = 0; PoolIndex < ButtonPool.Num(); ++PoolIndex)
+	{
+		ULSStoreButtonWidget* StoreButton = ButtonPool[PoolIndex];
+		if (!StoreButton)
+		{
 			continue;
 		}
-		NewButton->OnClicked.AddDynamic(this, &ULSStoreWidget::HandleStoreButtonClicked);
-		ButtonBox->AddChildToVerticalBox(NewButton);
-		ActiveButtons.Add(NewButton);
+
+		BindStoreButton(StoreButton);
+		if (PoolIndex < Count)
+		{
+			// 확인 버튼 상태에서 덮어쓴 슬롯이 다음 상태까지 남지 않도록 매번 원본으로 되돌린다.
+			ApplyButtonSlotTemplate(StoreButton);
+			StoreButton->SetVisibility(ButtonVisibleState);
+			ActiveButtons.Add(StoreButton);
+		}
+		else
+		{
+			StoreButton->SetVisibility(ESlateVisibility::Collapsed);
+		}
 	}
 }
 

@@ -2,6 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/SlateWrapperTypes.h"
+#include "Layout/Margin.h"
+#include "Types/SlateEnums.h"
 #include "LSStoreWidget.generated.h"
 
 class UButton;
@@ -40,7 +43,8 @@ struct FLSStoreTalkEntry
 
 // 에이베리 보급소 상점 화면(WBP_Store)의 부모 클래스. 개인정비 ContentSwitcher의 Supply 페이지에 배치된다.
 // CASHIER-9 이미지/이름표는 아트가 WBP에 고정 배치하고, C++은 버튼과 대사창 텍스트만 제어한다.
-// 버튼은 상태 전환 시 ButtonBox(버티컬 박스) 안에 WBP_StoreButton을 동적으로 생성/삭제해 채운다.
+// 버튼은 ButtonBox(버티컬 박스)에 배치된 WBP_StoreButton을 재사용하며 상태별로 필요한 개수만 노출한다.
+// 대화 목록에 퀘스트가 여러 개 쌓여 배치 버튼보다 많이 필요할 때만 부족분을 런타임에 생성한다.
 // 자판기와 제작대는 각 전용 화면을 최초 진입 시 생성해 전환한다.
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSStoreWidget : public UUserWidget
@@ -76,7 +80,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Store")
 	TSubclassOf<ULSCraftingWidget> CraftingWidgetClass;
 
-	// 상태별 버튼들을 담는 버티컬 박스. 내용물은 C++이 동적으로 채운다.
+	// 상태별 버튼들을 담는 버티컬 박스.
+	// 아트가 WBP_Store 디자이너에 배치한 WBP_StoreButton들이 레이아웃 원본이다. C++은 이 버튼을
+	// 재사용하며 표시/숨김과 라벨만 바꾼다. 디자이너 버튼을 지우면 슬롯 설정(패딩/Fill 등)을 잃고
+	// 런타임 기본값(Auto/패딩 0)으로 되돌아가므로 삭제하면 안 된다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Store")
 	TObjectPtr<UVerticalBox> ButtonBox;
 
@@ -91,7 +98,8 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Store")
 	TObjectPtr<UTextBlock> DialogueText;
 
-	// 동적 생성할 버튼 위젯 클래스. BP(WBP_Store) 클래스 디폴트에서 WBP_StoreButton을 매핑한다.
+	// 디자이너 배치 버튼이 모자랄 때 추가 생성할 버튼 위젯 클래스.
+	// BP(WBP_Store) 클래스 디폴트에서 WBP_StoreButton을 매핑한다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Store")
 	TSubclassOf<ULSStoreButtonWidget> StoreButtonClass;
 
@@ -109,7 +117,7 @@ private:
 	UFUNCTION()
 	void HandleVendingBackRequested();
 
-	// 상태 전환: ButtonBox를 비우고 상태에 맞는 버튼들을 다시 만든다. 기본 대사/화살표 표시도 함께 적용.
+	// 상태 전환: 상태에 맞는 개수만큼 버튼을 노출하고 라벨을 채운다. 기본 대사/화살표 표시도 함께 적용.
 	void ShowState(ELSStoreState NewState);
 
 	// 자판기 화면 표시 전환. true면 기능 선택 화면을 숨기고 자판기를 연다(최초 1회 생성).
@@ -133,8 +141,20 @@ private:
 	// 퀘스트 수락/거절 처리 후 결과 대사와 확인 버튼을 표시한다.
 	void HandleQuestOfferSelected(bool bAccepted);
 
-	// ButtonBox 안의 버튼을 모두 지우고 Count개를 새로 만들어 ActiveButtons에 담는다.
+	// ButtonBox의 버튼 중 앞에서 Count개만 보이게 하고 나머지는 숨긴다. 풀이 부족하면 그만큼만 새로 만든다.
 	void RebuildButtons(int32 Count);
+
+	// ButtonBox에 있는 WBP_StoreButton들을 풀로 수집하고, 첫 버튼의 슬롯 값을 원본으로 캐시한다(최초 1회).
+	void EnsureButtonPool();
+
+	// 새로 만든 버튼을 넣을 ButtonBox 인덱스. 화살표가 ButtonBox의 자식이어도 그 사이에 들어가게 한다.
+	int32 GetButtonInsertIndex() const;
+
+	// 캐시한 원본 슬롯 값을 버튼의 VerticalBox 슬롯에 적용한다. 신규 생성과 상태 전환 복원에 모두 쓴다.
+	void ApplyButtonSlotTemplate(ULSStoreButtonWidget* StoreButton) const;
+
+	// 버튼 클릭 델리게이트 바인딩. 재구성 후에도 안전하게 다시 부를 수 있게 중복 없이 등록한다.
+	void BindStoreButton(ULSStoreButtonWidget* StoreButton);
 
 	// 현재 스크롤 위치 기준으로 대화 목록 버튼들의 라벨/아이콘을 갱신한다.
 	void RefreshTalkList();
@@ -145,9 +165,29 @@ private:
 	// 수락 전 퀘스트 대화가 남아 있는지. 대화하기 버튼의 퀘스트 아이콘 표시 판단용.
 	bool HasPendingQuest() const;
 
-	// 현재 ButtonBox에 떠 있는 동적 버튼들. 클릭 시 순서 판별용.
+	// 현재 화면에 보이는 버튼들. 클릭 시 순서 판별용(숨긴 버튼은 담지 않는다).
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULSStoreButtonWidget>> ActiveButtons;
+
+	// ButtonBox 안의 버튼 전체. 디자이너 배치 버튼 + 풀이 부족할 때 런타임에 추가한 버튼을 담는다.
+	// 상태 전환 시 지우지 않고 표시/숨김만 바꿔 디자이너 슬롯 설정을 보존한다.
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<ULSStoreButtonWidget>> ButtonPool;
+
+	// 디자이너 첫 버튼에서 캡처한 VerticalBox 슬롯 원본 값(UVerticalBoxSlot의 전체 프로퍼티).
+	FSlateChildSize ButtonSlotSize;
+	FMargin ButtonSlotPadding;
+	TEnumAsByte<EHorizontalAlignment> ButtonSlotHAlign = HAlign_Fill;
+	TEnumAsByte<EVerticalAlignment> ButtonSlotVAlign = VAlign_Fill;
+
+	// 버튼을 보일 때 적용할 Visibility. 디자이너 값을 그대로 쓰되 숨김 값이면 Visible로 대체한다.
+	ESlateVisibility ButtonVisibleState = ESlateVisibility::Visible;
+
+	// 슬롯 원본 캡처 완료 여부. 실패했으면 슬롯을 건드리지 않고 엔진 기본값에 맡긴다.
+	bool bSlotTemplateCaptured = false;
+
+	// 버튼 풀 수집 완료 여부.
+	bool bButtonPoolInitialized = false;
 
 	// 목록에서 보여줄 대화 항목들. 퀘스트 수락 시 퀘스트 항목을 제거하고 다시 만든다.
 	TArray<FLSStoreTalkEntry> TalkEntries;

@@ -61,6 +61,7 @@ public:
 	bool QuickEquipChipToFirstEmptyHardwareSlot(ELSInventorySlotArea SourceArea, int32 SourceSlotIndex);
 	// Shift+좌클릭 빠른 조작: 장착된 칩을 해제한다(출처 기억에 따라 인벤토리 복귀 우선, 자리 없으면 창고 폴백).
 	bool QuickUnequipEquippedChipToWarehouse(int32 EquipmentSlotIndex);
+	bool IsChipVisibleForCurrentFilter(FName ItemRowName) const;
 
 	// 이 스테이션이 띄운 용량 차단 알림 다이얼로그가 화면에 떠 있는지. 로비 메뉴(ULSLobbyMenuWidget)의 매 틱
 	// 포커스 회수 가드가 외부 모달을 예외로 둘 때 참조한다 — 보고하지 않으면 다이얼로그가 매 틱 포커스를 뺏겨
@@ -121,13 +122,13 @@ protected:
 	UFUNCTION()
 	void HandleSignalSliderValueChanged(float Value);
 
-	// ---- 칩 목록 정렬 버튼 (WBP_SortButton 5개) ----
-	// 정렬 기준을 고르는 버튼이며 필터가 아니다. 해당 프로토콜 값이 0인 칩도 목록에서 빠지지 않고 뒤로 밀린다.
+	// ---- 칩 목록 필터 버튼 (WBP_SortButton 5개) ----
+	// ALL은 전체를 표시하고, 나머지는 해당 프로토콜 값이 1 이상인 칩만 표시한다.
 	void BindSortButtons();
 	void UnbindSortButtons();
 	void ApplySortButtonState() const;
-	// 정렬 기준 변경 + 버튼 색 갱신 + 칩 목록 재정렬. 미설정(unset)은 ALL이다.
-	void SetChipSortProtocol(TOptional<ELSProtocolType> NewSortProtocol);
+	// 필터 기준 변경 + 버튼 색 갱신 + 칩 목록 재구성. 미설정(unset)은 ALL이다.
+	void SetChipFilterProtocol(TOptional<ELSProtocolType> NewFilterProtocol);
 
 	UFUNCTION()
 	void HandleSortButtonAllClicked();
@@ -171,9 +172,9 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
 	TObjectPtr<UTextBlock> MemoryText;
 
-	// ---- 칩 목록 정렬 버튼. WBP_ChipStation의 위젯 이름을 그대로 따른다. ----
+	// ---- 칩 목록 필터 버튼. WBP_ChipStation의 기존 위젯 이름을 그대로 따른다. ----
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
-	TObjectPtr<ULSStorageButtonWidget> SortButton1;   // ALL — 기본 정렬
+	TObjectPtr<ULSStorageButtonWidget> SortButton1;   // ALL — 전체 표시
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
 	TObjectPtr<ULSStorageButtonWidget> SortButton2;   // 생존 프로토콜
@@ -252,8 +253,8 @@ protected:
 	TSubclassOf<ULSConfirmDialogWidget> ConfirmDialogClass;
 
 private:
-	// 칩 목록 정렬 기준. 미설정이면 ALL(기존 기본 정렬)이다. 저장하지 않는 화면 상태다.
-	TOptional<ELSProtocolType> ChipSortProtocol;
+	// 칩 목록 필터 기준. 미설정이면 ALL이다. 저장하지 않는 화면 상태다.
+	TOptional<ELSProtocolType> ChipFilterProtocol;
 
 	// QueueRefreshEquippedChipState가 같은 틱에 여러 번 예약되지 않도록 막는 코얼레스 가드.
 	bool bPendingEquippedStateRefresh = false;
