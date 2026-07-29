@@ -14,7 +14,6 @@ class UBorder;
 class UDragDropOperation;
 class UProgressBar;
 class UTextBlock;
-class ULSChipStatWidget;
 class ULSChipEquipmentSlotWidget;
 class ULSConfirmDialogWidget;
 class ULSInventoryDragDropOperation;
@@ -23,6 +22,7 @@ class ULSMinimapWidget;
 class ULSProtocolWidget;
 class ULSSaveSubsystem;
 class ULSSkillBarWidget;
+class ULSStorageButtonWidget;
 class ULSSurvivalStatusWidget;
 class ULSSoundDirectionIndicatorWidget;
 class USlider;
@@ -49,11 +49,6 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="LS/UI|Chip")
 	void RefreshChipStation();
 
-	// 스탯 키(예: "Chip_Attack")에 해당하는 ChipStat 칸을 갱신한다.
-	// 이름 라벨은 키에서 자동 변환(GetChipStatLabel)되며, 값/신호유실은 임의값/파라미터.
-	UFUNCTION(BlueprintCallable, Category="LS/UI|Chip")
-	void SetChipStat(FName StatKey, int32 StatValue, int32 SignalLoss);
-
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Chip")
 	void SetSignalGaugePercent(float Percent);
 
@@ -75,8 +70,6 @@ public:
 protected:
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
-	// 키 → ChipStat 칸 매핑. 8개 스탯.
-	ULSChipStatWidget* GetStatWidget(FName StatKey) const;
 	void SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, const TCHAR* ProtocolName, ELSProtocolType ProtocolType, int32 CurrentLevel, int32 PreviousLevel) const;
 	void RefreshChipSlots();
 	void RefreshEquipmentSlots();
@@ -128,36 +121,29 @@ protected:
 	UFUNCTION()
 	void HandleSignalSliderValueChanged(float Value);
 
-	// ---- 8개 ChipStat 칸 (WBP_ChipStat) ----
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSChipStatWidget> ChipStat_Attack;              // 공격력
+	// ---- 칩 목록 정렬 버튼 (WBP_SortButton 5개) ----
+	// 정렬 기준을 고르는 버튼이며 필터가 아니다. 해당 프로토콜 값이 0인 칩도 목록에서 빠지지 않고 뒤로 밀린다.
+	void BindSortButtons();
+	void UnbindSortButtons();
+	void ApplySortButtonState() const;
+	// 정렬 기준 변경 + 버튼 색 갱신 + 칩 목록 재정렬. 미설정(unset)은 ALL이다.
+	void SetChipSortProtocol(TOptional<ELSProtocolType> NewSortProtocol);
 
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSChipStatWidget> ChipStat_CriticalRate;        // 치명타 확률
+	UFUNCTION()
+	void HandleSortButtonAllClicked();
 
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSChipStatWidget> ChipStat_CriticalDamage;      // 치명타 피해
+	UFUNCTION()
+	void HandleSortButtonSurvivalClicked();
 
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSChipStatWidget> ChipStat_DefensePenetration;  // 방어 관통
+	UFUNCTION()
+	void HandleSortButtonCarryingClicked();
 
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSChipStatWidget> ChipStat_Health;             // 체력
+	UFUNCTION()
+	void HandleSortButtonNavigationClicked();
 
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSChipStatWidget> ChipStat_Defense;            // 방어력
+	UFUNCTION()
+	void HandleSortButtonBattleClicked();
 
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSChipStatWidget> ChipStat_AttackSpeed;        // 공격 속도
-
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSChipStatWidget> ChipStat_Skill_Haste;
-
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSChipStatWidget> ChipStat_Recovery;
-
-	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSChipStatWidget> ChipStat_MoveSpeed;          // 이동 속도
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSProtocolWidget> Protocol_Survival;
 
@@ -184,6 +170,22 @@ protected:
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
 	TObjectPtr<UTextBlock> MemoryText;
+
+	// ---- 칩 목록 정렬 버튼. WBP_ChipStation의 위젯 이름을 그대로 따른다. ----
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
+	TObjectPtr<ULSStorageButtonWidget> SortButton1;   // ALL — 기본 정렬
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
+	TObjectPtr<ULSStorageButtonWidget> SortButton2;   // 생존 프로토콜
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
+	TObjectPtr<ULSStorageButtonWidget> SortButton3;   // 적재 프로토콜
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
+	TObjectPtr<ULSStorageButtonWidget> SortButton4;   // 탐색 프로토콜
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Chip")
+	TObjectPtr<ULSStorageButtonWidget> SortButton5;   // 전투 프로토콜
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Minimap")
 	TObjectPtr<ULSMinimapWidget> Minimap;
@@ -250,6 +252,9 @@ protected:
 	TSubclassOf<ULSConfirmDialogWidget> ConfirmDialogClass;
 
 private:
+	// 칩 목록 정렬 기준. 미설정이면 ALL(기존 기본 정렬)이다. 저장하지 않는 화면 상태다.
+	TOptional<ELSProtocolType> ChipSortProtocol;
+
 	// QueueRefreshEquippedChipState가 같은 틱에 여러 번 예약되지 않도록 막는 코얼레스 가드.
 	bool bPendingEquippedStateRefresh = false;
 

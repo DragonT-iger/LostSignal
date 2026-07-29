@@ -1,5 +1,6 @@
 #include "UI/Storage/LSLobbyStorageWidget.h"
 
+#include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
@@ -473,34 +474,35 @@ void ULSLobbyStorageWidget::UpdateStorageCountText(const TArray<FLSSessionItem>&
 
 void ULSLobbyStorageWidget::ApplyFilterButtonState() const
 {
+	// 비활성화는 슬레이트가 채도를 죽여 그려서 색이 탁해지므로, 선택 표시는 버튼 색으로만 한다.
 	if (AllTabButton)
 	{
-		AllTabButton->SetIsEnabled(CurrentFilter != ELSStorageFilter::All);
+		AllTabButton->SetSelected(CurrentFilter == ELSStorageFilter::All);
 	}
 
 	if (WeaponTabButton)
 	{
-		WeaponTabButton->SetIsEnabled(CurrentFilter != ELSStorageFilter::Weapon);
+		WeaponTabButton->SetSelected(CurrentFilter == ELSStorageFilter::Weapon);
 	}
 
 	if (ArmorTabButton)
 	{
-		ArmorTabButton->SetIsEnabled(CurrentFilter != ELSStorageFilter::Armor);
+		ArmorTabButton->SetSelected(CurrentFilter == ELSStorageFilter::Armor);
 	}
 
 	if (ConsumableTabButton)
 	{
-		ConsumableTabButton->SetIsEnabled(CurrentFilter != ELSStorageFilter::Consumable);
+		ConsumableTabButton->SetSelected(CurrentFilter == ELSStorageFilter::Consumable);
 	}
 
 	if (MiscTabButton)
 	{
-		MiscTabButton->SetIsEnabled(CurrentFilter != ELSStorageFilter::Misc);
+		MiscTabButton->SetSelected(CurrentFilter == ELSStorageFilter::Misc);
 	}
 
 	if (ChipTabButton)
 	{
-		ChipTabButton->SetIsEnabled(CurrentFilter != ELSStorageFilter::Chip);
+		ChipTabButton->SetSelected(CurrentFilter == ELSStorageFilter::Chip);
 	}
 }
 

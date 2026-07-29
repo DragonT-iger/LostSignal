@@ -1,8 +1,15 @@
 #include "UI/Storage/LSStorageButtonWidget.h"
 
 #include "Components/Button.h"
-#include "Components/TextBlock.h"
 #include "LostSignal.h"
+
+void ULSStorageButtonWidget::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+
+	// WBP 디자이너 프리뷰에서도 실제 색으로 보이게 한다.
+	ApplyButtonColors();
+}
 
 void ULSStorageButtonWidget::NativeConstruct()
 {
@@ -17,10 +24,7 @@ void ULSStorageButtonWidget::NativeConstruct()
 		Button->OnClicked.AddDynamic(this, &ULSStorageButtonWidget::HandleButtonClicked);
 	}
 
-	if (!Text)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Text is not bound on %s."), *GetNameSafe(this));
-	}
+	ApplyButtonColors();
 }
 
 void ULSStorageButtonWidget::NativeDestruct()
@@ -33,18 +37,35 @@ void ULSStorageButtonWidget::NativeDestruct()
 	Super::NativeDestruct();
 }
 
-void ULSStorageButtonWidget::SetLabelText(const FText& NewText) const
+void ULSStorageButtonWidget::SetSelected(const bool bInSelected)
 {
-	if (!Text)
+	if (bIsSelected == bInSelected)
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot set label text because Text is not bound on %s."), *GetNameSafe(this));
 		return;
 	}
 
-	Text->SetText(NewText);
+	bIsSelected = bInSelected;
+	ApplyButtonColors();
 }
 
 void ULSStorageButtonWidget::HandleButtonClicked()
 {
 	OnClicked.Broadcast();
+}
+
+void ULSStorageButtonWidget::ApplyButtonColors() const
+{
+	if (!Button)
+	{
+		return;
+	}
+
+	// 아트가 WBP에서 잡은 브러시(이미지·라운드박스·모서리)는 유지하고 틴트만 상태별로 덮어쓴다.
+	FButtonStyle ButtonStyle = Button->GetStyle();
+	ButtonStyle.Normal.TintColor = FSlateColor(bIsSelected ? SelectedColor : NormalColor);
+	// 선택된 탭은 호버해도 색이 흔들리지 않도록 선택색으로 고정한다.
+	ButtonStyle.Hovered.TintColor = FSlateColor(bIsSelected ? SelectedColor : HoveredColor);
+	ButtonStyle.Pressed.TintColor = FSlateColor(PressedColor);
+	ButtonStyle.Disabled.TintColor = FSlateColor(NormalColor);
+	Button->SetStyle(ButtonStyle);
 }

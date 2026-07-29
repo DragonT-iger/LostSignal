@@ -19,7 +19,6 @@
 #include "Session/LSSaveSubsystem.h"
 #include "TimerManager.h"
 #include "UI/ChipSystem/LSChipEquipmentSlotWidget.h"
-#include "UI/ChipSystem/LSChipStatWidget.h"
 #include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/Inventory/LSInventoryDragDropOperation.h"
 #include "UI/LSUILayer.h"
@@ -28,6 +27,7 @@
 #include "UI/Minimap/LSMinimapWidget.h"
 #include "UI/Protocol/LSProtocolWidget.h"
 #include "UI/Skill/LSSkillBarWidget.h"
+#include "UI/Storage/LSStorageButtonWidget.h"
 #include "UI/Survival/LSSurvivalStatusWidget.h"
 #include "UI/Noise/LSSoundDirectionIndicatorWidget.h"
 
@@ -39,6 +39,8 @@ struct FLSChipStationViewItem
 	int32 SourceSlotIndex = INDEX_NONE;
 	FLSSessionItem Item;
 	int32 Price = 0;
+	// 프로토콜 정렬 키. 비교 함수 안에서 DataTable을 조회하지 않도록 목록을 만들 때 미리 담아둔다.
+	FLSChipProtocolTotals Protocols;
 };
 
 bool IsInventoryChipItem(const FLSSessionItem& Item)
@@ -73,6 +75,28 @@ int32 ResolveChipPrice(UDataTable* ChipTable, const FName ItemRowName, const UOb
 	}
 
 	return Row->Item_Cost;
+}
+
+FLSChipProtocolTotals ResolveChipStationProtocolValues(UDataTable* ChipTable, const FName ItemRowName, const UObject* LogContext)
+{
+	FLSChipProtocolTotals Protocols;
+	if (!ChipTable)
+	{
+		return Protocols;
+	}
+
+	const FLSChipRow* Row = ChipTable->FindRow<FLSChipRow>(ItemRowName, TEXT("ChipStationProtocolSort"));
+	if (!Row)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot resolve chip protocol values for '%s' on %s."), *ItemRowName.ToString(), *GetNameSafe(LogContext));
+		return Protocols;
+	}
+
+	Protocols.Survival = Row->Chip_Protocol_Survival;
+	Protocols.Carrying = Row->Chip_Protocol_Carrying;
+	Protocols.Battle = Row->Chip_Protocol_Battle;
+	Protocols.Navigation = Row->Chip_Protocol_Navigation;
+	return Protocols;
 }
 
 int32 ResolveChipMemoryCost(UDataTable* ChipTable, const FName ItemRowName, const UObject* LogContext)
@@ -160,25 +184,6 @@ int32 GetProtocolTotalByType(const FLSChipProtocolTotals& Totals, const ELSProto
 	}
 }
 
-TArray<FLSSessionItem> BuildInactiveSignalEquipmentItems(const TArray<FLSSessionItem>& Items, const int32 InactiveSlotCount)
-{
-	TArray<FLSSessionItem> InactiveItems;
-	InactiveItems.Reserve(FMath::Min(Items.Num(), InactiveSlotCount));
-
-	for (int32 SlotIndex = 0; SlotIndex < Items.Num() && SlotIndex < InactiveSlotCount; ++SlotIndex)
-	{
-		InactiveItems.Add(Items[SlotIndex]);
-	}
-
-	return InactiveItems;
-}
-
-int32 GetHalfSignalLossValue(const TMap<FName, int32>& Totals, const FName StatKey)
-{
-	const int32* Total = Totals.Find(StatKey);
-	return Total ? FMath::RoundToInt(static_cast<float>(*Total) * 0.5f) : 0;
-}
-
 void AddChipViewItems(
 	const TArray<FLSSessionItem>& Items,
 	const ELSInventorySlotArea SourceArea,
@@ -198,14 +203,27 @@ void AddChipViewItems(
 		ViewItem.SourceSlotIndex = SlotIndex;
 		ViewItem.Item = Items[SlotIndex];
 		ViewItem.Price = ResolveChipPrice(ChipTable, ViewItem.Item.ItemRowName, LogContext);
+		ViewItem.Protocols = ResolveChipStationProtocolValues(ChipTable, ViewItem.Item.ItemRowName, LogContext);
 		OutViewItems.Add(ViewItem);
 	}
 }
 
-void SortChipViewItems(TArray<FLSChipStationViewItem>& ViewItems)
+// SortProtocol이 지정되면 그 프로토콜 수치 내림차순이 최우선 키가 된다(값이 0인 칩도 빠지지 않고 뒤로 밀린다).
+// 동값이거나 미지정(ALL)이면 기존 기준 — 가격 내림차순 → 출처(인벤토리 우선) → 슬롯 인덱스.
+void SortChipViewItems(TArray<FLSChipStationViewItem>& ViewItems, const TOptional<ELSProtocolType>& SortProtocol)
 {
-	ViewItems.Sort([](const FLSChipStationViewItem& Left, const FLSChipStationViewItem& Right)
+	ViewItems.Sort([&SortProtocol](const FLSChipStationViewItem& Left, const FLSChipStationViewItem& Right)
 	{
+		if (SortProtocol.IsSet())
+		{
+			const int32 LeftProtocol = GetProtocolTotalByType(Left.Protocols, SortProtocol.GetValue());
+			const int32 RightProtocol = GetProtocolTotalByType(Right.Protocols, SortProtocol.GetValue());
+			if (LeftProtocol != RightProtocol)
+			{
+				return LeftProtocol > RightProtocol;
+			}
+		}
+
 		if (Left.Price != Right.Price)
 		{
 			return Left.Price > Right.Price;
@@ -295,11 +313,16 @@ void ULSChipStationWidget::NativeConstruct()
 		UE_LOG(LogLS, Warning, TEXT("SignalSlider is not bound on %s."), *GetNameSafe(this));
 	}
 
+	BindSortButtons();
+	ApplySortButtonState();
+
 	RefreshChipStation();
 }
 
 void ULSChipStationWidget::NativeDestruct()
 {
+	UnbindSortButtons();
+
 	if (SignalSlider)
 	{
 		SignalSlider->OnValueChanged.RemoveDynamic(this, &ULSChipStationWidget::HandleSignalSliderValueChanged);
@@ -324,6 +347,152 @@ bool ULSChipStationWidget::NativeOnDrop(const FGeometry& InGeometry, const FDrag
 	}
 
 	return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
+}
+
+void ULSChipStationWidget::BindSortButtons()
+{
+	if (!SortButton1)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SortButton1 is not bound on %s."), *GetNameSafe(this));
+	}
+	else
+	{
+		SortButton1->OnClicked.AddDynamic(this, &ULSChipStationWidget::HandleSortButtonAllClicked);
+	}
+
+	if (!SortButton2)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SortButton2 is not bound on %s."), *GetNameSafe(this));
+	}
+	else
+	{
+		SortButton2->OnClicked.AddDynamic(this, &ULSChipStationWidget::HandleSortButtonSurvivalClicked);
+	}
+
+	if (!SortButton3)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SortButton3 is not bound on %s."), *GetNameSafe(this));
+	}
+	else
+	{
+		SortButton3->OnClicked.AddDynamic(this, &ULSChipStationWidget::HandleSortButtonCarryingClicked);
+	}
+
+	if (!SortButton4)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SortButton4 is not bound on %s."), *GetNameSafe(this));
+	}
+	else
+	{
+		SortButton4->OnClicked.AddDynamic(this, &ULSChipStationWidget::HandleSortButtonNavigationClicked);
+	}
+
+	if (!SortButton5)
+	{
+		UE_LOG(LogLS, Warning, TEXT("SortButton5 is not bound on %s."), *GetNameSafe(this));
+	}
+	else
+	{
+		SortButton5->OnClicked.AddDynamic(this, &ULSChipStationWidget::HandleSortButtonBattleClicked);
+	}
+}
+
+void ULSChipStationWidget::UnbindSortButtons()
+{
+	if (SortButton1)
+	{
+		SortButton1->OnClicked.RemoveDynamic(this, &ULSChipStationWidget::HandleSortButtonAllClicked);
+	}
+
+	if (SortButton2)
+	{
+		SortButton2->OnClicked.RemoveDynamic(this, &ULSChipStationWidget::HandleSortButtonSurvivalClicked);
+	}
+
+	if (SortButton3)
+	{
+		SortButton3->OnClicked.RemoveDynamic(this, &ULSChipStationWidget::HandleSortButtonCarryingClicked);
+	}
+
+	if (SortButton4)
+	{
+		SortButton4->OnClicked.RemoveDynamic(this, &ULSChipStationWidget::HandleSortButtonNavigationClicked);
+	}
+
+	if (SortButton5)
+	{
+		SortButton5->OnClicked.RemoveDynamic(this, &ULSChipStationWidget::HandleSortButtonBattleClicked);
+	}
+}
+
+void ULSChipStationWidget::ApplySortButtonState() const
+{
+	const auto IsProtocolSelected = [this](const ELSProtocolType ProtocolType)
+	{
+		return ChipSortProtocol.IsSet() && ChipSortProtocol.GetValue() == ProtocolType;
+	};
+
+	if (SortButton1)
+	{
+		SortButton1->SetSelected(!ChipSortProtocol.IsSet());
+	}
+
+	if (SortButton2)
+	{
+		SortButton2->SetSelected(IsProtocolSelected(ELSProtocolType::Survival));
+	}
+
+	if (SortButton3)
+	{
+		SortButton3->SetSelected(IsProtocolSelected(ELSProtocolType::Carrying));
+	}
+
+	if (SortButton4)
+	{
+		SortButton4->SetSelected(IsProtocolSelected(ELSProtocolType::Navigation));
+	}
+
+	if (SortButton5)
+	{
+		SortButton5->SetSelected(IsProtocolSelected(ELSProtocolType::Battle));
+	}
+}
+
+void ULSChipStationWidget::SetChipSortProtocol(TOptional<ELSProtocolType> NewSortProtocol)
+{
+	if (ChipSortProtocol == NewSortProtocol)
+	{
+		return;
+	}
+
+	ChipSortProtocol = NewSortProtocol;
+	ApplySortButtonState();
+	RefreshChipSlots();
+}
+
+void ULSChipStationWidget::HandleSortButtonAllClicked()
+{
+	SetChipSortProtocol(TOptional<ELSProtocolType>());
+}
+
+void ULSChipStationWidget::HandleSortButtonSurvivalClicked()
+{
+	SetChipSortProtocol(ELSProtocolType::Survival);
+}
+
+void ULSChipStationWidget::HandleSortButtonCarryingClicked()
+{
+	SetChipSortProtocol(ELSProtocolType::Carrying);
+}
+
+void ULSChipStationWidget::HandleSortButtonNavigationClicked()
+{
+	SetChipSortProtocol(ELSProtocolType::Navigation);
+}
+
+void ULSChipStationWidget::HandleSortButtonBattleClicked()
+{
+	SetChipSortProtocol(ELSProtocolType::Battle);
 }
 
 void ULSChipStationWidget::RefreshChipStation_Implementation()
@@ -361,7 +530,7 @@ void ULSChipStationWidget::RefreshChipSlots()
 	TArray<FLSChipStationViewItem> ViewItems;
 	AddChipViewItems(SaveSubsystem->GetInventory(), ELSInventorySlotArea::Inventory, ChipTable, this, ViewItems);
 	AddChipViewItems(SaveSubsystem->GetWarehouseItems(), ELSInventorySlotArea::Warehouse, ChipTable, this, ViewItems);
-	SortChipViewItems(ViewItems);
+	SortChipViewItems(ViewItems, ChipSortProtocol);
 
 	// 칩 리스트는 총 칩 개수(미장착 + 장착)만큼 고정 크기로 잡는다. 장착하면 그 칸이 빈 칸(hole)으로 남고,
 	// 해제하면 빈 칸에 다시 채워지므로 스테이션 조작 중에는 위젯을 추가/삭제할 필요가 없다(InsertChipListSlot 참고).
@@ -457,31 +626,6 @@ void ULSChipStationWidget::RefreshEquippedChipSummary()
 
 	const int32 InactiveSlotCount = GetInactiveSignalSlotCount();
 	const TArray<FLSSessionItem>& AllEquipmentItems = EquipmentItems;
-	const TArray<FLSSessionItem> InactiveEquipmentItems = BuildInactiveSignalEquipmentItems(EquipmentItems, InactiveSlotCount);
-	const TMap<FName, int32> StatTotals = LSChipStats::AggregateChipStatTotals(AllEquipmentItems);
-	const TMap<FName, int32> SignalLossTotals = LSChipStats::AggregateChipStatTotals(InactiveEquipmentItems);
-	auto GetStatTotal = [&StatTotals](const FName StatKey)
-	{
-		const int32* Total = StatTotals.Find(StatKey);
-		return Total ? *Total : 0;
-	};
-	auto GetSignalLossTotal = [&SignalLossTotals](const FName StatKey)
-	{
-		return GetHalfSignalLossValue(SignalLossTotals, StatKey);
-	};
-
-	// 최종 적용 수치는 활성 슬롯 합산 + 신호 유실 보정값이다.
-	// UI에서는 두 값을 StatValueText / SignalLossText로 분리해서 보여준다.
-	SetChipStat(TEXT("Chip_Attack"), GetStatTotal(TEXT("Chip_Attack")), GetSignalLossTotal(TEXT("Chip_Attack")));
-	SetChipStat(TEXT("Chip_Critical_Rate"), GetStatTotal(TEXT("Chip_Critical_Rate")), GetSignalLossTotal(TEXT("Chip_Critical_Rate")));
-	SetChipStat(TEXT("Chip_Critical_Damage"), GetStatTotal(TEXT("Chip_Critical_Damage")), GetSignalLossTotal(TEXT("Chip_Critical_Damage")));
-	SetChipStat(TEXT("Chip_Defense_Penetration"), GetStatTotal(TEXT("Chip_Defense_Penetration")), GetSignalLossTotal(TEXT("Chip_Defense_Penetration")));
-	SetChipStat(TEXT("Chip_Health"), GetStatTotal(TEXT("Chip_Health")), GetSignalLossTotal(TEXT("Chip_Health")));
-	SetChipStat(TEXT("Chip_Defense"), GetStatTotal(TEXT("Chip_Defense")), GetSignalLossTotal(TEXT("Chip_Defense")));
-	SetChipStat(TEXT("Chip_Attack_Speed"), GetStatTotal(TEXT("Chip_Attack_Speed")), GetSignalLossTotal(TEXT("Chip_Attack_Speed")));
-	SetChipStat(TEXT("Chip_Skill_Haste"), GetStatTotal(TEXT("Chip_Skill_Haste")), GetSignalLossTotal(TEXT("Chip_Skill_Haste")));
-	SetChipStat(TEXT("Chip_Recovery"), GetStatTotal(TEXT("Chip_Recovery")), GetSignalLossTotal(TEXT("Chip_Recovery")));
-	SetChipStat(TEXT("Chip_Move_Speed"), GetStatTotal(TEXT("Chip_Move_Speed")), GetSignalLossTotal(TEXT("Chip_Move_Speed")));
 
 	// 프로토콜 표시는 디버그 오버라이드가 켜져 있으면 그 값을, 아니면 장착 칩 합산값(현재=활성칩, 이전=전체칩)을 따라간다.
 	const TArray<FLSSessionItem> ActiveEquipmentItems = LSChipStats::BuildSignalActiveEquipmentItems(EquipmentItems, InactiveSlotCount);
@@ -1181,18 +1325,6 @@ void ULSChipStationWidget::PlayChipSound(USoundBase* Sound, const TCHAR* SoundPr
 	UGameplayStatics::PlaySound2D(this, Sound);
 }
 
-void ULSChipStationWidget::SetChipStat(FName StatKey, int32 StatValue, int32 SignalLoss)
-{
-	ULSChipStatWidget* StatWidget = GetStatWidget(StatKey);
-	if (!StatWidget)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[ChipStation] '%s' 칸이 null (BindWidget 안 됨)."), *StatKey.ToString());
-		return;
-	}
-
-	StatWidget->SetStat(LSChipStats::GetChipStatLabel(StatKey), StatValue, SignalLoss);
-}
-
 void ULSChipStationWidget::SetEquippedChipMemoryText(const int32 CurrentMemory)
 {
 	if (!MemoryText)
@@ -1283,39 +1415,3 @@ void ULSChipStationWidget::SetProtocolWidget(ULSProtocolWidget* ProtocolWidget, 
 	ProtocolWidget->SetProtocolLevels(CurrentLevel, PreviousLevel, CurrentLevel);
 }
 
-ULSChipStatWidget* ULSChipStationWidget::GetStatWidget(FName StatKey) const
-{
-	static const TMap<FName, int32> KeyToIndex = {
-		{ TEXT("Chip_Attack"),              0 },
-		{ TEXT("Chip_Critical_Rate"),       1 },
-		{ TEXT("Chip_Critical_Damage"),     2 },
-		{ TEXT("Chip_Defense_Penetration"), 3 },
-		{ TEXT("Chip_Health"),              4 },
-		{ TEXT("Chip_Defense"),             5 },
-		{ TEXT("Chip_Attack_Speed"),        6 },
-		{ TEXT("Chip_Skill_Haste"),         7 },
-		{ TEXT("Chip_Recovery"),            8 },
-		{ TEXT("Chip_Move_Speed"),          9 },
-	};
-
-	const int32* Index = KeyToIndex.Find(StatKey);
-	if (!Index)
-	{
-		return nullptr;
-	}
-
-	switch (*Index)
-	{
-	case 0: return ChipStat_Attack;
-	case 1: return ChipStat_CriticalRate;
-	case 2: return ChipStat_CriticalDamage;
-	case 3: return ChipStat_DefensePenetration;
-	case 4: return ChipStat_Health;
-	case 5: return ChipStat_Defense;
-	case 6: return ChipStat_AttackSpeed;
-	case 7: return ChipStat_Skill_Haste;
-	case 8: return ChipStat_Recovery;
-	case 9: return ChipStat_MoveSpeed;
-	default: return nullptr;
-	}
-}

@@ -6,6 +6,7 @@
 #include "LSLobbyStorageWidget.generated.h"
 
 class ALSWorldDroppedItem;
+class UButton;
 class UDragDropOperation;
 class ULSInventoryDragDropOperation;
 class ULSItemSlotWidget;
@@ -60,7 +61,7 @@ protected:
 	TObjectPtr<UTextBlock> StorageCountText;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Storage")
-	TObjectPtr<ULSStorageButtonWidget> SortButton;
+	TObjectPtr<UButton> SortButton;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Storage")
 	TObjectPtr<ULSStorageButtonWidget> AllTabButton;
