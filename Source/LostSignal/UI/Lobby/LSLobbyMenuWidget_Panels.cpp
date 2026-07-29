@@ -254,6 +254,8 @@ void ULSLobbyMenuWidget::HandleLobbyTabClicked(ULSLobbyTabWidget* ClickedTab)
 		return;
 	}
 
+	CloseSettingsForTabSwitch(ClickedTab);
+
 	// 지도는 안내창 토글, 패널이 있는 탭은 안내창을 닫고 전환을 이어간다.
 	const bool bClosedNotice = CloseNotImplementedNotice();
 	if (bClosedNotice && ClickedTab == MapTab)

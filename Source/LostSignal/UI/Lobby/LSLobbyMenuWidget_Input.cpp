@@ -153,6 +153,19 @@ void ULSLobbyMenuWidget::HandleSettingsBackToMenu()
 	}));
 }
 
+void ULSLobbyMenuWidget::CloseSettingsForTabSwitch(const ULSLobbyTabWidget* ClickedTab)
+{
+	if (ClickedTab == SettingsTab)
+	{
+		return;
+	}
+
+	if (ActiveSettingsWidget && ActiveSettingsWidget->IsInViewport())
+	{
+		ActiveSettingsWidget->CloseSettings();
+	}
+}
+
 ULSSettingsWidget* ULSLobbyMenuWidget::ShowSettingsWidget()
 {
 	// 이미 세팅 화면이 떠 있으면 중복 생성하지 않는다.

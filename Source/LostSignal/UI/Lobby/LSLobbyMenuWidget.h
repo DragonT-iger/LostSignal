@@ -205,6 +205,9 @@ private:
 	// Settings 화면을 생성해 뷰포트에 띄운다. 이미 떠 있으면 nullptr 반환.
 	ULSSettingsWidget* ShowSettingsWidget();
 
+	// 설정 외의 로비 탭을 누르면 설정 오버레이를 정상 종료한 뒤 탭 전환을 이어간다.
+	void CloseSettingsForTabSwitch(const ULSLobbyTabWidget* ClickedTab);
+
 	// "아직 구현되지 않았습니다" 안내창을 띄운다. 이미 떠 있으면 중복 생성하지 않는다.
 	void ShowNotImplementedNotice();
 

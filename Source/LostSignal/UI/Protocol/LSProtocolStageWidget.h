@@ -34,7 +34,7 @@ protected:
 	TObjectPtr<UTextBlock> StageText;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
-	FLinearColor UnlockedBoxColor = FLinearColor::White;
+	FLinearColor UnlockedBoxColor = FLinearColor(FColor(0x5B, 0xAD, 0xD5));
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Protocol")
 	FLinearColor LockedBoxColor = FLinearColor(0.22f, 0.22f, 0.22f, 0.55f);
