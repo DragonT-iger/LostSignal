@@ -303,27 +303,31 @@ void ULSLoadoutPreparationWidget::CloseActiveConfirmDialog()
 	}
 }
 
-void ULSLoadoutPreparationWidget::HandleSupplyTabClicked()
+void ULSLoadoutPreparationWidget::HandleSupplyTabClicked(ULSLobbyTabWidget* ClickedTab)
 {
+	(void)ClickedTab;
 	CloseActiveConfirmDialog();
 	ShowTab(ELSLoadoutTab::Supply);
 }
 
-void ULSLoadoutPreparationWidget::HandleStorageTabClicked()
+void ULSLoadoutPreparationWidget::HandleStorageTabClicked(ULSLobbyTabWidget* ClickedTab)
 {
+	(void)ClickedTab;
 	CloseActiveConfirmDialog();
 	ShowTab(ELSLoadoutTab::Storage);
 }
 
-void ULSLoadoutPreparationWidget::HandleUpgradeTabClicked()
+void ULSLoadoutPreparationWidget::HandleUpgradeTabClicked(ULSLobbyTabWidget* ClickedTab)
 {
+	(void)ClickedTab;
 	// 전용 스킬 탭 버튼이 없어서, 업그레이드 버튼으로 스킬 로드아웃 페이지를 연다.
 	CloseActiveConfirmDialog();
 	ShowTab(ELSLoadoutTab::Skill);
 }
 
-void ULSLoadoutPreparationWidget::HandleChipTabClicked()
+void ULSLoadoutPreparationWidget::HandleChipTabClicked(ULSLobbyTabWidget* ClickedTab)
 {
+	(void)ClickedTab;
 	CloseActiveConfirmDialog();
 	ShowTab(ELSLoadoutTab::Chip);
 }

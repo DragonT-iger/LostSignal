@@ -20,13 +20,27 @@
 레이어 값의 단일 출처는 `Source/LostSignal/UI/LSUILayer.h`다. 문서엔 수치를 복붙하지 않으며, 순서 관계만 적는다.
 
 ```text
-HUD  <  BackgroundBlur  <  ModalPanel  <  ModalPanelInventory  <  ProtocolDebug  <  Tooltip
+HUD = LobbyBackground
+  < LobbyMenu
+  < BackgroundBlur
+  < ModalPanel
+  < ModalPanelInventory
+  < ModalPanelDialog
+  < Settings
+  < SettingsSubPanel
+  < ProtocolDebug
+  < Tooltip
 ```
 
 - `HUD`: 상시 게임플레이 HUD. 블러보다 아래라 패널이 열리면 HUD도 함께 블러된다.
+- `LobbyBackground`: 로비 메뉴 뒤에 상시 깔리는 로비 전용 배경 블러.
+- `LobbyMenu`: 로비의 단일 루트 위젯. 상단 메뉴와 배타 패널은 모두 이 위젯 안에 있으며, 패널을 별도 `AddToViewport` 하지 않는다. 내부 구조는 [LobbyScreenStructure.md](LobbyScreenStructure.md)가 소유한다.
 - `BackgroundBlur`: 공유 풀스크린 블러. 모든 모달 패널이 공유한다.
 - `ModalPanel`: 창고/칩스테이션/루트드랍 같은 컨테이너 패널 본체. 블러 위에 선명하게 그려진다.
 - `ModalPanelInventory`: 인벤토리 본체. 컨테이너와 짝으로 떠도 항상 위에 그려진다. 같은 Z를 쓰면 뷰포트 삽입 순서에 따라 컨테이너 WBP의 불투명 배경이 인벤토리를 덮는 경우가 생겨, 한 단계 위로 분리한다.
+- `ModalPanelDialog`: 칩스테이션·인벤토리 등 패널이 띄우는 확인/알림 다이얼로그.
+- `Settings`: 타이틀·로비·레이드에서 공용으로 띄우는 설정 오버레이.
+- `SettingsSubPanel`: 설정 화면 안에서 뜨는 사운드·확인 다이얼로그 같은 서브 패널.
 - `ProtocolDebug`: 시연용 디버그 패널.
 - `Tooltip`: 커서를 따라다니는 호버 툴팁(프로토콜 등). 모든 패널/디버그 위에 떠야 하므로 최상단. 입력을 가로채지 않도록 `HitTestInvisible`로 띄운다.
 

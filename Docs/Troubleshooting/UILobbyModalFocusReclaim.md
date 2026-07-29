@@ -2,7 +2,7 @@
 
 ## 증상
 
-로비(개인정비)에서 뜨는 확인/알림 다이얼로그 — 예: 칩 스테이션의 "인벤토리 용량이 부족합니다" 경고 — 의 **확인/취소 버튼을 두 번 눌러야 닫힌다.** 첫 클릭은 씹히고 두 번째 클릭에야 버튼이 반응한다. 타이틀/세팅 화면에서 같은 `WBP_ConfirmDialog`를 버튼 클릭으로 열면 한 번에 닫히는데, 로비의 슬롯 제스처(더블클릭/Shift/드래그드롭)로 뜨는 다이얼로그만 재현된다.
+로비에서 뜨는 확인/알림 다이얼로그 — 예: 칩 스테이션의 "인벤토리 용량이 부족합니다" 경고 — 의 **확인/취소 버튼을 두 번 눌러야 닫힌다.** 첫 클릭은 씹히고 두 번째 클릭에야 버튼이 반응한다. 타이틀/세팅 화면에서 같은 `WBP_ConfirmDialog`를 버튼 클릭으로 열면 한 번에 닫히는데, 로비의 슬롯 제스처(더블클릭/Shift/드래그드롭)로 뜨는 다이얼로그만 재현된다.
 
 ## 원인
 
@@ -20,14 +20,15 @@
 
 ## 수정
 
-1. `ULSChipStationWidget::HasActiveConfirmDialog()` public 접근자 추가 — `ActiveConfirmDialog && IsInViewport()`.
-2. `ULSLoadoutPreparationWidget::HasActiveConfirmDialog()`가 자기 다이얼로그뿐 아니라 **콘텐츠에 중첩된 칩 스테이션 다이얼로그도 함께 보고**하도록 확장(`FindLoadoutChipStationWidget`으로 활성 콘텐츠에서 칩 스테이션을 찾아 위임). 이걸로 로비 메뉴 가드의 기존 예외 계약에 칩 다이얼로그가 합류한다.
-3. `ULSLobbyMenuWidget::NativeTick` 가드를 `포커스 보유 검사 먼저 → 없을 때만 외부 모달 판정` 순으로 재배치. 새로 추가된 위젯 트리 탐색이 매 틱 돌지 않게 하는 최적화(포커스를 이미 쥐고 있으면 회수가 불필요하므로 판정 생략).
+1. `ULSLobbyMenuWidget::NativeTick` 가드를 `포커스 보유 검사 먼저 → 없을 때만 외부 모달 판정` 순으로 유지한다.
+2. 1단 배타 패널 전환 뒤에는 루트 `HasActivePanelModal()`이 칩 스테이션·보급소·로비 인벤토리의 모달 접근자를 **직접 종합**한다. 중간 `ULSLoadoutPreparationWidget` 위임과 재귀 위젯 탐색은 제거한다.
+3. 구 위임 사슬에는 인벤토리의 "가득 찼습니다" 알림이 누락돼 있었다. `ULSInventoryWidget::HasActiveNotificationDialog()`를 합류시켜 가방 패널의 Shift 빠른이동 실패 알림도 첫 클릭에 반응하게 한다.
+4. 패널을 바꿀 때는 `ClosePanelModal()`이 떠나는 패널의 별도 레이어 다이얼로그를 닫아 고아 모달을 남기지 않는다.
 
 ## 재발 방지 체크
 
-- **로비 메뉴 트리 밖에 새 포커스 위젯/모달을 띄우면, 반드시 `ULSLobbyMenuWidget::NativeTick`의 `bExternalFocusWidgetOpen` 예외에 합류시킨다.** 안 하면 그 위젯이 매 틱 포커스를 뺏겨 첫 입력이 씹힌다. (코드 주석에도 이 계약이 명시돼 있다.)
-- 중첩 위젯(개인정비 콘텐츠 안의 칩 스테이션 등)이 자체 모달을 띄우면, 그 부모(`LoadoutPreparation`)의 `HasActiveConfirmDialog()`가 중첩 모달까지 보고하는지 확인한다.
+- **로비 메뉴 트리 밖에 새 포커스 위젯/모달을 띄우면, 반드시 `ULSLobbyMenuWidget::HasActivePanelModal()` 또는 루트의 직접 예외에 합류시킨다.** 안 하면 그 위젯이 매 틱 포커스를 뺏겨 첫 입력이 씹힌다.
+- 새 패널이 자체 모달을 띄우면 `HasActivePanelModal()` 보고와 `ClosePanelModal()` 정리를 한 쌍으로 추가한다. 체크리스트의 단일 출처는 [../Systems/LobbyScreenStructure.md](../Systems/LobbyScreenStructure.md)다.
 - "새로 뜬 위젯의 첫 클릭만 씹힌다"는 증상은 포인터 캡처보다 **포커스 도둑질**을 먼저 의심한다. 다이얼로그에 `NativeOnFocusReceived`/`NativeOnFocusLost`(+`cause`) 로그를 달아 받자마자 잃는지 본다.
 
 ## 관련

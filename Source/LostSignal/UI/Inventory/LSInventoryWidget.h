@@ -60,6 +60,10 @@ public:
 	// (칩 스테이션의 용량 차단 알림과 동일 패턴 — 다음 틱 생성 + 중복 방지)
 	void ShowInventoryFullNotification();
 
+	// 로비 루트의 포커스 회수 예외와 패널 전환 시 고아 모달 정리에 사용한다.
+	bool HasActiveNotificationDialog() const;
+	void CloseActiveNotificationDialog();
+
 protected:
 	virtual void NativeDestruct() override;
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;

@@ -94,16 +94,16 @@ protected:
 
 private:
 	UFUNCTION()
-	void HandleSupplyTabClicked();
+	void HandleSupplyTabClicked(ULSLobbyTabWidget* ClickedTab);
 
 	UFUNCTION()
-	void HandleStorageTabClicked();
+	void HandleStorageTabClicked(ULSLobbyTabWidget* ClickedTab);
 
 	UFUNCTION()
-	void HandleUpgradeTabClicked();
+	void HandleUpgradeTabClicked(ULSLobbyTabWidget* ClickedTab);
 
 	UFUNCTION()
-	void HandleChipTabClicked();
+	void HandleChipTabClicked(ULSLobbyTabWidget* ClickedTab);
 
 	// 미구현 안내창이 닫히면 참조를 정리하고 TAB/ESC가 다시 로비로 오도록 포커스를 회수한다.
 	UFUNCTION()

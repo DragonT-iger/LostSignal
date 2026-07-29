@@ -90,6 +90,8 @@ void ULSInventoryWidget::NativeDestruct()
 		PlayerController->UnregisterLobbyInventoryWidget(this);
 	}
 
+	CloseActiveNotificationDialog();
+
 	Super::NativeDestruct();
 }
 
@@ -688,6 +690,20 @@ void ULSInventoryWidget::PresentInventoryFullNotification()
 void ULSInventoryWidget::HandleNotificationDialogClosed()
 {
 	// 다이얼로그는 스스로 뷰포트에서 제거되므로 참조만 비운다.
+	ActiveNotificationDialog = nullptr;
+}
+
+bool ULSInventoryWidget::HasActiveNotificationDialog() const
+{
+	return ActiveNotificationDialog && ActiveNotificationDialog->IsInViewport();
+}
+
+void ULSInventoryWidget::CloseActiveNotificationDialog()
+{
+	if (HasActiveNotificationDialog())
+	{
+		ActiveNotificationDialog->Cancel();
+	}
 	ActiveNotificationDialog = nullptr;
 }
 

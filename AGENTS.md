@@ -78,6 +78,7 @@
 | [Docs/Systems/MinimapSystem.md](Docs/Systems/MinimapSystem.md) | 미니맵 표시 대상·지형 도형·탐색 프로토콜 연동 구조 |
 | [Docs/Systems/MapTilePlacementTool.md](Docs/Systems/MapTilePlacementTool.md) | 에디터 전용 맵 타일 팔레트·2D 그리드 교체·높이 정렬 구조 |
 | [Docs/Systems/UILayerStructure.md](Docs/Systems/UILayerStructure.md) | UI 레이어 Z-order·공유 풀스크린 블러 표시 규칙 |
+| [Docs/Systems/LobbyScreenStructure.md](Docs/Systems/LobbyScreenStructure.md) | 로비 상단 메뉴·배타 패널·입력 계단·패널 갱신·포커스 가드 구조 |
 | [Docs/Systems/CraftingSystem.md](Docs/Systems/CraftingSystem.md) | 제작 레시피·UI 필터·재료 소비·완성품 지급·원자적 저장 규칙 |
 
 ### 트러블슈팅 (버그 원인·수정 기록)

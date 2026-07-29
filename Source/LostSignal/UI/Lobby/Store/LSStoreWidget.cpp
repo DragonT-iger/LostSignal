@@ -139,6 +139,14 @@ bool ULSStoreWidget::HasActiveConfirmDialog() const
 	return VendingPanel && VendingPanel->HasActiveConfirmDialog();
 }
 
+void ULSStoreWidget::CloseActiveConfirmDialog()
+{
+	if (VendingPanel)
+	{
+		VendingPanel->CloseActiveConfirmDialog();
+	}
+}
+
 void ULSStoreWidget::SetVendingVisible(const bool bVisible)
 {
 	// 자판기 위젯은 처음 열 때만 생성한다. 닫기 경로에서는 이미 있는 위젯만 숨긴다.

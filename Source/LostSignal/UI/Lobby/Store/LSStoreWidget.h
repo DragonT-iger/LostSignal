@@ -41,7 +41,7 @@ struct FLSStoreTalkEntry
 	bool bQuest = false;
 };
 
-// 에이베리 보급소 상점 화면(WBP_Store)의 부모 클래스. 개인정비 ContentSwitcher의 Supply 페이지에 배치된다.
+// 에이베리 보급소 상점 화면(WBP_Store)의 부모 클래스. 로비 상단 정비 탭의 Supply 패널에 배치된다.
 // CASHIER-9 이미지/이름표는 아트가 WBP에 고정 배치하고, C++은 버튼과 대사창 텍스트만 제어한다.
 // 버튼은 ButtonBox(버티컬 박스)에 배치된 WBP_StoreButton을 재사용하며 상태별로 필요한 개수만 노출한다.
 // 대화 목록에 퀘스트가 여러 개 쌓여 배치 버튼보다 많이 필요할 때만 부족분을 런타임에 생성한다.
@@ -55,16 +55,17 @@ public:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	// 초기 상태(기능 선택 + 대기 대사)로 되돌린다. 개인정비에서 보급소 페이지를 열 때마다 호출한다.
+	// 초기 상태(기능 선택 + 대기 대사)로 되돌린다. 로비에서 정비 패널을 열 때마다 호출한다.
 	void ResetStore();
 
 	// 자판기/제작대가 열려 있으면 기능 선택 화면으로 한 단계만 되돌린다.
-	// 처리할 하위 화면이 없으면 상위 개인정비 화면이 입력을 처리하도록 false를 반환한다.
+	// 처리할 하위 화면이 없으면 로비 루트가 입력을 처리하도록 false를 반환한다.
 	bool TryHandleBack();
 
-	// 개인정비에 매핑된 공용 확인 다이얼로그를 자판기에 전달한다.
+	// 로비 루트에 매핑된 공용 확인 다이얼로그를 자판기에 전달한다.
 	void SetConfirmDialogClass(TSubclassOf<ULSConfirmDialogWidget> InConfirmDialogClass);
 	bool HasActiveConfirmDialog() const;
+	void CloseActiveConfirmDialog();
 
 protected:
 	// 기능 선택/대화 화면 전체(CASHIER-9 이미지·버튼·대사창 묶음) 컨테이너. 자판기를 열면 통째로 숨긴다.

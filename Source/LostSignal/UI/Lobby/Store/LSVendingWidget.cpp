@@ -129,13 +129,7 @@ void ULSVendingWidget::NativeDestruct()
 		World->GetTimerManager().ClearTimer(RefreshTimerHandle);
 	}
 	bNotificationPending = false;
-	if (ActiveConfirmDialog)
-	{
-		ActiveConfirmDialog->OnConfirmed.RemoveAll(this);
-		ActiveConfirmDialog->OnCancelled.RemoveAll(this);
-		ActiveConfirmDialog->RemoveFromParent();
-		ActiveConfirmDialog = nullptr;
-	}
+	CloseActiveConfirmDialog();
 
 	Super::NativeDestruct();
 }
@@ -157,6 +151,18 @@ void ULSVendingWidget::SetConfirmDialogClass(const TSubclassOf<ULSConfirmDialogW
 bool ULSVendingWidget::HasActiveConfirmDialog() const
 {
 	return ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport();
+}
+
+void ULSVendingWidget::CloseActiveConfirmDialog()
+{
+	bNotificationPending = false;
+	if (ActiveConfirmDialog)
+	{
+		ActiveConfirmDialog->OnConfirmed.RemoveAll(this);
+		ActiveConfirmDialog->OnCancelled.RemoveAll(this);
+		ActiveConfirmDialog->RemoveFromParent();
+		ActiveConfirmDialog = nullptr;
+	}
 }
 
 FReply ULSVendingWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)

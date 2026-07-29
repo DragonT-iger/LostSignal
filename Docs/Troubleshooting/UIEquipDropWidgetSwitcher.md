@@ -55,6 +55,10 @@
 - `Source/LostSignal/UI/Inventory/LSItemSlotWidget.cpp` / `.h` — 드래그·드롭·히트테스트, `HoveredRenderScale`
 - `Source/LostSignal/UI/Inventory/LSInventoryWidget.cpp` — 장비 드롭 경로(`HandleInventorySlotDrop` → `HandleEquipmentSlotDrop`), 배경 드롭
 - `Source/LostSignal/UI/Inventory/LSInventoryDragDropOperation.cpp` — `Drop` / `DragCancelled`
-- `Source/LostSignal/UI/Lobby/LSLoadoutPreparationWidget.cpp` — ContentSwitcher 레이아웃
+- `Source/LostSignal/UI/Lobby/LSLobbyMenuWidget_Panels.cpp` — 로비 배타 패널 스위처 전환
+
+로비 1단 패널 리팩터링은 중첩 스위처 한 단계를 제거해 후보 1의 표면적을 줄이지만, 원인을 확정한 것은 아니다.
+새 레이아웃에서도 위 `[EquipDiag]` 절차로 재현 여부와 실제 드롭 수신 위젯을 다시 측정하기 전까지 상태는
+계속 **조사 중**으로 유지한다.
 
 슬롯 조작·드래그앤드롭 로직 전반은 [../Systems/InventoryLogic.md](../Systems/InventoryLogic.md)가 소유한다.

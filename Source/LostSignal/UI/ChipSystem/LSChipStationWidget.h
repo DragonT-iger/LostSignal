@@ -64,9 +64,10 @@ public:
 	bool IsChipVisibleForCurrentFilter(FName ItemRowName) const;
 
 	// 이 스테이션이 띄운 용량 차단 알림 다이얼로그가 화면에 떠 있는지. 로비 메뉴(ULSLobbyMenuWidget)의 매 틱
-	// 포커스 회수 가드가 외부 모달을 예외로 둘 때 참조한다 — 보고하지 않으면 다이얼로그가 매 틱 포커스를 뺏겨
-	// 확인 버튼 첫 클릭이 씹힌다(개인정비 → LoadoutPreparation::HasActiveConfirmDialog 경유로 합류).
+	// 포커스 회수 가드가 외부 모달을 예외로 둘 때 직접 참조한다 — 보고하지 않으면 다이얼로그가 매 틱 포커스를
+	// 뺏겨 확인 버튼 첫 클릭이 씹힌다.
 	bool HasActiveConfirmDialog() const;
+	void CloseActiveConfirmDialog();
 
 protected:
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;

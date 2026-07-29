@@ -322,11 +322,7 @@ void ULSChipStationWidget::NativeDestruct()
 	}
 
 	// 스테이션이 강제로 닫힐 때(범위 이탈 등) 떠 있던 용량 알림 다이얼로그가 뷰포트에 남지 않게 정리한다.
-	if (ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport())
-	{
-		ActiveConfirmDialog->Cancel();
-	}
-	ActiveConfirmDialog = nullptr;
+	CloseActiveConfirmDialog();
 
 	Super::NativeDestruct();
 }
@@ -1122,6 +1118,15 @@ void ULSChipStationWidget::PresentCapacityBlockedDialog(const FText& Message)
 bool ULSChipStationWidget::HasActiveConfirmDialog() const
 {
 	return ActiveConfirmDialog && ActiveConfirmDialog->IsInViewport();
+}
+
+void ULSChipStationWidget::CloseActiveConfirmDialog()
+{
+	if (HasActiveConfirmDialog())
+	{
+		ActiveConfirmDialog->Cancel();
+	}
+	ActiveConfirmDialog = nullptr;
 }
 
 void ULSChipStationWidget::HandleCapacityDialogClosed()

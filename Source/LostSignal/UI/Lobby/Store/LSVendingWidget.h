@@ -46,9 +46,10 @@ public:
 	// 자판기 화면을 초기 상태로 열 준비를 한다(골드/목록/내 아이템 갱신, 선택 해제).
 	void OpenVending();
 
-	// 개인정비에 매핑된 공용 확인 다이얼로그 클래스를 전달받는다.
+	// 로비 루트에 매핑된 공용 확인 다이얼로그 클래스를 전달받는다.
 	void SetConfirmDialogClass(TSubclassOf<ULSConfirmDialogWidget> InConfirmDialogClass);
 	bool HasActiveConfirmDialog() const;
+	void CloseActiveConfirmDialog();
 
 	// 뒤로가기 버튼. 상점 위젯이 구독해 기능 선택 화면으로 되돌린다.
 	UPROPERTY(BlueprintAssignable, Category="LS/UI|Store")
