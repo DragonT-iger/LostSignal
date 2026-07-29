@@ -78,6 +78,8 @@ protected:
 	UFUNCTION()
 	void HandleAddGold();
 	UFUNCTION()
+	void HandleResetSkillCooldowns();
+	UFUNCTION()
 	void HandleEndRaid();
 	UFUNCTION()
 	void HandleGoToTestMap();

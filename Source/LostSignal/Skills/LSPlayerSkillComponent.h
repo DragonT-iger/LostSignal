@@ -72,6 +72,10 @@ public:
 	float GetSkillCooldownRemaining(const ULSSkillDataAsset* SkillData) const;
 	float GetSkillCooldownTotalDuration(const ULSSkillDataAsset* SkillData) const;
 
+	// 디버그: 이 캐릭터의 모든 스킬(및 대쉬) 쿨타임을 즉시 초기화한다. 서버 권한에서만 유효.
+	UFUNCTION(BlueprintCallable, Category="LS/Skill|Debug")
+	void ResetAllSkillCooldowns();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

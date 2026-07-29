@@ -456,6 +456,31 @@ float ULSPlayerSkillComponent::GetSkillCooldownTotalDuration(const ULSSkillDataA
 	return TotalDuration;
 }
 
+void ULSPlayerSkillComponent::ResetAllSkillCooldowns()
+{
+	AActor* OwnerActor = GetOwner();
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerActor);
+	if (!OwnerActor || !ASC)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[SkillDebug] 스킬 쿨타임 초기화 실패: ASC 없음 (%s)"), *GetNameSafe(OwnerActor));
+		return;
+	}
+
+	// 쿨타임 GE 제거는 서버 권한에서만(멀티 전환 대비). 싱글/PIE 스탠드얼론에선 소유 클라가 곧 서버다.
+	if (!OwnerActor->HasAuthority())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[SkillDebug] 스킬 쿨타임 초기화는 서버 권한에서만 가능합니다. (%s)"), *GetNameSafe(OwnerActor));
+		return;
+	}
+
+	// 부모 태그 LS.Cooldown 하나로 스킬(LS.Cooldown.Skill.*)과 대쉬(LS.Cooldown.Dash) 쿨타임 GE를 계층 매칭으로 모두 제거한다.
+	FGameplayTagContainer CooldownTags;
+	CooldownTags.AddTag(FGameplayTag::RequestGameplayTag(FName(TEXT("LS.Cooldown"))));
+	const int32 Removed = ASC->RemoveActiveEffectsWithGrantedTags(CooldownTags);
+
+	UE_LOG(LogLS, Log, TEXT("[SkillDebug] %s 스킬 쿨타임 초기화 (제거된 쿨타임 GE %d개)"), *GetNameSafe(OwnerActor), Removed);
+}
+
 void ULSPlayerSkillComponent::BeginPlay()
 {
 	Super::BeginPlay();

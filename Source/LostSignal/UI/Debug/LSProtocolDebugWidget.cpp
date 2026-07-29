@@ -12,6 +12,7 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Characters/LSPlayerCharacter.h"
 #include "Core/LSFarmingGameMode.h"
 #include "Core/LSLobbyGameMode.h"
 #include "Core/LSPlayerControllerBase.h"
@@ -20,6 +21,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
+#include "Skills/LSPlayerSkillComponent.h"
 
 #define LOCTEXT_NAMESPACE "LSProtocolDebugWidget"
 
@@ -82,6 +84,13 @@ void ULSProtocolDebugWidget::BuildPanel()
 	if (UHorizontalBoxSlot* AddGoldSlot = ActionRow->AddChildToHorizontalBox(AddGoldButton))
 	{
 		AddGoldSlot->SetPadding(FMargin(4.f, 2.f));
+	}
+
+	UButton* ResetCooldownButton = MakeButton(LOCTEXT("ResetSkillCooldownButton", "스킬 쿨타임 초기화"), 16);
+	ResetCooldownButton->OnClicked.AddDynamic(this, &ULSProtocolDebugWidget::HandleResetSkillCooldowns);
+	if (UHorizontalBoxSlot* ResetCooldownSlot = ActionRow->AddChildToHorizontalBox(ResetCooldownButton))
+	{
+		ResetCooldownSlot->SetPadding(FMargin(4.f, 2.f));
 	}
 
 	if (UVerticalBoxSlot* ActionSlot = VBox->AddChildToVerticalBox(ActionRow))
@@ -536,6 +545,20 @@ void ULSProtocolDebugWidget::HandleAddGold()
 	}
 
 	SaveSubsystem->AddGold(DebugGoldAmount);
+}
+
+void ULSProtocolDebugWidget::HandleResetSkillCooldowns()
+{
+	const ALSPlayerControllerBase* PC = ResolvePC();
+	ALSPlayerCharacter* PlayerCharacter = PC ? Cast<ALSPlayerCharacter>(PC->GetPawn()) : nullptr;
+	ULSPlayerSkillComponent* SkillComponent = PlayerCharacter ? PlayerCharacter->GetPlayerSkillComponent() : nullptr;
+	if (!SkillComponent)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[ProtocolDebug] 스킬 쿨타임 초기화 실패: 플레이어 스킬 컴포넌트를 찾지 못했습니다."));
+		return;
+	}
+
+	SkillComponent->ResetAllSkillCooldowns();
 }
 
 #undef LOCTEXT_NAMESPACE
