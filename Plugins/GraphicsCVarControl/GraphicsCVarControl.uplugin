@@ -1,0 +1,25 @@
+{
+	"FileVersion": 3,
+	"Version": 4,
+	"VersionName": "1.3.0",
+	"FriendlyName": "Graphics CVar Control",
+	"Description": "Editor tools for controlling graphics CVars and comparing baseline and candidate GPU snapshots.",
+	"Category": "Rendering",
+	"CreatedBy": "",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"EnabledByDefault": true,
+	"Modules": [
+		{
+			"Name": "GraphicsCVarControlEditor",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit"
+		}
+	]
+}
