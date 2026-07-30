@@ -26,7 +26,7 @@ protected:
 
 private:
 	// 아래에서 위로 올라가며 퍼지는 링 개수(연기 상승 느낌 임시 표현).
-	static constexpr int32 RisingRingCount = 3;
+	static constexpr int32 RisingRingCount = 0;
 
 	UPROPERTY(VisibleAnywhere, Category="LS/Extraction")
 	TObjectPtr<UBoxComponent> ExtractionBox;
@@ -35,9 +35,9 @@ private:
 	UPROPERTY(VisibleAnywhere, Category="LS/Extraction")
 	TObjectPtr<UStaticMeshComponent> MarkerMesh;
 
-	// 바닥에서 위로 솟아오르며 퍼지는 링들(연기/포탈 상승 느낌). Tick에서 위치·스케일을 순환 애니메이션.
-	UPROPERTY(VisibleAnywhere, Category="LS/Extraction")
-	TArray<TObjectPtr<UStaticMeshComponent>> RisingRings;
+	//// 바닥에서 위로 솟아오르며 퍼지는 링들(연기/포탈 상승 느낌). Tick에서 위치·스케일을 순환 애니메이션.
+	//UPROPERTY(VisibleAnywhere, Category="LS/Extraction")
+	//TArray<TObjectPtr<UStaticMeshComponent>> RisingRings;
 
 	UPROPERTY(VisibleAnywhere, Category="LS/Extraction")
 	TObjectPtr<UTextRenderComponent> MarkerText;

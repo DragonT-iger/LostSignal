@@ -42,7 +42,7 @@ ALSExtractionZone::ALSExtractionZone()
 	}
 
 	// 바닥에서 위로 솟아오르며 퍼지는 링들(연기 상승 임시 표현). 실제 위치·스케일은 Tick이 순환 구동한다.
-	RisingRings.Reserve(RisingRingCount);
+	/*RisingRings.Reserve(RisingRingCount);
 	for (int32 RingIndex = 0; RingIndex < RisingRingCount; ++RingIndex)
 	{
 		const FName RingName(*FString::Printf(TEXT("RisingRing_%d"), RingIndex));
@@ -58,7 +58,7 @@ ALSExtractionZone::ALSExtractionZone()
 			Ring->SetStaticMesh(CylinderMesh.Object);
 		}
 		RisingRings.Add(Ring);
-	}
+	}*/
 
 	SmokeEffectComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SmokeEffectComponent"));
 	SmokeEffectComponent->SetupAttachment(ExtractionBox);
@@ -115,22 +115,22 @@ void ALSExtractionZone::Tick(float DeltaSeconds)
 	constexpr float RiseHeight = 420.f;
 	constexpr float RingStartScaleXY = 1.2f;
 	constexpr float RingEndScaleXY = 4.0f;
-	for (int32 RingIndex = 0; RingIndex < RisingRings.Num(); ++RingIndex)
-	{
-		UStaticMeshComponent* Ring = RisingRings[RingIndex];
-		if (!Ring)
-		{
-			continue;
-		}
+	//for (int32 RingIndex = 0; RingIndex < RisingRings.Num(); ++RingIndex)
+	//{
+	//	UStaticMeshComponent* Ring = RisingRings[RingIndex];
+	//	if (!Ring)
+	//	{
+	//		continue;
+	//	}
 
-		// 링마다 위상을 어긋나게 해 연속으로 올라오는 것처럼 보이게 한다.
-		const float PhaseOffset = (RisePeriodSeconds / FMath::Max(1, RisingRings.Num())) * RingIndex;
-		const float Alpha = FMath::Fmod(MarkerAnimTime + PhaseOffset, RisePeriodSeconds) / RisePeriodSeconds;
+	//	// 링마다 위상을 어긋나게 해 연속으로 올라오는 것처럼 보이게 한다.
+	//	const float PhaseOffset = (RisePeriodSeconds / FMath::Max(1, RisingRings.Num())) * RingIndex;
+	//	const float Alpha = FMath::Fmod(MarkerAnimTime + PhaseOffset, RisePeriodSeconds) / RisePeriodSeconds;
 
-		const float RingScaleXY = FMath::Lerp(RingStartScaleXY, RingEndScaleXY, Alpha);
-		Ring->SetRelativeLocation(FVector(0.f, 0.f, RiseBaseZ + Alpha * RiseHeight));
-		Ring->SetRelativeScale3D(FVector(RingScaleXY, RingScaleXY, 0.06f));
-	}
+	//	const float RingScaleXY = FMath::Lerp(RingStartScaleXY, RingEndScaleXY, Alpha);
+	//	Ring->SetRelativeLocation(FVector(0.f, 0.f, RiseBaseZ + Alpha * RiseHeight));
+	//	Ring->SetRelativeScale3D(FVector(RingScaleXY, RingScaleXY, 0.06f));
+	//}
 
 	// 탈출 지점을 살아있게 — 초록 라이트를 은은하게 맥동시킨다.
 	if (MarkerLight)
