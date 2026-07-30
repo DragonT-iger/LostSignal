@@ -25,6 +25,9 @@ protected:
 	bool IsLocalVisionController() const;
 	bool IsPointVisibleInCurrentVision(const FVector2D& Point2D) const;
 	void UpdateVisionTargets(const FVector2D& VisionOrigin2D);
+	// 현재 폴리곤 기준 마스크 파라미터를 등록된 모든 서피스에 푸시한다.
+	// 재solve 경로와 "서피스만 새로 등록된" 경로 양쪽에서 호출된다.
+	void ApplyVisionParametersToSurfaces(const FVector2D& Forward2D, float SliceZ);
 	void DrawDebugVisionRays() const;
 	void InitializeLocalVision();
 	void ShutdownLocalVision();
@@ -98,4 +101,8 @@ private:
 	int32 LastSolveTopologyVersion = -1;
 	FVector2D LastSolveOrigin = FVector2D::ZeroVector;
 	FVector2D LastSolveForward = FVector2D::ZeroVector;
+
+	// 서피스 파라미터를 마지막으로 푸시한 시점의 서피스 등록 버전.
+	// 폴리곤이 그대로여도 이 값이 밀리면(스트리밍 인 등) 새 서피스에 파라미터를 다시 먹여야 한다.
+	int32 LastSurfaceRegistryVersion = -1;
 };

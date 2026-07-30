@@ -10,6 +10,7 @@ class UBoxComponent;
 class UStaticMeshComponent;
 class UPrimitiveComponent;
 class USceneComponent;
+struct FPropertyChangedEvent;
 
 UENUM(BlueprintType)
 enum class ELSVisionOccluderSourceMode : uint8
@@ -34,6 +35,11 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnUnregister() override;
+
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
 	virtual void TickComponent(
 		float DeltaTime,
 		ELevelTick TickType,

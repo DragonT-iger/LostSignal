@@ -63,6 +63,13 @@ public:
 		return SegmentTopologyVersion;
 	}
 
+	// 등록된 서피스 집합이 바뀔 때마다 증가한다(WP 스트리밍 인/아웃 등).
+	// 폴리곤은 그대로여도 새 서피스는 마스크 파라미터를 아직 못 받았으므로, 이 값이 바뀌면 파라미터를 다시 푸시해야 한다.
+	int32 GetSurfaceRegistryVersion() const
+	{
+		return SurfaceRegistryVersion;
+	}
+
 	// 오클루더 콜리전을 자르는 시야 평면 월드 Z. 플레이어 발 높이 기준 모드에서 런타임에 갱신된다.
 	float GetRuntimeSliceZ() const
 	{
@@ -105,6 +112,8 @@ private:
 	int32 NextSegmentId = 0;
 
 	int32 SegmentTopologyVersion = 0;
+
+	int32 SurfaceRegistryVersion = 0;
 
 	float RuntimeSliceZ = 0.0f;
 

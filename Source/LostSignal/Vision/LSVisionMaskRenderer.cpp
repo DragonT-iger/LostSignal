@@ -36,6 +36,8 @@ void ALSVisionMaskRenderer::RequestMaskUpdate(const FLSVisionPolygonData& Polygo
 	TArray<float> PolygonFlagUploadData;
 	PolygonFlagUploadData.Reserve(PolygonData.Points.Num());
 
+	// 폴리곤 점을 Origin(플레이어) 기준 상대 좌표로 내린다. 이 때문에 셰이더의 좌표계는 "월드"가 아니라
+	// "플레이어 상대"가 된다 — 절대 월드 위치가 필요한 계산(노이즈 샘플)은 VisionOrigin을 더해 복원해야 한다.
 	for (int32 PointIndex = 0; PointIndex < PolygonData.Points.Num(); ++PointIndex)
 	{
 		const FVector2D LocalPoint = PolygonData.Points[PointIndex] - PolygonData.Origin;
@@ -45,6 +47,8 @@ void ALSVisionMaskRenderer::RequestMaskUpdate(const FLSVisionPolygonData& Polygo
 
 	const float VisionRadius = PolygonData.VisionRadius;
 	const float Extent = PolygonData.Extent;
+	// 상대 좌표계의 원점이 놓인 절대 월드 위치. 셰이더가 노이즈를 월드 고정으로 샘플하는 데 쓴다.
+	const FVector2f MaskOriginWS(PolygonData.Origin);
 	const float FeatherWidthValue = FeatherWidth;
 	const FLinearColor HiddenColorValue = HiddenColor;
 
@@ -55,7 +59,7 @@ void ALSVisionMaskRenderer::RequestMaskUpdate(const FLSVisionPolygonData& Polygo
 	const float OccluderFeatherScaleValue = OccluderFeatherScale;
 
 	ENQUEUE_RENDER_COMMAND(RenderLostSignalVisionMask)(
-		[RenderTargetResource, VisionRadius, Extent, FeatherWidthValue, HiddenColorValue, NoiseResource, NoiseScaleValue, NoiseWidthValue, OccluderFeatherScaleValue, PolygonUploadData = MoveTemp(PolygonUploadData), PolygonFlagUploadData = MoveTemp(PolygonFlagUploadData)](FRHICommandListImmediate& RHICmdList)
+		[RenderTargetResource, VisionRadius, Extent, MaskOriginWS, FeatherWidthValue, HiddenColorValue, NoiseResource, NoiseScaleValue, NoiseWidthValue, OccluderFeatherScaleValue, PolygonUploadData = MoveTemp(PolygonUploadData), PolygonFlagUploadData = MoveTemp(PolygonFlagUploadData)](FRHICommandListImmediate& RHICmdList)
 		{
 			FRDGBuilder GraphBuilder(RHICmdList);
 
@@ -70,7 +74,7 @@ void ALSVisionMaskRenderer::RequestMaskUpdate(const FLSVisionPolygonData& Polygo
 
 			LSVision::FMaskDispatchInputs Inputs;
 			Inputs.OutputTexture = OutputTexture;
-			Inputs.VisionOrigin = FVector2f::ZeroVector;
+			Inputs.VisionOrigin = MaskOriginWS;
 			Inputs.VisionRadius = VisionRadius;
 			Inputs.FeatherWidth = FeatherWidthValue;
 			Inputs.WorldMin = FVector2f(-Extent, -Extent);

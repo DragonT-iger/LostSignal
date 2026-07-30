@@ -14,7 +14,6 @@ class ULSAimComponent;
 class ULSCharacterLightingComponent;
 class ULSChipStatComponent;
 class ULSEquipmentStatComponent;
-class ULSMPCVisionSourceComponent;
 class ULSNoiseEmitterComponent;
 class ULSPlayerCombatComponent;
 class ULSPlayerXRayComponent;
@@ -96,9 +95,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UCameraComponent> FollowCamera;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Components", meta=(AllowPrivateAccess="true"))
-	TObjectPtr<ULSMPCVisionSourceComponent> MPCVisionSourceComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULSVisionComponent> VisionComponent;

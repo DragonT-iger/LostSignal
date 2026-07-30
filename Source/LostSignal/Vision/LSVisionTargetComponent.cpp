@@ -62,6 +62,16 @@ void ULSVisionTargetComponent::SetLocallyVisible(const bool bVisible)
 		return;
 	}
 
+	// 프리미티브 수집(GetComponents 힙 할당)과 가시성 적용도 값이 바뀔 때만 한다 — 매 주기 호출이라 그냥 두면
+	// 타깃 수 × 프레임만큼 낭비된다. 단, bIsLocallyVisible 기본값이 true라 "처음부터 보이는 상태"면 bChanged가
+	// 한 번도 서지 않으므로, 최초 1회는 무조건 적용해 에디터에 숨김으로 저장된 프리미티브가 방치되지 않게 한다.
+	if (!bChanged && bHasAppliedVisibility)
+	{
+		return;
+	}
+
+	bHasAppliedVisibility = true;
+
 	TArray<UPrimitiveComponent*> TargetComponents;
 	GatherRenderPrimitives(TargetComponents);
 

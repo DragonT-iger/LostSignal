@@ -42,7 +42,6 @@
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/LSUILayer.h"
 #include "Vision/LSCharacterLightingComponent.h"
-#include "Vision/LSMPCVisionSourceComponent.h"
 #include "Vision/LSPlayerXRayComponent.h"
 #include "Vision/LSVisionComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -71,7 +70,6 @@ ALSPlayerCharacter::ALSPlayerCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 
-	MPCVisionSourceComponent = CreateDefaultSubobject<ULSMPCVisionSourceComponent>(TEXT("MPCVisionSourceComponent"));
 	VisionComponent = CreateDefaultSubobject<ULSVisionComponent>(TEXT("VisionComponent"));
 	PlayerXRayComponent = CreateDefaultSubobject<ULSPlayerXRayComponent>(TEXT("PlayerXRayComponent"));
 	CharacterLightingComponent = CreateDefaultSubobject<ULSCharacterLightingComponent>(TEXT("CharacterLightingComponent"));

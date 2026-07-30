@@ -204,6 +204,15 @@ void ULSVisionComponent::UpdateVisionPolygon()
 			DrawDebugVisionRays();
 		}
 
+		// 폴리곤은 그대로지만 서피스가 새로 등록됐다면(WP 스트리밍 인 등) 그 서피스의 MID는 아직 마스크 파라미터가 비어 있다.
+		// 재solve 없이 파라미터만 다시 푸시해, 플레이어가 멈춰 있어도 새 지오메트리가 즉시 올바르게 마스킹되게 한다.
+		const int32 CurrentSurfaceRegistryVersion = VisionSubsystem->GetSurfaceRegistryVersion();
+		if (LastSurfaceRegistryVersion != CurrentSurfaceRegistryVersion)
+		{
+			LastSurfaceRegistryVersion = CurrentSurfaceRegistryVersion;
+			ApplyVisionParametersToSurfaces(LastSolveForward, SliceZ);
+		}
+
 		UpdateVisionTargets(ActorLocation2D);
 		return;
 	}
@@ -257,6 +266,21 @@ void ULSVisionComponent::UpdateVisionPolygon()
 
 	VisionSubsystem->GetMaskRenderer()->RequestMaskUpdate(CurrentPolygon);
 
+	LastSurfaceRegistryVersion = VisionSubsystem->GetSurfaceRegistryVersion();
+	ApplyVisionParametersToSurfaces(SolverInfo.OriginForward, SliceZ);
+
+	UpdateVisionTargets(SolverInfo.OriginPos);
+}
+
+// Pushes the current polygon's mask placement into every registered surface material.
+void ULSVisionComponent::ApplyVisionParametersToSurfaces(const FVector2D& Forward2D, const float SliceZ)
+{
+	ULSVisionSubsystem* VisionSubsystem = GetWorld() ? GetWorld()->GetSubsystem<ULSVisionSubsystem>() : nullptr;
+	if (VisionSubsystem == nullptr)
+	{
+		return;
+	}
+
 	for (ULSVisionSurfaceComponent* SurfaceComponent : VisionSubsystem->GetRegisteredVisionSurfaces())
 	{
 		if (SurfaceComponent != nullptr)
@@ -265,11 +289,9 @@ void ULSVisionComponent::UpdateVisionPolygon()
 				VisionSubsystem->GetVisibilityMaskRenderTarget(),
 				FVector(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, SliceZ),
 				CurrentPolygon.Extent,
-				SolverInfo.OriginForward);
+				Forward2D);
 		}
 	}
-
-	UpdateVisionTargets(SolverInfo.OriginPos);
 }
 
 // Draws each sampled visibility ray so the current endpoint-based solver can be inspected in the world.

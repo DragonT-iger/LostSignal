@@ -3,6 +3,10 @@
 
 RWTexture2D<float4> RWOutputTexture;
 
+// [좌표계 계약] 이 셰이더가 다루는 좌표는 월드가 아니라 "플레이어 상대"다.
+// C++가 폴리곤 점을 Points - Origin으로 내려 보내고 WorldMin/Max를 ±Extent로 넘기기 때문이다.
+// VisionOrigin = 그 상대 원점이 놓인 절대 월드 위치. 절대 월드 위치가 필요한 계산은 반드시 이걸 더해야 한다.
+// 마스크 기하(원/폴리곤 판정, 엣지 거리)는 상대 좌표가 맞으므로 VisionOrigin을 더하지 않는다.
 float2 VisionOrigin;
 float VisionRadius;
 float FeatherWidth;
@@ -51,8 +55,9 @@ void MainCS(uint3 DispatchThreadId : SV_DispatchThreadID)
     const float CircleAlpha = smoothstep(max(VisionRadius - FeatherWidth, 0.0f), VisionRadius, DistanceToVision);
 
     // 경계 디더용 노이즈 오프셋(월드 유닛, ±NoiseWidth/2). 충돌 안 한 "열린" 경계 거리에만 더해 그 경계만 디더한다.
-    // 판정/오클루더 거리는 흔들리지 않은 WorldPos를 그대로 써서 오브젝트 경계는 또렷하게 유지. 월드 좌표 샘플이라 안 기어다님.
-    const float EdgeNoise = NoiseTexture.SampleLevel(NoiseSampler, WorldPos * NoiseScale, 0).r;
+    // 판정/오클루더 거리는 흔들리지 않은 WorldPos를 그대로 써서 오브젝트 경계는 또렷하게 유지.
+    // 샘플 좌표에 VisionOrigin을 더해 절대 월드로 복원한다 — 안 더하면 UV가 플레이어에 고정돼 무늬가 지형 위를 기어다닌다.
+    const float EdgeNoise = NoiseTexture.SampleLevel(NoiseSampler, (WorldPos + VisionOrigin) * NoiseScale, 0).r;
     const float NoiseOffset = (EdgeNoise - 0.5f) * NoiseWidth;
 
     bool bInside = false;

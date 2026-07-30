@@ -13,8 +13,10 @@
 
 ULSVisionOccluderComponent::ULSVisionOccluderComponent()
 {
+	// 틱은 디버그 세그먼트 드로우 전용이다. 레벨의 모든 벽이 무의미한 틱 비용을 물지 않도록 기본은 꺼두고,
+	// bDrawDebugSegments가 켜졌을 때만 활성화한다.
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.bStartWithTickEnabled = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
 void ULSVisionOccluderComponent::OnRegister()
@@ -30,6 +32,7 @@ void ULSVisionOccluderComponent::BeginPlay()
 	Super::BeginPlay();
 	RebuildSegments();
 	UpdateObservedComponentBinding();
+	SetComponentTickEnabled(bDrawDebugSegments);
 
 	if (UWorld* World = GetWorld())
 	{
@@ -59,6 +62,16 @@ void ULSVisionOccluderComponent::OnUnregister()
 
 	Super::OnUnregister();
 }
+
+#if WITH_EDITOR
+// PIE 중 디테일 패널에서 디버그 체크박스를 토글해도 틱 상태가 즉시 따라오게 한다.
+void ULSVisionOccluderComponent::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	SetComponentTickEnabled(bDrawDebugSegments);
+}
+#endif
 
 void ULSVisionOccluderComponent::RebuildSegments()
 {

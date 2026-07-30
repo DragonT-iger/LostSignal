@@ -47,4 +47,7 @@ public:
 
 private:
 	void GatherRenderPrimitives(TArray<UPrimitiveComponent*>& OutPrimitives) const;
+
+	// 가시성을 프리미티브에 한 번이라도 적용했는지. 최초 1회는 변화가 없어도 적용하기 위한 상태.
+	bool bHasAppliedVisibility = false;
 };

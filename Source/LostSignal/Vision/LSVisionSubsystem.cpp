@@ -167,18 +167,31 @@ void ULSVisionSubsystem::RefreshOccluder(ULSVisionOccluderComponent* Occluder)
 }
 
 // Tracks surfaces that need the latest mask texture and transform parameters.
+// 집합이 실제로 변했을 때만 버전을 올린다 — 새 서피스는 마스크 파라미터를 아직 못 받은 상태이므로
+// 플레이어가 멈춰 있어도(폴리곤 재계산 없이) 파라미터를 다시 푸시해야 한다.
 void ULSVisionSubsystem::RegisterSurface(ULSVisionSurfaceComponent* Surface)
 {
-	if (Surface != nullptr)
+	if (Surface == nullptr)
 	{
-		RegisteredSurfaces.AddUnique(Surface);
+		return;
+	}
+
+	const int32 PreviousSurfaceCount = RegisteredSurfaces.Num();
+	RegisteredSurfaces.AddUnique(Surface);
+
+	if (RegisteredSurfaces.Num() != PreviousSurfaceCount)
+	{
+		++SurfaceRegistryVersion;
 	}
 }
 
 // Removes surfaces when the owning actor/component leaves the world.
 void ULSVisionSubsystem::UnregisterSurface(ULSVisionSurfaceComponent* Surface)
 {
-	RegisteredSurfaces.Remove(Surface);
+	if (RegisteredSurfaces.Remove(Surface) > 0)
+	{
+		++SurfaceRegistryVersion;
+	}
 }
 
 // Tracks visibility targets that can be shown/hidden by local vision checks.
