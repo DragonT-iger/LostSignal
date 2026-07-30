@@ -146,9 +146,13 @@ public:
 	const TArray<FName>& GetQuickSlots() const;
 
 	// 적재 프로토콜로 해금된 퀵슬롯 칸 수(0~QuickSlotCount). 인벤토리 슬롯 용량과 동일 메커니즘
-	// (Carrying 프로토콜 + DT_Protocol의 "Quick" UI_Slot 행). UI 표시·사용 게이트의 단일 출처.
+	// (Carrying 프로토콜 + DT_Protocol의 "Quick" UI_Slot 행). 신호 활성 장착 칩 기반(current/previous).
 	UFUNCTION(BlueprintPure, Category="LS/Save")
 	int32 GetUnlockedQuickSlotCount() const;
+
+	// 주어진 적재 프로토콜 레벨로 해금 퀵슬롯 칸 수를 계산한다(디버그 패널 오버라이드 반영 경로).
+	// 강제 레벨은 보호 레벨이 무의미하므로 current==previous로 다룬다(스킬 바 디버그 경로와 동일).
+	int32 GetUnlockedQuickSlotCountForCarryingLevel(int32 CarryingLevel) const;
 
 	// SlotIndex 칸에 소모품 ItemRowName을 등록한다. 소모품(Item_Type 4~9)이 아니거나 인덱스가 범위 밖이면 false.
 	// 같은 아이템이 다른 칸에 이미 있으면 그 칸을 비운다(이동). 성공 시 저장 후 OnQuickSlotsChanged 발행.

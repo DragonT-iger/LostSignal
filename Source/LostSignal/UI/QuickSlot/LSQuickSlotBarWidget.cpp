@@ -98,8 +98,16 @@ void ULSQuickSlotBarWidget::ApplyProtocolVisibility()
 	}
 
 	// HUD 바: 적재 프로토콜로 해금된 칸만 표시하고 나머지는 접는다(표시 영역 리플로우).
-	const ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem();
-	const int32 UnlockedCount = SaveSubsystem ? SaveSubsystem->GetUnlockedQuickSlotCount() : 0;
+	// 컨트롤러 경유로 디버그 패널 오버라이드까지 반영한다. 컨트롤러가 없으면 세이브의 칩 기반 값으로 폴백.
+	int32 UnlockedCount = 0;
+	if (const ALSPlayerControllerBase* PlayerController = GetOwningPlayer<ALSPlayerControllerBase>())
+	{
+		UnlockedCount = PlayerController->GetUnlockedQuickSlotCount();
+	}
+	else if (const ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem())
+	{
+		UnlockedCount = SaveSubsystem->GetUnlockedQuickSlotCount();
+	}
 	for (int32 Index = 0; Index < Slots.Num(); ++Index)
 	{
 		if (Slots[Index])

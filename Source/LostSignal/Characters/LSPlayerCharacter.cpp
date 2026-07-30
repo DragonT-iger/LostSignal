@@ -605,7 +605,9 @@ void ALSPlayerCharacter::TryUseQuickSlot(const int32 QuickSlotIndex)
 	}
 
 	// 적재 프로토콜로 해금되지 않은 칸은 사용할 수 없다(인덱스 0~5 = 1~6번 칸과 1:1).
-	const int32 UnlockedQuickSlotCount = SaveSubsystem->GetUnlockedQuickSlotCount();
+	// 컨트롤러 경유로 디버그 패널 오버라이드까지 반영해 UI 표시(가시성)와 항상 같은 값을 쓴다.
+	const ALSPlayerControllerBase* QuickSlotOwner = Cast<ALSPlayerControllerBase>(GetController());
+	const int32 UnlockedQuickSlotCount = QuickSlotOwner ? QuickSlotOwner->GetUnlockedQuickSlotCount() : SaveSubsystem->GetUnlockedQuickSlotCount();
 	if (QuickSlotIndex >= UnlockedQuickSlotCount)
 	{
 		UE_LOG(LogLS, Verbose, TEXT("[QuickSlot] 잠긴 슬롯 %d 사용 시도 (해금=%d)."), QuickSlotIndex, UnlockedQuickSlotCount);

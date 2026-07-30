@@ -400,6 +400,11 @@ void ALSPlayerControllerBase::RefreshAllInventoryUI()
 	RefreshOpenChipStationWidget();
 
 	// 퀵슬롯 개수는 인벤토리에서 실시간 합산하므로, 인벤토리가 바뀔 때마다 등록된 모든 바(인벤토리+HUD)를 다시 그린다.
+	RefreshRegisteredQuickSlotBars();
+}
+
+void ALSPlayerControllerBase::RefreshRegisteredQuickSlotBars()
+{
 	for (int32 Index = RegisteredQuickSlotBars.Num() - 1; Index >= 0; --Index)
 	{
 		if (ULSQuickSlotBarWidget* Bar = RegisteredQuickSlotBars[Index].Get())
@@ -1321,6 +1326,25 @@ int32 ALSPlayerControllerBase::GetEffectiveProtocolLevel(const ELSProtocolType P
 	}
 }
 
+int32 ALSPlayerControllerBase::GetUnlockedQuickSlotCount() const
+{
+	const UGameInstance* GameInstance = GetGameInstance();
+	const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
+	if (!SaveSubsystem)
+	{
+		return 0;
+	}
+
+	// 디버그 패널이 떠 있고 적재 오버라이드가 설정돼 있으면 그 레벨로 해금 칸 수를 계산한다.
+	// (스킬 바 ResolveBattleProtocolLevels / 칩스테이션 ResolveProtocolPreviewLevels와 동일한 게이트.)
+	if (HasProtocolTestLevel(ELSProtocolType::Carrying))
+	{
+		return SaveSubsystem->GetUnlockedQuickSlotCountForCarryingLevel(GetProtocolTestLevel(ELSProtocolType::Carrying));
+	}
+
+	return SaveSubsystem->GetUnlockedQuickSlotCount();
+}
+
 bool ALSPlayerControllerBase::HasProtocolTestLevel(const ELSProtocolType ProtocolType) const
 {
 	return IsProtocolDebugWidgetVisible() && GetProtocolTestLevel(ProtocolType) >= 0;
@@ -1392,6 +1416,9 @@ void ALSPlayerControllerBase::RefreshProtocolTestTargets()
 	{
 		ChipStationWidgetInstance->RefreshChipStation();
 	}
+
+	// 적재 오버라이드 변경은 퀵슬롯 해금 칸 수를 바꾸므로 등록된 바의 가시성을 즉시 다시 평가한다.
+	RefreshRegisteredQuickSlotBars();
 }
 
 bool ALSPlayerControllerBase::TransferInventorySlotToLootDrop(const ELSInventorySlotArea FromSlotArea, const int32 FromSlotIndex)

@@ -89,6 +89,10 @@ public:
 	// 소스 슬롯만 낙관적으로 비우는 부분 갱신은 금지 — 반드시 이 funnel로 전체를 다시 그린다.
 	void RefreshAllInventoryUI();
 
+	// 등록된 모든 퀵슬롯 바(인벤토리+HUD)를 다시 그린다(개수·해금 가시성 재평가).
+	// 인벤토리 변경 funnel과 디버그 프로토콜 레벨 변경 양쪽에서 호출한다.
+	void RefreshRegisteredQuickSlotBars();
+
 	// 폰의 인벤토리가 열려 있거나, 등록된 로비 인벤토리 위젯이 보이면 true.
 	bool IsInventoryUIOpen() const;
 
@@ -170,6 +174,10 @@ public:
 	int32 GetProtocolTestLevel(ELSProtocolType ProtocolType) const;
 	// 현재 적용 중인 프로토콜 레벨: 패널 표시 중 오버라이드가 있으면 그 값, 없으면 신호 활성 장착 칩의 합산값.
 	int32 GetEffectiveProtocolLevel(ELSProtocolType ProtocolType) const;
+
+	// 해금된 퀵슬롯 칸 수(UI 표시·사용 게이트의 단일 출처). 디버그 패널 적재 오버라이드가 있으면 그 레벨을,
+	// 없으면 세이브의 신호 활성 칩 기반 값을 쓴다. 두 소비처(HUD 바 가시성 / 레이드 키 사용)가 이 값 하나를 공유한다.
+	int32 GetUnlockedQuickSlotCount() const;
 
 	UFUNCTION(Client, Reliable)
 	void ClientStartRaidSession(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);

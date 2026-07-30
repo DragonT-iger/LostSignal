@@ -31,12 +31,14 @@
 
 퀵슬롯 사용 가능 칸 수는 **적재 프로토콜(`ELSProtocolType::Carrying`) 레벨**로 해금된다. 인벤토리 슬롯 용량과 **동일 메커니즘**이다: `DT_Protocol`의 `Protocol_Enable_Name = "Quick"`(`UI_Slot`) 행들을 `ULSGameDataSubsystem::GetVisibleProtocolEnableValueSum`으로 합산한 값이 해금 칸 수다. 레벨/칸 수는 **DT가 단일 출처**(수치는 [ChipSystem.md](ChipSystem.md)의 적재 프로토콜 정의와 `DT_Protocol`가 소유) — 코드엔 하드코딩하지 않는다.
 
-- **단일 출처 함수:** [`ULSSaveSubsystem::GetUnlockedQuickSlotCount`](../../Source/LostSignal/Session/LSSaveSubsystem.h) — `GetCarryingProtocolSlotBonus("Quick")`를 `QuickSlotCount`로 클램프. UI 표시와 사용 게이트 **양쪽이 이 값 하나**를 쓴다(항상 일치). 세이브/신호-활성 칩 집계 기반이라 인벤토리 용량과 동일하게 **디버그 패널 테스트 레벨 오버라이드는 반영하지 않는다**(실제 칩 장착 기준).
+- **단일 출처 함수:** [`ALSPlayerControllerBase::GetUnlockedQuickSlotCount`](../../Source/LostSignal/Core/LSPlayerControllerBase.h) — UI 표시(바 가시성)와 사용 게이트 **양쪽이 이 값 하나**를 쓴다(항상 일치). 내부 분기:
+  - **디버그 패널 오버라이드 우선:** 프로토콜 디버그 패널(Insert 토글)이 떠 있고 적재 오버라이드가 설정돼 있으면 그 레벨로 계산(`ULSSaveSubsystem::GetUnlockedQuickSlotCountForCarryingLevel`, current==previous). 스킬 바/칩스테이션의 디버그 게이트(`HasProtocolTestLevel`)와 동일.
+  - **평상시:** 세이브의 신호-활성 칩 집계 기반 [`ULSSaveSubsystem::GetUnlockedQuickSlotCount`](../../Source/LostSignal/Session/LSSaveSubsystem.h)(`GetCarryingProtocolSlotBonus("Quick")` → `QuickSlotCount` 클램프). 컨트롤러가 없는 경로는 이 세이브 값으로 폴백.
 - **사용 게이트:** `TryUseQuickSlot(index)` 상단에서 `index >= 해금 칸 수`면 거부(인덱스 0~5 = 1~6번 칸과 1:1). 등록(드래그앤드랍)은 잠긴 칸에도 허용 — 해금 시 바로 쓰인다.
 - **표시 게이트(바별로 다름):** `ULSQuickSlotBarWidget::bHideLockedSlots`(`EditAnywhere`)로 인스턴스마다 분기.
   - **HUD 바**(기본 `true`): 잠긴 칸을 `Collapsed`로 접어 표시 영역이 해금 수만큼(예: 3→6칸) 리플로우.
   - **인벤토리 바**(아트가 `false`로 설정): 레벨 무관 6칸 항상 표시, 잠금 표시 없음. (사용 자체는 여전히 게이트됨.)
-- **실시간 갱신:** 칩 장착/해제·신호 게이지 변경은 `OnChipLoadoutChanged`로 브로드캐스트되어 바의 `RefreshAll`(→ `ApplyProtocolVisibility`)을 태운다. 레이드 중 신호 하락으로 적재 레벨이 떨어지면 `IsProtocolUnlockVisible`의 current/previous·`Protocol_Protected_Level`(정보 유지) 규칙대로 표시가 갱신된다.
+- **실시간 갱신:** 칩 장착/해제·신호 게이지 변경은 `OnChipLoadoutChanged`로 브로드캐스트되어 바의 `RefreshAll`(→ `ApplyProtocolVisibility`)을 태운다. 레이드 중 신호 하락으로 적재 레벨이 떨어지면 `IsProtocolUnlockVisible`의 current/previous·`Protocol_Protected_Level`(정보 유지) 규칙대로 표시가 갱신된다. 디버그 패널에서 적재 레벨을 +/-로 조정하면 `RefreshProtocolTestTargets` → `RefreshRegisteredQuickSlotBars`로 등록된 모든 바가 즉시 다시 그려진다.
 
 > **아트 매핑:** `WBP_QuickSlotBar`의 **인벤토리 인스턴스**는 Details에서 `bHideLockedSlots`를 **해제**, **HUD 인스턴스**는 기본값 `true` 유지.
 > **기획 데이터:** `DT_Protocol`에 적재 행 추가 필요 — 예) 레벨 2에서 `Quick` +3, 레벨 5에서 +3(합산 0/3/6). 값·`Protocol_Protected_Level`은 기획 조정.

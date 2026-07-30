@@ -1523,6 +1523,25 @@ int32 ULSSaveSubsystem::GetUnlockedQuickSlotCount() const
 	return FMath::Clamp(GetCarryingProtocolSlotBonus(TEXT("Quick")), 0, LSInventorySlotUtils::QuickSlotCount);
 }
 
+int32 ULSSaveSubsystem::GetUnlockedQuickSlotCountForCarryingLevel(const int32 CarryingLevel) const
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	const ULSGameDataSubsystem* GameDataSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	if (!GameDataSubsystem)
+	{
+		return 0;
+	}
+
+	// 디버그 강제 레벨은 current==previous로 둔다(정보 유지/보호 레벨 무의미).
+	const int32 Sum = GameDataSubsystem->GetVisibleProtocolEnableValueSum(
+		ELSProtocolType::Carrying,
+		TEXT("Quick"),
+		CarryingLevel,
+		CarryingLevel,
+		TEXT("QuickSlotDebugLevel"));
+	return FMath::Clamp(Sum, 0, LSInventorySlotUtils::QuickSlotCount);
+}
+
 int32 ULSSaveSubsystem::ComputeCarryingProtocolSlotBonus(const TArray<FLSSessionItem>& EquipmentSlots, const FName EnableName) const
 {
 	if (!SaveData || EnableName.IsNone())
