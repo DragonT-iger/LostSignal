@@ -2,6 +2,7 @@
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Camera/CameraComponent.h"
+#include "Combat/LSAimComponent.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
@@ -124,6 +125,21 @@ TArray<FMinimapVisionPath> BuildMinimapVisionPaths(const TArray<FLSVisionSegment
 	}
 
 	return Paths;
+}
+
+FVector ResolveMinimapSightWorldDirection(const APawn* Pawn)
+{
+	if (Pawn == nullptr)
+	{
+		return FVector::ForwardVector;
+	}
+
+	if (const ULSAimComponent* AimComponent = Pawn->FindComponentByClass<ULSAimComponent>())
+	{
+		return AimComponent->GetAimDirection();
+	}
+
+	return Pawn->GetActorForwardVector();
 }
 
 FLinearColor ResolveMarkerColor(const FLSMinimapMarkerSnapshot& Marker)
@@ -279,7 +295,7 @@ int32 ULSMinimapWidget::NativePaint(
 	const APawn* Pawn = ObservedPawn.Get();
 	if (Pawn && IsNavigationFeatureVisible(TEXT("Minimap_View_Angle"), CurrentNavigationProtocol, PreviousNavigationProtocol, true))
 	{
-		const FVector2D Forward2D = ProjectWorldDirection(Pawn->GetActorForwardVector());
+		const FVector2D Forward2D = ProjectWorldDirection(ResolveMinimapSightWorldDirection(Pawn));
 		DrawSightCone(OutDrawElements, ++CurrentLayer, AllottedGeometry, Center, Forward2D, Radius, SightAngleDegrees, SightColor);
 	}
 
@@ -698,41 +714,28 @@ void ULSMinimapWidget::DrawMinimapObstacles(const FGeometry& Geometry, FSlateWin
 
 	TArray<ULSMinimapObstacleComponent*> Obstacles;
 	MinimapSubsystem->GetRegisteredObstacles(Obstacles);
-	for (const ULSMinimapObstacleComponent* Obstacle : Obstacles)
+	for (ULSMinimapObstacleComponent* Obstacle : Obstacles)
 	{
 		if (!IsValid(Obstacle) || !Obstacle->IsMinimapVisible())
 		{
 			continue;
 		}
 
-		TArray<FBox> BoundsList;
-		Obstacle->GatherObstacleBounds(BoundsList);
-		for (const FBox& Bounds : BoundsList)
+		TArray<FLSVisionSegment2D> Segments;
+		Obstacle->GatherObstacleSegments(Segments);
+		if (Segments.Num() > 0)
 		{
-			if (Bounds.IsValid)
-			{
-				DrawObstacleBounds(Bounds, Geometry, OutDrawElements, ++LayerId, Center, Radius, PixelsPerCm, FlattenTerrainColor(Obstacle->GetObstacleColor()), Obstacle->GetLineThickness());
-			}
-		}
-	}
-}
-
-void ULSMinimapWidget::DrawObstacleBounds(const FBox& Bounds, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm, const FLinearColor& Color, const float Thickness) const
-{
-	const TArray<FVector2D> Corners = {
-		ProjectWorldLocation(FVector(Bounds.Min.X, Bounds.Min.Y, Bounds.Min.Z), Center, PixelsPerCm),
-		ProjectWorldLocation(FVector(Bounds.Max.X, Bounds.Min.Y, Bounds.Min.Z), Center, PixelsPerCm),
-		ProjectWorldLocation(FVector(Bounds.Max.X, Bounds.Max.Y, Bounds.Min.Z), Center, PixelsPerCm),
-		ProjectWorldLocation(FVector(Bounds.Min.X, Bounds.Max.Y, Bounds.Min.Z), Center, PixelsPerCm)
-	};
-
-	for (int32 CornerIndex = 0; CornerIndex < Corners.Num(); ++CornerIndex)
-	{
-		FVector2D Start = Corners[CornerIndex];
-		FVector2D End = Corners[(CornerIndex + 1) % Corners.Num()];
-		if (ClipSegmentToCircle(Start, End, Center, Radius - 0.75f))
-		{
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { Start, End }, ESlateDrawEffect::None, Color, true, Thickness);
+			DrawFilledSegmentTerrain(
+				Segments,
+				Geometry,
+				OutDrawElements,
+				++LayerId,
+				Center,
+				Radius,
+				PixelsPerCm,
+				FlattenTerrainColor(Obstacle->GetObstacleColor()),
+				Obstacle->GetLineThickness(),
+				Obstacle->GetLineThickness());
 		}
 	}
 }
@@ -764,24 +767,42 @@ void ULSMinimapWidget::DrawVisionTerrain(const FGeometry& Geometry, FSlateWindow
 
 		if (SurfaceOwners.Contains(Occluder->GetOwner()))
 		{
-			DrawVisionOccluderTerrain(Occluder->GetSegments(), Geometry, OutDrawElements, ++LayerId, Center, Radius, PixelsPerCm);
+			DrawFilledSegmentTerrain(
+				Occluder->GetSegments(),
+				Geometry,
+				OutDrawElements,
+				++LayerId,
+				Center,
+				Radius,
+				PixelsPerCm,
+				FlattenTerrainColor(VisionTerrainColor),
+				1.5f,
+				3.0f);
 		}
 		else
 		{
-			DrawVisionOccluderSegments(Occluder->GetSegments(), Geometry, OutDrawElements, ++LayerId, Center, Radius, PixelsPerCm);
+			DrawWorldSegments(
+				Occluder->GetSegments(),
+				Geometry,
+				OutDrawElements,
+				++LayerId,
+				Center,
+				Radius,
+				PixelsPerCm,
+				FlattenTerrainColor(VisionTerrainColor),
+				3.0f);
 		}
 	}
 }
 
-void ULSMinimapWidget::DrawVisionOccluderTerrain(const TArray<FLSVisionSegment2D>& Segments, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm) const
+void ULSMinimapWidget::DrawFilledSegmentTerrain(const TArray<FLSVisionSegment2D>& Segments, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm, const FLinearColor& Color, const float FilledOutlineThickness, const float OpenLineThickness) const
 {
-	const FLinearColor TerrainColor = FlattenTerrainColor(VisionTerrainColor);
 	TArray<FLSVisionSegment2D> OpenSegments;
 	for (const FMinimapVisionPath& Path : BuildMinimapVisionPaths(Segments))
 	{
 		if (Path.bClosed && Path.Points.Num() >= 3)
 		{
-			DrawVisionFilledLoop(Path.Points, Geometry, OutDrawElements, LayerId, Center, Radius, PixelsPerCm, TerrainColor);
+			DrawFilledWorldLoop(Path.Points, Geometry, OutDrawElements, LayerId, Center, Radius, PixelsPerCm, Color, FilledOutlineThickness);
 			continue;
 		}
 
@@ -794,10 +815,19 @@ void ULSMinimapWidget::DrawVisionOccluderTerrain(const TArray<FLSVisionSegment2D
 		}
 	}
 
-	DrawVisionOccluderSegments(OpenSegments, Geometry, OutDrawElements, LayerId, Center, Radius, PixelsPerCm);
+	DrawWorldSegments(
+		OpenSegments,
+		Geometry,
+		OutDrawElements,
+		LayerId,
+		Center,
+		Radius,
+		PixelsPerCm,
+		Color,
+		OpenLineThickness);
 }
 
-void ULSMinimapWidget::DrawVisionFilledLoop(const TArray<FVector2D>& WorldPoints, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm, const FLinearColor& Color) const
+void ULSMinimapWidget::DrawFilledWorldLoop(const TArray<FVector2D>& WorldPoints, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm, const FLinearColor& Color, const float OutlineThickness) const
 {
 	TArray<FVector2D> ProjectedPoints;
 	ProjectedPoints.Reserve(WorldPoints.Num());
@@ -813,12 +843,12 @@ void ULSMinimapWidget::DrawVisionFilledLoop(const TArray<FVector2D>& WorldPoints
 		FVector2D End = ProjectedPoints[(PointIndex + 1) % ProjectedPoints.Num()];
 		if (ClipSegmentToCircle(Start, End, Center, Radius - 0.75f))
 		{
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { Start, End }, ESlateDrawEffect::None, Color, true, 1.5f);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { Start, End }, ESlateDrawEffect::None, Color, true, OutlineThickness);
 		}
 	}
 }
 
-void ULSMinimapWidget::DrawVisionOccluderSegments(const TArray<FLSVisionSegment2D>& Segments, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm) const
+void ULSMinimapWidget::DrawWorldSegments(const TArray<FLSVisionSegment2D>& Segments, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm, const FLinearColor& Color, const float Thickness) const
 {
 	for (const FLSVisionSegment2D& Segment : Segments)
 	{
@@ -828,7 +858,7 @@ void ULSMinimapWidget::DrawVisionOccluderSegments(const TArray<FLSVisionSegment2
 		FVector2D ProjectedEnd = ProjectWorldLocation(End, Center, PixelsPerCm);
 		if (ClipSegmentToCircle(ProjectedStart, ProjectedEnd, Center, Radius))
 		{
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { ProjectedStart, ProjectedEnd }, ESlateDrawEffect::None, FlattenTerrainColor(VisionTerrainColor), true, 3.0f);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { ProjectedStart, ProjectedEnd }, ESlateDrawEffect::None, Color, true, Thickness);
 		}
 	}
 

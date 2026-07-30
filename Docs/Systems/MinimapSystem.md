@@ -84,6 +84,8 @@ ULSMinimapWidget
 | `Minimap_Enemy` | 미니맵 범위 안 모든 몬스터 표시. 정보 유지는 `Protocol_Protected_Level`로 판정 |
 | `Minimap_Looting_Object` | 미니맵 범위 안 모든 루팅 오브젝트/월드 드랍 아이템 표시. 정보 유지는 `Protocol_Protected_Level`로 판정 |
 
+`Minimap_View_Angle`의 방향은 실제 Vision 판정과 동일하게 `ULSAimComponent::GetAimDirection()`을 사용한다. 달리기 중 캐릭터 본체가 이동 방향을 바라보더라도 미니맵 시야각은 마우스 조준 방향을 유지하며, Aim 컴포넌트가 없을 때만 액터 정면으로 대체한다.
+
 ### 테스트 UI 프리뷰 단계
 
 `WBP_ChipStation`의 미니맵 프리뷰는 실제 월드 데이터를 쓰지 않고 `ULSMinimapWidget::DrawPreviewData()`의 고정 더미 데이터를 그린다.
@@ -106,7 +108,7 @@ ULSMinimapWidget
 
 닫히지 않았거나 점이 부족한 오클루더 선분은 내부를 채우지 않고 보라색 선으로만 그린다. `ULSVisionSurfaceComponent` 없이 `ULSVisionOccluderComponent`만 있는 액터도 선으로 표시하며, 반대로 Surface만 있고 오클루더가 없는 액터는 잘못된 사각형을 대신 그리지 않는다. 지형 면과 선분은 미니맵 원 반경 안에서만 그려서 바깥으로 삐져나가지 않게 한다. 이 방식은 플레이어 시야를 실제로 가리는 벽, 장애물, 차폐물과 미니맵 지형 표시를 같은 데이터에서 관리하기 위한 기본 경로다.
 
-펜스나 난간처럼 구멍이 있어 시야를 막지 않는 물체는 `ULSMinimapObstacleComponent`를 붙여 미니맵 전용으로 표시한다. 이 컴포넌트는 지정한 `TargetPrimitives`를 우선 사용하고, 비어 있으면 owner의 Pawn Block 콜라이더를 수집해 보라색 외곽선으로 그린다. 시야 판정에는 영향을 주지 않는다.
+펜스나 난간처럼 구멍이 있어 시야를 막지 않는 물체는 `ULSMinimapObstacleComponent`를 붙여 미니맵 전용으로 표시한다. 이 컴포넌트는 지정한 `TargetPrimitives`를 우선 사용하고, 비어 있으면 owner의 Pawn Block 콜라이더를 수집한다. 각 대상은 Vision 오클루더와 같은 Box·Convex Simple Collision 단면의 닫힌 외곽 내부를 보라색 면으로 채우며, 지원 충돌이 없으면 회전이 반영된 Mesh Bounds 영역으로 대체한다. 닫히지 않은 선분은 내부를 채우지 않고 선으로만 그린다. 시야 판정에는 영향을 주지 않는다.
 
 StaticMeshActor 기반 펜스는 Outliner에서 액터를 선택한 뒤 우클릭 메뉴의 `LostSignal > Add Minimap Obstacle`로 `ULSMinimapObstacleComponent`를 추가할 수 있다.
 

@@ -1,7 +1,12 @@
 #include "Minimap/LSMinimapObstacleComponent.h"
 
 #include "Components/PrimitiveComponent.h"
+#include "Components/SceneComponent.h"
+#include "GameFramework/Actor.h"
 #include "Minimap/LSMinimapSubsystem.h"
+#include "Vision/LSVisionCollisionGeometry.h"
+#include "Vision/LSVisionSettings.h"
+#include "Vision/LSVisionSubsystem.h"
 
 ULSMinimapObstacleComponent::ULSMinimapObstacleComponent()
 {
@@ -10,15 +15,32 @@ ULSMinimapObstacleComponent::ULSMinimapObstacleComponent()
 
 void ULSMinimapObstacleComponent::AddTargetPrimitive(UPrimitiveComponent* Primitive)
 {
-	if (IsValid(Primitive))
+	if (!IsValid(Primitive))
 	{
-		TargetPrimitives.AddUnique(Primitive);
+		return;
 	}
+
+	TargetPrimitives.AddUnique(Primitive);
+	if (IsRegistered())
+	{
+		RebuildSegments();
+		UpdateObservedComponentBindings();
+	}
+}
+
+void ULSMinimapObstacleComponent::OnRegister()
+{
+	Super::OnRegister();
+
+	RebuildSegments();
+	UpdateObservedComponentBindings();
 }
 
 void ULSMinimapObstacleComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	RebuildSegments();
+	UpdateObservedComponentBindings();
 
 	if (UWorld* World = GetWorld())
 	{
@@ -42,53 +64,123 @@ void ULSMinimapObstacleComponent::EndPlay(const EEndPlayReason::Type EndPlayReas
 	Super::EndPlay(EndPlayReason);
 }
 
-void ULSMinimapObstacleComponent::GatherObstacleBounds(TArray<FBox>& OutBounds) const
+void ULSMinimapObstacleComponent::OnUnregister()
 {
-	OutBounds.Reset();
+	ClearObservedComponentBindings();
+
+	Super::OnUnregister();
+}
+
+void ULSMinimapObstacleComponent::GatherObstacleSegments(TArray<FLSVisionSegment2D>& OutSegments)
+{
+	OutSegments.Reset();
 	if (!bVisibleOnMinimap)
 	{
 		return;
 	}
 
-	for (const UPrimitiveComponent* Primitive : TargetPrimitives)
+	const float SliceZ = ResolveSliceZ();
+	if (!FMath::IsNearlyEqual(CachedSliceZ, SliceZ, 1.0f))
+	{
+		RebuildSegments();
+	}
+
+	OutSegments = CachedSegments;
+}
+
+void ULSMinimapObstacleComponent::RebuildSegments()
+{
+	CachedSegments.Reset();
+	CachedSliceZ = ResolveSliceZ();
+
+	TArray<UPrimitiveComponent*> SourcePrimitives;
+	GatherSourcePrimitives(SourcePrimitives);
+	for (const UPrimitiveComponent* Primitive : SourcePrimitives)
+	{
+		LSVisionCollisionGeometry::AppendCollisionSegments(Primitive, CachedSliceZ, CachedSegments);
+	}
+}
+
+void ULSMinimapObstacleComponent::GatherSourcePrimitives(TArray<UPrimitiveComponent*>& OutPrimitives) const
+{
+	OutPrimitives.Reset();
+	for (UPrimitiveComponent* Primitive : TargetPrimitives)
 	{
 		if (ShouldUsePrimitive(Primitive))
 		{
-			OutBounds.Add(Primitive->Bounds.GetBox());
+			OutPrimitives.AddUnique(Primitive);
 		}
 	}
 
-	if (OutBounds.Num() > 0 || !bUseOwnerBlockingPrimitives)
-	{
-		return;
-	}
-
-	const AActor* Owner = GetOwner();
-	if (!Owner)
+	if (OutPrimitives.Num() > 0 || !bUseOwnerBlockingPrimitives || GetOwner() == nullptr)
 	{
 		return;
 	}
 
 	TArray<UPrimitiveComponent*> OwnerPrimitives;
-	Owner->GetComponents<UPrimitiveComponent>(OwnerPrimitives);
-	for (const UPrimitiveComponent* Primitive : OwnerPrimitives)
+	GetOwner()->GetComponents<UPrimitiveComponent>(OwnerPrimitives);
+	for (UPrimitiveComponent* Primitive : OwnerPrimitives)
 	{
 		if (ShouldUsePrimitive(Primitive))
 		{
-			OutBounds.Add(Primitive->Bounds.GetBox());
+			OutPrimitives.AddUnique(Primitive);
 		}
 	}
 }
 
-bool ULSMinimapObstacleComponent::ShouldUsePrimitive(const UPrimitiveComponent* Primitive) const
+void ULSMinimapObstacleComponent::ClearObservedComponentBindings()
 {
-	if (!IsValid(Primitive))
+	for (const TWeakObjectPtr<USceneComponent>& SceneComponent : ObservedSceneComponents)
 	{
-		return false;
+		if (SceneComponent.IsValid())
+		{
+			SceneComponent->TransformUpdated.RemoveAll(this);
+		}
+	}
+	ObservedSceneComponents.Reset();
+}
+
+void ULSMinimapObstacleComponent::UpdateObservedComponentBindings()
+{
+	ClearObservedComponentBindings();
+
+	TArray<UPrimitiveComponent*> SourcePrimitives;
+	GatherSourcePrimitives(SourcePrimitives);
+	for (UPrimitiveComponent* Primitive : SourcePrimitives)
+	{
+		Primitive->TransformUpdated.AddUObject(this, &ULSMinimapObstacleComponent::HandleObservedComponentTransformUpdated);
+		ObservedSceneComponents.AddUnique(Primitive);
+	}
+}
+
+void ULSMinimapObstacleComponent::HandleObservedComponentTransformUpdated(
+	USceneComponent* UpdatedComponent,
+	EUpdateTransformFlags UpdateTransformFlags,
+	ETeleportType Teleport)
+{
+	RebuildSegments();
+}
+
+float ULSMinimapObstacleComponent::ResolveSliceZ() const
+{
+	const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>();
+	if (VisionSettings != nullptr && VisionSettings->bSliceHeightFromPlayer)
+	{
+		if (const UWorld* World = GetWorld())
+		{
+			if (const ULSVisionSubsystem* VisionSubsystem = World->GetSubsystem<ULSVisionSubsystem>())
+			{
+				return VisionSubsystem->GetRuntimeSliceZ();
+			}
+		}
 	}
 
-	const ECollisionEnabled::Type CollisionEnabled = Primitive->GetCollisionEnabled();
-	if (CollisionEnabled == ECollisionEnabled::NoCollision)
+	return VisionSettings != nullptr ? VisionSettings->OccluderSliceHeight : 0.0f;
+}
+
+bool ULSMinimapObstacleComponent::ShouldUsePrimitive(const UPrimitiveComponent* Primitive) const
+{
+	if (!IsValid(Primitive) || Primitive->GetCollisionEnabled() == ECollisionEnabled::NoCollision)
 	{
 		return false;
 	}
