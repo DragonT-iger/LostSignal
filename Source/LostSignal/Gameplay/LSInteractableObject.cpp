@@ -39,10 +39,17 @@ ALSInteractableObject::ALSInteractableObject()
 void ALSInteractableObject::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 아웃라인 대상 수집을 오버랩 바인딩보다 먼저 한다.
+	// 아래 UpdateOverlaps()는 이미 범위 안에 있던 폰에 대해 OnSphereBeginOverlap을 동기 호출하고,
+	// 그 경로가 RefreshWidgetVisibility → ApplyOutlineState로 재진입한다.
+	// 수집 전에 재진입하면 빈 목록으로 bOutlineActive만 true로 굳어 아웃라인이 영구히 표시되지 않는다
+	// (런타임 스폰 오브젝트가 플레이어 발밑에 생기는 경우 — 예: 몬스터 사망 루트박스).
+	GatherOutlineMeshes();
+
 	InteractionSphere->OnComponentBeginOverlap.AddDynamic(this, &ALSInteractableObject::OnSphereBeginOverlap);
 	InteractionSphere->OnComponentEndOverlap.AddDynamic(this, &ALSInteractableObject::OnSphereEndOverlap);
 	InteractionSphere->UpdateOverlaps();
-	GatherOutlineMeshes();
 	RefreshWidgetVisibility();
 
 	if (UWorld* World = GetWorld())
