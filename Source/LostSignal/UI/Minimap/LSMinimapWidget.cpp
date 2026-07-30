@@ -2,8 +2,6 @@
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Camera/CameraComponent.h"
-#include "Components/MeshComponent.h"
-#include "Components/PrimitiveComponent.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
 #include "Data/LSGameDataSubsystem.h"
@@ -29,6 +27,104 @@ namespace
 {
 constexpr float MinimapPadding = 4.0f;
 constexpr float CircleFillStep = 1.0f;
+constexpr float MinimapVisionEndpointToleranceCm = 0.1f;
+
+struct FMinimapVisionPath
+{
+	TArray<FVector2D> Points;
+	TArray<int32> SegmentIndices;
+	bool bClosed = false;
+};
+
+bool ResolveMinimapConnectedSegmentEnd(const FLSVisionSegment2D& Segment, const FVector2D& CurrentPoint, FVector2D& OutEndPoint)
+{
+	if (Segment.Start.Equals(CurrentPoint, MinimapVisionEndpointToleranceCm))
+	{
+		OutEndPoint = Segment.End;
+		return true;
+	}
+
+	if (Segment.End.Equals(CurrentPoint, MinimapVisionEndpointToleranceCm))
+	{
+		OutEndPoint = Segment.Start;
+		return true;
+	}
+
+	return false;
+}
+
+int32 FindMinimapConnectedSegment(
+	const TArray<FLSVisionSegment2D>& Segments,
+	const TBitArray<>& ConsumedSegments,
+	const int32 PreviousSegmentIndex,
+	const FVector2D& CurrentPoint,
+	FVector2D& OutEndPoint)
+{
+	const int32 PreferredIndex = PreviousSegmentIndex + 1;
+	if (Segments.IsValidIndex(PreferredIndex) && !ConsumedSegments[PreferredIndex] &&
+		ResolveMinimapConnectedSegmentEnd(Segments[PreferredIndex], CurrentPoint, OutEndPoint))
+	{
+		return PreferredIndex;
+	}
+
+	for (int32 SegmentIndex = 0; SegmentIndex < Segments.Num(); ++SegmentIndex)
+	{
+		if (!ConsumedSegments[SegmentIndex] &&
+			ResolveMinimapConnectedSegmentEnd(Segments[SegmentIndex], CurrentPoint, OutEndPoint))
+		{
+			return SegmentIndex;
+		}
+	}
+
+	return INDEX_NONE;
+}
+
+TArray<FMinimapVisionPath> BuildMinimapVisionPaths(const TArray<FLSVisionSegment2D>& Segments)
+{
+	TArray<FMinimapVisionPath> Paths;
+	TBitArray<> ConsumedSegments(false, Segments.Num());
+
+	for (int32 StartIndex = 0; StartIndex < Segments.Num(); ++StartIndex)
+	{
+		if (ConsumedSegments[StartIndex])
+		{
+			continue;
+		}
+
+		FMinimapVisionPath& Path = Paths.AddDefaulted_GetRef();
+		Path.Points.Add(Segments[StartIndex].Start);
+		Path.SegmentIndices.Add(StartIndex);
+		ConsumedSegments[StartIndex] = true;
+
+		FVector2D CurrentPoint = Segments[StartIndex].End;
+		int32 PreviousSegmentIndex = StartIndex;
+		while (!CurrentPoint.Equals(Path.Points[0], MinimapVisionEndpointToleranceCm))
+		{
+			Path.Points.Add(CurrentPoint);
+
+			FVector2D NextPoint = FVector2D::ZeroVector;
+			const int32 NextSegmentIndex = FindMinimapConnectedSegment(
+				Segments,
+				ConsumedSegments,
+				PreviousSegmentIndex,
+				CurrentPoint,
+				NextPoint);
+			if (NextSegmentIndex == INDEX_NONE)
+			{
+				break;
+			}
+
+			Path.SegmentIndices.Add(NextSegmentIndex);
+			ConsumedSegments[NextSegmentIndex] = true;
+			PreviousSegmentIndex = NextSegmentIndex;
+			CurrentPoint = NextPoint;
+		}
+
+		Path.bClosed = CurrentPoint.Equals(Path.Points[0], MinimapVisionEndpointToleranceCm);
+	}
+
+	return Paths;
+}
 
 FLinearColor ResolveMarkerColor(const FLSMinimapMarkerSnapshot& Marker)
 {
@@ -653,77 +749,71 @@ void ULSMinimapWidget::DrawVisionTerrain(const FGeometry& Geometry, FSlateWindow
 	TSet<const AActor*> SurfaceOwners;
 	for (const ULSVisionSurfaceComponent* Surface : VisionSubsystem->GetRegisteredVisionSurfaces())
 	{
-		if (!IsValid(Surface))
+		if (IsValid(Surface) && IsValid(Surface->GetOwner()))
 		{
-			continue;
-		}
-
-		if (const AActor* Owner = Surface->GetOwner())
-		{
-			SurfaceOwners.Add(Owner);
-		}
-
-		FBox CombinedBounds(ForceInit);
-		if (Surface->TargetPrimitives.Num() > 0)
-		{
-			for (const UPrimitiveComponent* Primitive : Surface->TargetPrimitives)
-			{
-				if (IsValid(Primitive))
-				{
-					CombinedBounds += Primitive->Bounds.GetBox();
-				}
-			}
-		}
-		else
-		{
-			TArray<UMeshComponent*> MeshComponents;
-			if (AActor* Owner = Surface->GetOwner())
-			{
-				Owner->GetComponents<UMeshComponent>(MeshComponents);
-			}
-			for (const UMeshComponent* MeshComponent : MeshComponents)
-			{
-				if (IsValid(MeshComponent))
-				{
-					CombinedBounds += MeshComponent->Bounds.GetBox();
-				}
-			}
-		}
-
-		if (CombinedBounds.IsValid)
-		{
-			DrawVisionSurfaceBounds(CombinedBounds, Geometry, OutDrawElements, ++LayerId, Center, Radius, PixelsPerCm);
+			SurfaceOwners.Add(Surface->GetOwner());
 		}
 	}
 
 	for (const ULSVisionOccluderComponent* Occluder : VisionSubsystem->GetRegisteredOccluders())
 	{
-		if (!IsValid(Occluder) || SurfaceOwners.Contains(Occluder->GetOwner()))
+		if (!IsValid(Occluder))
 		{
 			continue;
 		}
 
-		DrawVisionOccluderSegments(Occluder->GetSegments(), Geometry, OutDrawElements, ++LayerId, Center, Radius, PixelsPerCm);
+		if (SurfaceOwners.Contains(Occluder->GetOwner()))
+		{
+			DrawVisionOccluderTerrain(Occluder->GetSegments(), Geometry, OutDrawElements, ++LayerId, Center, Radius, PixelsPerCm);
+		}
+		else
+		{
+			DrawVisionOccluderSegments(Occluder->GetSegments(), Geometry, OutDrawElements, ++LayerId, Center, Radius, PixelsPerCm);
+		}
 	}
 }
 
-void ULSMinimapWidget::DrawVisionSurfaceBounds(const FBox& Bounds, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm) const
+void ULSMinimapWidget::DrawVisionOccluderTerrain(const TArray<FLSVisionSegment2D>& Segments, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm) const
 {
-	const TArray<FVector2D> Corners = {
-		ProjectWorldLocation(FVector(Bounds.Min.X, Bounds.Min.Y, Bounds.Min.Z), Center, PixelsPerCm),
-		ProjectWorldLocation(FVector(Bounds.Max.X, Bounds.Min.Y, Bounds.Min.Z), Center, PixelsPerCm),
-		ProjectWorldLocation(FVector(Bounds.Max.X, Bounds.Max.Y, Bounds.Min.Z), Center, PixelsPerCm),
-		ProjectWorldLocation(FVector(Bounds.Min.X, Bounds.Max.Y, Bounds.Min.Z), Center, PixelsPerCm)
-	};
 	const FLinearColor TerrainColor = FlattenTerrainColor(VisionTerrainColor);
-	DrawFilledPolygonInCircle(OutDrawElements, LayerId, Geometry, Corners, Center, Radius, TerrainColor);
-	for (int32 CornerIndex = 0; CornerIndex < Corners.Num(); ++CornerIndex)
+	TArray<FLSVisionSegment2D> OpenSegments;
+	for (const FMinimapVisionPath& Path : BuildMinimapVisionPaths(Segments))
 	{
-		FVector2D Start = Corners[CornerIndex];
-		FVector2D End = Corners[(CornerIndex + 1) % Corners.Num()];
+		if (Path.bClosed && Path.Points.Num() >= 3)
+		{
+			DrawVisionFilledLoop(Path.Points, Geometry, OutDrawElements, LayerId, Center, Radius, PixelsPerCm, TerrainColor);
+			continue;
+		}
+
+		for (const int32 SegmentIndex : Path.SegmentIndices)
+		{
+			if (Segments.IsValidIndex(SegmentIndex))
+			{
+				OpenSegments.Add(Segments[SegmentIndex]);
+			}
+		}
+	}
+
+	DrawVisionOccluderSegments(OpenSegments, Geometry, OutDrawElements, LayerId, Center, Radius, PixelsPerCm);
+}
+
+void ULSMinimapWidget::DrawVisionFilledLoop(const TArray<FVector2D>& WorldPoints, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, const int32 LayerId, const FVector2D& Center, const float Radius, const float PixelsPerCm, const FLinearColor& Color) const
+{
+	TArray<FVector2D> ProjectedPoints;
+	ProjectedPoints.Reserve(WorldPoints.Num());
+	for (const FVector2D& WorldPoint : WorldPoints)
+	{
+		ProjectedPoints.Add(ProjectWorldLocation(FVector(WorldPoint.X, WorldPoint.Y, 0.0f), Center, PixelsPerCm));
+	}
+
+	DrawFilledPolygonInCircle(OutDrawElements, LayerId, Geometry, ProjectedPoints, Center, Radius, Color);
+	for (int32 PointIndex = 0; PointIndex < ProjectedPoints.Num(); ++PointIndex)
+	{
+		FVector2D Start = ProjectedPoints[PointIndex];
+		FVector2D End = ProjectedPoints[(PointIndex + 1) % ProjectedPoints.Num()];
 		if (ClipSegmentToCircle(Start, End, Center, Radius - 0.75f))
 		{
-			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { Start, End }, ESlateDrawEffect::None, TerrainColor, true, 1.5f);
+			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, Geometry.ToPaintGeometry(), { Start, End }, ESlateDrawEffect::None, Color, true, 1.5f);
 		}
 	}
 }

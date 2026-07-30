@@ -102,9 +102,9 @@ ULSMinimapWidget
 
 ## 지형 표시
 
-미니맵 지형은 `ULSVisionSubsystem`에 등록된 시야 판정 데이터를 먼저 사용한다. `ULSVisionSurfaceComponent`가 있으면 대상 프리미티브의 월드 바운드를 합산한 뒤 보라색 면으로 채우고, 같은 액터에 `ULSVisionOccluderComponent`가 함께 있으면 중복 표현을 피하기 위해 오클루더 선분은 생략한다.
+미니맵 지형은 `ULSVisionSubsystem`에 등록된 시야 판정 데이터를 먼저 사용한다. 같은 액터에 `ULSVisionSurfaceComponent`와 `ULSVisionOccluderComponent`가 함께 있으면 오클루더의 충돌 단면 선분을 닫힌 외곽별로 묶어 보라색 면으로 채운다. Box·Convex 등 Simple Collision 조각이 여러 개면 각 외곽을 독립된 면으로 그린다.
 
-`ULSVisionSurfaceComponent` 없이 `ULSVisionOccluderComponent`만 있는 액터는 오클루더 선분을 보라색 선으로 그린다. 지형 면과 선분은 미니맵 원 반경 안에서만 그려서 바깥으로 삐져나가지 않게 한다. 이 방식은 플레이어 시야를 실제로 가리는 벽, 장애물, 차폐물과 미니맵 지형 표시를 같은 데이터에서 관리하기 위한 기본 경로다.
+닫히지 않았거나 점이 부족한 오클루더 선분은 내부를 채우지 않고 보라색 선으로만 그린다. `ULSVisionSurfaceComponent` 없이 `ULSVisionOccluderComponent`만 있는 액터도 선으로 표시하며, 반대로 Surface만 있고 오클루더가 없는 액터는 잘못된 사각형을 대신 그리지 않는다. 지형 면과 선분은 미니맵 원 반경 안에서만 그려서 바깥으로 삐져나가지 않게 한다. 이 방식은 플레이어 시야를 실제로 가리는 벽, 장애물, 차폐물과 미니맵 지형 표시를 같은 데이터에서 관리하기 위한 기본 경로다.
 
 펜스나 난간처럼 구멍이 있어 시야를 막지 않는 물체는 `ULSMinimapObstacleComponent`를 붙여 미니맵 전용으로 표시한다. 이 컴포넌트는 지정한 `TargetPrimitives`를 우선 사용하고, 비어 있으면 owner의 Pawn Block 콜라이더를 수집해 보라색 외곽선으로 그린다. 시야 판정에는 영향을 주지 않는다.
 

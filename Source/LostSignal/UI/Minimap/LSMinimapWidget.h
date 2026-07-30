@@ -56,7 +56,8 @@ private:
 	void DrawMinimapObstacles(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
 	void DrawObstacleBounds(const FBox& Bounds, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm, const FLinearColor& Color, float Thickness) const;
 	void DrawVisionTerrain(const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32& LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
-	void DrawVisionSurfaceBounds(const FBox& Bounds, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
+	void DrawVisionOccluderTerrain(const TArray<FLSVisionSegment2D>& Segments, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
+	void DrawVisionFilledLoop(const TArray<FVector2D>& WorldPoints, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm, const FLinearColor& Color) const;
 	void DrawVisionOccluderSegments(const TArray<FLSVisionSegment2D>& Segments, const FGeometry& Geometry, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FVector2D& Center, float Radius, float PixelsPerCm) const;
 	void DrawSightCone(FSlateWindowElementList& OutDrawElements, int32 LayerId, const FGeometry& Geometry, const FVector2D& Center, const FVector2D& Forward, float Radius, float AngleDegrees, const FLinearColor& Color) const;
 	void DrawMarker(FSlateWindowElementList& OutDrawElements, int32 LayerId, const FGeometry& Geometry, const FVector2D& Center, float DrawRadius, const FLinearColor& Color, UTexture2D* Texture, const FVector2D& TextureDrawSize) const;
