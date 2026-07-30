@@ -60,7 +60,7 @@ public:
 	bool bUsePlayerTrigger = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
-	bool bUseMouseTrigger = true;
+	bool bUseMouseTrigger = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	bool bAutoCreateTriggerVolume = true;
@@ -78,7 +78,7 @@ public:
 	float MouseProjectionPlaneZ = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
-	FVector TriggerExtentScale = FVector(1.2f, 1.2f, 1.0f);
+	FVector TriggerExtentScale = FVector(1.0f, 1.0f, 1.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision|RoofFade|Trigger")
 	FVector TriggerExtentPadding = FVector(0.0f, 0.0f, 0.0f);
