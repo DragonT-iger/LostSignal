@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Characters/LSPlayerCharacter.h"
 
@@ -1842,8 +1842,8 @@ void ALSPlayerCharacter::UpdateHealthRecovery(float DeltaSeconds)
 	}
 
 	// Recovery 어트리뷰트 = 초당 회복 체력(HP/s). 칩/장비 합산으로 올라간다.
-	const float RecoveryPerSecond = PlayerAttributeSet->GetRecovery();
-	if (RecoveryPerSecond <= 0.0f)
+	const float RecoveryPer10Sec = PlayerAttributeSet->GetRecovery() / 10.0f;
+	if (RecoveryPer10Sec <= 0.0f)
 	{
 		return;
 	}
@@ -1871,7 +1871,7 @@ void ALSPlayerCharacter::UpdateHealthRecovery(float DeltaSeconds)
 		return;
 	}
 
-	const float NewHealth = FMath::Min(CurrentHealth + RecoveryPerSecond * DeltaSeconds, MaxHealth);
+	const float NewHealth = FMath::Min(CurrentHealth + RecoveryPer10Sec * DeltaSeconds, MaxHealth);
 	ASC->SetNumericAttributeBase(ULSCombatAttributeSet::GetCurrentHealthAttribute(), NewHealth);
 }
 
