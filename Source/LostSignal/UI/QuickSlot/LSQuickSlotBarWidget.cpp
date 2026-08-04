@@ -62,9 +62,23 @@ void ULSQuickSlotBarWidget::InitializeBar()
 			UE_LOG(LogLS, Warning, TEXT("[QuickSlot] QuickSlot%d is not bound on %s."), Index + 1, *GetNameSafe(this));
 			continue;
 		}
+		Slots[Index]->SetInventoryInteractionEnabled(bInventoryInteractionEnabled);
 		Slots[Index]->InitializeSlot(Index);
 	}
 
+	ApplyProtocolVisibility();
+}
+
+void ULSQuickSlotBarWidget::SetInventoryInteractionEnabled(const bool bEnabled)
+{
+	bInventoryInteractionEnabled = bEnabled;
+	for (ULSQuickSlotWidget* SlotWidget : Slots)
+	{
+		if (SlotWidget)
+		{
+			SlotWidget->SetInventoryInteractionEnabled(bEnabled);
+		}
+	}
 	ApplyProtocolVisibility();
 }
 
@@ -83,6 +97,10 @@ void ULSQuickSlotBarWidget::RefreshAll()
 
 void ULSQuickSlotBarWidget::ApplyProtocolVisibility()
 {
+	const ESlateVisibility VisibleSlotState = bInventoryInteractionEnabled
+		? ESlateVisibility::Visible
+		: ESlateVisibility::HitTestInvisible;
+
 	// 인벤토리 바 등 접지 않는 바는 6칸을 항상 표시한다(이전에 접혔던 상태도 복원).
 	if (!bHideLockedSlots)
 	{
@@ -90,8 +108,7 @@ void ULSQuickSlotBarWidget::ApplyProtocolVisibility()
 		{
 			if (SlotWidget)
 			{
-				// 바는 입력을 통과시키되 개별 퀵슬롯은 호버·드롭을 직접 받아야 한다.
-				SlotWidget->SetVisibility(ESlateVisibility::Visible);
+				SlotWidget->SetVisibility(VisibleSlotState);
 			}
 		}
 		return;
@@ -112,7 +129,7 @@ void ULSQuickSlotBarWidget::ApplyProtocolVisibility()
 	{
 		if (Slots[Index])
 		{
-			Slots[Index]->SetVisibility(Index < UnlockedCount ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+			Slots[Index]->SetVisibility(Index < UnlockedCount ? VisibleSlotState : ESlateVisibility::Collapsed);
 		}
 	}
 }

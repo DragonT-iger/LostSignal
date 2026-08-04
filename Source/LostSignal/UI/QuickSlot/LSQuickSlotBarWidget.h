@@ -21,6 +21,8 @@ class LOSTSIGNAL_API ULSQuickSlotBarWidget : public UUserWidget
 public:
 	// 모든 칸의 아이콘/개수를 다시 그린다. 인벤토리 변경 funnel과 등록 변경 알림의 공통 진입점.
 	void RefreshAll();
+	// 인벤토리 안에 배치된 바만 슬롯의 마우스 편집과 hit-test를 활성화한다. HUD 바는 기본 false.
+	void SetInventoryInteractionEnabled(bool bEnabled);
 
 protected:
 	virtual void NativeConstruct() override;
@@ -58,6 +60,7 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULSQuickSlotWidget>> Slots;
+	bool bInventoryInteractionEnabled = false;
 
 	FDelegateHandle QuickSlotsChangedHandle;
 	// 칩 장착/신호 게이지 변경(=적재 프로토콜 레벨 변동) 구독 핸들. 변경 시 RefreshAll로 가시성 재평가.

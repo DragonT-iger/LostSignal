@@ -1422,7 +1422,7 @@ bool ALSPlayerCharacter::ShowInventoryWidgetInternal(bool bShowStoreAllButton, b
 		LSInventoryWidget->RebuildConfirmedStorageSlots();
 		LSInventoryWidget->SetStoreAllButtonVisible(bShowStoreAllButton);
 		// 퀵슬롯 바는 Tab 인벤토리(및 로비 창고 동반)에서만 켠다. 레이드 루팅 박스로 연 인벤토리에선 숨긴다.
-		LSInventoryWidget->SetQuickSlotBarVisible(bShowQuickSlotBar);
+		LSInventoryWidget->SetQuickSlotPanelVisible(bShowQuickSlotBar);
 	}
 	else
 	{

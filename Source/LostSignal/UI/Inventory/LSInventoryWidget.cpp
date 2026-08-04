@@ -3,6 +3,7 @@
 #include "Components/Border.h"
 #include "LostSignal.h"
 #include "Components/Button.h"
+#include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
 #include "Components/WrapBox.h"
 #include "Core/LSPlayerControllerBase.h"
@@ -17,6 +18,7 @@
 #include "UI/Inventory/LSSlotWidgetSync.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/LSUILayer.h"
+#include "UI/QuickSlot/LSQuickSlotBarWidget.h"
 
 namespace
 {
@@ -63,9 +65,18 @@ void ULSInventoryWidget::NativeConstruct()
 	}
 	else
 	{
+		QuickSlotBar->SetInventoryInteractionEnabled(true);
+	}
+
+	if (!QuickSlotPanel)
+	{
+		UE_LOG(LogLS, Warning, TEXT("QuickSlotPanel is not bound on %s."), *GetNameSafe(this));
+	}
+	else
+	{
 		// 기본은 표시. 폰 경로(ShowInventoryWidgetInternal)를 타는 레이드는 매 오픈 시 값을 덮어써 루팅 박스에서만 숨긴다.
-		// 폰 없이 열리는 로비 인벤토리는 이 경로를 안 타므로 기본 표시로 남아 Tab/메뉴로 열어도 바가 보인다.
-		SetQuickSlotBarVisible(true);
+		// 폰 없이 열리는 로비 인벤토리는 이 경로를 안 타므로 기본 표시로 남아 Tab/메뉴로 열어도 패널이 보인다.
+		SetQuickSlotPanelVisible(true);
 	}
 
 	RebuildInventorySlots();
@@ -502,16 +513,16 @@ void ULSInventoryWidget::SetStoreAllButtonVisible(const bool bVisible)
 	StoreAllButton->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
 }
 
-void ULSInventoryWidget::SetQuickSlotBarVisible(const bool bVisible)
+void ULSInventoryWidget::SetQuickSlotPanelVisible(const bool bVisible)
 {
-	if (!QuickSlotBar)
+	if (!QuickSlotPanel)
 	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot update QuickSlotBar visibility because QuickSlotBar is not bound on %s."), *GetNameSafe(this));
+		UE_LOG(LogLS, Warning, TEXT("Cannot update quick slot panel visibility because QuickSlotPanel is not bound on %s."), *GetNameSafe(this));
 		return;
 	}
 
-	// 숨길 때는 Collapsed로 자리도 차지하지 않게 한다. 보일 때는 자식 슬롯이 드롭/클릭을 받도록 SelfHitTestInvisible.
-	QuickSlotBar->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	// 부모가 블러와 바를 함께 소유한다. 보일 때는 자식 퀵슬롯이 입력을 받도록 SelfHitTestInvisible.
+	QuickSlotPanel->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 }
 
 void ULSInventoryWidget::HandleStoreAllButtonClicked()

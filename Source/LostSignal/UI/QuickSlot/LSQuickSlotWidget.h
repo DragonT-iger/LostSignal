@@ -23,6 +23,8 @@ class LOSTSIGNAL_API ULSQuickSlotWidget : public UUserWidget
 public:
 	// 이 칸이 담당할 퀵슬롯 인덱스(0-based)를 지정한다. 바 위젯이 생성 직후 1회 호출한다.
 	void InitializeSlot(int32 InSlotIndex);
+	// 인벤토리 안에 배치된 바의 슬롯만 마우스 편집(호버·우클릭·드롭)을 허용한다.
+	void SetInventoryInteractionEnabled(bool bEnabled);
 
 	// 등록된 소모품의 아이콘과 인벤토리 합산 개수를 다시 그린다. 비어 있으면 아이콘을 숨긴다.
 	void Refresh();
@@ -55,9 +57,10 @@ private:
 	int32 CountOwnedAmount(FName ItemRowName) const;
 	// 호버 상태에 맞춰 틴트/스케일/배경색을 다시 적용한다. 호버 진입·이탈·Refresh 뒤 단일 진입점.
 	void ApplyHoverVisual();
-	// 인벤토리 패널이 열려 있는지. 열려 있을 때만 호버 반응을 준다(HUD 상시 바는 전투 중 무반응).
-	bool IsInventoryContextOpen() const;
+	// 이 슬롯이 인벤토리 바 소속이고 인벤토리 패널도 열려 있는지 확인한다.
+	bool IsInventoryInteractionAllowed() const;
 
 	int32 SlotIndex = INDEX_NONE;
+	bool bInventoryInteractionEnabled = false;
 	bool bIsHovered = false;
 };

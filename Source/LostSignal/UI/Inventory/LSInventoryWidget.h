@@ -9,6 +9,7 @@ class ALSWorldDroppedItem;
 class UBorder;
 class UButton;
 class UDragDropOperation;
+class UPanelWidget;
 class UTextBlock;
 class UWrapBox;
 class ULSConfirmDialogWidget;
@@ -49,8 +50,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void SetStoreAllButtonVisible(bool bVisible);
 
-	// 인벤토리에 배치된 퀵슬롯 바 표시를 켜고 끈다. Tab 인벤토리에서만 켜고 루팅 박스로 연 인벤토리에선 끈다.
-	void SetQuickSlotBarVisible(bool bVisible);
+	// 퀵슬롯 바와 배경 블러를 감싼 부모 패널을 함께 켜고 끈다.
+	void SetQuickSlotPanelVisible(bool bVisible);
 
 	bool HandleInventorySlotDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
 	bool HandleLootSlotDrop(ULSLootDropWidget* LootDropWidget, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex);
@@ -88,9 +89,13 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UButton> SortButton;
 
-	// 인벤토리 안에 배치되는 퀵슬롯 바(소모품 6칸). 여는 경로에 따라 표시가 켜지고 꺼진다.
+	// 배경 블러와 QuickSlotBar를 함께 감싸는 표시 전환 부모. WBP에서는 PanelWidget 계열로 배치한다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<UUserWidget> QuickSlotBar;
+	TObjectPtr<UPanelWidget> QuickSlotPanel;
+
+	// 인벤토리 안에 배치되는 퀵슬롯 바(소모품 6칸). 마우스 편집 컨텍스트 설정에 사용한다.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSQuickSlotBarWidget> QuickSlotBar;
 
 	// 장비 장착 슬롯. BindWidget 이름은 장비 타입과 일치시킨다(ELSEquipmentSlot 순서).
 	// 무기=Weapon, 프로세서(머리)=Processor, 코어(몸)=Core, 구동계(손)=Actuator, 프레임(발)=Frame.

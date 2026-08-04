@@ -43,6 +43,16 @@ void ULSQuickSlotWidget::InitializeSlot(const int32 InSlotIndex)
 	Refresh();
 }
 
+void ULSQuickSlotWidget::SetInventoryInteractionEnabled(const bool bEnabled)
+{
+	bInventoryInteractionEnabled = bEnabled;
+	if (!bEnabled)
+	{
+		bIsHovered = false;
+		ApplyHoverVisual();
+	}
+}
+
 void ULSQuickSlotWidget::Refresh()
 {
 	if (!ItemSlot)
@@ -78,7 +88,7 @@ void ULSQuickSlotWidget::Refresh()
 FReply ULSQuickSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
 	// 우클릭으로 등록 해제. 인벤토리 패널이 열려 있을 때만 허용한다(HUD 상시 바는 전투 중 해제 방지).
-	if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton && IsInventoryContextOpen())
+	if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton && IsInventoryInteractionAllowed())
 	{
 		if (ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem())
 		{
@@ -92,6 +102,11 @@ FReply ULSQuickSlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, 
 
 bool ULSQuickSlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
+	if (!IsInventoryInteractionAllowed())
+	{
+		return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
+	}
+
 	const ULSInventoryDragDropOperation* DragOp = Cast<ULSInventoryDragDropOperation>(InOperation);
 	if (!DragOp)
 	{
@@ -124,7 +139,7 @@ void ULSQuickSlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const F
 {
 	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
 	// 인벤토리 패널이 열려 있을 때만 호버 강조한다(HUD에 상시 떠 있는 바는 전투 중 무반응).
-	bIsHovered = IsInventoryContextOpen();
+	bIsHovered = IsInventoryInteractionAllowed();
 	ApplyHoverVisual();
 }
 
@@ -143,10 +158,10 @@ void ULSQuickSlotWidget::ApplyHoverVisual()
 	}
 }
 
-bool ULSQuickSlotWidget::IsInventoryContextOpen() const
+bool ULSQuickSlotWidget::IsInventoryInteractionAllowed() const
 {
 	const ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer());
-	return PlayerController && PlayerController->IsInventoryUIOpen();
+	return bInventoryInteractionEnabled && PlayerController && PlayerController->IsInventoryUIOpen();
 }
 
 ULSSaveSubsystem* ULSQuickSlotWidget::ResolveSaveSubsystem() const
