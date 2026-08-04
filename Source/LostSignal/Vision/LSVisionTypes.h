@@ -63,11 +63,6 @@ struct LOSTSIGNAL_API FLSVisionPolygonData
 	// 도달한 "열린" 점(또는 apex)이면 0.0. 셰이더가 바깥 시야 경계 엣지에만 페더를 적용할 때 사용한다.
 	UPROPERTY(Transient)
 	TArray<float> PointFlags;
-
-	// Stores the exact ray hit points used while solving visibility so debug drawing can show
-	// actual raycasts without reconstructing them from the polygon outline.
-	UPROPERTY(Transient)
-	TArray<FVector2D> DebugRayHitPoints;
 };
 
 USTRUCT()
@@ -78,13 +73,14 @@ struct LOSTSIGNAL_API FLSVisionSolverInfo
 	FVector2D OriginPos = FVector2D::ZeroVector;
 	FVector2D RayOriginPos = FVector2D::ZeroVector;
 	FVector2D OriginForward = FVector2D::UnitX();
-	TArray<FLSVisionSegment2D*> Segments;
+	// 값 소유. 서브시스템의 세그먼트 캐시(TMap)를 가리키는 포인터를 들고 있으면 캐시가 재배치될 때
+	// 무효화되므로, 쿼리 시점에 복사해 이 구조체가 직접 소유한다.
+	TArray<FLSVisionSegment2D> Segments;
 	float HalfFovDegrees = 45.0f;
 	float DivideAngleDegree = 2.0f;
 	float VisionRadius = 100.0f;
 	float AngleEpsilon = 0.01f;
 	float MaxRayDistance = 2500.0f;
-	UWorld* World = nullptr;
 };
 
 USTRUCT()

@@ -33,8 +33,11 @@ public:
 	float SpatialGridCellSize = 800.0f;
 
 	// true면 시야 평면 Z를 로컬 플레이어 발 높이 기준으로 잡는다(발 높이 + OccluderSliceHeight). false면 OccluderSliceHeight를 절대 월드 Z로 사용.
+	// 켤 때의 비용: 발 높이가 1유닛 넘게 변하면 등록된 모든 오클루더의 단면을 다시 계산하고(SetRuntimeSliceZ),
+	// 그 과정에서 세그먼트 토폴로지 버전이 올라 폴리곤 재solve까지 강제된다. 점프·낙하 중에는 시야 갱신마다 발생한다.
+	// 평면 레벨에서는 이득이 없으므로 기본은 끈다 — 다층 지형이 필요해지면 재슬라이스 스로틀링을 함께 설계해야 한다.
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision|Occluder")
-	bool bSliceHeightFromPlayer = true;
+	bool bSliceHeightFromPlayer = false;
 
 	// 오클루더 콜리전을 자를 시야 평면 높이. bSliceHeightFromPlayer=true면 "플레이어 발 위로의 오프셋", false면 "절대 월드 Z".
 	// 바닥 면과 정확히 일치하면 단면이 degenerate 되므로 살짝 위로 둔다(예: 8). 평면 게임이라 거의 변하지 않아 재슬라이스 비용은 무시 수준.

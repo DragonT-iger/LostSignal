@@ -47,12 +47,11 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 	CulledSegments.Reserve(SolverInfo.Segments.Num());
 	{
 		const float CullHalfFovDeg = SolverInfo.HalfFovDegrees + SolverInfo.AngleEpsilon;
-		for (const FLSVisionSegment2D* Segment : SolverInfo.Segments)
+		// SolverInfo.Segments가 세그먼트를 값으로 소유하므로 원소 주소를 그대로 캐시해도 안전하다.
+		// Solve() 실행 중 이 배열은 변하지 않으므로 CulledSegments의 포인터는 함수 끝까지 유효하다.
+		for (const FLSVisionSegment2D& SegmentRef : SolverInfo.Segments)
 		{
-			if (Segment == nullptr)
-			{
-				continue;
-			}
+			const FLSVisionSegment2D* Segment = &SegmentRef;
 
 			const float StartDeltaDeg = FMath::FindDeltaAngleDegrees(
 				ForwardAngleDeg,
@@ -232,7 +231,6 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 	PolygonData.Extent = SolverInfo.MaxRayDistance;
 	PolygonData.Points.Reserve(FinalAngles.Num() + 1);
 	PolygonData.PointFlags.Reserve(FinalAngles.Num() + 1);
-	PolygonData.DebugRayHitPoints.Reserve(FinalAngles.Num());
 	PolygonData.Points.Add(SolverInfo.RayOriginPos);
 	PolygonData.PointFlags.Add(0.0f); // apex(RayOrigin)는 열린 점으로 취급.
 
@@ -290,7 +288,6 @@ FLSVisionPolygonData FLSVisionSolver::Solve(FLSVisionSolverInfo& SolverInfo)
 
 		PolygonData.Points.Add(ClosestHit.HitPoint);
 		PolygonData.PointFlags.Add(bWasOccluderHit ? 1.0f : 0.0f);
-		PolygonData.DebugRayHitPoints.Add(ClosestHit.HitPoint);
 	}
 
 	return PolygonData;

@@ -65,17 +65,34 @@ void ULSVisionComponent::InitializeLocalVision()
 			true);
 	}
 
-	if (PostProcessMaterial != nullptr)
+	// 아래 세 실패는 모두 "시야 포스트 프로세스가 화면에 안 붙는다"로 이어진다. 조용히 넘기면 원인 추적이 불가능하므로 로그를 남긴다.
+	if (PostProcessMaterial == nullptr)
+	{
+		UE_LOG(LogLS, Warning, TEXT("LSVisionComponent '%s': PostProcessMaterial 미할당 — 시야 포스트 프로세스가 적용되지 않습니다."),
+			*GetNameSafe(GetOwner()));
+	}
+	else
 	{
 		PostProcessMID = UMaterialInstanceDynamic::Create(PostProcessMaterial, this);
 
-		if (PostProcessMID != nullptr)
+		if (PostProcessMID == nullptr)
+		{
+			UE_LOG(LogLS, Warning, TEXT("LSVisionComponent '%s': PostProcessMaterial '%s'로 MID 생성 실패 — 시야 포스트 프로세스가 적용되지 않습니다."),
+				*GetNameSafe(GetOwner()),
+				*GetNameSafe(PostProcessMaterial));
+		}
+		else
 		{
 			PostProcessMID->SetScalarParameterValue(EnableParamName, bEnableVision ? 1.0f : 0.0f);
 
 			if (UCameraComponent* Camera = GetOwner() ? GetOwner()->FindComponentByClass<UCameraComponent>() : nullptr)
 			{
 				Camera->PostProcessSettings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0f, PostProcessMID));
+			}
+			else
+			{
+				UE_LOG(LogLS, Warning, TEXT("LSVisionComponent '%s': CameraComponent를 찾지 못해 시야 포스트 프로세스를 블렌더블에 등록하지 못했습니다."),
+					*GetNameSafe(GetOwner()));
 			}
 		}
 	}
@@ -187,7 +204,12 @@ void ULSVisionComponent::UpdateVisionPolygon()
 		ActorForward = AimComponent->GetAimDirection();
 	}
 	const FVector2D ActorForward2D = FVector2D(ActorForward.X, ActorForward.Y).GetSafeNormal();
-	const FVector2D RayOrigin2D = ActorLocation2D - (ActorForward2D * (VisionRadius - 50));
+
+	// apex(레이 원점)를 캐릭터 뒤로 물리는 거리. 근접 원(VisionRadius) 안쪽이 콘 밖으로 빠지지 않도록
+	// 반경보다 이 여유만큼 짧게 잡는다. 음수가 되면 apex가 캐릭터 앞으로 나와 콘이 뒤집히므로 0에서 막는다.
+	constexpr float RayOriginPullbackMargin = 50.0f;
+	const float RayOriginPullback = FMath::Max(VisionRadius - RayOriginPullbackMargin, 0.0f);
+	const FVector2D RayOrigin2D = ActorLocation2D - (ActorForward2D * RayOriginPullback);
 
 	// 플레이어 포즈·오클루더 토폴로지·활성화 플래그가 모두 직전과 같으면 폴리곤/마스크가 그대로이므로 재계산을 건너뛴다.
 	// 단, 타겟(몬스터 등)은 플레이어가 멈춰 있어도 움직이므로 가시성 갱신은 계속 수행한다.
@@ -232,7 +254,6 @@ void ULSVisionComponent::UpdateVisionPolygon()
 	SolverInfo.AngleEpsilon = 0.01f;
 	SolverInfo.DivideAngleDegree = DivideAngleDegree;
 	SolverInfo.MaxRayDistance = MaxRayDistance;
-	SolverInfo.World = World;
 
 	VisionSubsystem->QuerySegmentsInRadius(RayOrigin2D, MaxRayDistance, SolverInfo.Segments);
 
@@ -298,7 +319,7 @@ void ULSVisionComponent::ApplyVisionParametersToSurfaces(const FVector2D& Forwar
 void ULSVisionComponent::DrawDebugVisionRays() const
 {
 	UWorld* World = GetWorld();
-	if (World == nullptr || CurrentPolygon.DebugRayHitPoints.Num() == 0)
+	if (World == nullptr || CurrentPolygon.Points.Num() <= 1)
 	{
 		return;
 	}
@@ -310,8 +331,10 @@ void ULSVisionComponent::DrawDebugVisionRays() const
 	const FVector RayOrigin(CurrentPolygon.RayOrigin.X, CurrentPolygon.RayOrigin.Y, DrawZ);
 	const bool bPersistentLines = DebugRayDuration > 0.0f;
 
-	for (const FVector2D& Point2D : CurrentPolygon.DebugRayHitPoints)
+	// Points[0]은 apex(RayOrigin) 자신이므로 건너뛴다. 이후 점들이 각 레이의 실제 히트 지점이다.
+	for (int32 PointIndex = 1; PointIndex < CurrentPolygon.Points.Num(); ++PointIndex)
 	{
+		const FVector2D& Point2D = CurrentPolygon.Points[PointIndex];
 		const FVector RayEnd(Point2D.X, Point2D.Y, DrawZ);
 
 		DrawDebugLine(

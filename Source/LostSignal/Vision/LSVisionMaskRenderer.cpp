@@ -6,6 +6,7 @@
 #include "LSVisionGlobalShader.h"
 #include "RenderGraphUtils.h"
 #include "TextureResource.h"
+#include "Vision/LSVisionSettings.h"
 
 ALSVisionMaskRenderer::ALSVisionMaskRenderer()
 {
@@ -15,8 +16,6 @@ ALSVisionMaskRenderer::ALSVisionMaskRenderer()
 // Uploads polygon data to the render thread and refreshes the visibility mask texture.
 void ALSVisionMaskRenderer::RequestMaskUpdate(const FLSVisionPolygonData& PolygonData)
 {
-	LastRenderedPolygon = PolygonData;
-
 	if (VisibilityMaskRenderTarget == nullptr || IsEngineExitRequested())
 	{
 		return;
@@ -49,14 +48,18 @@ void ALSVisionMaskRenderer::RequestMaskUpdate(const FLSVisionPolygonData& Polygo
 	const float Extent = PolygonData.Extent;
 	// 상대 좌표계의 원점이 놓인 절대 월드 위치. 셰이더가 노이즈를 월드 고정으로 샘플하는 데 쓴다.
 	const FVector2f MaskOriginWS(PolygonData.Origin);
-	const float FeatherWidthValue = FeatherWidth;
-	const FLinearColor HiddenColorValue = HiddenColor;
+	// 페더·노이즈·틴트의 단일 출처인 설정을 디스패치 시점에 읽는다. 덕분에 Project Settings 수정이
+	// 렌더러 재스폰(레벨 재시작) 없이 즉시 반영된다.
+	const ULSVisionSettings& VisionSettings = *GetDefault<ULSVisionSettings>();
+
+	const float FeatherWidthValue = VisionSettings.FeatherWidth;
+	const FLinearColor HiddenColorValue = VisionSettings.HiddenColor;
 
 	// 노이즈 리소스를 게임 스레드에서 확보해 렌더 스레드 람다로 캡처한다. 텍스쳐가 없으면 진폭 0으로 흔들림 비활성.
 	FTextureResource* NoiseResource = EdgeNoiseTexture != nullptr ? EdgeNoiseTexture->GetResource() : nullptr;
-	const float NoiseScaleValue = EdgeNoiseScale;
-	const float NoiseWidthValue = NoiseResource != nullptr ? EdgeNoiseWidth : 0.0f;
-	const float OccluderFeatherScaleValue = OccluderFeatherScale;
+	const float NoiseScaleValue = VisionSettings.EdgeNoiseScale;
+	const float NoiseWidthValue = NoiseResource != nullptr ? VisionSettings.EdgeNoiseWidth : 0.0f;
+	const float OccluderFeatherScaleValue = VisionSettings.OccluderFeatherScale;
 
 	ENQUEUE_RENDER_COMMAND(RenderLostSignalVisionMask)(
 		[RenderTargetResource, VisionRadius, Extent, MaskOriginWS, FeatherWidthValue, HiddenColorValue, NoiseResource, NoiseScaleValue, NoiseWidthValue, OccluderFeatherScaleValue, PolygonUploadData = MoveTemp(PolygonUploadData), PolygonFlagUploadData = MoveTemp(PolygonFlagUploadData)](FRHICommandListImmediate& RHICmdList)

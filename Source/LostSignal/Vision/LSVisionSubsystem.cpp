@@ -18,6 +18,22 @@ namespace
 		const float DeltaY = Point.Y < Bounds.Min.Y ? Bounds.Min.Y - Point.Y : (Point.Y > Bounds.Max.Y ? Point.Y - Bounds.Max.Y : 0.0f);
 		return FMath::Square(DeltaX) + FMath::Square(DeltaY);
 	}
+
+	// [마스크 RT 계약] 아래 세 설정은 취향이 아니라 정확성 요구사항이므로 에셋 저작값에 맡기지 않고 코드가 강제한다.
+	// 이 계약의 단일 출처는 이 함수다. 템플릿 경로와 폴백 경로가 모두 여기를 거친다.
+	//
+	// - bCanCreateUAV: 컴퓨트 셰이더가 RWTexture2D로 직접 쓰므로 UAV 생성이 가능해야 한다.
+	// - TA_Clamp: 서피스 머티리얼은 등록된 모든 벽·바닥의 모든 픽셀에서 MaskOriginWS/MaskExtent로 UV를 계산하므로,
+	//   마스크 창(±Extent) 밖 지오메트리는 필연적으로 UV가 [0,1]을 벗어난다. Wrap이면 창 반대편을 읽어 멀리 떨어진
+	//   지오메트리에 시야 콘이 격자처럼 복제된다. Clamp면 테두리 텍셀(=가려짐)을 읽어 균일하게 가려진 상태로 퇴화한다.
+	// - bAutoGenerateMips 금지: 컴퓨트가 mip 0만 쓰므로 상위 mip이 있으면 머티리얼이 갱신되지 않은 mip을 샘플할 수 있다.
+	void ApplyVisionMaskRenderTargetContract(UTextureRenderTarget2D& RenderTarget)
+	{
+		RenderTarget.bCanCreateUAV = true;
+		RenderTarget.AddressX = TextureAddress::TA_Clamp;
+		RenderTarget.AddressY = TextureAddress::TA_Clamp;
+		RenderTarget.bAutoGenerateMips = false;
+	}
 }
 
 // Creates the shared runtime objects that every local vision calculation depends on.
@@ -51,15 +67,11 @@ void ULSVisionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 			MaskRenderer->SetCanBeDamaged(false);
 			MaskRenderer->VisibilityMaskRenderTarget = RuntimeMaskRenderTarget;
 
-			// MaskRenderer는 런타임 스폰(BP/레벨 인스턴스 없음)이라, 설정값을 여기서 복사해 적용한다.
+			// 스칼라·색 값은 렌더러가 디스패치 시점에 설정에서 직접 읽으므로 복사하지 않는다.
+			// 노이즈 텍스쳐만 여기서 한 번 동기 로드해 넘긴다(프레임당 LoadSynchronous 방지).
 			if (VisionSettings != nullptr)
 			{
-				MaskRenderer->FeatherWidth = VisionSettings->FeatherWidth;
-				MaskRenderer->HiddenColor = VisionSettings->HiddenColor;
 				MaskRenderer->EdgeNoiseTexture = VisionSettings->EdgeNoiseTexture.LoadSynchronous();
-				MaskRenderer->EdgeNoiseScale = VisionSettings->EdgeNoiseScale;
-				MaskRenderer->EdgeNoiseWidth = VisionSettings->EdgeNoiseWidth;
-				MaskRenderer->OccluderFeatherScale = VisionSettings->OccluderFeatherScale;
 			}
 		}
 	}
@@ -210,7 +222,7 @@ void ULSVisionSubsystem::UnregisterTarget(ULSVisionTargetComponent* Target)
 }
 
 // Returns only the cached occluder segments near the viewer instead of making every solver traverse the whole world.
-void ULSVisionSubsystem::QuerySegmentsInRadius(const FVector2D& Origin, const float Radius, TArray<FLSVisionSegment2D*>& OutSegments) const
+void ULSVisionSubsystem::QuerySegmentsInRadius(const FVector2D& Origin, const float Radius, TArray<FLSVisionSegment2D>& OutSegments) const
 {
 	OutSegments.Reset();
 
@@ -257,7 +269,9 @@ void ULSVisionSubsystem::QuerySegmentsInRadius(const FVector2D& Origin, const fl
 			}
 
 			UniqueSegmentIds.Add(SegmentId);
-			OutSegments.Add(const_cast<FLSVisionSegment2D*>(&CachedSegment->Segment));
+			// CachedSegments(TMap) 내부를 가리키는 포인터가 아니라 값을 복사한다. 포인터를 넘기면
+			// 이후 오클루더 등록/해제로 캐시가 재배치될 때 호출자 쪽에서 무효 포인터가 된다.
+			OutSegments.Add(CachedSegment->Segment);
 		}
 	}
 }
@@ -301,12 +315,24 @@ UTextureRenderTarget2D* ULSVisionSubsystem::CreateRenderTargetFromTemplate(const
 		return nullptr;
 	}
 
+	// 아트 소유값(색·감마·포맷·크기)은 템플릿에서 그대로 상속한다.
 	RenderTarget->ClearColor = TemplateRenderTarget->ClearColor;
-	RenderTarget->bAutoGenerateMips = TemplateRenderTarget->bAutoGenerateMips;
-	RenderTarget->bCanCreateUAV = true;
-	RenderTarget->AddressX = TemplateRenderTarget->AddressX;
-	RenderTarget->AddressY = TemplateRenderTarget->AddressY;
 	RenderTarget->TargetGamma = TemplateRenderTarget->TargetGamma;
+
+	// 주소 모드·mip은 계약이므로 에셋 값을 무시하고 강제한다. 무시된 항목이 있으면 아트가 에셋을 고칠 수 있게 남긴다.
+	const bool bTemplateAddressMismatch =
+		TemplateRenderTarget->AddressX != TextureAddress::TA_Clamp || TemplateRenderTarget->AddressY != TextureAddress::TA_Clamp;
+	if (bTemplateAddressMismatch || TemplateRenderTarget->bAutoGenerateMips)
+	{
+		UE_LOG(LogLS, Warning,
+			TEXT("Vision mask RT 템플릿 '%s'이 계약과 다릅니다(무시하고 강제 적용): AddressX/Y=%d/%d(요구 TA_Clamp), bAutoGenerateMips=%s(요구 false). 에셋을 수정해 주세요."),
+			*GetNameSafe(TemplateRenderTarget),
+			static_cast<int32>(TemplateRenderTarget->AddressX),
+			static_cast<int32>(TemplateRenderTarget->AddressY),
+			TemplateRenderTarget->bAutoGenerateMips ? TEXT("true") : TEXT("false"));
+	}
+
+	ApplyVisionMaskRenderTargetContract(*RenderTarget);
 
 	if (TemplateRenderTarget->OverrideFormat != PF_Unknown)
 	{
@@ -338,11 +364,7 @@ UTextureRenderTarget2D* ULSVisionSubsystem::CreateFallbackRenderTarget(const int
 
 	RenderTarget->RenderTargetFormat = RTF_RGBA8;
 	RenderTarget->ClearColor = FLinearColor::Black;
-	RenderTarget->bAutoGenerateMips = false;
-	RenderTarget->bCanCreateUAV = true;
-	// Extent 밖 지오메트리의 UV가 [0,1]을 벗어나도 중심(보임) 영역을 다시 샘플하지 않도록 Clamp.
-	RenderTarget->AddressX = TextureAddress::TA_Clamp;
-	RenderTarget->AddressY = TextureAddress::TA_Clamp;
+	ApplyVisionMaskRenderTargetContract(*RenderTarget);
 	RenderTarget->InitAutoFormat(Size, Size);
 	RenderTarget->UpdateResourceImmediate(true);
 	return RenderTarget;

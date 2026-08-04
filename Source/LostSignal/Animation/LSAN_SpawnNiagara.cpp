@@ -62,7 +62,7 @@ void ULSAN_SpawnNiagara::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceB
 	{
 		UNiagaraComponent* SpawnedComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
 			NiagaraSystem, MeshComp, ResolvedSocketName, LocationOffset, RotationOffset, Scale,
-			EAttachLocation::KeepRelativeOffset, bAutoDestroy, ENCPoolMethod::None, bAutoActivate);
+			EAttachLocation::KeepRelativeOffset, bAutoDestroy, ENCPoolMethod::AutoRelease, bAutoActivate);
 		if (bDetachAfterSpawn && SpawnedComponent)
 		{
 			SpawnedComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);

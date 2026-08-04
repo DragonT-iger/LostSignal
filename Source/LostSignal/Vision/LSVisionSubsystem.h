@@ -29,7 +29,8 @@ public:
 
 	void RegisterTarget(ULSVisionTargetComponent* Target);
 	void UnregisterTarget(ULSVisionTargetComponent* Target);
-	void QuerySegmentsInRadius(const FVector2D& Origin, float Radius, TArray<FLSVisionSegment2D*>& OutSegments) const;
+	// 세그먼트를 값으로 복사해 넘긴다. 내부 캐시(TMap) 포인터를 반환하면 캐시 재배치 시 무효화되기 때문이다.
+	void QuerySegmentsInRadius(const FVector2D& Origin, float Radius, TArray<FLSVisionSegment2D>& OutSegments) const;
 
 	const TArray<TObjectPtr<ULSVisionOccluderComponent>>& GetRegisteredOccluders() const
 	{
