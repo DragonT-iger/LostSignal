@@ -47,7 +47,7 @@ protected:
 	TObjectPtr<ULSQuickSlotWidget> QuickSlot6;
 
 	// true면 적재 프로토콜로 해금되지 않은 칸을 접어 표시 영역을 줄인다(HUD 바 기본값).
-	// false면 레벨과 무관하게 6칸을 항상 표시한다(인벤토리 바 — 아트가 인스턴스에서 해제).
+	// 인벤토리 상호작용 바는 이 값과 무관하게 6칸을 항상 유지한다.
 	UPROPERTY(EditAnywhere, Category="LS/UI|QuickSlot")
 	bool bHideLockedSlots = true;
 

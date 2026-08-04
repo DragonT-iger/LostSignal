@@ -35,12 +35,12 @@
   - **디버그 패널 오버라이드 우선:** 프로토콜 디버그 패널(Insert 토글)이 떠 있고 적재 오버라이드가 설정돼 있으면 그 레벨로 계산(`ULSSaveSubsystem::GetUnlockedQuickSlotCountForCarryingLevel`, current==previous). 스킬 바/칩스테이션의 디버그 게이트(`HasProtocolTestLevel`)와 동일.
   - **평상시:** 세이브의 신호-활성 칩 집계 기반 [`ULSSaveSubsystem::GetUnlockedQuickSlotCount`](../../Source/LostSignal/Session/LSSaveSubsystem.h)(`GetCarryingProtocolSlotBonus("Quick")` → `QuickSlotCount` 클램프). 컨트롤러가 없는 경로는 이 세이브 값으로 폴백.
 - **사용 게이트:** `TryUseQuickSlot(index)` 상단에서 `index >= 해금 칸 수`면 거부(인덱스 0~5 = 1~6번 칸과 1:1). 등록(드래그앤드랍)은 잠긴 칸에도 허용 — 해금 시 바로 쓰인다.
-- **표시 게이트(바별로 다름):** `ULSQuickSlotBarWidget::bHideLockedSlots`(`EditAnywhere`)로 인스턴스마다 분기.
+- **표시 게이트(바별로 다름):** 인벤토리 상호작용 컨텍스트와 `ULSQuickSlotBarWidget::bHideLockedSlots`(`EditAnywhere`)로 분기한다.
   - **HUD 바**(기본 `true`): 잠긴 칸을 `Collapsed`로 접어 표시 영역이 해금 수만큼(예: 3→6칸) 리플로우.
-  - **인벤토리 바**(아트가 `false`로 설정): 레벨 무관 6칸 항상 표시, 잠금 표시 없음. (사용 자체는 여전히 게이트됨.)
+  - **인벤토리 바**(`SetInventoryInteractionEnabled(true)`): `bHideLockedSlots` 값과 레벨에 무관하게 6칸을 항상 표시하고 잠금 표시도 하지 않는다. 프로토콜 레벨이 떨어져도 등록 내용과 칸 표시는 유지된다. (키 입력 사용 자체는 여전히 게이트됨.)
 - **실시간 갱신:** 칩 장착/해제·신호 게이지 변경은 `OnChipLoadoutChanged`로 브로드캐스트되어 바의 `RefreshAll`(→ `ApplyProtocolVisibility`)을 태운다. 레이드 중 신호 하락으로 적재 레벨이 떨어지면 `IsProtocolUnlockVisible`의 current/previous·`Protocol_Protected_Level`(정보 유지) 규칙대로 표시가 갱신된다. 디버그 패널에서 적재 레벨을 +/-로 조정하면 `RefreshProtocolTestTargets` → `RefreshRegisteredQuickSlotBars`로 등록된 모든 바가 즉시 다시 그려진다.
 
-> **아트 매핑:** `WBP_QuickSlotBar`의 **인벤토리 인스턴스**는 Details에서 `bHideLockedSlots`를 **해제**, **HUD 인스턴스**는 기본값 `true` 유지.
+> **아트 매핑:** HUD 인스턴스는 `bHideLockedSlots=true`를 유지한다. 인벤토리 인스턴스는 C++ 상호작용 컨텍스트가 항상 6칸 표시를 강제하므로 별도 설정이 필요 없다.
 > **기획 데이터:** `DT_Protocol`에 적재 행 추가 필요 — 예) 레벨 2에서 `Quick` +3, 레벨 5에서 +3(합산 0/3/6). 값·`Protocol_Protected_Level`은 기획 조정.
 
 ## 갱신 경로 (단일 funnel)

@@ -101,8 +101,8 @@ void ULSQuickSlotBarWidget::ApplyProtocolVisibility()
 		? ESlateVisibility::Visible
 		: ESlateVisibility::HitTestInvisible;
 
-	// 인벤토리 바 등 접지 않는 바는 6칸을 항상 표시한다(이전에 접혔던 상태도 복원).
-	if (!bHideLockedSlots)
+	// 인벤토리 바는 프로토콜 레벨과 무관하게 6칸을 유지한다. 표시 전용 바도 설정으로 같은 동작을 선택할 수 있다.
+	if (bInventoryInteractionEnabled || !bHideLockedSlots)
 	{
 		for (ULSQuickSlotWidget* SlotWidget : Slots)
 		{
