@@ -26,7 +26,7 @@ public:
 	virtual FText GetInteractText_Implementation() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	void InitializeDroppedItem(const FLSSessionItem& InItem, const FVector& InDropAnimationStartLocation);
+	void InitializeDroppedItem(const FLSSessionItem& InItem, const FVector& InDropAnimationStartLocation, float InDropAnimationDurationScale = 1.0f);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Drop")
@@ -60,6 +60,9 @@ private:
 	UPROPERTY(Replicated)
 	FVector_NetQuantize10 DropAnimationStartLocation;
 
+	UPROPERTY(Replicated)
+	float DropAnimationDurationScale;
+
 	UPROPERTY(ReplicatedUsing=OnRep_HasLanded)
 	bool bHasLanded;
 
@@ -70,6 +73,7 @@ private:
 	void OnRep_HasLanded();
 
 	void RefreshItemVisual();
+	float GetDropVisualAnimationDurationSeconds() const;
 	void StartDropVisualAnimation();
 	void UpdateDropVisualAnimation(float NormalizedTime);
 	void FinishDropVisualAnimation();

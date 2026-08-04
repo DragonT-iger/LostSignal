@@ -19,7 +19,6 @@ class ULSLobbyStorageWidget;
 class ULSInventoryWidget;
 class ULSQuickSlotBarWidget;
 class ULSChipStationWidget;
-class ULSBackgroundBlurWidget;
 class ULSRaidInventoryComponent;
 class ULSSaveSubsystem;
 class ULSHpDebugWidget;
@@ -111,10 +110,6 @@ public:
 
 	// 폰의 인벤토리가 열려 있거나, 등록된 로비 인벤토리 위젯이 보이면 true.
 	bool IsInventoryUIOpen() const;
-
-	// 모달 패널(인벤토리/창고/칩스테이션/루트드랍) 표시 상태에 맞춰 공유 블러를 켜고 끈다.
-	// 어느 패널이든 show/hide 직후 호출하면 되며, 매번 현재 상태를 재계산하므로 중복 호출에 안전하다.
-	void UpdateBackgroundBlurVisibility();
 
 	// 모달 패널(인벤토리/창고/칩스테이션/루트드랍)이 하나라도 보이면 true. 매번 현재 상태를 재계산한다.
 	bool IsAnyModalPanelOpen() const;
@@ -229,9 +224,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
 	TSubclassOf<ULSPlayerHUDWidget> PlayerHUDWidgetClass;
 
-	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
-	TSubclassOf<ULSBackgroundBlurWidget> BackgroundBlurWidgetClass;
-
 	// 레이드 중 ESC로 여는 세팅 화면. 타이틀/로비와 동일한 WBP_Settings를 재사용한다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI")
 	TSubclassOf<ULSSettingsWidget> RaidSettingsWidgetClass;
@@ -247,9 +239,6 @@ protected:
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSPlayerHUDWidget> PlayerHUDWidgetInstance;
-
-	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
-	TObjectPtr<ULSBackgroundBlurWidget> BackgroundBlurWidgetInstance;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSLobbyStorageWidget> LobbyStorageWidgetInstance;
@@ -281,6 +270,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Inventory", meta=(ClampMin="0"))
 	float DroppedItemForwardDistance = 100.0f;
+
+	// 수동 월드 드랍에서 최고 이동속도일 때 캐릭터 이동 방향으로 더하는 거리. 정지 중에는 적용하지 않는다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Inventory", meta=(ClampMin="0"))
+	float ManualDropMaxSpeedDistanceBonus = 200.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Inventory", meta=(ClampMin="1"))
 	int32 OverflowDropItemsPerRing = 6;
@@ -394,7 +387,6 @@ private:
 	void ShowChipStationWidgetLocal(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass);
 	void HideChipStationWidgetLocal();
 	void CreatePlayerHUDWidgetLocal();
-	void CreateBackgroundBlurWidgetLocal();
 	void InitializeRaidInventoryFromSessionSubsystem();
 	void SubmitLocalRaidEntryData();
 	void StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);
@@ -417,9 +409,10 @@ private:
 	void QueueOverflowWorldDropItems(TArray<FLSSessionItem>&& ExtractedItems);
 	FVector BuildOverflowWorldDropDirection(int32 ItemIndex, int32 ItemCount) const;
 	float BuildOverflowWorldDropDistance(int32 ItemIndex) const;
+	void BuildManualWorldDropTrajectory(FVector RequestedDropDirection, FVector& OutDropDirection, float& OutDropDistance) const;
 	void FlushPendingOverflowWorldDrops();
 	void SchedulePendingOverflowWorldDropRetry();
-	bool SpawnDroppedItemToWorld(const FLSSessionItem& SlotItem, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection, float DropDistance = -1.0f, bool bRequireGround = false);
+	bool SpawnDroppedItemToWorld(const FLSSessionItem& SlotItem, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection, float DropDistance = -1.0f, bool bRequireGround = false, float DropAnimationDurationScale = 1.0f);
 	bool ResolveServerDroppedItemTransform(FTransform& OutDropTransform, FVector DropDirection, float DropDistance, bool bRequireGround) const;
 	bool ResolveServerDroppedItemGroundLocation(FVector& OutGroundLocation, FVector DropDirection, float DropDistance, bool bRequireGround) const;
 	bool TransferLootDropSlotToSessionInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FLSSessionItem& OutLootItem);

@@ -16,6 +16,7 @@
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PawnMovementComponent.h"
 #include "Gameplay/LSLootBox.h"
 #include "Gameplay/LSNoiseTypes.h"
 #include "Gameplay/LSWorldDroppedItem.h"
@@ -28,7 +29,6 @@
 #include "Session/LSSaveSubsystem.h"
 #include "UI/Debug/LSHpDebugWidget.h"
 #include "UI/Debug/LSProtocolDebugWidget.h"
-#include "UI/LSBackgroundBlurWidget.h"
 #include "UI/LSPlayerHUDWidget.h"
 #include "UI/LSUILayer.h"
 #include "UI/Settings/LSSettingsWidget.h"
@@ -97,7 +97,6 @@ void ALSPlayerControllerBase::BeginPlay()
 	}
 
 	CreatePlayerHUDWidgetLocal();
-	CreateBackgroundBlurWidgetLocal();
 }
 
 void ALSPlayerControllerBase::OnPossess(APawn* InPawn)
@@ -741,7 +740,6 @@ void ALSPlayerControllerBase::ShowLootDropWidgetLocal(const FText& LootSourceNam
 	LootDropWidgetInstance->SetLootSourceName(LootSourceName);
 	LootDropWidgetInstance->SetSourceLootBox(SourceLootBox);
 	LootDropWidgetInstance->SetLootItems(Results);
-	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::HideLootDropWidgetLocal()
@@ -751,8 +749,6 @@ void ALSPlayerControllerBase::HideLootDropWidgetLocal()
 		LootDropWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 		LootDropWidgetInstance->ClearLootItems();
 	}
-
-	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass)
@@ -791,7 +787,6 @@ void ALSPlayerControllerBase::ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbySt
 
 	LobbyStorageWidgetInstance->RefreshStorage();
 	LobbyStorageWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::HideLobbyStorageWidgetLocal()
@@ -800,8 +795,6 @@ void ALSPlayerControllerBase::HideLobbyStorageWidgetLocal()
 	{
 		LobbyStorageWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
-
-	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass)
@@ -840,7 +833,6 @@ void ALSPlayerControllerBase::ShowChipStationWidgetLocal(TSubclassOf<ULSChipStat
 
 	ChipStationWidgetInstance->RefreshChipStation();
 	ChipStationWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::HideChipStationWidgetLocal()
@@ -849,8 +841,6 @@ void ALSPlayerControllerBase::HideChipStationWidgetLocal()
 	{
 		ChipStationWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
-
-	UpdateBackgroundBlurVisibility();
 }
 
 void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
@@ -892,39 +882,6 @@ void ALSPlayerControllerBase::CreatePlayerHUDWidgetLocal()
 	PlayerHUDWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	PlayerHUDWidgetInstance->InitializeHUDForPawn(CurrentPawn);
 }
-
-void ALSPlayerControllerBase::CreateBackgroundBlurWidgetLocal()
-{
-	if (!IsLocalPlayerController())
-	{
-		return;
-	}
-
-	if (!BackgroundBlurWidgetClass)
-	{
-		UE_LOG(LogLS, Warning, TEXT("BackgroundBlurWidgetClass is not set on %s."), *GetNameSafe(this));
-		return;
-	}
-
-	if (!BackgroundBlurWidgetInstance)
-	{
-		BackgroundBlurWidgetInstance = CreateWidget<ULSBackgroundBlurWidget>(this, BackgroundBlurWidgetClass);
-		if (!BackgroundBlurWidgetInstance)
-		{
-			UE_LOG(LogLS, Warning, TEXT("Failed to create modal backdrop widget on %s."), *GetNameSafe(this));
-			return;
-		}
-	}
-
-	if (!BackgroundBlurWidgetInstance->IsInViewport())
-	{
-		BackgroundBlurWidgetInstance->AddToViewport(LSUILayer::BackgroundBlur);
-	}
-
-	// 패널 뒤에 상주시키되 평상시엔 숨겨 둔다. 표시는 UpdateBackgroundBlurVisibility가 켠다.
-	BackgroundBlurWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
-}
-
 bool ALSPlayerControllerBase::IsAnyModalPanelOpen() const
 {
 	if (LootDropWidgetInstance && LootDropWidgetInstance->IsVisible())
@@ -952,20 +909,6 @@ bool ALSPlayerControllerBase::IsAnyModalPanelOpen() const
 	}
 
 	return false;
-}
-
-void ALSPlayerControllerBase::UpdateBackgroundBlurVisibility()
-{
-	if (!IsLocalPlayerController() || !BackgroundBlurWidgetInstance)
-	{
-		return;
-	}
-
-	// 입력은 위에 깔린 패널이 받도록 표시 시 HitTestInvisible로 둔다.
-	const ESlateVisibility NewVisibility = IsAnyModalPanelOpen()
-		? ESlateVisibility::HitTestInvisible
-		: ESlateVisibility::Collapsed;
-	BackgroundBlurWidgetInstance->SetVisibility(NewVisibility);
 }
 
 void ALSPlayerControllerBase::NotifyNoiseForHUD(const FLSNoiseEvent& NoiseEvent)
@@ -1859,7 +1802,13 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 		return false;
 	}
 
-	if (!SpawnDroppedItemToWorld(SlotItem, DroppedItemClass, DropDirection))
+	FVector ManualDropDirection = DropDirection;
+	float ManualDropDistance = DroppedItemForwardDistance;
+	BuildManualWorldDropTrajectory(DropDirection, ManualDropDirection, ManualDropDistance);
+	const float DropAnimationDurationScale = DroppedItemForwardDistance > KINDA_SMALL_NUMBER
+		? FMath::Max(1.0f, ManualDropDistance / DroppedItemForwardDistance)
+		: 1.0f;
+	if (!SpawnDroppedItemToWorld(SlotItem, DroppedItemClass, ManualDropDirection, ManualDropDistance, false, DropAnimationDurationScale))
 	{
 		UE_LOG(LogLS, Warning, TEXT("Failed to spawn dropped item for slot. Area=%d Index=%d"),
 			static_cast<int32>(SlotArea), SlotIndex);
@@ -1960,6 +1909,38 @@ float ALSPlayerControllerBase::BuildOverflowWorldDropDistance(const int32 ItemIn
 	return DroppedItemForwardDistance + (OverflowDropRingSpacing * RingIndex);
 }
 
+void ALSPlayerControllerBase::BuildManualWorldDropTrajectory(
+	FVector RequestedDropDirection,
+	FVector& OutDropDirection,
+	float& OutDropDistance) const
+{
+	const APawn* ControlledPawn = GetPawn();
+	RequestedDropDirection.Z = 0.0f;
+	RequestedDropDirection = RequestedDropDirection.GetSafeNormal();
+	if (RequestedDropDirection.IsNearlyZero())
+	{
+		RequestedDropDirection = ControlledPawn
+			? ControlledPawn->GetActorForwardVector().GetSafeNormal2D()
+			: FVector::ForwardVector;
+	}
+
+	FVector CombinedDropOffset = RequestedDropDirection * DroppedItemForwardDistance;
+	const UPawnMovementComponent* MovementComponent = ControlledPawn ? ControlledPawn->GetMovementComponent() : nullptr;
+	const float MaxSpeed = MovementComponent ? MovementComponent->GetMaxSpeed() : 0.0f;
+	if (ControlledPawn && MaxSpeed > KINDA_SMALL_NUMBER)
+	{
+		FVector MovementVelocity = ControlledPawn->GetVelocity();
+		MovementVelocity.Z = 0.0f;
+		const float SpeedRatio = FMath::Clamp(MovementVelocity.Size() / MaxSpeed, 0.0f, 1.0f);
+		CombinedDropOffset += MovementVelocity.GetSafeNormal() * ManualDropMaxSpeedDistanceBonus * SpeedRatio;
+	}
+
+	OutDropDistance = CombinedDropOffset.Size2D();
+	OutDropDirection = OutDropDistance > KINDA_SMALL_NUMBER
+		? CombinedDropOffset / OutDropDistance
+		: RequestedDropDirection;
+}
+
 void ALSPlayerControllerBase::FlushPendingOverflowWorldDrops()
 {
 	if (!HasAuthority() || PendingOverflowWorldDropItems.IsEmpty())
@@ -2026,7 +2007,8 @@ bool ALSPlayerControllerBase::SpawnDroppedItemToWorld(
 	TSubclassOf<ALSWorldDroppedItem> DroppedItemClass,
 	const FVector DropDirection,
 	const float DropDistance,
-	const bool bRequireGround)
+	const bool bRequireGround,
+	const float DropAnimationDurationScale)
 {
 	if (!LSInventorySlotUtils::IsFilled(SlotItem))
 	{
@@ -2076,7 +2058,7 @@ bool ALSPlayerControllerBase::SpawnDroppedItemToWorld(
 	const FVector DropAnimationStartLocation = ControlledPawn
 		? ControlledPawn->GetActorLocation()
 		: SpawnTransform.GetLocation();
-	DroppedItem->InitializeDroppedItem(SlotItem, DropAnimationStartLocation);
+	DroppedItem->InitializeDroppedItem(SlotItem, DropAnimationStartLocation, DropAnimationDurationScale);
 	DroppedItem->FinishSpawning(SpawnTransform);
 	return true;
 }
@@ -2189,7 +2171,8 @@ bool ALSPlayerControllerBase::ResolveServerDroppedItemGroundLocation(
 	const FVector PawnLocation = ControlledPawn->GetActorLocation();
 	float ResolvedDropDistance = DropDistance >= 0.0f ? DropDistance : DroppedItemForwardDistance;
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(LSDropInventoryItemToGround), false, ControlledPawn);
-	if (bRequireGround)
+	// 호출자가 거리를 명시한 수동/오버플로 드랍은 늘어난 거리만큼 벽을 통과하지 않도록 벽 앞에서 줄인다.
+	if (DropDistance >= 0.0f)
 	{
 		FHitResult ObstructionHit;
 		const FVector ObstructionEnd = PawnLocation + (DropDirection * ResolvedDropDistance);

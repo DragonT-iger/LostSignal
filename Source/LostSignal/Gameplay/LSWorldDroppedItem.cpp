@@ -16,6 +16,7 @@ ALSWorldDroppedItem::ALSWorldDroppedItem()
 {
 	DropAnimationDurationSeconds = 0.45f;
 	DropAnimationArcHeight = 80.0f;
+	DropAnimationDurationScale = 1.0f;
 	bHasLanded = true;
 	bDropVisualAnimating = false;
 	DropVisualAnimationElapsedSeconds = 0.0f;
@@ -56,7 +57,8 @@ void ALSWorldDroppedItem::BeginPlay()
 
 	if (HasAuthority())
 	{
-		if (DropAnimationDurationSeconds <= KINDA_SMALL_NUMBER)
+		const float AnimationDurationSeconds = GetDropVisualAnimationDurationSeconds();
+		if (AnimationDurationSeconds <= KINDA_SMALL_NUMBER)
 		{
 			CompleteDropLanding();
 		}
@@ -66,7 +68,7 @@ void ALSWorldDroppedItem::BeginPlay()
 				DropLandingTimerHandle,
 				this,
 				&ALSWorldDroppedItem::CompleteDropLanding,
-				DropAnimationDurationSeconds,
+				AnimationDurationSeconds,
 				false);
 		}
 	}
@@ -82,8 +84,9 @@ void ALSWorldDroppedItem::Tick(const float DeltaSeconds)
 	}
 
 	DropVisualAnimationElapsedSeconds += DeltaSeconds;
-	const float NormalizedTime = DropAnimationDurationSeconds > KINDA_SMALL_NUMBER
-		? FMath::Clamp(DropVisualAnimationElapsedSeconds / DropAnimationDurationSeconds, 0.0f, 1.0f)
+	const float AnimationDurationSeconds = GetDropVisualAnimationDurationSeconds();
+	const float NormalizedTime = AnimationDurationSeconds > KINDA_SMALL_NUMBER
+		? FMath::Clamp(DropVisualAnimationElapsedSeconds / AnimationDurationSeconds, 0.0f, 1.0f)
 		: 1.0f;
 	UpdateDropVisualAnimation(NormalizedTime);
 
@@ -158,12 +161,14 @@ void ALSWorldDroppedItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME(ALSWorldDroppedItem, Amount);
 	DOREPLIFETIME(ALSWorldDroppedItem, ChipStats);
 	DOREPLIFETIME(ALSWorldDroppedItem, DropAnimationStartLocation);
+	DOREPLIFETIME(ALSWorldDroppedItem, DropAnimationDurationScale);
 	DOREPLIFETIME(ALSWorldDroppedItem, bHasLanded);
 }
 
-void ALSWorldDroppedItem::InitializeDroppedItem(const FLSSessionItem& InItem, const FVector& InDropAnimationStartLocation)
+void ALSWorldDroppedItem::InitializeDroppedItem(const FLSSessionItem& InItem, const FVector& InDropAnimationStartLocation, const float InDropAnimationDurationScale)
 {
 	DropAnimationStartLocation = InDropAnimationStartLocation;
+	DropAnimationDurationScale = FMath::Max(1.0f, InDropAnimationDurationScale);
 	bHasLanded = false;
 	ItemRowName = InItem.ItemRowName;
 	Amount = InItem.Amount;
@@ -224,8 +229,9 @@ void ALSWorldDroppedItem::RefreshItemVisual()
 		IconWidget->SetIconTexture(IconTexture);
 		if (bDropVisualAnimating)
 		{
-			const float NormalizedTime = DropAnimationDurationSeconds > KINDA_SMALL_NUMBER
-				? FMath::Clamp(DropVisualAnimationElapsedSeconds / DropAnimationDurationSeconds, 0.0f, 1.0f)
+			const float AnimationDurationSeconds = GetDropVisualAnimationDurationSeconds();
+			const float NormalizedTime = AnimationDurationSeconds > KINDA_SMALL_NUMBER
+				? FMath::Clamp(DropVisualAnimationElapsedSeconds / AnimationDurationSeconds, 0.0f, 1.0f)
 				: 1.0f;
 			UpdateDropVisualAnimation(NormalizedTime);
 		}
@@ -235,6 +241,11 @@ void ALSWorldDroppedItem::RefreshItemVisual()
 	UE_LOG(LogLS, Warning, TEXT("Dropped item icon widget is missing or invalid on %s."), *GetNameSafe(this));
 }
 
+float ALSWorldDroppedItem::GetDropVisualAnimationDurationSeconds() const
+{
+	return DropAnimationDurationSeconds * FMath::Max(1.0f, DropAnimationDurationScale);
+}
+
 void ALSWorldDroppedItem::StartDropVisualAnimation()
 {
 	if (bHasLanded || bDropVisualAnimating || !ItemIconWidgetComponent || GetNetMode() == NM_DedicatedServer)
@@ -242,7 +253,7 @@ void ALSWorldDroppedItem::StartDropVisualAnimation()
 		return;
 	}
 
-	bDropVisualAnimating = DropAnimationDurationSeconds > KINDA_SMALL_NUMBER;
+	bDropVisualAnimating = GetDropVisualAnimationDurationSeconds() > KINDA_SMALL_NUMBER;
 	DropVisualAnimationElapsedSeconds = 0.0f;
 	if (!bDropVisualAnimating)
 	{
@@ -271,7 +282,7 @@ void ALSWorldDroppedItem::UpdateDropVisualAnimation(const float NormalizedTime)
 void ALSWorldDroppedItem::FinishDropVisualAnimation()
 {
 	bDropVisualAnimating = false;
-	DropVisualAnimationElapsedSeconds = DropAnimationDurationSeconds;
+	DropVisualAnimationElapsedSeconds = GetDropVisualAnimationDurationSeconds();
 	if (ItemIconWidgetComponent)
 	{
 		ItemIconWidgetComponent->SetRelativeLocation(DropVisualLandedRelativeLocation);

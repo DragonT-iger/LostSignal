@@ -1434,11 +1434,6 @@ bool ALSPlayerCharacter::ShowInventoryWidgetInternal(bool bShowStoreAllButton, b
 	// 인벤토리가 뜨면 진행 중이던 스킬 프리뷰는 취소한다(모달 아래 프리뷰 잔류 방지).
 	CancelActiveSkillPreview();
 
-	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(PlayerController))
-	{
-		LSPlayerController->UpdateBackgroundBlurVisibility();
-	}
-
 	return true;
 }
 
@@ -1489,7 +1484,6 @@ void ALSPlayerCharacter::HideInventoryWidget()
 	{
 		PlayerController->HideLootDropWidget();
 		PlayerController->HideLobbyStorageWidget();
-		PlayerController->UpdateBackgroundBlurVisibility();
 	}
 
 	ActiveInventoryTarget.Reset();

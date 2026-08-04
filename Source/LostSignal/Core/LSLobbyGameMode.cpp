@@ -8,7 +8,6 @@
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSettings.h"
 #include "Session/LSSessionSubsystem.h"
-#include "UI/LSBackgroundBlurWidget.h"
 #include "UI/LSUILayer.h"
 #include "UI/Lobby/LSLobbyMenuWidget.h"
 
@@ -27,7 +26,6 @@ void ALSLobbyGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	RestoreLobbySignalGauge();
-	CreateLobbyBackgroundWidget();
 	CreateLobbyMenuWidget();
 }
 
@@ -53,33 +51,6 @@ void ALSLobbyGameMode::RestoreLobbySignalGauge()
 	}
 
 	SaveSubsystem->SetChipSignalGaugePercent(1.0f);
-}
-
-void ALSLobbyGameMode::CreateLobbyBackgroundWidget()
-{
-	APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
-	if (!PlayerController)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot create lobby background because PlayerController is missing."));
-		return;
-	}
-
-	if (!BackgroundBlurWidgetClass)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] BackgroundBlurWidgetClass is not set on %s. Check BP_LobbyGameMode."), *GetNameSafe(this));
-		return;
-	}
-
-	BackgroundBlurWidgetInstance = CreateWidget<ULSBackgroundBlurWidget>(PlayerController, BackgroundBlurWidgetClass);
-	if (!BackgroundBlurWidgetInstance)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] Failed to create lobby background widget on %s."), *GetNameSafe(this));
-		return;
-	}
-
-	// 메뉴 뒤에 상시 깔리는 배경. 입력은 메뉴가 받도록 HitTestInvisible로 둔다.
-	BackgroundBlurWidgetInstance->AddToViewport(LSUILayer::LobbyBackground);
-	BackgroundBlurWidgetInstance->SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
 void ALSLobbyGameMode::CreateLobbyMenuWidget()

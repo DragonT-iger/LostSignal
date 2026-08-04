@@ -1,28 +1,27 @@
-# UI 레이어 / 공유 블러 구조
+# UI 레이어 / 패널 배경 효과 구조
 
 ## 목적
 
-이 문서는 뷰포트 최상위 UMG 위젯의 **Z-order 레이어 규칙**과, 모달 패널 뒤에 깔리는 **공유 풀스크린 블러**의 표시 규칙을 정리한다.
+이 문서는 뷰포트 최상위 UMG 위젯의 **Z-order 레이어 규칙**과 각 패널 WBP가 소유하는 **배경 효과**의 책임을 정리한다.
 
-각 패널의 슬롯/조작 로직은 [InventoryLogic.md](InventoryLogic.md)가 소유한다. 이 문서는 "여러 패널이 동시에 떴을 때 누가 위에 그려지고, 블러는 언제 깔리는가"만 다룬다.
+각 패널의 슬롯/조작 로직은 [InventoryLogic.md](InventoryLogic.md)가 소유한다. 이 문서는 "여러 패널이 동시에 떴을 때 누가 위에 그려지고, 배경 효과는 어디서 관리하는가"만 다룬다.
 
 ## 배경 (왜 필요한가)
 
-인벤토리·창고·칩스테이션·루트드랍은 **서로 독립된 최상위 위젯**이고, 루팅 중에는 인벤토리와 루트드랍이 **동시에** 떠서 서로 드래그/Shift-이동한다. 과거에는 풀스크린 블러가 루트드랍 WBP 안에 들어 있어서, 같은 Z(0)로 올라간 인벤토리를 루트드랍의 블러가 덮어 인벤토리가 뿌옇게 보였다.
+인벤토리·창고·칩스테이션·루트드랍은 **서로 독립된 최상위 위젯**이고, 루팅 중에는 인벤토리와 루트드랍이 **동시에** 떠서 서로 드래그/Shift-이동한다. 따라서 위젯 본체의 앞뒤 순서는 C++의 Z-order가 결정하고, 블러·딤드 같은 시각 효과의 범위와 강도는 각 패널 WBP가 결정한다.
 
 해결은 두 축으로 나눠 본다.
 
-- **순서(깊이):** 누가 위에 그려지는가 → Z-order로만 결정.
-- **표시:** 블러를 언제 켜고 끄는가 → 패널 표시 상태에 따라 토글.
+- **순서(깊이):** 누가 위에 그려지는가 → C++의 Z-order로 결정.
+- **배경 효과:** 무엇을 얼마나 흐리거나 어둡게 하는가 → 각 패널 WBP가 소유.
 
 ## Z-order 레이어
 
 레이어 값의 단일 출처는 `Source/LostSignal/UI/LSUILayer.h`다. 문서엔 수치를 복붙하지 않으며, 순서 관계만 적는다.
 
 ```text
-HUD = LobbyBackground
+HUD
   < LobbyMenu
-  < BackgroundBlur
   < ModalPanel
   < ModalPanelInventory
   < ModalPanelDialog
@@ -32,11 +31,9 @@ HUD = LobbyBackground
   < Tooltip
 ```
 
-- `HUD`: 상시 게임플레이 HUD. 블러보다 아래라 패널이 열리면 HUD도 함께 블러된다.
-- `LobbyBackground`: 로비 메뉴 뒤에 상시 깔리는 로비 전용 배경 블러.
+- `HUD`: 상시 게임플레이 HUD.
 - `LobbyMenu`: 로비의 단일 루트 위젯. 상단 메뉴와 배타 패널은 모두 이 위젯 안에 있으며, 패널을 별도 `AddToViewport` 하지 않는다. 내부 구조는 [LobbyScreenStructure.md](LobbyScreenStructure.md)가 소유한다.
-- `BackgroundBlur`: 공유 풀스크린 블러. 모든 모달 패널이 공유한다.
-- `ModalPanel`: 창고/칩스테이션/루트드랍 같은 컨테이너 패널 본체. 블러 위에 선명하게 그려진다.
+- `ModalPanel`: 창고/칩스테이션/루트드랍 같은 컨테이너 패널 본체.
 - `ModalPanelInventory`: 인벤토리 본체. 컨테이너와 짝으로 떠도 항상 위에 그려진다. 같은 Z를 쓰면 뷰포트 삽입 순서에 따라 컨테이너 WBP의 불투명 배경이 인벤토리를 덮는 경우가 생겨, 한 단계 위로 분리한다.
 - `ModalPanelDialog`: 칩스테이션·인벤토리 등 패널이 띄우는 확인/알림 다이얼로그.
 - `Settings`: 타이틀·로비·레이드에서 공용으로 띄우는 설정 오버레이.
@@ -46,17 +43,17 @@ HUD = LobbyBackground
 
 새 최상위 위젯을 `AddToViewport` 할 때는 리터럴 Z 대신 `LSUILayer`의 값을 쓴다.
 
-## 공유 블러 표시 규칙
+## 패널 배경 효과 책임
 
-- 위젯: `ULSBackgroundBlurWidget`(C++) → `WBP_BackgroundBlur`(풀스크린 `BackgroundBlur`, 이름 `BlurEffect`로 `BindWidget` 강제). 클래스 구조는 헤더가 단일 출처다.
-- 생성: 로컬 컨트롤러 `BeginPlay`에서 1회 생성해 `BackgroundBlur` 레이어에 상주시키고, 시작 상태는 `Collapsed`.
-- 토글: `ALSPlayerControllerBase::UpdateBackgroundBlurVisibility()`가 **매번 현재 상태를 재계산**한다. 인벤토리/창고/칩스테이션/루트드랍 중 하나라도 표시 중이면 `HitTestInvisible`로 켜고(입력은 위 패널이 받음), 전부 닫히면 `Collapsed`로 끈다.
-- 호출 지점: 각 패널 show/hide 직후. 컨트롤러 소유 패널은 `Show/Hide*Local`에서, 인벤토리는 Pawn(`ALSPlayerCharacter`)의 show/hide에서 컨트롤러로 호출한다.
+- 공용 블러 위젯을 별도로 생성하거나 패널 상태에 맞춰 토글하는 C++ 로직은 두지 않는다.
+- 인벤토리·창고·칩스테이션·루트드랍·로비 메뉴의 블러/딤드 여부와 범위는 각 WBP가 직접 소유한다.
+- 패널 WBP 안에서는 배경 효과를 패널 본체보다 먼저 그려지는 하위 위젯으로 배치하고, 입력을 가로채지 않도록 `HitTestInvisible`을 사용한다.
+- 패널의 기존 show/hide가 WBP 전체 가시성을 바꾸므로, 배경 효과를 위한 별도 C++ 표시 상태는 관리하지 않는다.
 
-재계산 방식이라 중복 show / 이미 닫힌 hide에도 상태가 어긋나지 않는다(단순 증감 카운터의 drift 회피).
+`ALSPlayerControllerBase::IsAnyModalPanelOpen()`은 공격·대시·스킬 입력을 차단하기 위한 모달 상태 판정이다. 배경 효과와 무관하므로 유지하며, 시각 효과 제어 용도로 다시 결합하지 않는다.
 
 ## 주의점
 
-- 블러는 공유 블러 WBP에만 둔다. 개별 패널 WBP에 풀스크린 블러를 다시 넣으면 이중 블러가 되므로 금지.
-- HUD를 패널 위에서 또렷하게 유지하고 싶으면 HUD 레이어를 `BackgroundBlur`보다 큰 값으로 올린다(현재는 의도적으로 함께 블러).
-- 블러는 컨트롤러 소유라 Pawn 교체에도 유지된다. 인벤토리 위젯만 Pawn 소유다.
+- 인벤토리와 컨테이너 패널이 동시에 열릴 수 있다. 상위 Z의 패널에 풀스크린 블러를 두면 아래 패널도 흐려질 수 있으므로, 필요한 범위만 덮도록 WBP에서 크기와 순서를 확인한다.
+- 패널별 효과가 겹치면 강도가 누적될 수 있으므로 인벤토리+루트드랍, 인벤토리+창고, 인벤토리+칩스테이션 조합을 함께 검증한다.
+- 새 최상위 패널을 추가할 때도 C++에는 Z-order와 표시 흐름만 추가하고, 시각 배경 효과는 해당 WBP에 둔다.

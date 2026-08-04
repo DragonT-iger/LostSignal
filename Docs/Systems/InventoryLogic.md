@@ -70,7 +70,7 @@ Source/LostSignal/Inventory/LSInventorySlotUtils.cpp
 
 닫기는 Tab(다시 누름)과 ESC(`MenuAction`)가 공유하는 `TryCloseOpenModalPanel`이 우선순위대로 처리한다. 칩스테이션([ChipSystem.md](ChipSystem.md) 소유)이 떠 있으면 인벤토리를 열지 않고 칩스테이션부터 닫고, 아니면 인벤토리를 닫는다(이때 함께 떠 있던 룻드랍/로비 창고도 같이 닫힌다). 닫을 모달이 없을 때만 Tab은 단독 인벤토리를 열고, ESC는 설정 메뉴를 연다(설정 UI 연결은 추후).
 
-키 매핑은 Enhanced Input 에셋(`IA_Inventory`=Tab, `IA_Menu`=ESC)을 `IMC_Default`에서 연결하고, Pawn BP에서 두 `UInputAction` 슬롯에 할당한다. 공유 블러 토글은 [UILayerStructure.md](UILayerStructure.md)가 소유한다 — 위 show/hide가 컨트롤러 `UpdateBackgroundBlurVisibility()`를 호출해 자동 반영된다.
+키 매핑은 Enhanced Input 에셋(`IA_Inventory`=Tab, `IA_Menu`=ESC)을 `IMC_Default`에서 연결하고, Pawn BP에서 두 `UInputAction` 슬롯에 할당한다. 패널 배경 효과의 소유 규칙은 [UILayerStructure.md](UILayerStructure.md)가 담당하며, C++ show/hide는 패널 가시성만 관리한다.
 
 ## UI 표시 흐름
 
@@ -300,13 +300,13 @@ LootBox 슬롯 -> 인벤토리
 
 수동 월드 드랍은 `IsSessionSlotAccessible` 검사를 통과한 현재 용량 안의 슬롯만 허용한다. 초과분 정리는 클라이언트가 슬롯 인덱스를 지정하지 않으며, 서버가 `ExtractOverflowInventoryItems`로 현재 최대 슬롯 수 뒤의 채워진 `Inventory` 슬롯을 한 번에 비운다. 꺼낸 아이템은 서버의 월드 드랍 대기 목록으로 옮겨 즉시 스폰하고, 실패한 항목만 1초 뒤 재시도한다. 실패한 아이템을 인벤토리 초과 슬롯으로 되돌리지 않는다. 자동 드랍은 `LS Drop Settings`의 `WorldDroppedItemClass`를 사용하므로 서버·패키지 빌드에서도 `BP_WorldDroppedItem`에 설정된 상호작용 안내 위젯을 유지한다. 설정이 없으면 UI 없는 네이티브 액터로 폴백하지 않고 스폰을 보류해 대기 목록에서 재시도한다.
 
-월드 드랍 액터의 실제 위치와 상호작용 충돌은 서버가 확정한 착지점에 처음부터 고정한다. `ALSWorldDroppedItem`은 복제된 시작 위치에서 `ItemIconWidgetComponent`만 포물선으로 이동시키며, `bHasLanded`가 확정되기 전에는 클라이언트 타겟 선택과 서버 획득 판정을 모두 거부한다. 착지 후 상호작용 안내·아웃라인·거리 마커·미니맵 표시를 다시 활성화한다. 수동 드랍은 기존 마우스 방향 착지점을 바꾸지 않고 이 시각 애니메이션만 사용한다. 초과분 자동 드랍은 같은 애니메이션을 공유하되, 서버가 한 링의 아이템을 사방에 균등 배치하고 수용 개수를 넘으면 바깥 링을 추가한다. 각 대기 항목에 방향과 링 거리를 함께 고정 저장하므로 일부 스폰이 실패해도 재시도 위치가 바뀌지 않는다. 초과분 위치만 캐릭터에서 목표점까지 장애물을 검사해 벽 앞에서 거리를 줄이고, 목표점 아래에서 지면을 찾지 못하면 스폰하지 않고 대기 목록에 남긴다. 링당 개수와 간격은 `ALSPlayerControllerBase`의 설정 필드가 소유한다.
+월드 드랍 액터의 실제 위치와 상호작용 충돌은 서버가 확정한 착지점에 처음부터 고정한다. `ALSWorldDroppedItem`은 복제된 시작 위치에서 `ItemIconWidgetComponent`만 포물선으로 이동시키며, `bHasLanded`가 확정되기 전에는 클라이언트 타겟 선택과 서버 획득 판정을 모두 거부한다. 착지 후 상호작용 안내·아웃라인·거리 마커·미니맵 표시를 다시 활성화한다. 수동 드랍은 마우스 방향의 기본 이동 벡터에 캐릭터의 실제 수평 이동 벡터를 더해 착지 방향과 거리를 함께 정한다. 정지 중에는 마우스 방향 기본 거리만 사용하고, 최고속도에서 이동 방향으로 더하는 거리는 `ALSPlayerControllerBase::ManualDropMaxSpeedDistanceBonus`가 소유한다. 늘어난 거리가 순간이동처럼 보이지 않도록 수동 드랍에만 기본 거리 대비 증가 비율만큼 애니메이션 시간도 늘리고, 이 시간 배율을 월드 드랍 액터에 복제해 서버 착지 판정과 각 클라이언트 연출 시간을 맞춘다. 수동 드랍도 목표점까지 장애물을 검사해 벽 앞에서 거리를 줄이지만, 목표점 아래에 바닥이 없다는 이유만으로 드랍을 실패시키지는 않는다. 초과분 자동 드랍은 같은 애니메이션을 공유하되, 서버가 한 링의 아이템을 사방에 균등 배치하고 수용 개수를 넘으면 바깥 링을 추가한다. 각 대기 항목에 방향과 링 거리를 함께 고정 저장하므로 일부 스폰이 실패해도 재시도 위치가 바뀌지 않는다. 초과분 위치는 목표점 아래에서 지면을 찾지 못하면 스폰하지 않고 대기 목록에 남긴다. 링당 개수와 간격은 `ALSPlayerControllerBase`의 설정 필드가 소유한다.
 
 ```text
 DropSessionSlotToWorld
 -> 로비면(레이드 아님) 거부 (아이템 손실 방지)
 -> 레이드 중이면 RaidInventoryComponent 슬롯을 원본으로 사용
--> 드래그 취소 이벤트 위치에서 캐릭터 위치로 향하는 2D 단위 방향을 서버에 전달하고, 서버가 캐릭터 발 위치 기준으로 드랍 위치만 확정
+-> 드래그 취소 이벤트 위치에서 캐릭터 위치로 향하는 2D 단위 방향을 서버에 전달하고, 서버가 현재 수평 이동 벡터를 합쳐 캐릭터 발 위치 기준 드랍 방향·거리를 확정
 -> 슬롯을 먼저 비움
 -> WorldDroppedItem 스폰
 -> 스폰 실패 시 원래 슬롯 복구
