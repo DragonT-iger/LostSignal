@@ -6,6 +6,7 @@
 #include "LSVisionSubsystem.generated.h"
 
 class ALSVisionMaskRenderer;
+class UMaterialParameterCollection;
 class ULSVisionOccluderComponent;
 class ULSVisionSurfaceComponent;
 class ULSVisionTargetComponent;
@@ -80,9 +81,12 @@ public:
 	// 시야 평면 Z를 갱신하고, 의미 있게 바뀌었으면 등록된 모든 오클루더의 단면을 다시 계산한다.
 	void SetRuntimeSliceZ(float NewSliceZ);
 
+	// 마스크 배치값을 머티리얼 파라미터 컬렉션에 쓴다. 컬렉션 인스턴스는 world마다 따로이므로 값은 자동으로 격리된다.
+	// 서피스별 MID 푸시와 달리 프레임당 업로드가 서피스 수와 무관하게 1회다.
+	void ApplyVisionParametersToCollection(const FVector& MaskOriginWS, float MaskExtent, float SurfacePush);
+
 private:
 	UTextureRenderTarget2D* ResolveVisibilityMaskRenderTarget();
-	UTextureRenderTarget2D* CreateRenderTargetFromTemplate(const UTextureRenderTarget2D* TemplateRenderTarget);
 	UTextureRenderTarget2D* CreateFallbackRenderTarget(int32 Size);
 	FLSVisionGridCellKey WorldToGridCell(const FVector2D& Position) const;
 	void CollectGridCellsForBounds(const FBox2D& Bounds, TArray<FLSVisionGridCellKey>& OutCells) const;
@@ -103,6 +107,17 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextureRenderTarget2D> RuntimeMaskRenderTarget;
+
+	// 설정 쪽은 TSoftObjectPtr이라 프레임당 읽으면 LoadSynchronous가 되므로 Initialize에서 한 번 해석해 담아둔다.
+	// (EdgeNoiseTexture와 같은 패턴.) GC가 추적할 수 있도록 UPROPERTY로 유지한다.
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialParameterCollection> VisionParameterCollection;
+
+	// 컬렉션에 없는 파라미터 이름을 매 프레임 경고하지 않도록 1회만 찍기 위한 상태.
+	bool bWarnedMissingCollectionParameter = false;
+
+	// 마스크 RT(에셋)를 공유하는 동시 활성 비전 world를 이 프로세스에서 셌는지 여부. 증감 짝을 보장하기 위한 플래그.
+	bool bCountedActiveVisionWorld = false;
 
 	TMap<FLSVisionGridCellKey, FLSVisionGridCell> GridCells;
 

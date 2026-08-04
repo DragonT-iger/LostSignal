@@ -27,7 +27,7 @@ protected:
 	void UpdateVisionTargets(const FVector2D& VisionOrigin2D);
 	// 현재 폴리곤 기준 마스크 파라미터를 등록된 모든 서피스에 푸시한다.
 	// 재solve 경로와 "서피스만 새로 등록된" 경로 양쪽에서 호출된다.
-	void ApplyVisionParametersToSurfaces(const FVector2D& Forward2D, float SliceZ);
+	void ApplyVisionParametersToSurfaces(float SliceZ);
 	void DrawDebugVisionRays() const;
 	void InitializeLocalVision();
 	void ShutdownLocalVision();

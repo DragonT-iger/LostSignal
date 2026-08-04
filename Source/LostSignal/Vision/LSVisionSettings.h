@@ -6,6 +6,7 @@
 
 class ALSVisionMaskRenderer;
 class UMaterialInterface;
+class UMaterialParameterCollection;
 class UTexture2D;
 class UTextureRenderTarget2D;
 
@@ -20,6 +21,15 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	TSoftClassPtr<ALSVisionMaskRenderer> MaskRendererClass;
 
+	// 벽·바닥 머티리얼(MF_VisionMaskSample)이 읽는 마스크 배치값의 배달 통로. 값은 world마다 인스턴스가 따로 생기므로
+	// 서피스별 MID 없이도 전역 배달이 되고, 프레임당 유니폼 업로드가 서피스 수와 무관해진다.
+	// 담는 파라미터: Vector MaskOriginWS / Scalar MaskExtent / Scalar MaskSurfacePush.
+	// 마스크 RT는 텍스쳐라 MPC에 담을 수 없어 머티리얼이 VisibilityMaskRenderTarget 에셋을 직접 참조한다.
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision")
+	TSoftObjectPtr<UMaterialParameterCollection> VisionParameterCollection;
+
+	// 머티리얼이 이 에셋을 직접 샘플하므로 런타임 복사본을 만들지 않고 이 에셋에 직접 쓴다(프로세스 전역).
+	// 계약: bCanCreateUAV=true / AddressX,Y=Clamp / bAutoGenerateMips=false. 위반 시 Error 로그 + 런타임 강제.
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	TSoftObjectPtr<UTextureRenderTarget2D> VisibilityMaskRenderTarget;
 

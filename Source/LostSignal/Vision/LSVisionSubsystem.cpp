@@ -4,6 +4,8 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "LostSignal.h"
+#include "Materials/MaterialParameterCollection.h"
+#include "Materials/MaterialParameterCollectionInstance.h"
 #include "RenderingThread.h"
 #include "Vision/LSVisionMaskRenderer.h"
 #include "Vision/LSVisionOccluderComponent.h"
@@ -34,6 +36,38 @@ namespace
 		RenderTarget.AddressY = TextureAddress::TA_Clamp;
 		RenderTarget.bAutoGenerateMips = false;
 	}
+
+	// 설정 에셋을 복사 없이 직접 쓰는 경로용. 계약 위반은 에셋을 고쳐야 하는 문제이므로 조치를 Error로 남기고,
+	// 부팅을 막지 않기 위해 런타임에 한 번 강제한다. bCanCreateUAV는 리소스 생성 전 상태여야 하므로 강제 후 재생성한다.
+	// Modify()를 부르지 않으므로 에디터에서 에셋이 dirty로 표시되지는 않는다.
+	void EnforceVisionMaskContractOnConfiguredAsset(UTextureRenderTarget2D& RenderTarget)
+	{
+		const bool bViolatesContract =
+			!RenderTarget.bCanCreateUAV
+			|| RenderTarget.AddressX != TextureAddress::TA_Clamp
+			|| RenderTarget.AddressY != TextureAddress::TA_Clamp
+			|| RenderTarget.bAutoGenerateMips;
+
+		if (!bViolatesContract)
+		{
+			return;
+		}
+
+		UE_LOG(LogLS, Error,
+			TEXT("Vision mask RT 에셋 '%s'이 계약을 위반합니다(런타임 강제 적용). 에셋을 이렇게 고쳐 주세요 — bCanCreateUAV=true(현재 %s), AddressX/Y=Clamp(현재 %d/%d), bAutoGenerateMips=false(현재 %s)."),
+			*GetNameSafe(&RenderTarget),
+			RenderTarget.bCanCreateUAV ? TEXT("true") : TEXT("false"),
+			static_cast<int32>(RenderTarget.AddressX),
+			static_cast<int32>(RenderTarget.AddressY),
+			RenderTarget.bAutoGenerateMips ? TEXT("true") : TEXT("false"));
+
+		ApplyVisionMaskRenderTargetContract(RenderTarget);
+		RenderTarget.UpdateResourceImmediate(true);
+	}
+
+	// 마스크 RT는 설정 에셋을 직접 쓰므로 프로세스 전역이다. 한 프로세스에서 두 world가 동시에 시야를 굴리면
+	// (에디터 PIE 다중 클라이언트) 서로의 마스크를 덮어써 깜빡인다. 조용히 깨지지 않도록 세어서 경고한다.
+	int32 GLSActiveVisionWorldCount = 0;
 }
 
 // Creates the shared runtime objects that every local vision calculation depends on.
@@ -73,8 +107,22 @@ void ULSVisionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 			{
 				MaskRenderer->EdgeNoiseTexture = VisionSettings->EdgeNoiseTexture.LoadSynchronous();
 			}
+
+			// 이 world가 마스크 RT(전역 에셋)에 쓰기 시작했다. 두 개 이상이면 서로 덮어쓰므로 원인을 남긴다.
+			bCountedActiveVisionWorld = true;
+			++GLSActiveVisionWorldCount;
+			if (GLSActiveVisionWorldCount > 1)
+			{
+				UE_LOG(LogLS, Warning,
+					TEXT("이 프로세스에서 시야를 굴리는 world가 %d개입니다. 마스크 RT는 설정 에셋을 직접 쓰므로 공유되어 서로 덮어씁니다 — PIE 다중 클라이언트는 별도 프로세스로 실행하세요."),
+					GLSActiveVisionWorldCount);
+			}
 		}
 	}
+
+	// 컬렉션도 프레임당 LoadSynchronous를 피하려고 여기서 한 번만 해석한다(EdgeNoiseTexture와 같은 이유).
+	VisionParameterCollection = VisionSettings != nullptr ? VisionSettings->VisionParameterCollection.LoadSynchronous() : nullptr;
+	bWarnedMissingCollectionParameter = false;
 
 	RegisteredOccluders.Reset();
 	RegisteredSurfaces.Reset();
@@ -109,6 +157,39 @@ void ULSVisionSubsystem::SetRuntimeSliceZ(const float NewSliceZ)
 	}
 }
 
+// 마스크 배치값을 머티리얼 파라미터 컬렉션에 쓴다. 이름은 MPC 에셋과 반드시 일치해야 하는 계약이다.
+void ULSVisionSubsystem::ApplyVisionParametersToCollection(const FVector& MaskOriginWS, const float MaskExtent, const float SurfacePush)
+{
+	if (VisionParameterCollection == nullptr)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	UMaterialParameterCollectionInstance* CollectionInstance = World != nullptr
+		? World->GetParameterCollectionInstance(VisionParameterCollection)
+		: nullptr;
+	if (CollectionInstance == nullptr)
+	{
+		return;
+	}
+
+	// Set*ParameterValue는 컬렉션에 그 이름이 없으면 false를 반환한다. MPC 에셋 세팅 실수를 조용히 넘기지 않는다.
+	bool bAllParametersFound = CollectionInstance->SetVectorParameterValue(
+		TEXT("MaskOriginWS"),
+		FLinearColor(MaskOriginWS.X, MaskOriginWS.Y, MaskOriginWS.Z, 0.0f));
+	bAllParametersFound &= CollectionInstance->SetScalarParameterValue(TEXT("MaskExtent"), MaskExtent);
+	bAllParametersFound &= CollectionInstance->SetScalarParameterValue(TEXT("MaskSurfacePush"), SurfacePush);
+
+	if (!bAllParametersFound && !bWarnedMissingCollectionParameter)
+	{
+		bWarnedMissingCollectionParameter = true;
+		UE_LOG(LogLS, Warning,
+			TEXT("Vision 파라미터 컬렉션 '%s'에 필요한 파라미터가 없습니다. Vector MaskOriginWS / Scalar MaskExtent / Scalar MaskSurfacePush를 정확한 이름으로 추가해 주세요."),
+			*GetNameSafe(VisionParameterCollection));
+	}
+}
+
 // Releases the shared vision runtime objects when the world is torn down.
 void ULSVisionSubsystem::Deinitialize()
 {
@@ -130,7 +211,15 @@ void ULSVisionSubsystem::Deinitialize()
 		MaskRenderer = nullptr;
 	}
 
+	// 렌더러가 이미 무효화됐어도 증감 짝이 어긋나지 않도록 플래그로 감소를 판단한다.
+	if (bCountedActiveVisionWorld)
+	{
+		bCountedActiveVisionWorld = false;
+		--GLSActiveVisionWorldCount;
+	}
+
 	RuntimeMaskRenderTarget = nullptr;
+	VisionParameterCollection = nullptr;
 
 	Super::Deinitialize();
 }
@@ -282,15 +371,15 @@ UTextureRenderTarget2D* ULSVisionSubsystem::ResolveVisibilityMaskRenderTarget()
 	const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>();
 	if (VisionSettings != nullptr && !VisionSettings->VisibilityMaskRenderTarget.IsNull())
 	{
-		if (const UTextureRenderTarget2D* ConfiguredRenderTarget = VisionSettings->VisibilityMaskRenderTarget.LoadSynchronous())
+		if (UTextureRenderTarget2D* ConfiguredRenderTarget = VisionSettings->VisibilityMaskRenderTarget.LoadSynchronous())
 		{
-			if (UTextureRenderTarget2D* RuntimeRenderTarget = CreateRenderTargetFromTemplate(ConfiguredRenderTarget))
-			{
-				return RuntimeRenderTarget;
-			}
-
-			UE_LOG(LogLS, Warning, TEXT("Failed to create runtime vision mask render target from configured asset. Falling back to transient RT."));
+			// 벽 머티리얼이 이 에셋을 파라미터가 아니라 직접 참조하므로, world별 복사본을 만들면 아무도 안 보는 RT에 쓰게 된다.
+			// 따라서 에셋 자체에 쓴다(프로세스 전역 — 동시 활성 world 경고는 Initialize 참고).
+			EnforceVisionMaskContractOnConfiguredAsset(*ConfiguredRenderTarget);
+			return ConfiguredRenderTarget;
 		}
+
+		UE_LOG(LogLS, Warning, TEXT("Failed to load the configured vision mask render target asset. Falling back to transient RT."));
 	}
 
 	const int32 FallbackSize = VisionSettings != nullptr
@@ -298,58 +387,6 @@ UTextureRenderTarget2D* ULSVisionSubsystem::ResolveVisibilityMaskRenderTarget()
 		: 1024;
 
 	return CreateFallbackRenderTarget(FallbackSize);
-}
-
-// Creates a per-world runtime RT so PIE worlds and listen-server views do not overwrite the same asset.
-UTextureRenderTarget2D* ULSVisionSubsystem::CreateRenderTargetFromTemplate(const UTextureRenderTarget2D* TemplateRenderTarget)
-{
-	if (TemplateRenderTarget == nullptr)
-	{
-		return nullptr;
-	}
-
-	UTextureRenderTarget2D* RenderTarget = NewObject<UTextureRenderTarget2D>(this, TEXT("LSVisionMaskRT_Runtime"));
-	if (RenderTarget == nullptr)
-	{
-		UE_LOG(LogLS, Warning, TEXT("Failed to allocate runtime vision mask render target from template."));
-		return nullptr;
-	}
-
-	// 아트 소유값(색·감마·포맷·크기)은 템플릿에서 그대로 상속한다.
-	RenderTarget->ClearColor = TemplateRenderTarget->ClearColor;
-	RenderTarget->TargetGamma = TemplateRenderTarget->TargetGamma;
-
-	// 주소 모드·mip은 계약이므로 에셋 값을 무시하고 강제한다. 무시된 항목이 있으면 아트가 에셋을 고칠 수 있게 남긴다.
-	const bool bTemplateAddressMismatch =
-		TemplateRenderTarget->AddressX != TextureAddress::TA_Clamp || TemplateRenderTarget->AddressY != TextureAddress::TA_Clamp;
-	if (bTemplateAddressMismatch || TemplateRenderTarget->bAutoGenerateMips)
-	{
-		UE_LOG(LogLS, Warning,
-			TEXT("Vision mask RT 템플릿 '%s'이 계약과 다릅니다(무시하고 강제 적용): AddressX/Y=%d/%d(요구 TA_Clamp), bAutoGenerateMips=%s(요구 false). 에셋을 수정해 주세요."),
-			*GetNameSafe(TemplateRenderTarget),
-			static_cast<int32>(TemplateRenderTarget->AddressX),
-			static_cast<int32>(TemplateRenderTarget->AddressY),
-			TemplateRenderTarget->bAutoGenerateMips ? TEXT("true") : TEXT("false"));
-	}
-
-	ApplyVisionMaskRenderTargetContract(*RenderTarget);
-
-	if (TemplateRenderTarget->OverrideFormat != PF_Unknown)
-	{
-		RenderTarget->InitCustomFormat(
-			TemplateRenderTarget->SizeX,
-			TemplateRenderTarget->SizeY,
-			TemplateRenderTarget->OverrideFormat,
-			TemplateRenderTarget->bForceLinearGamma);
-	}
-	else
-	{
-		RenderTarget->RenderTargetFormat = TemplateRenderTarget->RenderTargetFormat;
-		RenderTarget->InitAutoFormat(TemplateRenderTarget->SizeX, TemplateRenderTarget->SizeY);
-	}
-
-	RenderTarget->UpdateResourceImmediate(true);
-	return RenderTarget;
 }
 
 // Creates a transient UAV-capable render target so the shader path works without BP setup.

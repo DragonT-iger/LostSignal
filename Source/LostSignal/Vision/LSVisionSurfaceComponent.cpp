@@ -124,8 +124,7 @@ void ULSVisionSurfaceComponent::InitializeVisionMaterials()
 void ULSVisionSurfaceComponent::ApplyVisionParameters(
 	UTextureRenderTarget2D* VisibilityMaskRT,
 	const FVector& MaskOriginWS,
-	const float MaskExtent,
-	const FVector2D& PlayerForward2D)
+	const float MaskExtent)
 {
 	// 솟아오른/기울어진 면에서 시야 경계가 표면을 일자로 자르는 것을 완화하는 노멀 푸시(머티리얼이 PixelNormalWS.XY에 곱해 사용).
 	const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>();
@@ -145,7 +144,6 @@ void ULSVisionSurfaceComponent::ApplyVisionParameters(
 
 		VisionMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(MaskOriginWS.X, MaskOriginWS.Y, MaskOriginWS.Z, 0.0f));
 		VisionMID->SetScalarParameterValue(MaskExtentParamName, MaskExtent);
-		VisionMID->SetVectorParameterValue(Forward2DParamName, FLinearColor(PlayerForward2D.X, PlayerForward2D.Y, 0.0f, 0.0f));
 		VisionMID->SetScalarParameterValue(SurfacePushParamName, SurfaceNormalPush);
 	}
 }

@@ -42,9 +42,6 @@ public:
 	FName MaskExtentParamName = TEXT("MaskExtent");
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
-	FName Forward2DParamName = TEXT("PlayerForward2D");
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LS/Vision")
 	FName SurfacePushParamName = TEXT("MaskSurfacePush");
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "LS/Vision")
@@ -54,7 +51,7 @@ public:
 	void InitializeVisionMaterials();
 
 	UFUNCTION(BlueprintCallable, Category = "LS/Vision")
-	void ApplyVisionParameters(UTextureRenderTarget2D* VisibilityMaskRT, const FVector& MaskOriginWS, float MaskExtent, const FVector2D& PlayerForward2D);
+	void ApplyVisionParameters(UTextureRenderTarget2D* VisibilityMaskRT, const FVector& MaskOriginWS, float MaskExtent);
 
 private:
 	void GatherTargetMeshComponents(TArray<UMeshComponent*>& OutMeshComponents) const;

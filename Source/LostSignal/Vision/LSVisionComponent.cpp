@@ -232,7 +232,7 @@ void ULSVisionComponent::UpdateVisionPolygon()
 		if (LastSurfaceRegistryVersion != CurrentSurfaceRegistryVersion)
 		{
 			LastSurfaceRegistryVersion = CurrentSurfaceRegistryVersion;
-			ApplyVisionParametersToSurfaces(LastSolveForward, SliceZ);
+			ApplyVisionParametersToSurfaces(SliceZ);
 		}
 
 		UpdateVisionTargets(ActorLocation2D);
@@ -264,20 +264,23 @@ void ULSVisionComponent::UpdateVisionPolygon()
 		DrawDebugVisionRays();
 	}
 
+	// 오클루더 벽이 자기 발자국 경계를 샘플해 통째로 어두워지는 것을 막는 노멀 푸시. 앞면 샘플을 시야 안쪽으로 민다.
+	// 머티리얼: offset.xy = WorldNormal.XY × 이 값 (월드 유닛, 높이 무관).
+	// 포스트 프로세스와 벽이 같은 값을 쓰므로 한 번 읽어 두 경로에 넘긴다.
+	const ULSVisionSettings* PushSettings = GetDefault<ULSVisionSettings>();
+	const float SurfaceNormalPush = PushSettings != nullptr ? PushSettings->SurfaceNormalPush : 0.0f;
+
+	// XY = 시야 폴리곤 원점(마스크 투영 기준). Z 슬롯은 현재 머티리얼에서 미사용(투영은 XY, 노멀 푸시는 높이 무관)이라
+	// 슬라이스 평면 높이를 참고용으로만 실어둔다.
+	const FVector MaskOriginWS(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, SliceZ);
+
 	if (PostProcessMID != nullptr)
 	{
 		PostProcessMID->SetScalarParameterValue(EnableParamName, bEnableVision ? 1.0f : 0.0f);
-		// XY = 시야 폴리곤 원점(마스크 투영 기준). Z 슬롯은 현재 머티리얼에서 미사용(투영은 XY, 노멀 푸시는 높이 무관)이라 슬라이스 평면 높이를 참고용으로만 실어둔다.
-		PostProcessMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, SliceZ, 0.0f));
+		PostProcessMID->SetVectorParameterValue(MaskOriginParamName, FLinearColor(MaskOriginWS.X, MaskOriginWS.Y, MaskOriginWS.Z, 0.0f));
 		//MaskExtent -> RenderTarget을 World좌표범위로 치환한 값. ex)extent = 2500 -> uv 0 ~ 1 = world -2500 ~ 2500 크기, 원점은 플레이어 기준
 		PostProcessMID->SetScalarParameterValue(MaskExtentParamName, CurrentPolygon.Extent);
-
-		// 오클루더 벽이 자기 발자국 경계를 샘플해 통째로 어두워지는 것을 막는 노멀 푸시. 앞면 샘플을 시야 안쪽으로 민다.
-		// 머티리얼: offset.xy = WorldNormal.XY × 이 값 (월드 유닛, 높이 무관).
-		if (const ULSVisionSettings* VisionSettings = GetDefault<ULSVisionSettings>())
-		{
-			PostProcessMID->SetScalarParameterValue(SurfacePushParamName, VisionSettings->SurfaceNormalPush);
-		}
+		PostProcessMID->SetScalarParameterValue(SurfacePushParamName, SurfaceNormalPush);
 
 		if (UTextureRenderTarget2D* VisibilityMaskRT = VisionSubsystem->GetVisibilityMaskRenderTarget())
 		{
@@ -287,14 +290,18 @@ void ULSVisionComponent::UpdateVisionPolygon()
 
 	VisionSubsystem->GetMaskRenderer()->RequestMaskUpdate(CurrentPolygon);
 
+	// 벽·바닥 머티리얼용 전역 배달. 아트가 MF를 CollectionParameter로 바꾸면 아래 서피스별 MID 푸시가 불필요해진다.
+	// 전환 중에는 양쪽에 써서 MF가 어느 상태여도 화면이 정상이게 한다.
+	VisionSubsystem->ApplyVisionParametersToCollection(MaskOriginWS, CurrentPolygon.Extent, SurfaceNormalPush);
+
 	LastSurfaceRegistryVersion = VisionSubsystem->GetSurfaceRegistryVersion();
-	ApplyVisionParametersToSurfaces(SolverInfo.OriginForward, SliceZ);
+	ApplyVisionParametersToSurfaces(SliceZ);
 
 	UpdateVisionTargets(SolverInfo.OriginPos);
 }
 
 // Pushes the current polygon's mask placement into every registered surface material.
-void ULSVisionComponent::ApplyVisionParametersToSurfaces(const FVector2D& Forward2D, const float SliceZ)
+void ULSVisionComponent::ApplyVisionParametersToSurfaces(const float SliceZ)
 {
 	ULSVisionSubsystem* VisionSubsystem = GetWorld() ? GetWorld()->GetSubsystem<ULSVisionSubsystem>() : nullptr;
 	if (VisionSubsystem == nullptr)
@@ -309,8 +316,7 @@ void ULSVisionComponent::ApplyVisionParametersToSurfaces(const FVector2D& Forwar
 			SurfaceComponent->ApplyVisionParameters(
 				VisionSubsystem->GetVisibilityMaskRenderTarget(),
 				FVector(CurrentPolygon.Origin.X, CurrentPolygon.Origin.Y, SliceZ),
-				CurrentPolygon.Extent,
-				Forward2D);
+				CurrentPolygon.Extent);
 		}
 	}
 }
