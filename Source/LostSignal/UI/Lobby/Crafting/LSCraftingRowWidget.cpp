@@ -8,12 +8,22 @@
 #include "Rendering/DrawElements.h"
 #include "UI/Inventory/LSItemSlotWidget.h"
 
+void ULSCraftingRowWidget::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+
+	if (SelectionBorder)
+	{
+		NormalBorderColor = SelectionBorder->GetBrushColor();
+	}
+}
+
 void ULSCraftingRowWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	const TCHAR* WidgetNames[] = { TEXT("SelectionBorder"), TEXT("ItemSlot"), TEXT("ItemNameText"), TEXT("OwnedCountText") };
-	const UWidget* Widgets[] = { SelectionBorder, ItemSlot, ItemNameText, OwnedCountText };
+	const TCHAR* WidgetNames[] = { TEXT("SelectionBorder"), TEXT("ItemSlot"), TEXT("ItemNameText"), TEXT("PriceText") };
+	const UWidget* Widgets[] = { SelectionBorder, ItemSlot, ItemNameText, PriceText };
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Widgets); ++Index)
 	{
 		if (!Widgets[Index])
@@ -21,10 +31,8 @@ void ULSCraftingRowWidget::NativeConstruct()
 			UE_LOG(LogLS, Warning, TEXT("[Crafting] %s is not bound on %s."), WidgetNames[Index], *GetNameSafe(this));
 		}
 	}
-
 	if (SelectionBorder)
 	{
-		NormalBorderColor = SelectionBorder->GetBrushColor();
 		RefreshBackgroundColor();
 	}
 }
@@ -79,7 +87,7 @@ void ULSCraftingRowWidget::SetRecipe(
 	const FName InRecipeRowName,
 	const FName ResultItemRowName,
 	const FText& ItemName,
-	const int32 OwnedAmount,
+	const int32 Price,
 	const bool bInCraftable)
 {
 	RecipeRowName = InRecipeRowName;
@@ -87,16 +95,16 @@ void ULSCraftingRowWidget::SetRecipe(
 	if (ItemSlot)
 	{
 		ItemSlot->SetDisplayOnlySlotContext();
-		ItemSlot->SetItem(ResultItemRowName, OwnedAmount, TArray<FLSChipResolvedStat>());
+		ItemSlot->SetItem(ResultItemRowName, 1, TArray<FLSChipResolvedStat>());
 		ItemSlot->SetAmountTextVisible(false);
 	}
 	if (ItemNameText)
 	{
 		ItemNameText->SetText(ItemName);
 	}
-	if (OwnedCountText)
+	if (PriceText)
 	{
-		OwnedCountText->SetText(FText::AsNumber(OwnedAmount));
+		PriceText->SetText(FText::AsNumber(Price));
 	}
 	RefreshBackgroundColor();
 }

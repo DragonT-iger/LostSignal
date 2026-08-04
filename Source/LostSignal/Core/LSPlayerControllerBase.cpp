@@ -21,6 +21,7 @@
 #include "Gameplay/LSWorldDroppedItem.h"
 #include "InputMappingContext.h"
 #include "Data/LSChipStats.h"
+#include "Data/LSDropSettings.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
@@ -40,6 +41,8 @@
 
 namespace
 {
+constexpr float LSRaidInventoryOverflowDropRetryIntervalSeconds = 1.0f;
+
 bool IsNoiseInstigatorPlayerForHUDDisplay(const AActor* NoiseInstigator)
 {
 	if (!NoiseInstigator)
@@ -197,6 +200,19 @@ void ALSPlayerControllerBase::ClientStartRaidSession_Implementation(const TArray
 			SaveSubsystem->BeginRaidSave(Loadout);
 		}
 	}
+}
+
+void ALSPlayerControllerBase::ClientApplyRaidSignalGaugePercent_Implementation(const float Percent)
+{
+	ULSSaveSubsystem* SaveSubsystem = ResolveSaveSubsystem();
+	if (!SaveSubsystem)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot apply raid signal gauge because SaveSubsystem is missing on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	SaveSubsystem->SetChipSignalGaugePercent(Percent);
+	RefreshAllInventoryUI();
 }
 
 void ALSPlayerControllerBase::ShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox)
@@ -385,6 +401,18 @@ void ALSPlayerControllerBase::RefreshActiveInventoryWidget()
 
 void ALSPlayerControllerBase::RefreshAllInventoryUI()
 {
+	if (UWidgetBlueprintLibrary::IsDragDropping())
+	{
+		QueueInventoryUIRefreshAfterDrag();
+		return;
+	}
+
+	bInventoryUIRefreshScheduled = false;
+	RefreshAllInventoryUIImmediate();
+}
+
+void ALSPlayerControllerBase::RefreshAllInventoryUIImmediate()
+{
 	// 인벤토리 + Safe (폰/로비 분기)는 기존 단일 경로를 재사용한다.
 	RefreshActiveInventoryWidget();
 
@@ -416,6 +444,35 @@ void ALSPlayerControllerBase::RefreshRegisteredQuickSlotBars()
 			RegisteredQuickSlotBars.RemoveAt(Index);
 		}
 	}
+}
+
+void ALSPlayerControllerBase::QueueInventoryUIRefreshAfterDrag()
+{
+	if (bInventoryUIRefreshScheduled)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		RefreshAllInventoryUIImmediate();
+		return;
+	}
+
+	bInventoryUIRefreshScheduled = true;
+	World->GetTimerManager().SetTimerForNextTick(this, &ALSPlayerControllerBase::FlushQueuedInventoryUIRefresh);
+}
+
+void ALSPlayerControllerBase::FlushQueuedInventoryUIRefresh()
+{
+	if (!bInventoryUIRefreshScheduled)
+	{
+		return;
+	}
+
+	bInventoryUIRefreshScheduled = false;
+	RefreshAllInventoryUI();
 }
 
 bool ALSPlayerControllerBase::IsInventoryUIOpen() const
@@ -1715,17 +1772,14 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorld(const ELSInventorySlotArea 
 	return true;
 }
 
-bool ALSPlayerControllerBase::DropOverflowInventorySlotsToWorld(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection)
+bool ALSPlayerControllerBase::DropOverflowInventorySlotsToWorld()
 {
-	DropDirection.Z = 0.0f;
-	DropDirection = DropDirection.GetSafeNormal();
-
 	if (HasAuthority())
 	{
-		return DropOverflowInventorySlotsToWorldInternal(DroppedItemClass, DropDirection);
+		return DropOverflowInventorySlotsToWorldInternal();
 	}
 
-	ServerDropOverflowInventorySlotsToWorld(DroppedItemClass, DropDirection);
+	ServerDropOverflowInventorySlotsToWorld();
 	return true;
 }
 
@@ -1734,9 +1788,9 @@ void ALSPlayerControllerBase::ServerDropSessionSlotToWorld_Implementation(const 
 	DropSessionSlotToWorldInternal(SlotArea, SlotIndex, DroppedItemClass, FVector(DropDirection));
 }
 
-void ALSPlayerControllerBase::ServerDropOverflowInventorySlotsToWorld_Implementation(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector_NetQuantizeNormal DropDirection)
+void ALSPlayerControllerBase::ServerDropOverflowInventorySlotsToWorld_Implementation()
 {
-	DropOverflowInventorySlotsToWorldInternal(DroppedItemClass, FVector(DropDirection));
+	DropOverflowInventorySlotsToWorldInternal();
 }
 
 bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector DropDirection)
@@ -1757,15 +1811,15 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 			static_cast<int32>(SlotArea), SlotIndex);
 		return false;
 	}
+	if (!InventoryComponent->IsSessionSlotAccessible(SlotArea, SlotIndex))
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot manually drop inaccessible raid slot to world. Area=%d Index=%d"),
+			static_cast<int32>(SlotArea), SlotIndex);
+		return false;
+	}
 
 	const bool bUseRaidInventory = InventoryComponent && InventoryComponent->IsRaidActive() && SlotArea != ELSInventorySlotArea::Warehouse;
 	ULSSaveSubsystem* SaveSubsystem = nullptr;
-
-	if (bUseRaidInventory && SlotArea == ELSInventorySlotArea::Safe && SlotIndex >= InventoryComponent->GetMaxSafeSlotCount())
-	{
-		UE_LOG(LogLS, Warning, TEXT("Cannot drop raid safe slot to world because source slot is locked. Index=%d"), SlotIndex);
-		return false;
-	}
 
 	FLSSessionItem SlotItem;
 	if (bUseRaidInventory)
@@ -1830,7 +1884,7 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 	return true;
 }
 
-bool ALSPlayerControllerBase::DropOverflowInventorySlotsToWorldInternal(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector DropDirection)
+bool ALSPlayerControllerBase::DropOverflowInventorySlotsToWorldInternal()
 {
 	if (!HasAuthority())
 	{
@@ -1838,52 +1892,141 @@ bool ALSPlayerControllerBase::DropOverflowInventorySlotsToWorldInternal(TSubclas
 	}
 
 	ULSRaidInventoryComponent* InventoryComponent = GetRaidInventoryComponent();
-	const bool bUseRaidInventory = InventoryComponent && InventoryComponent->IsRaidActive();
-	const int32 MaxInventorySlotCount = bUseRaidInventory
-		? InventoryComponent->GetMaxInventorySlotCount()
-		: [this]()
-		{
-			UGameInstance* GameInstance = GetGameInstance();
-			const ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-			return SaveSubsystem ? SaveSubsystem->GetMaxInventorySlotCount() : 0;
-		}();
-
-	int32 DroppedCount = 0;
-	if (bUseRaidInventory)
+	if (!InventoryComponent || !InventoryComponent->IsRaidActive())
 	{
-		const TArray<FLSSessionItem>& InventoryItems = InventoryComponent->GetSessionInventory();
-		for (int32 SlotIndex = MaxInventorySlotCount; SlotIndex < InventoryItems.Num(); ++SlotIndex)
-		{
-			if (LSInventorySlotUtils::IsFilled(InventoryItems[SlotIndex]) &&
-				DropSessionSlotToWorldInternal(ELSInventorySlotArea::Inventory, SlotIndex, DroppedItemClass, DropDirection))
-			{
-				++DroppedCount;
-			}
-		}
-	}
-	else
-	{
-		UGameInstance* GameInstance = GetGameInstance();
-		ULSSaveSubsystem* SaveSubsystem = GameInstance ? GameInstance->GetSubsystem<ULSSaveSubsystem>() : nullptr;
-		const TArray<FLSSessionItem>* InventoryItems = SaveSubsystem ? &SaveSubsystem->GetInventory() : nullptr;
-		for (int32 SlotIndex = MaxInventorySlotCount; InventoryItems && SlotIndex < InventoryItems->Num(); ++SlotIndex)
-		{
-			if (LSInventorySlotUtils::IsFilled((*InventoryItems)[SlotIndex]) &&
-				DropSessionSlotToWorldInternal(ELSInventorySlotArea::Inventory, SlotIndex, DroppedItemClass, DropDirection))
-			{
-				++DroppedCount;
-			}
-		}
+		return false;
 	}
 
-	if (DroppedCount > 0)
+	TArray<FLSSessionItem> ExtractedItems;
+	const int32 ExtractedCount = InventoryComponent->ExtractOverflowInventoryItems(ExtractedItems);
+	if (ExtractedCount <= 0)
 	{
-		UE_LOG(LogLS, Log, TEXT("Dropped %d overflow inventory slots to world on %s."), DroppedCount, *GetNameSafe(this));
+		FlushPendingOverflowWorldDrops();
+		return false;
 	}
-	return DroppedCount > 0;
+
+	QueueOverflowWorldDropItems(MoveTemp(ExtractedItems));
+	UE_LOG(LogLS, Log, TEXT("Queued %d overflow inventory items for world drop on %s. Pending=%d"),
+		ExtractedCount, *GetNameSafe(this), PendingOverflowWorldDropItems.Num());
+
+	FlushPendingOverflowWorldDrops();
+	ClientSyncRaidSessionAndLoot(
+		nullptr,
+		InventoryComponent->GetSessionInventory(),
+		InventoryComponent->GetSessionSafeInventory(),
+		InventoryComponent->GetSessionEquipmentSlots(),
+		TArray<FLSDropResult>());
+	return true;
 }
 
-bool ALSPlayerControllerBase::SpawnDroppedItemToWorld(const FLSSessionItem& SlotItem, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, const FVector DropDirection)
+void ALSPlayerControllerBase::QueueOverflowWorldDropItems(TArray<FLSSessionItem>&& ExtractedItems)
+{
+	const int32 ItemCount = ExtractedItems.Num();
+	for (int32 ItemIndex = 0; ItemIndex < ItemCount; ++ItemIndex)
+	{
+		FLSPendingOverflowWorldDropItem PendingItem;
+		PendingItem.Item = MoveTemp(ExtractedItems[ItemIndex]);
+		PendingItem.DropDirection = BuildOverflowWorldDropDirection(ItemIndex, ItemCount);
+		PendingItem.DropDistance = BuildOverflowWorldDropDistance(ItemIndex);
+		PendingOverflowWorldDropItems.Add(MoveTemp(PendingItem));
+	}
+}
+
+FVector ALSPlayerControllerBase::BuildOverflowWorldDropDirection(const int32 ItemIndex, const int32 ItemCount) const
+{
+	const int32 ItemsPerRing = FMath::Max(1, OverflowDropItemsPerRing);
+	const int32 RingIndex = FMath::Max(0, ItemIndex) / ItemsPerRing;
+	const int32 RingStartIndex = RingIndex * ItemsPerRing;
+	const int32 IndexInRing = FMath::Max(0, ItemIndex) - RingStartIndex;
+	const int32 ItemsInRing = FMath::Max(1, FMath::Min(ItemsPerRing, ItemCount - RingStartIndex));
+	const float AngleStep = 360.0f / static_cast<float>(ItemsInRing);
+	const float RingAngleOffset = (RingIndex % 2 == 0) ? 0.0f : AngleStep * 0.5f;
+
+	const APawn* ControlledPawn = GetPawn();
+	FVector BaseDirection = ControlledPawn
+		? ControlledPawn->GetActorForwardVector().GetSafeNormal2D()
+		: FVector::ForwardVector;
+	if (BaseDirection.IsNearlyZero())
+	{
+		BaseDirection = FVector::ForwardVector;
+	}
+	return BaseDirection.RotateAngleAxis((AngleStep * IndexInRing) + RingAngleOffset, FVector::UpVector).GetSafeNormal2D();
+}
+
+float ALSPlayerControllerBase::BuildOverflowWorldDropDistance(const int32 ItemIndex) const
+{
+	const int32 ItemsPerRing = FMath::Max(1, OverflowDropItemsPerRing);
+	const int32 RingIndex = FMath::Max(0, ItemIndex) / ItemsPerRing;
+	return DroppedItemForwardDistance + (OverflowDropRingSpacing * RingIndex);
+}
+
+void ALSPlayerControllerBase::FlushPendingOverflowWorldDrops()
+{
+	if (!HasAuthority() || PendingOverflowWorldDropItems.IsEmpty())
+	{
+		return;
+	}
+
+	if (!GetWorld() || !GetPawn())
+	{
+		SchedulePendingOverflowWorldDropRetry();
+		return;
+	}
+
+	int32 SpawnedCount = 0;
+	for (int32 ItemIndex = PendingOverflowWorldDropItems.Num() - 1; ItemIndex >= 0; --ItemIndex)
+	{
+		const FLSPendingOverflowWorldDropItem& PendingItem = PendingOverflowWorldDropItems[ItemIndex];
+		if (SpawnDroppedItemToWorld(
+			PendingItem.Item,
+			nullptr,
+			PendingItem.DropDirection,
+			PendingItem.DropDistance,
+			true))
+		{
+			PendingOverflowWorldDropItems.RemoveAt(ItemIndex);
+			++SpawnedCount;
+		}
+	}
+
+	if (SpawnedCount > 0)
+	{
+		UE_LOG(LogLS, Log, TEXT("Spawned %d pending overflow inventory items on %s. Pending=%d"),
+			SpawnedCount, *GetNameSafe(this), PendingOverflowWorldDropItems.Num());
+	}
+
+	if (PendingOverflowWorldDropItems.IsEmpty())
+	{
+		GetWorldTimerManager().ClearTimer(PendingOverflowWorldDropRetryTimerHandle);
+		return;
+	}
+
+	SchedulePendingOverflowWorldDropRetry();
+}
+
+void ALSPlayerControllerBase::SchedulePendingOverflowWorldDropRetry()
+{
+	UWorld* World = GetWorld();
+	if (!World || PendingOverflowWorldDropItems.IsEmpty()
+		|| World->GetTimerManager().IsTimerActive(PendingOverflowWorldDropRetryTimerHandle))
+	{
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(
+		PendingOverflowWorldDropRetryTimerHandle,
+		this,
+		&ALSPlayerControllerBase::FlushPendingOverflowWorldDrops,
+		LSRaidInventoryOverflowDropRetryIntervalSeconds,
+		false);
+}
+
+bool ALSPlayerControllerBase::SpawnDroppedItemToWorld(
+	const FLSSessionItem& SlotItem,
+	TSubclassOf<ALSWorldDroppedItem> DroppedItemClass,
+	const FVector DropDirection,
+	const float DropDistance,
+	const bool bRequireGround)
 {
 	if (!LSInventorySlotUtils::IsFilled(SlotItem))
 	{
@@ -1891,7 +2034,7 @@ bool ALSPlayerControllerBase::SpawnDroppedItemToWorld(const FLSSessionItem& Slot
 	}
 
 	FTransform SpawnTransform;
-	if (!ResolveServerDroppedItemTransform(SpawnTransform, DropDirection))
+	if (!ResolveServerDroppedItemTransform(SpawnTransform, DropDirection, DropDistance, bRequireGround))
 	{
 		UE_LOG(LogLS, Warning, TEXT("Cannot drop slot to world because server drop transform is invalid."));
 		return false;
@@ -1907,8 +2050,14 @@ bool ALSPlayerControllerBase::SpawnDroppedItemToWorld(const FLSSessionItem& Slot
 	TSubclassOf<ALSWorldDroppedItem> ClassToSpawn = DroppedItemClass;
 	if (!ClassToSpawn)
 	{
-		ClassToSpawn = ALSWorldDroppedItem::StaticClass();
-		UE_LOG(LogLS, Warning, TEXT("DroppedItemClass is not set. Spawning native ALSWorldDroppedItem; interact hint widget class may be missing."));
+		const ULSDropSettings* DropSettings = GetDefault<ULSDropSettings>();
+		ClassToSpawn = DropSettings ? DropSettings->WorldDroppedItemClass.LoadSynchronous() : nullptr;
+	}
+
+	if (!ClassToSpawn)
+	{
+		UE_LOG(LogLS, Error, TEXT("Cannot drop item because WorldDroppedItemClass is not configured in LS Drop Settings."));
+		return false;
 	}
 
 	ALSWorldDroppedItem* DroppedItem = World->SpawnActorDeferred<ALSWorldDroppedItem>(
@@ -1923,7 +2072,11 @@ bool ALSPlayerControllerBase::SpawnDroppedItemToWorld(const FLSSessionItem& Slot
 		return false;
 	}
 
-	DroppedItem->InitializeDroppedItem(SlotItem);
+	const APawn* ControlledPawn = GetPawn();
+	const FVector DropAnimationStartLocation = ControlledPawn
+		? ControlledPawn->GetActorLocation()
+		: SpawnTransform.GetLocation();
+	DroppedItem->InitializeDroppedItem(SlotItem, DropAnimationStartLocation);
 	DroppedItem->FinishSpawning(SpawnTransform);
 	return true;
 }
@@ -1970,24 +2123,21 @@ bool ALSPlayerControllerBase::ResolveDropDirectionFromSlatePosition(const FVecto
 	return !OutDropDirection.IsNearlyZero();
 }
 
-bool ALSPlayerControllerBase::ResolveServerDroppedItemTransform(FTransform& OutDropTransform, FVector DropDirection) const
+bool ALSPlayerControllerBase::ResolveServerDroppedItemTransform(
+	FTransform& OutDropTransform,
+	FVector DropDirection,
+	const float DropDistance,
+	const bool bRequireGround) const
 {
-	constexpr float DroppedItemGroundTraceDistance = 100.0f;
 	constexpr float DroppedItemRandomGroundOffsetXY = 12.0f;
 	constexpr float DroppedItemRandomGroundOffsetMin = 0.5f;
 	constexpr float DroppedItemRandomGroundOffsetMax = 2.0f;
 
 	const APawn* ControlledPawn = GetPawn();
-	UWorld* World = GetWorld();
-	if (!ControlledPawn || !World)
+	if (!ControlledPawn || !GetWorld())
 	{
 		return false;
 	}
-
-	const FVector PawnLocation = ControlledPawn->GetActorLocation();
-	float CollisionRadius = 0.0f;
-	float CollisionHalfHeight = 0.0f;
-	ControlledPawn->GetSimpleCollisionCylinder(CollisionRadius, CollisionHalfHeight);
 
 	DropDirection.Z = 0.0f;
 	DropDirection = DropDirection.GetSafeNormal();
@@ -1996,15 +2146,12 @@ bool ALSPlayerControllerBase::ResolveServerDroppedItemTransform(FTransform& OutD
 		DropDirection = ControlledPawn->GetActorForwardVector().GetSafeNormal2D();
 	}
 
-	const FVector FootLocation = PawnLocation - FVector(0.0f, 0.0f, CollisionHalfHeight);
-	const FVector TargetFootLocation = FootLocation + (DropDirection * DroppedItemForwardDistance);
-	const FVector TraceStart = TargetFootLocation + FVector(0.0f, 0.0f, DroppedItemGroundTraceDistance);
-	const FVector TraceEnd = TargetFootLocation - FVector(0.0f, 0.0f, DroppedItemGroundTraceDistance);
+	FVector GroundLocation;
+	if (!ResolveServerDroppedItemGroundLocation(GroundLocation, DropDirection, DropDistance, bRequireGround))
+	{
+		return false;
+	}
 
-	FHitResult HitResult;
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(LSDropInventoryItemToGround), false, ControlledPawn);
-	const bool bHitGround = World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECC_Visibility, QueryParams);
-	const FVector GroundLocation = bHitGround ? HitResult.ImpactPoint : TargetFootLocation;
 	const FVector2D RandomGroundOffset = FMath::RandPointInCircle(DroppedItemRandomGroundOffsetXY);
 	const FVector DropLocation = GroundLocation + FVector(
 		RandomGroundOffset.X,
@@ -2020,4 +2167,49 @@ bool ALSPlayerControllerBase::ResolveServerDroppedItemTransform(FTransform& OutD
 
 	OutDropTransform = FTransform(FRotator(0.0f, DropYaw, 0.0f), DropLocation);
 	return true;
+}
+
+bool ALSPlayerControllerBase::ResolveServerDroppedItemGroundLocation(
+	FVector& OutGroundLocation,
+	const FVector DropDirection,
+	const float DropDistance,
+	const bool bRequireGround) const
+{
+	constexpr float DroppedItemGroundTraceDistance = 100.0f;
+	const APawn* ControlledPawn = GetPawn();
+	UWorld* World = GetWorld();
+	if (!ControlledPawn || !World)
+	{
+		return false;
+	}
+
+	float CollisionRadius = 0.0f;
+	float CollisionHalfHeight = 0.0f;
+	ControlledPawn->GetSimpleCollisionCylinder(CollisionRadius, CollisionHalfHeight);
+	const FVector PawnLocation = ControlledPawn->GetActorLocation();
+	float ResolvedDropDistance = DropDistance >= 0.0f ? DropDistance : DroppedItemForwardDistance;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(LSDropInventoryItemToGround), false, ControlledPawn);
+	if (bRequireGround)
+	{
+		FHitResult ObstructionHit;
+		const FVector ObstructionEnd = PawnLocation + (DropDirection * ResolvedDropDistance);
+		if (World->LineTraceSingleByChannel(ObstructionHit, PawnLocation, ObstructionEnd, ECC_Visibility, QueryParams))
+		{
+			ResolvedDropDistance = FMath::Max(0.0f, ObstructionHit.Distance - CollisionRadius);
+		}
+	}
+
+	const FVector FootLocation = PawnLocation - FVector(0.0f, 0.0f, CollisionHalfHeight);
+	const FVector TargetFootLocation = FootLocation + (DropDirection * ResolvedDropDistance);
+	const FVector TraceStart = TargetFootLocation + FVector(0.0f, 0.0f, DroppedItemGroundTraceDistance);
+	const FVector TraceEnd = TargetFootLocation - FVector(0.0f, 0.0f, DroppedItemGroundTraceDistance);
+	FHitResult GroundHit;
+	if (World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
+	{
+		OutGroundLocation = GroundHit.ImpactPoint;
+		return true;
+	}
+
+	OutGroundLocation = TargetFootLocation;
+	return !bRequireGround;
 }

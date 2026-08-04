@@ -125,6 +125,8 @@ RefreshStorage
 
 슬롯 수는 `ULSSaveSubsystem::GetMaxInventorySlotCount`, `ULSSaveSubsystem::GetMaxSafeStashSlotCount`, `ULSSaveSubsystem::GetMaxWarehouseSlotCount`, `ULSRaidInventoryComponent::GetMaxInventorySlotCount`, `ULSRaidInventoryComponent::GetMaxSafeSlotCount`를 통해 조회한다. 창고 최대 슬롯 수는 `ULSSaveSettings`의 `MaxWarehouseSlotCount`가 단일 출처이며 기본값은 100이다. UI에서 보이는 슬롯 수와 저장/레이드 드래그, 루팅, 월드 픽업 제한은 같은 값을 사용해야 한다.
 
+레이드의 일반 슬롯 이동은 `ULSRaidInventoryComponent::IsSessionSlotAccessible`로 원본과 대상을 모두 검사한다. 따라서 배열에 아이템 데이터가 남아 있더라도 현재 최대 슬롯 수 이상의 `Inventory`/`Safe` 인덱스와 고정 범위를 벗어난 `Equipment` 인덱스는 일반 드롭 및 외부 아이템 배치 대상으로 사용할 수 없다. 이 검증은 초과 슬롯 데이터를 즉시 삭제하지 않으며, 초과분 정리는 별도 서버 경로의 책임이다.
+
 `WBP_Inventory`의 용량 텍스트는 이름을 `InventoryCountText`로 두고 강제 `BindWidget`한다. `ULSInventoryWidget::RebuildInventorySlots`가 현재 데이터에서 채워진 슬롯 수를 세고, 위 최대 슬롯 수와 함께 `({사용 슬롯 수}/{최대 슬롯 수})` 형식으로 갱신한다. 따라서 로비·레이드와 적재 프로토콜 용량 변경이 같은 표시 경로를 사용한다.
 
 기존 세이브에 창고 최대 슬롯 인덱스 밖의 아이템이 있으면 아이템을 자르거나 숨기지 않는다. 창고 UI와 자판기는 저장 배열 길이까지 임시 표시하고 `사용 슬롯 수/설정 최대 슬롯 수`로 초과 상태를 드러낸다. 초과 아이템은 창고 밖으로 반출하거나 최대 슬롯 범위 안으로 옮길 수 있지만, 초과 상태가 해소될 때까지 창고로 들어오는 신규 이동·칩 해제·전부 보관은 차단한다.
@@ -294,7 +296,11 @@ LootBox 슬롯 -> 인벤토리
 
 월드 드랍은 `ALSWorldDroppedItem`이 담당한다.
 
-**로비 금지(단일 관문):** 모든 월드 드랍(수동 드래그 + 적재 축소 초과분)은 서버 권한 `ALSPlayerControllerBase::DropSessionSlotToWorldInternal`을 통과하며, 이 함수는 **레이드가 아니면(`RaidInventoryComponent`가 없거나 `IsRaidActive()`가 false) 무조건 거부**한다. 판매 외 로비 아이템 손실 금지 정책의 단일 출처다 — 어떤 UI 경로(인벤토리/창고 창 밖 드래그, 칩 해제·스왑·신호 유실로 인한 초과분)로 들어와도 로비에서는 여기서 막힌다. 월드 드랍은 레이드 중에만 일어난다(익스트렉션 리스크 / 신호 유실 초과분).
+**로비 금지(단일 관문):** 수동 월드 드랍은 서버 권한 `ALSPlayerControllerBase::DropSessionSlotToWorldInternal`, 적재 축소 초과분은 `DropOverflowInventorySlotsToWorldInternal`을 통과하며, 두 경로 모두 **레이드가 아니면(`RaidInventoryComponent`가 없거나 `IsRaidActive()`가 false) 무조건 거부**한다. 판매 외 로비 아이템 손실 금지 정책의 단일 출처다. 월드 드랍은 레이드 중에만 일어난다(익스트렉션 리스크 / 신호 유실 초과분).
+
+수동 월드 드랍은 `IsSessionSlotAccessible` 검사를 통과한 현재 용량 안의 슬롯만 허용한다. 초과분 정리는 클라이언트가 슬롯 인덱스를 지정하지 않으며, 서버가 `ExtractOverflowInventoryItems`로 현재 최대 슬롯 수 뒤의 채워진 `Inventory` 슬롯을 한 번에 비운다. 꺼낸 아이템은 서버의 월드 드랍 대기 목록으로 옮겨 즉시 스폰하고, 실패한 항목만 1초 뒤 재시도한다. 실패한 아이템을 인벤토리 초과 슬롯으로 되돌리지 않는다. 자동 드랍은 `LS Drop Settings`의 `WorldDroppedItemClass`를 사용하므로 서버·패키지 빌드에서도 `BP_WorldDroppedItem`에 설정된 상호작용 안내 위젯을 유지한다. 설정이 없으면 UI 없는 네이티브 액터로 폴백하지 않고 스폰을 보류해 대기 목록에서 재시도한다.
+
+월드 드랍 액터의 실제 위치와 상호작용 충돌은 서버가 확정한 착지점에 처음부터 고정한다. `ALSWorldDroppedItem`은 복제된 시작 위치에서 `ItemIconWidgetComponent`만 포물선으로 이동시키며, `bHasLanded`가 확정되기 전에는 클라이언트 타겟 선택과 서버 획득 판정을 모두 거부한다. 착지 후 상호작용 안내·아웃라인·거리 마커·미니맵 표시를 다시 활성화한다. 수동 드랍은 기존 마우스 방향 착지점을 바꾸지 않고 이 시각 애니메이션만 사용한다. 초과분 자동 드랍은 같은 애니메이션을 공유하되, 서버가 한 링의 아이템을 사방에 균등 배치하고 수용 개수를 넘으면 바깥 링을 추가한다. 각 대기 항목에 방향과 링 거리를 함께 고정 저장하므로 일부 스폰이 실패해도 재시도 위치가 바뀌지 않는다. 초과분 위치만 캐릭터에서 목표점까지 장애물을 검사해 벽 앞에서 거리를 줄이고, 목표점 아래에서 지면을 찾지 못하면 스폰하지 않고 대기 목록에 남긴다. 링당 개수와 간격은 `ALSPlayerControllerBase`의 설정 필드가 소유한다.
 
 ```text
 DropSessionSlotToWorld
@@ -350,6 +356,7 @@ Item   -> 300000 + DataTable row 순서
 데이터↔화면 stale 버그의 근본 원인은 "데이터를 바꾼 곳마다 손으로 여러 리빌드를 골라 부르는" 구조였다. 경로마다 갱신 대상(인벤토리/Safe/장비/창고/칩스테이션)을 일부만 부르면 나머지가 stale로 남고, 소스 슬롯만 낙관적으로 비우면 부분 스택 이동 시 남은 수량이 화면에서 사라졌다.
 
 - **모든 데이터 변경 경로는 갱신을 `ALSPlayerControllerBase::RefreshAllInventoryUI()` 하나로만 한다.** 이 funnel이 열려 있는 인벤토리 계열 패널 전체(인벤토리/Safe/장비 + 열려 있으면 창고·칩스테이션)를 authoritative 데이터에서 통째로 다시 그린다. 개별 `RebuildInventorySlots`/`RebuildConfirmedStorageSlots`/`RefreshOpenLobbyStorageWidget` 등을 mutation 경로에서 직접 흩뿌리지 않는다.
+- **드래그 중 리빌드 금지.** `RefreshAllInventoryUI` 호출 시 UMG 드래그가 진행 중이면 위젯 트리를 즉시 재구성하지 않고 다음 틱으로 합친 뒤, 드래그가 끝날 때까지 다시 미룬다. 드래그 강제 취소는 `DragCancelled`의 월드 드랍 경로를 잘못 실행할 수 있으므로 사용하지 않는다.
 - **낙관적 부분 갱신 금지.** 소스 슬롯만 `ClearItem()`으로 비우는 최적화는 "전량 이동"을 가정하므로 부분 이동 시 desync를 만든다. 성공하면 funnel로 전체를 다시 그린다. (UI = 데이터의 순수 함수)
 - **예외 — 칩 스테이션 자체 sweep.** 칩 스테이션의 `RefreshChipStation`은 칩 리스트를 재정렬(`SortChipViewItems`)하므로, 칩 스테이션 내부 빠른 장착/해제 sweep 경로(`TryHandleChipStationQuickTransfer`/`TryHandleChipEquipmentQuickTransfer`)는 쓸기 중 재정렬을 피하려고 funnel을 부르지 않고 해당 칸만 in-place로 갱신한다. 창고는 재정렬하지 않는 고정 인덱스 그리드라 funnel 전체 리빌드가 안전하다.
 - authority 여부로 로컬 리빌드를 나누지 않는다. 비-authority에서도 funnel로 로컬 미러를 다시 그리고, 서버 미러 RPC(`ClientSyncRaidSessionAndLoot`)가 오면 funnel이 멱등하게 재적용한다.
@@ -394,8 +401,10 @@ Raid End
 
 적재 프로토콜 감소로 슬롯 최대치가 줄어들면 일반 인벤토리와 보호 슬롯을 다르게 처리한다.
 
-- 일반 인벤토리: 현재 최대 슬롯 수보다 뒤에 있는 아이템 슬롯은 기존 월드 드랍 흐름을 재사용해 플레이어 주변 바닥에 떨어뜨리고 원본 슬롯을 비운다. **단, 월드 드랍은 레이드 중에만 실행된다**(위 "루팅과 월드 드랍"의 로비 단일 관문). 즉 이 즉시 드랍 정책은 실질적으로 레이드 중 신호 유실(게이지 자동 감소)에만 적용된다.
+- 일반 인벤토리: 현재 최대 슬롯 수보다 뒤에 있는 아이템은 한 번에 원본 슬롯에서 제거해 서버 월드 드랍 대기 목록으로 옮긴다. 월드 스폰이 실패해도 인벤토리로 복구하지 않고 성공할 때까지 대기 목록에서 재시도하므로, 용량 변경 처리가 끝난 세션 인벤토리에는 채워진 초과 슬롯이 남지 않는다. 수동 드랍 경로는 이 인덱스에 접근할 수 없다. **단, 월드 드랍은 레이드 중에만 실행된다**(위 "루팅과 월드 드랍"의 로비 단일 관문).
+- 연결 순서: `ALSFarmingGameMode::TickSignalGaugeDrain`이 새 게이지를 확정한 뒤 각 활성 레이드 플레이어에게 게이지를 동기화하고 `DropOverflowInventorySlotsToWorld`를 호출한다. 초과 아이템이 없어도 클라이언트는 새 최대 슬롯 수로 UI를 갱신한다.
 - 보호 슬롯: 현재 최대 보호 슬롯 수보다 뒤에 있는 아이템은 보존하되 잠긴 슬롯으로 표시한다. 잠긴 보호 슬롯은 드래그, 드롭, Shift-click, 월드 드랍 대상/원본으로 사용할 수 없다.
+- 자동화 검증: `LostSignal.Inventory.RaidOverflowExtraction`은 정상 범위 아이템 보존, 일반 인벤토리 초과분의 일괄 제거와 순서·수량 유지, 보호 슬롯 초과분 보존, 반복 실행 멱등성을 확인한다.
 - **로비 아이템 손실 금지.** 로비에서 적재 용량을 줄일 수 있는 경로는 모두 손실이 나기 전에 막는다:
   - 칩 **해제** / 칩↔칩 **스왑**: 해제·스왑 후 예상 최대 슬롯 수보다 보유 아이템이 많으면 조작 자체를 막고 알림을 띄운다(판정 단일 출처는 [ChipSystem.md](ChipSystem.md)).
   - 칩 스테이션 **신호 게이지 슬라이더**: 순수 프리뷰라 저장 게이지·용량에 반영하지 않는다([ChipSystem.md](ChipSystem.md)).

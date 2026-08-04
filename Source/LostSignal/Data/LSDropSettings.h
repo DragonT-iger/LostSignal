@@ -5,6 +5,8 @@
 #include "Engine/DeveloperSettings.h"
 #include "LSDropSettings.generated.h"
 
+class ALSWorldDroppedItem;
+
 UCLASS(config=Game, defaultconfig, meta=(DisplayName="LS Drop Settings"))
 class LOSTSIGNAL_API ULSDropSettings : public UDeveloperSettings
 {
@@ -45,6 +47,10 @@ public:
 	// 제작 레시피 목록(DT_CraftingRecipe, Row=FLSCraftingRecipeRow). 제작 UI가 읽는다.
 	UPROPERTY(config, EditAnywhere, Category="LS/DataTables")
 	TSoftObjectPtr<UDataTable> CraftingRecipeTable;
+
+	// 서버 권한 자동 드랍도 상호작용 UI가 설정된 동일한 월드 아이템 BP를 사용한다.
+	UPROPERTY(config, EditAnywhere, Category="LS/Drop")
+	TSoftClassPtr<ALSWorldDroppedItem> WorldDroppedItemClass;
 
 	ULSDropSettings()
 	{

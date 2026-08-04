@@ -270,11 +270,8 @@ ULSCraftingRowWidget* ULSCraftingWidget::CreateRecipeRow(
 	}
 	const LSInventorySlotUtils::FLSItemTradeInfo Info =
 		LSInventorySlotUtils::ResolveItemTradeInfo(Entry.Recipe.ResultItemRowName);
-	const int32 OwnedAmount = SaveSubsystem
-		? SaveSubsystem->GetCraftingOwnedItemCount(Entry.Recipe.ResultItemRowName)
-		: 0;
 	const bool bCraftable = SaveSubsystem && SaveSubsystem->GetCraftableCount(Entry.Recipe) > 0;
-	NewRow->SetRecipe(Entry.RowName, Entry.Recipe.ResultItemRowName, Info.Name, OwnedAmount, bCraftable);
+	NewRow->SetRecipe(Entry.RowName, Entry.Recipe.ResultItemRowName, Info.Name, Entry.Recipe.GoldCost, bCraftable);
 	NewRow->OnClicked.AddDynamic(this, &ULSCraftingWidget::HandleRecipeClicked);
 	return NewRow;
 }
@@ -317,15 +314,12 @@ void ULSCraftingWidget::RefreshRecipeRows()
 		}
 		const LSInventorySlotUtils::FLSItemTradeInfo Info =
 			LSInventorySlotUtils::ResolveItemTradeInfo(Entry->Recipe.ResultItemRowName);
-		const int32 OwnedAmount = SaveSubsystem
-			? SaveSubsystem->GetCraftingOwnedItemCount(Entry->Recipe.ResultItemRowName)
-			: 0;
 		const bool bCraftable = SaveSubsystem && SaveSubsystem->GetCraftableCount(Entry->Recipe) > 0;
 		RecipeRow->SetRecipe(
 			Entry->RowName,
 			Entry->Recipe.ResultItemRowName,
 			Info.Name,
-			OwnedAmount,
+			Entry->Recipe.GoldCost,
 			bCraftable);
 	}
 }

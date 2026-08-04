@@ -9,10 +9,18 @@
 #include "Minimap/LSMinimapMarkerComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Session/LSSaveSubsystem.h"
+#include "UI/Interact/LSDistanceMarkerComponent.h"
 #include "UI/Inventory/LSWorldDroppedItemIconWidget.h"
 
 ALSWorldDroppedItem::ALSWorldDroppedItem()
 {
+	DropAnimationDurationSeconds = 0.45f;
+	DropAnimationArcHeight = 80.0f;
+	bHasLanded = true;
+	bDropVisualAnimating = false;
+	DropVisualAnimationElapsedSeconds = 0.0f;
+	DropVisualLandedRelativeLocation = FVector::ZeroVector;
+
 	MinimapMarkerComponent = CreateDefaultSubobject<ULSMinimapMarkerComponent>(TEXT("MinimapMarkerComponent"));
 	MinimapMarkerComponent->SetMarkerType(ELSMinimapMarkerType::DroppedItem);
 	MinimapMarkerComponent->SetMarkerColor(FLinearColor(0.25f, 1.0f, 0.42f, 1.0f));
@@ -33,16 +41,70 @@ void ALSWorldDroppedItem::BeginPlay()
 {
 	Super::BeginPlay();
 	RefreshItemVisual();
+
+	if (bHasLanded)
+	{
+		FinishDropVisualAnimation();
+		return;
+	}
+
+	if (DistanceMarkerComponent)
+	{
+		DistanceMarkerComponent->SetMarkerSuppressed(true);
+	}
+	StartDropVisualAnimation();
+
+	if (HasAuthority())
+	{
+		if (DropAnimationDurationSeconds <= KINDA_SMALL_NUMBER)
+		{
+			CompleteDropLanding();
+		}
+		else
+		{
+			GetWorldTimerManager().SetTimer(
+				DropLandingTimerHandle,
+				this,
+				&ALSWorldDroppedItem::CompleteDropLanding,
+				DropAnimationDurationSeconds,
+				false);
+		}
+	}
+}
+
+void ALSWorldDroppedItem::Tick(const float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (!bDropVisualAnimating)
+	{
+		return;
+	}
+
+	DropVisualAnimationElapsedSeconds += DeltaSeconds;
+	const float NormalizedTime = DropAnimationDurationSeconds > KINDA_SMALL_NUMBER
+		? FMath::Clamp(DropVisualAnimationElapsedSeconds / DropAnimationDurationSeconds, 0.0f, 1.0f)
+		: 1.0f;
+	UpdateDropVisualAnimation(NormalizedTime);
+
+	if (NormalizedTime >= 1.0f)
+	{
+		FinishDropVisualAnimation();
+	}
+	else
+	{
+		SetActorTickEnabled(true);
+	}
 }
 
 bool ALSWorldDroppedItem::CanInteract_Implementation(APawn* Interactor)
 {
-	return !ItemRowName.IsNone() && Amount > 0;
+	return bHasLanded && !ItemRowName.IsNone() && Amount > 0;
 }
 
 void ALSWorldDroppedItem::Interact_Implementation(APawn* Interactor)
 {
-	if (!HasAuthority() || ItemRowName.IsNone() || Amount <= 0)
+	if (!HasAuthority() || !bHasLanded || ItemRowName.IsNone() || Amount <= 0)
 	{
 		return;
 	}
@@ -95,10 +157,14 @@ void ALSWorldDroppedItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME(ALSWorldDroppedItem, ItemRowName);
 	DOREPLIFETIME(ALSWorldDroppedItem, Amount);
 	DOREPLIFETIME(ALSWorldDroppedItem, ChipStats);
+	DOREPLIFETIME(ALSWorldDroppedItem, DropAnimationStartLocation);
+	DOREPLIFETIME(ALSWorldDroppedItem, bHasLanded);
 }
 
-void ALSWorldDroppedItem::InitializeDroppedItem(const FLSSessionItem& InItem)
+void ALSWorldDroppedItem::InitializeDroppedItem(const FLSSessionItem& InItem, const FVector& InDropAnimationStartLocation)
 {
+	DropAnimationStartLocation = InDropAnimationStartLocation;
+	bHasLanded = false;
 	ItemRowName = InItem.ItemRowName;
 	Amount = InItem.Amount;
 	ChipStats = InItem.ChipStats;
@@ -108,6 +174,23 @@ void ALSWorldDroppedItem::InitializeDroppedItem(const FLSSessionItem& InItem)
 void ALSWorldDroppedItem::OnRep_ItemData()
 {
 	RefreshItemVisual();
+}
+
+void ALSWorldDroppedItem::OnRep_HasLanded()
+{
+	if (bHasLanded)
+	{
+		FinishDropVisualAnimation();
+		RefreshItemVisual();
+		return;
+	}
+
+	if (DistanceMarkerComponent)
+	{
+		DistanceMarkerComponent->SetMarkerSuppressed(true);
+	}
+	StartDropVisualAnimation();
+	RefreshWidgetVisibility();
 }
 
 void ALSWorldDroppedItem::RefreshItemVisual()
@@ -120,10 +203,11 @@ void ALSWorldDroppedItem::RefreshItemVisual()
 
 	if (MinimapMarkerComponent)
 	{
-		MinimapMarkerComponent->SetMinimapVisible(!ItemRowName.IsNone() && Amount > 0);
+		MinimapMarkerComponent->SetMinimapVisible(bHasLanded && !ItemRowName.IsNone() && Amount > 0);
 	}
 
-	ItemIconWidgetComponent->SetRelativeLocation(FVector(0.0f, 0.0f, GroundOffsetZ));
+	DropVisualLandedRelativeLocation = FVector(0.0f, 0.0f, GroundOffsetZ);
+	ItemIconWidgetComponent->SetRelativeLocation(DropVisualLandedRelativeLocation);
 	ItemIconWidgetComponent->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
 	ItemIconWidgetComponent->SetDrawSize(IconDrawSize);
 	ItemIconWidgetComponent->InitWidget();
@@ -138,10 +222,78 @@ void ALSWorldDroppedItem::RefreshItemVisual()
 	if (ULSWorldDroppedItemIconWidget* IconWidget = Cast<ULSWorldDroppedItemIconWidget>(ItemIconWidgetComponent->GetWidget()))
 	{
 		IconWidget->SetIconTexture(IconTexture);
+		if (bDropVisualAnimating)
+		{
+			const float NormalizedTime = DropAnimationDurationSeconds > KINDA_SMALL_NUMBER
+				? FMath::Clamp(DropVisualAnimationElapsedSeconds / DropAnimationDurationSeconds, 0.0f, 1.0f)
+				: 1.0f;
+			UpdateDropVisualAnimation(NormalizedTime);
+		}
 		return;
 	}
 
 	UE_LOG(LogLS, Warning, TEXT("Dropped item icon widget is missing or invalid on %s."), *GetNameSafe(this));
+}
+
+void ALSWorldDroppedItem::StartDropVisualAnimation()
+{
+	if (bHasLanded || bDropVisualAnimating || !ItemIconWidgetComponent || GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
+	bDropVisualAnimating = DropAnimationDurationSeconds > KINDA_SMALL_NUMBER;
+	DropVisualAnimationElapsedSeconds = 0.0f;
+	if (!bDropVisualAnimating)
+	{
+		ItemIconWidgetComponent->SetRelativeLocation(DropVisualLandedRelativeLocation);
+		return;
+	}
+
+	UpdateDropVisualAnimation(0.0f);
+	SetActorTickEnabled(true);
+}
+
+void ALSWorldDroppedItem::UpdateDropVisualAnimation(const float NormalizedTime)
+{
+	if (!ItemIconWidgetComponent)
+	{
+		return;
+	}
+
+	const float Time = FMath::Clamp(NormalizedTime, 0.0f, 1.0f);
+	const FVector LandedWorldLocation = GetActorTransform().TransformPosition(DropVisualLandedRelativeLocation);
+	FVector VisualWorldLocation = FMath::Lerp(FVector(DropAnimationStartLocation), LandedWorldLocation, Time);
+	VisualWorldLocation.Z += 4.0f * DropAnimationArcHeight * Time * (1.0f - Time);
+	ItemIconWidgetComponent->SetWorldLocation(VisualWorldLocation);
+}
+
+void ALSWorldDroppedItem::FinishDropVisualAnimation()
+{
+	bDropVisualAnimating = false;
+	DropVisualAnimationElapsedSeconds = DropAnimationDurationSeconds;
+	if (ItemIconWidgetComponent)
+	{
+		ItemIconWidgetComponent->SetRelativeLocation(DropVisualLandedRelativeLocation);
+	}
+	if (DistanceMarkerComponent)
+	{
+		DistanceMarkerComponent->SetMarkerSuppressed(!bHasLanded);
+	}
+	RefreshWidgetVisibility();
+}
+
+void ALSWorldDroppedItem::CompleteDropLanding()
+{
+	if (!HasAuthority() || bHasLanded)
+	{
+		return;
+	}
+
+	bHasLanded = true;
+	FinishDropVisualAnimation();
+	RefreshItemVisual();
+	ForceNetUpdate();
 }
 
 UTexture2D* ALSWorldDroppedItem::LoadIconTextureByRowName(const FName InItemRowName) const

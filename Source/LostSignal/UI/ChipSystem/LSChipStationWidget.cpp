@@ -671,7 +671,7 @@ void ULSChipStationWidget::HandleCarryingSlotCapacityChanged()
 {
 	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 	{
-		PlayerController->DropOverflowInventorySlotsToWorld(nullptr, FVector::ZeroVector);
+		PlayerController->DropOverflowInventorySlotsToWorld();
 		PlayerController->RefreshOpenLobbyStorageWidget();
 		// 폰 전용 RebuildInventoryWidgetSlots 만 호출하면 폰이 없는 로비에서 인벤토리 위젯이 갱신되지 않는다.
 		// 그러면 인벤토리에 있던 칩을 장착해 슬롯을 비운 뒤에도 인벤토리 위젯이 stale 상태로 남아,

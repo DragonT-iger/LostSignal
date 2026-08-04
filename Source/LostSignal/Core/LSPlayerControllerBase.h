@@ -8,6 +8,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameplayTagContainer.h"
 #include "Session/LSSessionSubsystem.h"
+#include "TimerManager.h"
 #include "UI/Combat/LSDamageNumberTypes.h"
 #include "LSPlayerControllerBase.generated.h"
 
@@ -27,6 +28,21 @@ class ULSPlayerHUDWidget;
 class ULSProtocolDebugWidget;
 class ULSSettingsWidget;
 struct FLSNoiseEvent;
+
+USTRUCT()
+struct FLSPendingOverflowWorldDropItem
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Inventory")
+	FLSSessionItem Item;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Inventory")
+	FVector DropDirection = FVector::ForwardVector;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Inventory")
+	float DropDistance = 0.0f;
+};
 
 UCLASS(Abstract)
 class LOSTSIGNAL_API ALSPlayerControllerBase : public APlayerController
@@ -182,6 +198,9 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientStartRaidSession(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);
 
+	UFUNCTION(Client, Reliable)
+	void ClientApplyRaidSignalGaugePercent(float Percent);
+
 	bool TransferInventorySlotToLootDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex);
 	bool TransferInventorySlotToOpenContainer(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, bool bRefreshOpenContainer = true);
 	bool DropInventorySlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
@@ -191,7 +210,7 @@ public:
 	bool TransferLootDropSlotToSessionSlot(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FName ItemRowName, int32 Amount, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
 	bool TransferSessionSlotToLootDropSlot(ALSLootBox* SourceLootBox, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, int32 LootSlotIndex, const FLSDropResult& CurrentLootItem, FLSSessionItem& OutLootItem);
 	bool DropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
-	bool DropOverflowInventorySlotsToWorld(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
+	bool DropOverflowInventorySlotsToWorld();
 	bool ResolveDropDirectionFromSlatePosition(FVector2D SlatePosition, FVector& OutDropDirection) const;
 	void NotifyNoiseForHUD(const FLSNoiseEvent& NoiseEvent);
 	void ShowDamageNumber(const FLSDamageNumberPayload& Payload);
@@ -263,6 +282,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Inventory", meta=(ClampMin="0"))
 	float DroppedItemForwardDistance = 100.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Inventory", meta=(ClampMin="1"))
+	int32 OverflowDropItemsPerRing = 6;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Inventory", meta=(ClampMin="0"))
+	float OverflowDropRingSpacing = 75.0f;
+
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
 	bool bHasSubmittedRaidEntryData = false;
 
@@ -299,7 +324,7 @@ private:
 	void ServerDropSessionSlotToWorld(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector_NetQuantizeNormal DropDirection);
 
 	UFUNCTION(Server, Reliable)
-	void ServerDropOverflowInventorySlotsToWorld(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector_NetQuantizeNormal DropDirection);
+	void ServerDropOverflowInventorySlotsToWorld();
 
 	UFUNCTION(Server, Reliable)
 	void ServerTransferLootDropSlotToSession(ALSLootBox* SourceLootBox, int32 LootSlotIndex);
@@ -384,12 +409,27 @@ private:
 	void ShowDamageNumberLocal(const FLSDamageNumberPayload& Payload);
 	void SetProtocolTestLevel(ELSProtocolType ProtocolType, int32 Level);
 	void RefreshProtocolTestTargets();
+	void RefreshAllInventoryUIImmediate();
+	void QueueInventoryUIRefreshAfterDrag();
+	void FlushQueuedInventoryUIRefresh();
 	bool DropSessionSlotToWorldInternal(ELSInventorySlotArea SlotArea, int32 SlotIndex, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
-	bool DropOverflowInventorySlotsToWorldInternal(TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
-	bool SpawnDroppedItemToWorld(const FLSSessionItem& SlotItem, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection);
-	bool ResolveServerDroppedItemTransform(FTransform& OutDropTransform, FVector DropDirection) const;
+	bool DropOverflowInventorySlotsToWorldInternal();
+	void QueueOverflowWorldDropItems(TArray<FLSSessionItem>&& ExtractedItems);
+	FVector BuildOverflowWorldDropDirection(int32 ItemIndex, int32 ItemCount) const;
+	float BuildOverflowWorldDropDistance(int32 ItemIndex) const;
+	void FlushPendingOverflowWorldDrops();
+	void SchedulePendingOverflowWorldDropRetry();
+	bool SpawnDroppedItemToWorld(const FLSSessionItem& SlotItem, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection, float DropDistance = -1.0f, bool bRequireGround = false);
+	bool ResolveServerDroppedItemTransform(FTransform& OutDropTransform, FVector DropDirection, float DropDistance, bool bRequireGround) const;
+	bool ResolveServerDroppedItemGroundLocation(FVector& OutGroundLocation, FVector DropDirection, float DropDistance, bool bRequireGround) const;
 	bool TransferLootDropSlotToSessionInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FLSSessionItem& OutLootItem);
 	bool TransferLootDropSlotToSessionSlotInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, ELSInventorySlotArea ToSlotArea, int32 ToSlotIndex, FLSSessionItem& OutLootItem);
 	bool TransferSessionSlotToLootDropSlotInternal(ALSLootBox* SourceLootBox, ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, int32 LootSlotIndex, FLSSessionItem& OutLootItem);
 	bool DropLootDropSlotInternal(ALSLootBox* SourceLootBox, int32 FromLootSlotIndex, int32 ToLootSlotIndex);
+
+	bool bInventoryUIRefreshScheduled = false;
+
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Inventory")
+	TArray<FLSPendingOverflowWorldDropItem> PendingOverflowWorldDropItems;
+	FTimerHandle PendingOverflowWorldDropRetryTimerHandle;
 };

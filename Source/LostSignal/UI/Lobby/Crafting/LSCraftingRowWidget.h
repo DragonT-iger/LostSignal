@@ -17,6 +17,7 @@ class LOSTSIGNAL_API ULSCraftingRowWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
 	virtual int32 NativePaint(
 		const FPaintArgs& Args,
@@ -35,7 +36,7 @@ public:
 		FName InRecipeRowName,
 		FName ResultItemRowName,
 		const FText& ItemName,
-		int32 OwnedAmount,
+		int32 Price,
 		bool bInCraftable);
 	void SetSelected(bool bSelected);
 	FName GetRecipeRowName() const { return RecipeRowName; }
@@ -51,7 +52,7 @@ protected:
 	TObjectPtr<UTextBlock> ItemNameText;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Crafting")
-	TObjectPtr<UTextBlock> OwnedCountText;
+	TObjectPtr<UTextBlock> PriceText;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|Crafting")
 	FLinearColor SelectedBorderColor = FLinearColor(1.0f, 0.42f, 0.08f, 1.0f);

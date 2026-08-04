@@ -367,6 +367,22 @@ void ALSFarmingGameMode::TickSignalGaugeDrain()
 		NextPercent);
 	SaveSubsystem->SetChipSignalGaugePercent(NextPercent);
 
+	if (UWorld* World = GetWorld())
+	{
+		for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
+		{
+			ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Iterator->Get());
+			const ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
+			if (!PlayerController || !RaidInventory || !RaidInventory->IsRaidActive())
+			{
+				continue;
+			}
+
+			PlayerController->ClientApplyRaidSignalGaugePercent(NextPercent);
+			PlayerController->DropOverflowInventorySlotsToWorld();
+		}
+	}
+
 	if (!bHasNextChip || NextPercent <= 0.0f)
 	{
 		StopSignalGaugeDrain();

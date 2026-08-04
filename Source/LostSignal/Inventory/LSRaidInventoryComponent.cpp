@@ -56,6 +56,11 @@ int32 ULSRaidInventoryComponent::GetMaxSafeSlotCount() const
 	return SaveSubsystem ? SaveSubsystem->GetMaxSafeStashSlotCount() : DefaultMaxRaidSafeSlotCount;
 }
 
+bool ULSRaidInventoryComponent::IsSessionSlotAccessible(const ELSInventorySlotArea SlotArea, const int32 SlotIndex) const
+{
+	return SlotIndex >= 0 && SlotIndex < ResolveMaxSlotCount(SlotArea);
+}
+
 bool ULSRaidInventoryComponent::TryAddSessionItem(const FName ItemRowName, const int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem)
 {
 	return LSInventorySlotUtils::TryAddItemsToSlotArray(SessionInventory, ItemRowName, Amount, GetMaxInventorySlotCount(), ChipStats, OutRemainingItem);
@@ -68,7 +73,7 @@ void ULSRaidInventoryComponent::SortSessionInventory()
 
 bool ULSRaidInventoryComponent::DropSessionSlot(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
 {
-	if (FromArea == ELSInventorySlotArea::Safe && FromIndex >= GetMaxSafeSlotCount())
+	if (!IsSessionSlotAccessible(FromArea, FromIndex) || !IsSessionSlotAccessible(ToArea, ToIndex))
 	{
 		return false;
 	}
@@ -95,6 +100,11 @@ bool ULSRaidInventoryComponent::DropSessionSlot(const ELSInventorySlotArea FromA
 
 bool ULSRaidInventoryComponent::DropExternalItemToSessionSlot(FLSSessionItem& InOutExternalItem, const ELSInventorySlotArea ToArea, const int32 ToIndex)
 {
+	if (!IsSessionSlotAccessible(ToArea, ToIndex))
+	{
+		return false;
+	}
+
 	TArray<FLSSessionItem>* ToSlots = ResolveSessionSlots(ToArea);
 	if (!ToSlots)
 	{
@@ -120,6 +130,11 @@ bool ULSRaidInventoryComponent::DropExternalItemToSessionSlot(FLSSessionItem& In
 
 bool ULSRaidInventoryComponent::GetSessionSlotItem(const ELSInventorySlotArea SlotArea, const int32 SlotIndex, FLSSessionItem& OutItem) const
 {
+	if (!IsSessionSlotAccessible(SlotArea, SlotIndex))
+	{
+		return false;
+	}
+
 	const TArray<FLSSessionItem>* Slots = ResolveSessionSlots(SlotArea);
 	if (!Slots || !Slots->IsValidIndex(SlotIndex) || !LSInventorySlotUtils::IsFilled((*Slots)[SlotIndex]))
 	{
@@ -132,6 +147,11 @@ bool ULSRaidInventoryComponent::GetSessionSlotItem(const ELSInventorySlotArea Sl
 
 bool ULSRaidInventoryComponent::ClearSessionSlot(const ELSInventorySlotArea SlotArea, const int32 SlotIndex)
 {
+	if (!IsSessionSlotAccessible(SlotArea, SlotIndex))
+	{
+		return false;
+	}
+
 	TArray<FLSSessionItem>* Slots = ResolveSessionSlots(SlotArea);
 	if (!Slots || !Slots->IsValidIndex(SlotIndex) || !LSInventorySlotUtils::IsFilled((*Slots)[SlotIndex]))
 	{
@@ -140,6 +160,23 @@ bool ULSRaidInventoryComponent::ClearSessionSlot(const ELSInventorySlotArea Slot
 
 	(*Slots)[SlotIndex] = LSInventorySlotUtils::MakeEmptyItem();
 	return true;
+}
+
+int32 ULSRaidInventoryComponent::ExtractOverflowInventoryItems(TArray<FLSSessionItem>& OutItems)
+{
+	const int32 PreviousItemCount = OutItems.Num();
+	for (int32 SlotIndex = GetMaxInventorySlotCount(); SlotIndex < SessionInventory.Num(); ++SlotIndex)
+	{
+		if (!LSInventorySlotUtils::IsFilled(SessionInventory[SlotIndex]))
+		{
+			continue;
+		}
+
+		OutItems.Add(SessionInventory[SlotIndex]);
+		SessionInventory[SlotIndex] = LSInventorySlotUtils::MakeEmptyItem();
+	}
+
+	return OutItems.Num() - PreviousItemCount;
 }
 
 int32 ULSRaidInventoryComponent::ConsumeSessionItem(const FName ItemRowName, const int32 Amount)
