@@ -393,17 +393,17 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerRequestInteract(AActor* Target);
 
-	// 소모품 사용 요청(클라 → 서버). 시전이 필요 없거나 시전 완료 후에 호출된다.
+	// 소모품 사용 시작 요청(클라 → 서버). 서버가 시전·차감·발동 지연·효과 적용을 순서대로 소유한다.
 	UFUNCTION(Server, Reliable)
-	void ServerUseConsumable(FName ItemRowName);
+	void ServerBeginConsumableUse(uint32 UseID, FName ItemRowName, bool bThrown, FVector_NetQuantize TargetLocation);
 
-	// 투척 소모품 사용 요청(클라 → 서버). 확정된 착탄 지점을 함께 보낸다. 발동 지연 뒤 효과만 적용한다.
+	// 시전 구간 중 취소 요청. 이미 차감된 사용은 취소하지 않는다.
 	UFUNCTION(Server, Reliable)
-	void ServerUseThrownConsumable(FName ItemRowName, FVector_NetQuantize TargetLocation);
+	void ServerCancelConsumableUse(uint32 UseID);
 
-	// 소모품 수량 차감 요청(클라 → 서버). 모든 소모품이 시전 완료 시점에 호출한다(효과 적용과 분리).
-	UFUNCTION(Server, Reliable)
-	void ServerConsumeConsumable(FName ItemRowName);
+	// 서버 사용 트랜잭션 종료(성공·거부 공통). 해당 로컬 사용 상태를 정리한다.
+	UFUNCTION(Client, Reliable)
+	void ClientEndConsumableUse(uint32 UseID);
 
 	FVector GetDashDirection() const;
 	bool ResolveMouseWorldPoint(FVector& OutMouseWorldPoint) const;
@@ -424,18 +424,25 @@ private:
 
 	// 퀵슬롯 인덱스(0~5)의 소모품 사용을 시도한다(클라 진입점). 등록/보유/시전 여부를 검사한다.
 	void TryUseQuickSlot(int32 QuickSlotIndex);
-	// 시전 시작. Cast_Time>0이면 게이지+타이머, 0이면 즉시 완료로 진행한다.
+	// 로컬 표시를 시작하고 동일한 사용 ID로 서버 트랜잭션을 요청한다.
 	void BeginConsumableCast(FName ItemRowName, const struct FLSConsumableRow& ConsumableDef);
-	// 시전 완료. Trigger_Delay가 있으면 그만큼 더 기다린 뒤 확정한다.
+	// 로컬 시전 게이지 완료. 실제 차감·발동은 서버 타이머가 처리한다.
 	void HandleConsumableCastComplete();
-	// 사용 확정(발동 지연 뒤): 서버 권한이면 직접, 아니면 서버 RPC로 효과만 적용한다.
-	void FinishConsumableUse();
 	// 시전 취소(이동 중단 등). 효과·차감 없이 상태/게이지만 정리한다.
 	void CancelConsumableCast();
-	// 서버 권한에서 효과만 적용한다(수량 차감은 시전 완료 시점에 별도 처리).
-	void UseConsumableAuthoritative(FName ItemRowName);
+	void ResetConsumableClientState();
+	uint32 AllocateConsumableUseID();
 
-	// 투척 소모품 조준 시작(범위 인디케이터 표시). 이미 조준/시전 중이면 무시한다.
+	// 서버 사용 트랜잭션: 검증 → 시전 완료 차감 → 발동 지연 → 효과 적용.
+	void BeginConsumableUseAuthoritative(uint32 UseID, FName ItemRowName, bool bThrown, const FVector& TargetLocation);
+	bool ValidateConsumableUseRequest(FName ItemRowName, bool bThrown, const FVector& TargetLocation, const struct FLSConsumableRow*& OutConsumableDef) const;
+	void CompleteConsumableCastAuthoritative();
+	void TriggerConsumableAuthoritative();
+	void EndConsumableUseAuthoritative();
+	void ResetConsumableServerState();
+	bool UseConsumableAuthoritative(FName ItemRowName);
+
+	// 투척 소모품 조준 시작(범위 인디케이터 표시). 이미 조준/사용 처리 중이면 무시한다.
 	void BeginThrowAim(FName ItemRowName, const struct FLSConsumableRow& ConsumableDef);
 	// 조준 중 매 틱: 마우스 지점을 사거리로 clamp해 인디케이터/착탄 지점을 갱신한다.
 	void UpdateThrowAim();
@@ -443,21 +450,19 @@ private:
 	bool ConfirmThrowAim();
 	// 조준 취소: 인디케이터를 내리고 상태를 리셋한다. 투척/차감 없음.
 	bool CancelThrowAim();
-	// 서버 권한에서 착탄 지점 주변 적을 수집해 효과만 적용한다(수량 차감은 시전 완료 시점에 별도 처리).
-	void UseThrownConsumableAuthoritative(FName ItemRowName, const FVector& TargetLocation);
-	// 서버 권한에서 소모품 수량 1 차감 + 클라 미러를 실행한다(모든 소모품, 시전 완료 시점 호출).
-	void ConsumeConsumableAuthoritative(FName ItemRowName);
+	// 서버 권한에서 착탄 지점 주변 적을 수집해 효과만 적용한다.
+	bool UseThrownConsumableAuthoritative(FName ItemRowName, const FVector& TargetLocation);
 	// 착탄 지점 기준 도형(Sphere/Cone/Box) 안의 적(ALSEnemyCharacter)을 수집한다.
 	void CollectThrowTargets(const struct FLSConsumableRow& ConsumableDef, const FVector& Center, TArray<AActor*>& OutTargets) const;
 	class ULSSkillPreviewComponent* ResolveSkillPreviewComponent() const;
 
 	// 소모품 시전 상태.
+	bool bIsConsumableUsePending = false;
 	bool bIsConsumableCasting = false;
 	bool bCastAllowsMove = false;
-	FName CastingConsumableRowName;
-	float PendingTriggerDelay = 0.0f;
+	uint32 NextConsumableUseID = 0;
+	uint32 ActiveConsumableUseID = 0;
 	FTimerHandle ConsumableCastCompleteTimer;
-	FTimerHandle ConsumableTriggerDelayTimer;
 
 	// 투척 조준/확정 상태.
 	bool bIsThrowAiming = false;
@@ -467,4 +472,14 @@ private:
 	// 시전 완료 후 투척으로 확정할지와 그 착탄 지점.
 	bool bPendingThrow = false;
 	FVector PendingThrowTargetLocation = FVector::ZeroVector;
+
+	// 서버 전용 소모품 사용 트랜잭션 상태. 차감 뒤에는 취소할 수 없다.
+	bool bServerConsumableUseActive = false;
+	bool bServerConsumableCommitted = false;
+	uint32 ServerConsumableUseID = 0;
+	FName ServerConsumableRowName;
+	bool bServerConsumableThrown = false;
+	FVector ServerConsumableTargetLocation = FVector::ZeroVector;
+	FTimerHandle ServerConsumableCastTimer;
+	FTimerHandle ServerConsumableTriggerTimer;
 };

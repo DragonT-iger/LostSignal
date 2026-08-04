@@ -577,7 +577,7 @@ void ALSPlayerCharacter::OnItem6() { TryUseQuickSlot(5); }
 
 void ALSPlayerCharacter::TryUseQuickSlot(const int32 QuickSlotIndex)
 {
-	if (!IsLocallyControlled() || bIsConsumableCasting)
+	if (!IsLocallyControlled() || bIsConsumableUsePending)
 	{
 		return;
 	}
@@ -654,93 +654,50 @@ void ALSPlayerCharacter::TryUseQuickSlot(const int32 QuickSlotIndex)
 
 void ALSPlayerCharacter::BeginConsumableCast(const FName ItemRowName, const FLSConsumableRow& ConsumableDef)
 {
-	CastingConsumableRowName = ItemRowName;
-	PendingTriggerDelay = FMath::Max(ConsumableDef.Item_Trigger_Delay, 0.0f);
-
-	// 시전 시간이 없으면 게이지 없이 바로 완료 처리로 넘어간다.
-	if (ConsumableDef.Item_Cast_Time <= 0.0f)
+	if (bIsConsumableUsePending)
 	{
-		bIsConsumableCasting = false;
-		HandleConsumableCastComplete();
 		return;
 	}
 
-	bIsConsumableCasting = true;
+	ActiveConsumableUseID = AllocateConsumableUseID();
+	bIsConsumableUsePending = true;
 	bCastAllowsMove = ConsumableDef.Item_Can_Move;
 
-	if (ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>())
+	const float CastTime = FMath::Max(ConsumableDef.Item_Cast_Time, 0.0f);
+	if (CastTime > 0.0f)
 	{
-		const LSInventorySlotUtils::FLSItemTradeInfo TradeInfo = LSInventorySlotUtils::ResolveItemTradeInfo(ItemRowName);
-		PlayerController->ShowCastGauge(TradeInfo.bValid ? TradeInfo.Name : FText::FromName(ItemRowName), ConsumableDef.Item_Cast_Time);
+		bIsConsumableCasting = true;
+		if (ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>())
+		{
+			const LSInventorySlotUtils::FLSItemTradeInfo TradeInfo = LSInventorySlotUtils::ResolveItemTradeInfo(ItemRowName);
+			PlayerController->ShowCastGauge(TradeInfo.bValid ? TradeInfo.Name : FText::FromName(ItemRowName), CastTime);
+		}
+		GetWorldTimerManager().SetTimer(ConsumableCastCompleteTimer, this, &ALSPlayerCharacter::HandleConsumableCastComplete, CastTime, false);
 	}
 
-	GetWorldTimerManager().SetTimer(ConsumableCastCompleteTimer, this, &ALSPlayerCharacter::HandleConsumableCastComplete, ConsumableDef.Item_Cast_Time, false);
+	const FVector TargetLocation = bPendingThrow ? PendingThrowTargetLocation : GetActorLocation();
+	if (HasAuthority())
+	{
+		BeginConsumableUseAuthoritative(ActiveConsumableUseID, ItemRowName, bPendingThrow, TargetLocation);
+	}
+	else
+	{
+		ServerBeginConsumableUse(ActiveConsumableUseID, ItemRowName, bPendingThrow, TargetLocation);
+	}
+
+	if (CastTime <= 0.0f)
+	{
+		HandleConsumableCastComplete();
+	}
 }
 
 void ALSPlayerCharacter::HandleConsumableCastComplete()
 {
-	// 시전 구간 종료(여기부터는 취소 불가). 게이지를 내린다.
+	// 로컬 표시만 종료한다. 서버는 자체 타이머에서 차감과 발동 지연을 이어간다.
 	bIsConsumableCasting = false;
 	if (ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>())
 	{
 		PlayerController->HideCastGauge();
-	}
-
-	// 모든 소모품은 시전 완료 시점에 수량을 차감한다(효과는 이후 발동 지연 뒤 적용).
-	if (!CastingConsumableRowName.IsNone())
-	{
-		if (HasAuthority())
-		{
-			ConsumeConsumableAuthoritative(CastingConsumableRowName);
-		}
-		else
-		{
-			ServerConsumeConsumable(CastingConsumableRowName);
-		}
-	}
-
-	if (PendingTriggerDelay > 0.0f)
-	{
-		GetWorldTimerManager().SetTimer(ConsumableTriggerDelayTimer, this, &ALSPlayerCharacter::FinishConsumableUse, PendingTriggerDelay, false);
-		return;
-	}
-
-	FinishConsumableUse();
-}
-
-void ALSPlayerCharacter::FinishConsumableUse()
-{
-	const FName ItemRowName = CastingConsumableRowName;
-	CastingConsumableRowName = NAME_None;
-	if (ItemRowName.IsNone())
-	{
-		bPendingThrow = false;
-		return;
-	}
-
-	// 투척 확정이면 착탄 지점을 함께 서버로 보낸다.
-	if (bPendingThrow)
-	{
-		const FVector TargetLocation = PendingThrowTargetLocation;
-		bPendingThrow = false;
-		if (HasAuthority())
-		{
-			UseThrownConsumableAuthoritative(ItemRowName, TargetLocation);
-		}
-		else
-		{
-			ServerUseThrownConsumable(ItemRowName, TargetLocation);
-		}
-		return;
-	}
-
-	if (HasAuthority())
-	{
-		UseConsumableAuthoritative(ItemRowName);
-	}
-	else
-	{
-		ServerUseConsumable(ItemRowName);
 	}
 }
 
@@ -751,10 +708,25 @@ void ALSPlayerCharacter::CancelConsumableCast()
 		return;
 	}
 
+	const uint32 CancelledUseID = ActiveConsumableUseID;
+	ResetConsumableClientState();
+	if (CancelledUseID == 0)
+	{
+		return;
+	}
+
+	ServerCancelConsumableUse(CancelledUseID);
+}
+
+void ALSPlayerCharacter::ResetConsumableClientState()
+{
 	GetWorldTimerManager().ClearTimer(ConsumableCastCompleteTimer);
+	bIsConsumableUsePending = false;
 	bIsConsumableCasting = false;
-	CastingConsumableRowName = NAME_None;
+	bCastAllowsMove = false;
+	ActiveConsumableUseID = 0;
 	bPendingThrow = false;
+	PendingThrowTargetLocation = FVector::ZeroVector;
 
 	if (ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>())
 	{
@@ -762,36 +734,221 @@ void ALSPlayerCharacter::CancelConsumableCast()
 	}
 }
 
-void ALSPlayerCharacter::ServerUseConsumable_Implementation(const FName ItemRowName)
+uint32 ALSPlayerCharacter::AllocateConsumableUseID()
 {
-	UseConsumableAuthoritative(ItemRowName);
+	++NextConsumableUseID;
+	if (NextConsumableUseID == 0)
+	{
+		++NextConsumableUseID;
+	}
+	return NextConsumableUseID;
 }
 
-void ALSPlayerCharacter::UseConsumableAuthoritative(const FName ItemRowName)
+void ALSPlayerCharacter::ServerBeginConsumableUse_Implementation(
+	const uint32 UseID,
+	const FName ItemRowName,
+	const bool bThrown,
+	const FVector_NetQuantize TargetLocation)
 {
-	if (!HasAuthority() || ItemRowName.IsNone())
+	BeginConsumableUseAuthoritative(UseID, ItemRowName, bThrown, TargetLocation);
+}
+
+void ALSPlayerCharacter::ServerCancelConsumableUse_Implementation(const uint32 UseID)
+{
+	if (!HasAuthority() || !bServerConsumableUseActive || bServerConsumableCommitted || ServerConsumableUseID != UseID)
 	{
 		return;
 	}
 
+	UE_LOG(LogLS, Verbose, TEXT("[Consumable] 서버 시전 취소: '%s' (UseID=%u)."), *ServerConsumableRowName.ToString(), UseID);
+	EndConsumableUseAuthoritative();
+}
+
+void ALSPlayerCharacter::ClientEndConsumableUse_Implementation(const uint32 UseID)
+{
+	if (ActiveConsumableUseID == UseID)
+	{
+		ResetConsumableClientState();
+	}
+}
+
+void ALSPlayerCharacter::BeginConsumableUseAuthoritative(
+	const uint32 UseID,
+	const FName ItemRowName,
+	const bool bThrown,
+	const FVector& TargetLocation)
+{
+	const FLSConsumableRow* ConsumableDef = nullptr;
+	if (!HasAuthority() || UseID == 0 || bServerConsumableUseActive
+		|| !ValidateConsumableUseRequest(ItemRowName, bThrown, TargetLocation, ConsumableDef))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Consumable] 서버 사용 시작 거부: '%s' (UseID=%u)."), *ItemRowName.ToString(), UseID);
+		ClientEndConsumableUse(UseID);
+		return;
+	}
+
+	bServerConsumableUseActive = true;
+	bServerConsumableCommitted = false;
+	ServerConsumableUseID = UseID;
+	ServerConsumableRowName = ItemRowName;
+	bServerConsumableThrown = bThrown;
+	ServerConsumableTargetLocation = TargetLocation;
+
+	const float CastRange = FMath::Max(ConsumableDef->Item_Cast_Range, 0.0f);
+	FVector ToTarget = ServerConsumableTargetLocation - GetActorLocation();
+	ToTarget.Z = 0.0f;
+	if (bThrown && CastRange > 0.0f && ToTarget.SizeSquared() > FMath::Square(CastRange))
+	{
+		ServerConsumableTargetLocation = GetActorLocation() + ToTarget.GetSafeNormal() * CastRange;
+		ServerConsumableTargetLocation.Z = TargetLocation.Z;
+	}
+
+	const float CastTime = FMath::Max(ConsumableDef->Item_Cast_Time, 0.0f);
+	if (CastTime > 0.0f)
+	{
+		GetWorldTimerManager().SetTimer(ServerConsumableCastTimer, this, &ALSPlayerCharacter::CompleteConsumableCastAuthoritative, CastTime, false);
+		return;
+	}
+
+	CompleteConsumableCastAuthoritative();
+}
+
+bool ALSPlayerCharacter::ValidateConsumableUseRequest(
+	const FName ItemRowName,
+	const bool bThrown,
+	const FVector& TargetLocation,
+	const FLSConsumableRow*& OutConsumableDef) const
+{
+	OutConsumableDef = nullptr;
+	if (ItemRowName.IsNone() || (bThrown && TargetLocation.ContainsNaN()))
+	{
+		return false;
+	}
+
 	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
 	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
-	const FLSConsumableRow* ConsumableDef = GameData ? GameData->FindConsumableRow(ItemRowName, TEXT("UseConsumableAuthoritative")) : nullptr;
-	if (!ConsumableDef)
+	OutConsumableDef = GameData ? GameData->FindConsumableRow(ItemRowName, TEXT("ValidateConsumableUseRequest")) : nullptr;
+	if (!OutConsumableDef || OutConsumableDef->Item_Effects.Num() == 0)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[QuickSlot] No DT_Consumable row for '%s' on server."), *ItemRowName.ToString());
+		return false;
+	}
+
+	const ELSConsumableUseType ExpectedUseType = bThrown ? ELSConsumableUseType::Throwable : ELSConsumableUseType::Direct;
+	if (OutConsumableDef->Item_Use_Type != ExpectedUseType)
+	{
+		return false;
+	}
+
+	for (const FLSConsumableEffectValue& EffectValue : OutConsumableDef->Item_Effects)
+	{
+		if (EffectValue.Effect_ID.IsNone()
+			|| !GameData->FindConsumableEffectRow(EffectValue.Effect_ID, TEXT("ValidateConsumableUseRequest")))
+		{
+			return false;
+		}
+	}
+
+	const ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>();
+	const ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
+	const ULSCharacterCombatComponent* CombatComponent = GetCharacterCombatComponent();
+	return RaidInventory && RaidInventory->IsRaidActive() && (!CombatComponent || !CombatComponent->IsDead())
+		&& LSCraftingUtils::CountItem(RaidInventory->GetSessionInventory(), ItemRowName) >= 1;
+}
+
+void ALSPlayerCharacter::CompleteConsumableCastAuthoritative()
+{
+	if (!HasAuthority() || !bServerConsumableUseActive || bServerConsumableCommitted)
+	{
 		return;
 	}
 
 	ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>();
 	ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
-	if (!RaidInventory || !RaidInventory->IsRaidActive())
+	const ULSCharacterCombatComponent* CombatComponent = GetCharacterCombatComponent();
+	const int32 ConsumedAmount = RaidInventory && RaidInventory->IsRaidActive()
+		&& (!CombatComponent || !CombatComponent->IsDead())
+		? RaidInventory->ConsumeSessionItem(ServerConsumableRowName, 1)
+		: 0;
+	if (ConsumedAmount != 1)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Consumable] 서버 차감 실패: '%s' (UseID=%u)."), *ServerConsumableRowName.ToString(), ServerConsumableUseID);
+		if (PlayerController)
+		{
+			PlayerController->SyncRaidInventoryToClient();
+		}
+		EndConsumableUseAuthoritative();
+		return;
+	}
+
+	bServerConsumableCommitted = true;
+	PlayerController->SyncRaidInventoryToClient();
+	UE_LOG(LogLS, Log, TEXT("[Consumable] 서버 차감: '%s' (UseID=%u)."), *ServerConsumableRowName.ToString(), ServerConsumableUseID);
+
+	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	const FLSConsumableRow* ConsumableDef = GameData ? GameData->FindConsumableRow(ServerConsumableRowName, TEXT("CompleteConsumableCastAuthoritative")) : nullptr;
+	const float TriggerDelay = ConsumableDef ? FMath::Max(ConsumableDef->Item_Trigger_Delay, 0.0f) : 0.0f;
+	if (TriggerDelay > 0.0f)
+	{
+		GetWorldTimerManager().SetTimer(ServerConsumableTriggerTimer, this, &ALSPlayerCharacter::TriggerConsumableAuthoritative, TriggerDelay, false);
+		return;
+	}
+
+	TriggerConsumableAuthoritative();
+}
+
+void ALSPlayerCharacter::TriggerConsumableAuthoritative()
+{
+	if (!HasAuthority() || !bServerConsumableUseActive || !bServerConsumableCommitted)
 	{
 		return;
 	}
 
-	// 수량 차감은 시전 완료 시점(ConsumeConsumableAuthoritative)에서 이미 끝났다. 여기서는 효과만 적용한다.
-	// 효과 적용(대상=자기 자신). 소모품 효과 코어가 서버 권한을 다시 검증한다.
+	if (bServerConsumableThrown)
+	{
+		UseThrownConsumableAuthoritative(ServerConsumableRowName, ServerConsumableTargetLocation);
+	}
+	else
+	{
+		UseConsumableAuthoritative(ServerConsumableRowName);
+	}
+	EndConsumableUseAuthoritative();
+}
+
+void ALSPlayerCharacter::EndConsumableUseAuthoritative()
+{
+	const uint32 EndedUseID = ServerConsumableUseID;
+	ResetConsumableServerState();
+	ClientEndConsumableUse(EndedUseID);
+}
+
+void ALSPlayerCharacter::ResetConsumableServerState()
+{
+	GetWorldTimerManager().ClearTimer(ServerConsumableCastTimer);
+	GetWorldTimerManager().ClearTimer(ServerConsumableTriggerTimer);
+	bServerConsumableUseActive = false;
+	bServerConsumableCommitted = false;
+	ServerConsumableUseID = 0;
+	ServerConsumableRowName = NAME_None;
+	bServerConsumableThrown = false;
+	ServerConsumableTargetLocation = FVector::ZeroVector;
+}
+
+bool ALSPlayerCharacter::UseConsumableAuthoritative(const FName ItemRowName)
+{
+	if (!HasAuthority() || ItemRowName.IsNone())
+	{
+		return false;
+	}
+
+	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	const FLSConsumableRow* ConsumableDef = GameData ? GameData->FindConsumableRow(ItemRowName, TEXT("UseConsumableAuthoritative")) : nullptr;
+	if (!ConsumableDef || ConsumableDef->Item_Use_Type != ELSConsumableUseType::Direct)
+	{
+		return false;
+	}
+
 	bool bApplied = false;
 	if (ULSCharacterCombatComponent* CombatComponent = GetCharacterCombatComponent())
 	{
@@ -799,6 +956,7 @@ void ALSPlayerCharacter::UseConsumableAuthoritative(const FName ItemRowName)
 	}
 
 	UE_LOG(LogLS, Log, TEXT("[Consumable] 사용 발동: '%s'%s."), *ItemRowName.ToString(), bApplied ? TEXT("") : TEXT(" (적용된 효과 없음)"));
+	return bApplied;
 }
 
 namespace
@@ -839,7 +997,7 @@ ULSSkillPreviewComponent* ALSPlayerCharacter::ResolveSkillPreviewComponent() con
 
 void ALSPlayerCharacter::BeginThrowAim(const FName ItemRowName, const FLSConsumableRow& ConsumableDef)
 {
-	if (bIsThrowAiming || bIsConsumableCasting)
+	if (bIsThrowAiming || bIsConsumableUsePending)
 	{
 		return;
 	}
@@ -954,29 +1112,21 @@ bool ALSPlayerCharacter::CancelThrowAim()
 	return true;
 }
 
-void ALSPlayerCharacter::ServerUseThrownConsumable_Implementation(const FName ItemRowName, const FVector_NetQuantize TargetLocation)
-{
-	UseThrownConsumableAuthoritative(ItemRowName, TargetLocation);
-}
-
-void ALSPlayerCharacter::UseThrownConsumableAuthoritative(const FName ItemRowName, const FVector& TargetLocation)
+bool ALSPlayerCharacter::UseThrownConsumableAuthoritative(const FName ItemRowName, const FVector& TargetLocation)
 {
 	if (!HasAuthority() || ItemRowName.IsNone())
 	{
-		return;
+		return false;
 	}
 
 	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
 	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
 	const FLSConsumableRow* ConsumableDef = GameData ? GameData->FindConsumableRow(ItemRowName, TEXT("UseThrownConsumableAuthoritative")) : nullptr;
-	if (!ConsumableDef)
+	if (!ConsumableDef || ConsumableDef->Item_Use_Type != ELSConsumableUseType::Throwable)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[QuickSlot] No DT_Consumable row for '%s' on server (thrown)."), *ItemRowName.ToString());
-		return;
+		return false;
 	}
-
-	// 수량 차감은 시전 완료 시점(ConsumeConsumableAuthoritative)에서 이미 끝났다.
-	// 여기서는 발동 지연 뒤 효과만 적용한다(재차감/재검사 없음).
 
 	// 착탄 지점 범위 내 적을 수집해 효과 적용(Self 효과는 소유자 1회).
 	TArray<AActor*> AreaTargets;
@@ -989,37 +1139,7 @@ void ALSPlayerCharacter::UseThrownConsumableAuthoritative(const FName ItemRowNam
 	}
 
 	UE_LOG(LogLS, Log, TEXT("[Consumable] 투척 발동: '%s' 착탄 대상 %d명%s."), *ItemRowName.ToString(), AreaTargets.Num(), bApplied ? TEXT("") : TEXT(" (적용된 효과 없음)"));
-}
-
-void ALSPlayerCharacter::ServerConsumeConsumable_Implementation(const FName ItemRowName)
-{
-	ConsumeConsumableAuthoritative(ItemRowName);
-}
-
-void ALSPlayerCharacter::ConsumeConsumableAuthoritative(const FName ItemRowName)
-{
-	if (!HasAuthority() || ItemRowName.IsNone())
-	{
-		return;
-	}
-
-	ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>();
-	ULSRaidInventoryComponent* RaidInventory = PlayerController ? PlayerController->GetRaidInventoryComponent() : nullptr;
-	if (!RaidInventory || !RaidInventory->IsRaidActive())
-	{
-		return;
-	}
-
-	if (LSCraftingUtils::CountItem(RaidInventory->GetSessionInventory(), ItemRowName) < 1)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Consumable] 차감 실패: '%s' 보유 수량 없음."), *ItemRowName.ToString());
-		return;
-	}
-
-	// 시전 완료 시점 차감(효과는 발동 지연 뒤 별도 적용). 차감 즉시 클라 미러로 개수 갱신.
-	RaidInventory->ConsumeSessionItem(ItemRowName, 1);
-	PlayerController->SyncRaidInventoryToClient();
-	UE_LOG(LogLS, Log, TEXT("[Consumable] 차감: '%s' (시전 완료)."), *ItemRowName.ToString());
+	return bApplied;
 }
 
 void ALSPlayerCharacter::CollectThrowTargets(const FLSConsumableRow& ConsumableDef, const FVector& Center, TArray<AActor*>& OutTargets) const

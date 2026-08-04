@@ -43,7 +43,7 @@
 
 ## 사용(소비) 흐름
 
-퀵슬롯 키 입력으로 소모품을 사용하는 경로는 [QuickSlotSystem.md](QuickSlotSystem.md)가 소유한다(입력→시전→차감→발동 지연→효과 적용). 시전 시간(`Item_Cast_Time`)·이동 중단(`Item_Can_Move`)·발동 지연(`Item_Trigger_Delay`)을 반영하며, 시전은 클라 구동(HUD 시전 게이지)이다. **수량 1 차감은 모든 소모품 공통으로 시전 완료 시점**에 실행하고(발동 지연 전), **효과 적용은 발동 지연 뒤**에 실행한다. 직접 사용(`Direct`)은 자기 자신(Self)에게, 투척(`Throwable`)은 조준한 착탄 지점 범위 내 적에게 `ApplyConsumableEffectsInArea`로 적용한다(Self 효과는 소유자 1회).
+퀵슬롯 키 입력으로 소모품을 사용하는 경로는 [QuickSlotSystem.md](QuickSlotSystem.md)가 소유한다(입력→서버 시전→차감→발동 지연→효과 적용). HUD 시전 게이지와 조준 표시는 클라이언트가 담당하지만, 서버가 고유 사용 트랜잭션으로 `Item_Cast_Time`·취소 가능 구간·`Item_Trigger_Delay`를 관리한다. **수량 1 차감은 모든 소모품 공통으로 서버 시전 완료 시점**에 실행하고(발동 지연 전), 정확히 1개 차감된 트랜잭션에만 **발동 지연 뒤 효과를 적용**한다. 직접 사용(`Direct`)은 자기 자신(Self)에게, 투척(`Throwable`)은 서버가 사거리로 다시 제한한 착탄 지점 범위 내 적에게 `ApplyConsumableEffectsInArea`로 적용한다(Self 효과는 소유자 1회).
 
 ## 조회
 

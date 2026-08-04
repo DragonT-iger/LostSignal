@@ -53,10 +53,10 @@
 
 `ALSPlayerCharacter`의 `Item1~6Action`이 퀵슬롯 0~5에 대응하며, 핸들러 `OnItemN`이 `TryUseQuickSlot(N-1)`을 호출한다. 폰은 레이드에만 존재하므로 사용은 레이드 전용이다.
 
-- **클라 진입**(`TryUseQuickSlot`): 퀵슬롯 RowName 조회 → `ULSGameDataSubsystem::FindConsumableRow` → 클라 미러 세션 인벤토리 보유 수량 확인 → 시전 시작.
-- **시전**(클라 구동): `Item_Cast_Time`>0이면 HUD 시전 게이지(`ALSPlayerControllerBase::ShowCastGauge`, 스킬 캐스팅 게이지 재사용) + 타이머. 시전 중 `Item_Can_Move=false`인데 이동 입력이 들어오면 취소(`Move` 훅). 완료 후 `Item_Trigger_Delay`만큼 더 대기(이 구간은 취소 불가).
-- **차감(시전 완료 시점, 모든 소모품 공통)**: 시전이 끝나면 `Item_Trigger_Delay`를 기다리기 **전에** 서버에서 수량 1을 차감한다(`ConsumeConsumableAuthoritative`, `ServerConsumeConsumable`). 서버에서 보유 수량 재검증 → `ULSRaidInventoryComponent::ConsumeSessionItem(RowName, 1)`(일반 인벤토리만 차감) → `SyncRaidInventoryToClient`로 미러+갱신(퀵슬롯 개수 즉시 반영). 차감은 발동 지연 시점이 아니라 **시전 완료 시점**이다.
-- **효과 적용(발동 지연 뒤)**: 직접 사용은 `UseConsumableAuthoritative`(`ServerUseConsumable` RPC, 대상=Self, `ApplyConsumableEffects`), 투척은 아래 투척 절(`UseThrownConsumableAuthoritative`). 이 단계는 효과만 적용하고 **재차감하지 않는다**.
+- **클라 진입**(`TryUseQuickSlot`): 퀵슬롯 RowName 조회 → `ULSGameDataSubsystem::FindConsumableRow` → 클라 미러 세션 인벤토리 보유 수량 확인 → 로컬 게이지/조준 표시 시작과 함께 고유 `UseID`로 `ServerBeginConsumableUse` 요청. 클라 검사는 빠른 피드백용이며 판정 권한은 없다.
+- **서버 트랜잭션**: 서버는 동시 사용이 없는지와 Row·사용 타입·효과 사전·레이드 상태·실제 보유 수량을 검증하고 자체 시전 타이머를 시작한다. 로컬 타이머는 HUD만 담당하며, 이동 취소는 시전 구간에만 `ServerCancelConsumableUse(UseID)`로 전달한다. 서버가 차감한 뒤의 발동 지연 구간은 취소할 수 없고, `ClientEndConsumableUse`를 받을 때까지 새 소모품 사용을 막는다.
+- **차감(시전 완료 시점, 모든 소모품 공통)**: 서버 시전 타이머가 끝나면 `ULSRaidInventoryComponent::ConsumeSessionItem(RowName, 1)`의 실제 반환값이 정확히 1인지 확인한다. 성공한 경우에만 `SyncRaidInventoryToClient`로 미러+갱신하고 발동 단계로 넘어간다. 차감 실패 트랜잭션에는 효과를 적용하지 않는다.
+- **효과 적용(발동 지연 뒤)**: 차감에 성공한 서버 트랜잭션만 서버 발동 타이머 뒤 직접 사용은 `UseConsumableAuthoritative` → `ApplyConsumableEffects`, 투척은 `UseThrownConsumableAuthoritative` → `ApplyConsumableEffectsInArea`로 적용한다. 완료·거부·시전 취소 모두 같은 `UseID`를 종료해 오래된 응답이 새 사용 상태를 지우지 않게 한다.
 
 ### 투척(Throwable) — 범위 인디케이터 조준
 
@@ -65,9 +65,9 @@
 - **조준 시작**(`BeginThrowAim`): 소모품 Row 도형을 `FLSSkillAreaPreviewSpec`으로 변환(`Sphere→Circle 360°`, `Cone→Circle+Degrees`, `Box→Box`) 후 `BeginAreaPreview`.
 - **매 틱**(`UpdateThrowAim`, Tick): 마우스 월드 지점을 `Item_Cast_Range`로 clamp해 착탄 지점/인디케이터를 갱신.
 - **확정/취소 입력(스킬과 동일)**: 좌클릭(Attack)=`ConfirmThrowAim`, 취소키(SkillCancel)·우클릭(Skill1)·대시=`CancelThrowAim`, 아이템 키 재입력=취소.
-- **확정 시**: 착탄 지점을 확정하고 시전(`Item_Cast_Time`) → 발동 지연(`Item_Trigger_Delay`) 순으로 진행한다.
+- **확정 시**: 착탄 지점을 포함해 서버 사용 트랜잭션을 시작하고 시전(`Item_Cast_Time`) → 발동 지연(`Item_Trigger_Delay`) 순으로 진행한다. 서버는 `Item_Use_Type==Throwable`을 재검증하고 전달된 착탄 지점을 서버 캐릭터 기준 `Item_Cast_Range` 안으로 다시 clamp한다.
 - **수량 차감은 시전 완료 시점**(모든 소모품 공통, 아래 "사용(소비)" 절 참고) — 발동 지연 시점이 아니다.
-- **효과 적용은 발동 지연 뒤**(`ServerUseThrownConsumable` → `UseThrownConsumableAuthoritative`): 착탄 지점 기준 도형 안의 적(`ALSEnemyCharacter`)을 수집(`CollectThrowTargets`, 2D 판정) → `ULSCharacterCombatComponent::ApplyConsumableEffectsInArea`(Self 효과는 소유자 1회, Enemy 효과는 대상별). 이 단계는 재차감하지 않는다.
+- **효과 적용은 발동 지연 뒤**(`TriggerConsumableAuthoritative` → `UseThrownConsumableAuthoritative`): 서버가 확정한 착탄 지점 기준 도형 안의 적(`ALSEnemyCharacter`)을 수집(`CollectThrowTargets`, 2D 판정) → `ULSCharacterCombatComponent::ApplyConsumableEffectsInArea`(Self 효과는 소유자 1회, Enemy 효과는 대상별). 이 단계는 재차감하지 않는다.
 
 효과 적용 규칙·미지원 조합은 [ConsumableSystem.md](ConsumableSystem.md)가 소유한다.
 
