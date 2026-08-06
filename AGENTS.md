@@ -7,7 +7,8 @@
 - **팀:** 프로그래머 2 / 아트 2 / 기획 3
 - **버전관리:** git-svn (`git svn rebase` / `git svn dcommit`)
 - **로컬라이징:** 한국어(기본) / 영어
-- **서버:** 싱글 먼저 → 3인 MO 데디케이티드
+- **서버:** 싱글 먼저 → 3인 MO. 접속 경로 3계층 — IP 직접/친구 방은 리슨, 커뮤니티 서버 목록은 유저 운영 데디, 공개 매칭은 우리 운영 데디. 레이드는 개별 탈출 + 관전자. 상세는 [DedicatedServerBuildout.md](Docs/Systems/DedicatedServerBuildout.md)
+- **저장:** 출시는 로컬 `SaveGame` + Steam Cloud(진행 데이터 포함). 서버 권위 저장 전환은 **학습용**이며 출시 방침이 아니다 — [SaveBackendMigration.md](Docs/Systems/SaveBackendMigration.md)
 - **클래스 접두사:** `LS` (예: `ALSCharacter`, `ULSCombatComponent`)
 
 ---
@@ -82,7 +83,7 @@
 | [Docs/Systems/CraftingSystem.md](Docs/Systems/CraftingSystem.md) | 제작 레시피·UI 필터·재료 소비·완성품 지급·원자적 저장 규칙 |
 | [Docs/Systems/CharacterNodeSystem.md](Docs/Systems/CharacterNodeSystem.md) | 캐릭터 강화 노드 그래프·링 해금·활성화 비용·노드 진행 저장·노드 UI |
 | [Docs/Systems/SaveBackendMigration.md](Docs/Systems/SaveBackendMigration.md) | 서버 권위 저장 전환 계획·단계·백엔드 선택 근거 + 출시 Steam Cloud 실무 (**학습용, 출시 방침 아님**) |
-| [Docs/Systems/DedicatedServerBuildout.md](Docs/Systems/DedicatedServerBuildout.md) | 데디케이티드 서버 구축 — 빌드 타깃·서버 부팅·접속/이탈·전역 상태 정리·매치 접속·운영·검증 |
+| [Docs/Systems/DedicatedServerBuildout.md](Docs/Systems/DedicatedServerBuildout.md) | 멀티플레이·데디 구축 — 공개 매칭(데디)/IP 직접(리슨) 이중 경로·접속/이탈·전역 상태 정리·빌드 타깃·운영·검증 |
 
 ### 트러블슈팅 (버그 원인·수정 기록)
 

@@ -196,6 +196,8 @@ ALSPlayerControllerBase::InitializeRaidInventoryFromSessionSubsystem
 
 `ALSFarmingGameMode`가 레이드 결과를 확정한다.
 
+> **현재는 개별 탈출이 없다.** 아래처럼 누가 탈출·사망하든 `EndRaid`가 모든 PlayerController를 순회해 **레이드를 한 번에 끝낸다.** 3인 MO에서는 개별 탈출 + 관전자 방식으로 개조하기로 결정했으며, 그 계획과 근거(플레이어별 결과 확정 경로, 호스트 이탈 시 생존자 소지품 확정 규칙)는 [DedicatedServerBuildout.md](DedicatedServerBuildout.md)가 단일 출처다. 이 문서는 계획이 아니라 현재 코드를 기술한다.
+
 ```text
 ALSFarmingGameMode::OnExtraction
 -> EndRaid(ELSRaidResult::Extracted)

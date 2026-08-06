@@ -160,7 +160,7 @@ SetWarehouseSlotContext
 
 슬롯은 배경과 아이콘을 별도 위젯으로 겹쳐 표시한다. 슬롯 루트는 `Overlay`이고, 바닥에 `SlotBackgroundImage`(항상 표시되는 슬롯 배경 프레임), 그 위에 `ItemIconImage`(아이템 아이콘), 그 위에 `AmountText`를 둔다. `AmountText`는 DataTable의 최대 스택(`Item_Max`)이 2 이상인 아이템에서만 표시하고, 최대 스택이 1인 아이템은 수량 텍스트를 생략한다. 아이템 아이콘이 배경을 덮어쓰지 않으므로 아이템이 있어도 슬롯 배경이 유지된다.
 
-`SlotBackgroundImage` 브러시는 `DefaultSlotTexture`로 C++가 설정한다. 모든 화면이 공유하는 슬롯 프레임이라 `ULSItemSlotWidget` 생성자에서 공용 텍스처를 기본값으로 물려두며, WBP에서 다른 텍스처를 지정하면 그 값이 우선한다. 둘 다 비어 있으면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다(이때 `UE_LOG(LogLS, Warning, ...)`). 호버/드래그 틴트는 배경과 아이콘 양쪽에 적용해 빈 슬롯에서도 피드백이 보인다. 잠금 틴트는 아이템이 있는 슬롯에서는 아이콘에만 적용하고 배경은 등급색을 유지한다. 아이템이 없는 잠금 슬롯은 배경에도 잠금 틴트를 적용한다.
+`SlotBackgroundImage` 브러시는 `DefaultSlotTexture`로 C++가 설정한다. 공용 슬롯 프레임은 에셋 경로를 C++에 하드코딩하지 않고 WBP 클래스 기본값의 `DefaultSlotTexture`에 매핑한다. 값이 비어 있으면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다(이때 `UE_LOG(LogLS, Warning, ...)`). 호버/드래그 틴트는 배경과 아이콘 양쪽에 적용해 빈 슬롯에서도 피드백이 보인다. 잠금 틴트는 아이템이 있는 슬롯에서는 아이콘에만 적용하고 배경은 등급색을 유지한다. 아이템이 없는 잠금 슬롯은 배경에도 잠금 틴트를 적용한다.
 
 평상시(특수 상태가 아닐 때) 배경 틴트는 아이템 등급색으로 칠한다. 등급은 Row Name 토큰에서 파싱하며(`LSInventorySlotUtils::ResolveItemGradeFromRowName`, 툴팁 등급 표기와 동일 출처), 6등급(`Supply/Standard/Precision/Tuning/Prototype/Masterpiece`)별 색은 `ULSItemSlotWidget`의 `*GradeColor` `UPROPERTY` 기본값으로 두고 디자이너가 조정한다. 등급이 없는 아이템은 `DefaultGradeColor`(UI 시그니처 블루 `#124B6B` 기본값), 아이템이 없는 빈 슬롯은 `EmptySlotBackgroundColor`(`#969696` 불투명도 66% 기본값)를 쓴다. 슬롯 배경 텍스처가 흰색 베이스라 이 틴트 값이 곧 화면에 보이는 슬롯 색이 된다. 호버/드래그 등 특수 상태에서는 기존 피드백 틴트가 우선하고, 잠긴 아이템 슬롯은 아이콘만 흐리게 처리해 등급 배경을 유지한다.
 

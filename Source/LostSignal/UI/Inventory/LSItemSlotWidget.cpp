@@ -17,7 +17,6 @@
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
-#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -25,17 +24,6 @@ namespace
 const FName EmptySlotIconKey(TEXT("__LSEmptySlot__"));
 // 미공개 placeholder(미확인 아이콘)가 적용된 상태를 나타내는 예약 키.
 const FName PlaceholderIconKey(TEXT("__LSUnconfirmed__"));
-}
-
-ULSItemSlotWidget::ULSItemSlotWidget(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
-{
-	// 모든 화면이 공유하는 슬롯 배경 프레임 기본값. WBP에서 다른 텍스처를 지정하면 그 값이 우선한다.
-	static ConstructorHelpers::FObjectFinder<UTexture2D> InventorySlotTextureFinder(TEXT("/Game/LostSignal/UI/Texture/Figma/InventorySlot.InventorySlot"));
-	if (InventorySlotTextureFinder.Succeeded())
-	{
-		DefaultSlotTexture = InventorySlotTextureFinder.Object;
-	}
 }
 
 void ULSItemSlotWidget::SetSlotLayoutSize(const FVector2D InSize)

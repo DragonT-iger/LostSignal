@@ -21,8 +21,6 @@ class LOSTSIGNAL_API ULSItemSlotWidget : public ULSItemTooltipSlotWidget
 	GENERATED_BODY()
 
 public:
-	ULSItemSlotWidget(const FObjectInitializer& ObjectInitializer);
-
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	void SetItem(FName ItemRowName, int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats);
 
@@ -175,7 +173,8 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	FVector2D DefaultSlotLayoutSize = FVector2D(80.f, 80.f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
+	// 공용 슬롯 배경은 에셋 경로를 코드에 고정하지 않고 WBP 클래스 기본값에서 매핑한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<UTexture2D> DefaultSlotTexture;
 
 	// 빈 칸에 표시할 기본 아이콘. 인벤토리 장비칸처럼 슬롯 타입이 고정된 칸에서 아트가 WBP 인스턴스별로 매핑한다.
