@@ -45,6 +45,16 @@
 
 퀵슬롯 키 입력으로 소모품을 사용하는 경로는 [QuickSlotSystem.md](QuickSlotSystem.md)가 소유한다(입력→서버 시전→차감→발동 지연→효과 적용). HUD 시전 게이지와 조준 표시는 클라이언트가 담당하지만, 서버가 고유 사용 트랜잭션으로 `Item_Cast_Time`·취소 가능 구간·`Item_Trigger_Delay`를 관리한다. **수량 1 차감은 모든 소모품 공통으로 서버 시전 완료 시점**에 실행하고(발동 지연 전), 정확히 1개 차감된 트랜잭션에만 **발동 지연 뒤 효과를 적용**한다. 직접 사용(`Direct`)은 자기 자신(Self)에게, 투척(`Throwable`)은 서버가 사거리로 다시 제한한 착탄 지점 범위 내 적에게 `ApplyConsumableEffectsInArea`로 적용한다(Self 효과는 소유자 1회).
 
+## 사용 중 회복 미리보기 (클라 표시)
+
+HP 회복 소모품은 서버 발동으로 실제 회복이 적용되기 전(시전+발동 지연 구간)에 **예상 회복 후 체력**을 HUD 생존 상태 위젯의 프리뷰 체력 바에 미리 보여준다. 순수 클라이언트 로컬 표시이며 판정 권한은 없다(캐스트 게이지와 동일).
+
+- **회복량 계산:** [`ULSGameDataSubsystem::GetConsumableSelfInstantHealthRecovery`](../../Source/LostSignal/Data/LSGameDataSubsystem.h)가 소모품의 `Item_Effects`를 순회해 **자기 즉발 회복**(Attribute/Health/Add + Self + Once + 비율 아님)만 합산한다. 분류 기준은 위 "효과는 성질로 분리한다" 표의 즉발 Health/Add 경로(`ApplyConsumableAttributeEffect`)와 동일하게 맞춘다. `Periodic`/`Percent`는 적용이 미지원(스킵)이라 프리뷰에서도 제외한다.
+- **표시:** `ULSSurvivalStatusWidget::SetHealthPreview(TargetHealth, Duration, bIsRecovery=true)`에 `현재 체력 + 회복량`을 전달한다(위젯이 MaxHealth로 클램프, `Duration` 경과 시 자동 클리어). 프리뷰 바는 생존 프로토콜 레벨 게이트(`HealthPreviewFillProtocolLevel`) 이상에서만 채워진다.
+  - 위젯은 절대 타겟을 **현재 체력 기준 델타**로 저장하고 `RefreshDisplay`마다 `현재 체력 + 델타`로 재계산한다. 그래서 **시전 중 데미지로 현재 체력이 깎이면**(GAS 델리게이트 → `RefreshDisplay`) 프리뷰도 그만큼 내려가 실제 회복 결과와 일치한다.
+- **배선:** `ALSPlayerCharacter::TryBeginHealthRecoveryPreview`(시전 시작 시) → `ALSPlayerControllerBase::ShowHealthRecoveryPreview` → `ULSPlayerHUDWidget::ShowHealthRecoveryPreview` → 위젯. 캐스트 게이지(`ShowCastGauge`)와 동일한 컨트롤러→HUD 라우팅이다. `Duration`은 `Item_Cast_Time + Item_Trigger_Delay`라 회복 착탄 시점 근처에 자동으로 사라진다. 시전 취소·사용 종료 시 `ClearHealthRecoveryPreview`로도 정리한다.
+- **범위:** 직접 사용(`Direct`) 자기 회복만. 투척형·스태미나 프리뷰는 후속(위젯에 스태미나 프리뷰 바 없음). 사용(소비) 흐름 자체는 [QuickSlotSystem.md](QuickSlotSystem.md)가 소유한다.
+
 ## 조회
 
 - **거동 조회:** [`ULSGameDataSubsystem`](../../Source/LostSignal/Data/LSGameDataSubsystem.h)의 `FindConsumableRow`/`FindConsumableEffectRow`. 테이블 참조는 `ULSGameDataSettings`의 `ConsumableTable`/`ConsumableEffectTable`(프로젝트 설정 > LS Game Data Settings).

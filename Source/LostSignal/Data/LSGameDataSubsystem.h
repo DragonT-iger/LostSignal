@@ -39,6 +39,9 @@ public:
 	const FLSStatusEffectRow* FindStatusEffectRowByID(int32 StatusID, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSConsumableRow* FindConsumableRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSConsumableEffectRow* FindConsumableEffectRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	// 사용 중 회복 미리보기용: 자기 대상 즉발(Once/Flat) 체력 증가량 합. 회복 효과가 없으면 0.
+	// 분류 기준은 LSCharacterCombatComponent::ApplyConsumableAttributeEffect의 즉발 Health/Add 경로와 동일하게 맞춘다.
+	float GetConsumableSelfInstantHealthRecovery(const FLSConsumableRow& ConsumableRow, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSMonsterArchetypeRow* FindMonsterArchetypeRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSMonsterActionRow* FindMonsterActionRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	const FLSNoiseProfileRow* FindNoiseProfileRow(FName RowName, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;

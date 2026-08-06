@@ -180,6 +180,25 @@ void ULSPlayerHUDWidget::HideSkillCastGauge()
 	}
 }
 
+void ULSPlayerHUDWidget::ShowHealthRecoveryPreview(const float TargetHealth, const float Duration)
+{
+	if (!SurvivalStatus)
+	{
+		UE_LOG(LogLS, Warning, TEXT("%s cannot show health recovery preview because SurvivalStatus is not bound."), *GetNameSafe(this));
+		return;
+	}
+
+	SurvivalStatus->SetHealthPreview(TargetHealth, Duration, /*bIsRecovery=*/true);
+}
+
+void ULSPlayerHUDWidget::ClearHealthRecoveryPreview()
+{
+	if (SurvivalStatus)
+	{
+		SurvivalStatus->ClearHealthPreview();
+	}
+}
+
 void ULSPlayerHUDWidget::InitializeSoundIndicatorPool(APawn* InPawn)
 {
 	if (!SoundIndicator)

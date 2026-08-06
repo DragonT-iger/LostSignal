@@ -203,6 +203,34 @@ const FLSConsumableEffectRow* ULSGameDataSubsystem::FindConsumableEffectRow(cons
 	return ConsumableEffectTable->FindRow<FLSConsumableEffectRow>(RowName, Context);
 }
 
+float ULSGameDataSubsystem::GetConsumableSelfInstantHealthRecovery(const FLSConsumableRow& ConsumableRow, const TCHAR* Context) const
+{
+	float TotalRecovery = 0.0f;
+	for (const FLSConsumableEffectValue& EffectValue : ConsumableRow.Item_Effects)
+	{
+		const FLSConsumableEffectRow* EffectDef = FindConsumableEffectRow(EffectValue.Effect_ID, Context);
+		if (!EffectDef)
+		{
+			continue;
+		}
+
+		// 즉발 자기 회복만 합산: Attribute/Health/Add + Self + Once + 비율 아님(Flat/None).
+		// Periodic/Percent는 적용 경로가 미지원(스킵)이므로 프리뷰도 제외해 실제 적용과 일치시킨다.
+		const bool bSelfInstantHealthAdd =
+			EffectDef->Consumable_Effect_Type == ELSConsumableEffectType::Attribute
+			&& EffectDef->Consumable_Effect_Attribute == ELSConsumableAttribute::Health
+			&& EffectDef->Consumable_Effect_Operation == ELSConsumableEffectOperation::Add
+			&& EffectDef->Consumable_Effect_Target == ELSConsumableEffectTarget::Self
+			&& EffectDef->Consumable_Effect_Apply_Type == ELSConsumableApplyType::Once
+			&& EffectDef->Consumable_Effect_Value_Type != ELSConsumableValueType::Percent;
+		if (bSelfInstantHealthAdd)
+		{
+			TotalRecovery += EffectValue.Effect_Value;
+		}
+	}
+	return FMath::Max(TotalRecovery, 0.0f);
+}
+
 const FLSMonsterArchetypeRow* ULSGameDataSubsystem::FindMonsterArchetypeRow(const FName RowName, const TCHAR* Context) const
 {
 	return MonsterArchetypeTable && !RowName.IsNone()

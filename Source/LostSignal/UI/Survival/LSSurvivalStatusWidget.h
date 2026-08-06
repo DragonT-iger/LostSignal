@@ -146,8 +146,10 @@ private:
 	UPROPERTY(Transient)
 	bool bHasHealthPreview = false;
 
+	// 회복량 델타(현재 체력 기준 증감). 표시 시점의 현재 체력에 더해 재계산하므로,
+	// 시전 중 데미지로 현재 체력이 바뀌면 프리뷰도 그만큼 따라 조절된다.
 	UPROPERTY(Transient)
-	float HealthPreviewTarget = 0.0f;
+	float HealthPreviewDelta = 0.0f;
 
 	UPROPERTY(Transient)
 	float HealthPreviewDuration = 0.0f;

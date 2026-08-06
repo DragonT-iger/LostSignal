@@ -367,6 +367,24 @@ void ALSPlayerControllerBase::HideCastGauge()
 	}
 }
 
+void ALSPlayerControllerBase::ShowHealthRecoveryPreview(const float TargetHealth, const float Duration)
+{
+	if (!IsLocalPlayerController() || !PlayerHUDWidgetInstance)
+	{
+		return;
+	}
+
+	PlayerHUDWidgetInstance->ShowHealthRecoveryPreview(TargetHealth, FMath::Max(Duration, 0.0f));
+}
+
+void ALSPlayerControllerBase::ClearHealthRecoveryPreview()
+{
+	if (PlayerHUDWidgetInstance)
+	{
+		PlayerHUDWidgetInstance->ClearHealthRecoveryPreview();
+	}
+}
+
 void ALSPlayerControllerBase::RegisterLobbyStorageWidget(ULSLobbyStorageWidget* InWidget)
 {
 	LobbyStorageWidgetInstance = InWidget;

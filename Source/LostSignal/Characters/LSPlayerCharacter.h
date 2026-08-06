@@ -426,6 +426,8 @@ private:
 	void TryUseQuickSlot(int32 QuickSlotIndex);
 	// 로컬 표시를 시작하고 동일한 사용 ID로 서버 트랜잭션을 요청한다.
 	void BeginConsumableCast(FName ItemRowName, const struct FLSConsumableRow& ConsumableDef);
+	// 자기 회복 소모품이면 예상 회복 후 체력을 HUD 프리뷰 바에 표시한다(회복량 0이면 무동작).
+	void TryBeginHealthRecoveryPreview(const struct FLSConsumableRow& ConsumableDef);
 	// 로컬 시전 게이지 완료. 실제 차감·발동은 서버 타이머가 처리한다.
 	void HandleConsumableCastComplete();
 	// 시전 취소(이동 중단 등). 효과·차감 없이 상태/게이지만 정리한다.

@@ -126,6 +126,11 @@ public:
 	void ShowCastGauge(const FText& Label, float Duration);
 	void HideCastGauge();
 
+	// 소모품 회복 미리보기 표시/클리어. HUD 생존 상태 위젯의 프리뷰 체력 바로 전달한다.
+	// 로컬 컨트롤러 + HUD 존재 시에만 동작한다(캐스트 게이지와 동일).
+	void ShowHealthRecoveryPreview(float TargetHealth, float Duration);
+	void ClearHealthRecoveryPreview();
+
 	void RefreshLootDropWidgetForSource(ALSLootBox* SourceLootBox, const TArray<FLSDropResult>& Results);
 	void SyncRaidInventoryToClient();
 	void RequestRaidEntryDataForRaidStart();

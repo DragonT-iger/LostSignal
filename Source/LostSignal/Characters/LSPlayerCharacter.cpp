@@ -663,6 +663,9 @@ void ALSPlayerCharacter::BeginConsumableCast(const FName ItemRowName, const FLSC
 	bIsConsumableUsePending = true;
 	bCastAllowsMove = ConsumableDef.Item_Can_Move;
 
+	// 회복 소모품이면 시전 시작과 동시에 예상 회복량을 프리뷰로 표시한다(취소·착탄 시 클리어).
+	TryBeginHealthRecoveryPreview(ConsumableDef);
+
 	const float CastTime = FMath::Max(ConsumableDef.Item_Cast_Time, 0.0f);
 	if (CastTime > 0.0f)
 	{
@@ -689,6 +692,35 @@ void ALSPlayerCharacter::BeginConsumableCast(const FName ItemRowName, const FLSC
 	{
 		HandleConsumableCastComplete();
 	}
+}
+
+void ALSPlayerCharacter::TryBeginHealthRecoveryPreview(const FLSConsumableRow& ConsumableDef)
+{
+	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	const ULSGameDataSubsystem* GameData = GameInstance ? GameInstance->GetSubsystem<ULSGameDataSubsystem>() : nullptr;
+	if (!GameData)
+	{
+		return;
+	}
+
+	// 자기 즉발 회복량이 없으면(버프·수류탄 등) 프리뷰를 띄우지 않는다.
+	const float HealAmount = GameData->GetConsumableSelfInstantHealthRecovery(ConsumableDef);
+	if (HealAmount <= 0.0f)
+	{
+		return;
+	}
+
+	const ULSCombatAttributeSet* CombatSet = GetCombatAttributeSet();
+	ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>();
+	if (!CombatSet || !PlayerController)
+	{
+		return;
+	}
+
+	// 예상 회복 후 체력(위젯이 MaxHealth로 클램프)을 시전+발동 지연 동안 프리뷰로 표시한다.
+	const float TargetHealth = CombatSet->GetCurrentHealth() + HealAmount;
+	const float PreviewDuration = FMath::Max(ConsumableDef.Item_Cast_Time, 0.0f) + FMath::Max(ConsumableDef.Item_Trigger_Delay, 0.0f);
+	PlayerController->ShowHealthRecoveryPreview(TargetHealth, PreviewDuration);
 }
 
 void ALSPlayerCharacter::HandleConsumableCastComplete()
@@ -731,6 +763,8 @@ void ALSPlayerCharacter::ResetConsumableClientState()
 	if (ALSPlayerControllerBase* PlayerController = GetController<ALSPlayerControllerBase>())
 	{
 		PlayerController->HideCastGauge();
+		// 시전 취소·사용 종료 시 회복 프리뷰도 정리한다(성공 시엔 이미 착탄·자동 클리어된 뒤라 무해).
+		PlayerController->ClearHealthRecoveryPreview();
 	}
 }
 

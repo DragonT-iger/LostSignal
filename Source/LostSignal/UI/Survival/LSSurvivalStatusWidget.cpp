@@ -135,8 +135,11 @@ void ULSSurvivalStatusWidget::SetHealthPreview(const float TargetHealth, const f
 		return;
 	}
 
+	// 절대 타겟을 현재 체력 기준 델타로 환산해 저장한다. 표시 때 (그 시점의 현재 체력 + 델타)로
+	// 재계산하므로, 시전 중 데미지로 현재 체력이 바뀌면 프리뷰도 자동으로 대응해 조절된다.
+	const float CurrentHealth = bUsePreviewSurvivalStatus ? PreviewCurrentHealth : (CombatAttributeSet ? CombatAttributeSet->GetCurrentHealth() : 0.0f);
 	bHasHealthPreview = true;
-	HealthPreviewTarget = FMath::Clamp(TargetHealth, 0.0f, MaxHealth);
+	HealthPreviewDelta = TargetHealth - CurrentHealth;
 	HealthPreviewDuration = FMath::Max(0.0f, Duration);
 	HealthPreviewRemaining = HealthPreviewDuration;
 	bHealthPreviewIsRecovery = bIsRecovery;
@@ -146,7 +149,7 @@ void ULSSurvivalStatusWidget::SetHealthPreview(const float TargetHealth, const f
 void ULSSurvivalStatusWidget::ClearHealthPreview()
 {
 	bHasHealthPreview = false;
-	HealthPreviewTarget = 0.0f;
+	HealthPreviewDelta = 0.0f;
 	HealthPreviewDuration = 0.0f;
 	HealthPreviewRemaining = 0.0f;
 	bHealthPreviewIsRecovery = true;
@@ -268,7 +271,9 @@ void ULSSurvivalStatusWidget::RefreshDisplay()
 	{
 		const bool bUpdateHealthProgress = CurrentSurvivalProtocolLevel >= HealthProgressFillProtocolLevel;
 		const bool bUpdateHealthPreview = CurrentSurvivalProtocolLevel >= HealthPreviewFillProtocolLevel;
-		const float PreviewPercent = MaxHealth > 0.0f ? ((bHasHealthPreview ? HealthPreviewTarget : CurrentHealth) / MaxHealth) : 0.0f;
+		// 프리뷰 = 그 시점의 현재 체력 + 회복 델타(최대치 클램프). 데미지로 현재 체력이 내려가면 프리뷰도 함께 내려간다.
+		const float PreviewValue = bHasHealthPreview ? FMath::Clamp(CurrentHealth + HealthPreviewDelta, 0.0f, MaxHealth) : CurrentHealth;
+		const float PreviewPercent = MaxHealth > 0.0f ? (PreviewValue / MaxHealth) : 0.0f;
 		HealthPreviewProgressBar->SetPercent(bUpdateHealthProgress && bUpdateHealthPreview && MaxHealth > 0.0f ? PreviewPercent : 0.0f);
 	}
 	if (StaminaProgressBar)

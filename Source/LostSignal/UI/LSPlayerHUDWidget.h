@@ -33,6 +33,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/UI|Combat")
 	void HideSkillCastGauge();
 
+	// 소모품 회복 미리보기: 예상 회복 후 체력을 생존 상태 위젯의 프리뷰 바에 전달한다(회복 착탄/취소 시 클리어).
+	void ShowHealthRecoveryPreview(float TargetHealth, float Duration);
+	void ClearHealthRecoveryPreview();
+
 protected:
 	virtual void NativeConstruct() override;
 
