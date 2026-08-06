@@ -24,26 +24,26 @@ namespace
 	// [마스크 RT 계약] 아래 세 설정은 취향이 아니라 정확성 요구사항이므로 에셋 저작값에 맡기지 않고 코드가 강제한다.
 	// 이 계약의 단일 출처는 이 함수다. 템플릿 경로와 폴백 경로가 모두 여기를 거친다.
 	//
-	// - bCanCreateUAV: 컴퓨트 셰이더가 RWTexture2D로 직접 쓰므로 UAV 생성이 가능해야 한다.
+	// - bSupportsUAV: 컴퓨트 셰이더가 RWTexture2D로 직접 쓰므로 UAV 생성이 가능해야 한다.
 	// - TA_Clamp: 서피스 머티리얼은 등록된 모든 벽·바닥의 모든 픽셀에서 MaskOriginWS/MaskExtent로 UV를 계산하므로,
 	//   마스크 창(±Extent) 밖 지오메트리는 필연적으로 UV가 [0,1]을 벗어난다. Wrap이면 창 반대편을 읽어 멀리 떨어진
 	//   지오메트리에 시야 콘이 격자처럼 복제된다. Clamp면 테두리 텍셀(=가려짐)을 읽어 균일하게 가려진 상태로 퇴화한다.
 	// - bAutoGenerateMips 금지: 컴퓨트가 mip 0만 쓰므로 상위 mip이 있으면 머티리얼이 갱신되지 않은 mip을 샘플할 수 있다.
 	void ApplyVisionMaskRenderTargetContract(UTextureRenderTarget2D& RenderTarget)
 	{
-		RenderTarget.bCanCreateUAV = true;
+		RenderTarget.bSupportsUAV = true;
 		RenderTarget.AddressX = TextureAddress::TA_Clamp;
 		RenderTarget.AddressY = TextureAddress::TA_Clamp;
 		RenderTarget.bAutoGenerateMips = false;
 	}
 
 	// 설정 에셋을 복사 없이 직접 쓰는 경로용. 계약 위반은 에셋을 고쳐야 하는 문제이므로 조치를 Error로 남기고,
-	// 부팅을 막지 않기 위해 런타임에 한 번 강제한다. bCanCreateUAV는 리소스 생성 전 상태여야 하므로 강제 후 재생성한다.
+	// 부팅을 막지 않기 위해 런타임에 한 번 강제한다. bSupportsUAV 변경을 리소스에 반영하기 위해 강제 후 재생성한다.
 	// Modify()를 부르지 않으므로 에디터에서 에셋이 dirty로 표시되지는 않는다.
 	void EnforceVisionMaskContractOnConfiguredAsset(UTextureRenderTarget2D& RenderTarget)
 	{
 		const bool bViolatesContract =
-			!RenderTarget.bCanCreateUAV
+			!RenderTarget.bSupportsUAV
 			|| RenderTarget.AddressX != TextureAddress::TA_Clamp
 			|| RenderTarget.AddressY != TextureAddress::TA_Clamp
 			|| RenderTarget.bAutoGenerateMips;
@@ -54,9 +54,9 @@ namespace
 		}
 
 		UE_LOG(LogLS, Error,
-			TEXT("Vision mask RT 에셋 '%s'이 계약을 위반합니다(런타임 강제 적용). 에셋을 이렇게 고쳐 주세요 — bCanCreateUAV=true(현재 %s), AddressX/Y=Clamp(현재 %d/%d), bAutoGenerateMips=false(현재 %s)."),
+			TEXT("Vision mask RT 에셋 '%s'이 계약을 위반합니다(런타임 강제 적용). 에셋을 이렇게 고쳐 주세요 — bSupportsUAV=true(현재 %s), AddressX/Y=Clamp(현재 %d/%d), bAutoGenerateMips=false(현재 %s)."),
 			*GetNameSafe(&RenderTarget),
-			RenderTarget.bCanCreateUAV ? TEXT("true") : TEXT("false"),
+			RenderTarget.bSupportsUAV ? TEXT("true") : TEXT("false"),
 			static_cast<int32>(RenderTarget.AddressX),
 			static_cast<int32>(RenderTarget.AddressY),
 			RenderTarget.bAutoGenerateMips ? TEXT("true") : TEXT("false"));

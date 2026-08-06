@@ -29,7 +29,7 @@ public:
 	TSoftObjectPtr<UMaterialParameterCollection> VisionParameterCollection;
 
 	// 머티리얼이 이 에셋을 직접 샘플하므로 런타임 복사본을 만들지 않고 이 에셋에 직접 쓴다(프로세스 전역).
-	// 계약: bCanCreateUAV=true / AddressX,Y=Clamp / bAutoGenerateMips=false. 위반 시 Error 로그 + 런타임 강제.
+	// 계약: bSupportsUAV=true / AddressX,Y=Clamp / bAutoGenerateMips=false. 위반 시 Error 로그 + 런타임 강제.
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category = "LS/Vision")
 	TSoftObjectPtr<UTextureRenderTarget2D> VisibilityMaskRenderTarget;
 
