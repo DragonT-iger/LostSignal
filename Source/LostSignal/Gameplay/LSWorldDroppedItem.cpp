@@ -12,6 +12,13 @@
 #include "UI/Interact/LSDistanceMarkerComponent.h"
 #include "UI/Inventory/LSWorldDroppedItemIconWidget.h"
 
+namespace
+{
+// 착지 확정이 연출보다 먼저 도착했을 때 남은 포물선을 마무리할 시간(초).
+// 즉시 바닥으로 스냅하면 비행 중간에서 순간이동처럼 보이므로, 배속만 올려 이어서 재생한다.
+constexpr float LSDroppedItemLandingCatchUpSeconds = 0.08f;
+}
+
 ALSWorldDroppedItem::ALSWorldDroppedItem()
 {
 	DropAnimationDurationSeconds = 0.45f;
@@ -20,6 +27,7 @@ ALSWorldDroppedItem::ALSWorldDroppedItem()
 	bHasLanded = true;
 	bDropVisualAnimating = false;
 	DropVisualAnimationElapsedSeconds = 0.0f;
+	DropVisualPlayRateMultiplier = 1.0f;
 	DropVisualLandedRelativeLocation = FVector::ZeroVector;
 
 	MinimapMarkerComponent = CreateDefaultSubobject<ULSMinimapMarkerComponent>(TEXT("MinimapMarkerComponent"));
@@ -83,7 +91,7 @@ void ALSWorldDroppedItem::Tick(const float DeltaSeconds)
 		return;
 	}
 
-	DropVisualAnimationElapsedSeconds += DeltaSeconds;
+	DropVisualAnimationElapsedSeconds += DeltaSeconds * DropVisualPlayRateMultiplier;
 	const float AnimationDurationSeconds = GetDropVisualAnimationDurationSeconds();
 	const float NormalizedTime = AnimationDurationSeconds > KINDA_SMALL_NUMBER
 		? FMath::Clamp(DropVisualAnimationElapsedSeconds / AnimationDurationSeconds, 0.0f, 1.0f)
@@ -94,10 +102,11 @@ void ALSWorldDroppedItem::Tick(const float DeltaSeconds)
 	{
 		FinishDropVisualAnimation();
 	}
-	else
-	{
-		SetActorTickEnabled(true);
-	}
+}
+
+bool ALSWorldDroppedItem::ShouldKeepTickEnabled() const
+{
+	return bDropVisualAnimating;
 }
 
 bool ALSWorldDroppedItem::CanInteract_Implementation(APawn* Interactor)
@@ -185,8 +194,7 @@ void ALSWorldDroppedItem::OnRep_HasLanded()
 {
 	if (bHasLanded)
 	{
-		FinishDropVisualAnimation();
-		RefreshItemVisual();
+		ApplyDropLandedVisualState();
 		return;
 	}
 
@@ -255,6 +263,7 @@ void ALSWorldDroppedItem::StartDropVisualAnimation()
 
 	bDropVisualAnimating = GetDropVisualAnimationDurationSeconds() > KINDA_SMALL_NUMBER;
 	DropVisualAnimationElapsedSeconds = 0.0f;
+	DropVisualPlayRateMultiplier = 1.0f;
 	if (!bDropVisualAnimating)
 	{
 		ItemIconWidgetComponent->SetRelativeLocation(DropVisualLandedRelativeLocation);
@@ -279,10 +288,39 @@ void ALSWorldDroppedItem::UpdateDropVisualAnimation(const float NormalizedTime)
 	ItemIconWidgetComponent->SetWorldLocation(VisualWorldLocation);
 }
 
+void ALSWorldDroppedItem::ApplyDropLandedVisualState()
+{
+	// 착지 확정이 도착했다고 아이콘을 바닥으로 스냅하면 비행 중간에서 순간이동처럼 보인다.
+	// 남은 구간은 배속으로 이어서 재생하고, 상호작용·미니맵 해금만 지금 적용한다.
+	CompressRemainingDropVisualAnimation();
+	RefreshItemVisual();
+	if (!bDropVisualAnimating)
+	{
+		FinishDropVisualAnimation();
+	}
+}
+
+void ALSWorldDroppedItem::CompressRemainingDropVisualAnimation()
+{
+	if (!bDropVisualAnimating)
+	{
+		return;
+	}
+
+	const float RemainingSeconds = GetDropVisualAnimationDurationSeconds() - DropVisualAnimationElapsedSeconds;
+	if (RemainingSeconds <= LSDroppedItemLandingCatchUpSeconds)
+	{
+		return;
+	}
+
+	DropVisualPlayRateMultiplier = RemainingSeconds / LSDroppedItemLandingCatchUpSeconds;
+}
+
 void ALSWorldDroppedItem::FinishDropVisualAnimation()
 {
 	bDropVisualAnimating = false;
 	DropVisualAnimationElapsedSeconds = GetDropVisualAnimationDurationSeconds();
+	DropVisualPlayRateMultiplier = 1.0f;
 	if (ItemIconWidgetComponent)
 	{
 		ItemIconWidgetComponent->SetRelativeLocation(DropVisualLandedRelativeLocation);
@@ -302,8 +340,7 @@ void ALSWorldDroppedItem::CompleteDropLanding()
 	}
 
 	bHasLanded = true;
-	FinishDropVisualAnimation();
-	RefreshItemVisual();
+	ApplyDropLandedVisualState();
 	ForceNetUpdate();
 }
 

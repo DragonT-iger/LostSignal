@@ -17,6 +17,8 @@ public:
 	ALSLobbyGameMode();
 
 	virtual void BeginPlay() override;
+	virtual void PostLogin(APlayerController* NewPlayer) override;
+	virtual void Logout(AController* Exiting) override;
 
 	// 로비에서 레이드 시작 (로드아웃은 인벤토리 시스템 구현 후 연결)
 	UFUNCTION(BlueprintCallable, Category="LS/Lobby")
@@ -57,9 +59,13 @@ private:
 
 	bool RequestRaidEntryDataFromPlayers();
 	bool AreRaidEntryDataReady() const;
+	bool HasPendingPlayerConnections() const;
+	void TryBeginRaidEntryDataCollection();
+	void PollPendingPlayerConnections();
 	void TryStartRaidWithSubmittedData();
 	void HandleRaidEntryDataTimeout();
 	void ClearRaidEntryDataWait();
 
 	FTimerHandle RaidEntryDataTimeoutTimerHandle;
+	FTimerHandle PendingPlayerConnectionPollTimerHandle;
 };

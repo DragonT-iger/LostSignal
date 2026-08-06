@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/LSGameModeBase.h"
+#include "TimerManager.h"
 #include "LSTitleGameMode.generated.h"
 
 class ULSTitleMenuWidget;
@@ -16,6 +17,9 @@ public:
 	ALSTitleGameMode();
 
 	virtual void BeginPlay() override;
+	virtual void PostLogin(APlayerController* NewPlayer) override;
+
+	void RequestOpenLobbyLevel();
 
 protected:
 	// BP(BP_TitleGameMode)에서 WBP_TitleMenu를 매핑한다.
@@ -27,4 +31,11 @@ private:
 	TObjectPtr<ULSTitleMenuWidget> TitleMenuWidgetInstance;
 
 	void CreateTitleMenuWidget();
+	bool HasPendingPlayerConnections() const;
+	void TryOpenLobbyLevel();
+	void HandlePendingPlayerConnectionTimeout();
+
+	bool bLobbyTravelRequested = false;
+	FTimerHandle PendingPlayerConnectionPollTimerHandle;
+	FTimerHandle PendingPlayerConnectionTimeoutTimerHandle;
 };

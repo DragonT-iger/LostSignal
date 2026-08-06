@@ -142,10 +142,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI")
 	FVector2D HoveredRenderScale = FVector2D(1.1f, 1.1f);
 
-	// 장착 후보 하이라이트(드래그 중 대상 장비칸) 색·펄스. 아트/기획이 WBP 기본값에서 조정.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipCandidate")
-	FLinearColor EquipCandidateTint = FLinearColor(0.35f, 1.0f, 0.55f, 1.0f);
-
+	// 장착 후보는 색을 바꾸지 않고 크기 펄스로만 강조한다. 아트/기획이 WBP 기본값에서 조정한다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="LS/UI|EquipCandidate")
 	float EquipCandidatePulseSpeed = 2.0f;
 
@@ -240,6 +237,9 @@ private:
 	// NativeOnMouseButtonDoubleClick에서 세우고 NativeOnDragDetected/다음 NativeOnMouseButtonDown에서 해제한다.
 	// 슬롯 재사용(ResetTransientSlotState)으로 지워지면 안 되므로 그 함수에서 건드리지 않는다.
 	bool bSuppressNextDragDetect = false;
+	// 장비 교체 후 같은 Shift 제스처가 원본 칸으로 돌아온 기존 장비를 즉시 재장착하는 것을 막는다.
+	// 슬롯 리빌드 중에도 유지하고, 새 클릭이나 실제 MouseLeave에서만 해제한다.
+	bool bSuppressEquipmentSwapQuickTransfer = false;
 	// 현재 표시 중인 아이템 등급에 해당하는 배경색. 빈 슬롯·등급 없는 아이템은 DefaultGradeColor.
 	FLinearColor CurrentGradeBackgroundColor = FLinearColor::White;
 
@@ -265,14 +265,15 @@ private:
 	bool TryHandleQuickTransfer();
 	bool TryHandleLootQuickTransfer();
 	bool TryHandleInventoryQuickTransfer();
+	bool TryHandleSafeQuickTransfer();
 	bool TryHandleWarehouseQuickTransfer();
 	bool TryHandleChipEquipmentQuickTransfer();
 	bool TryHandleChipStationQuickTransfer();
 	// 무기/방어구 장착칸 Shift 빠른이동: 인벤토리 첫 빈 칸으로 해제(로비=세이브, 레이드=서버). 빈 칸이 없으면 알림만 띄운다.
 	bool TryHandleEquipmentQuickTransfer();
-	// 인벤토리 슬롯 Shift 빠른이동: 장착 가능하고 대상 장비칸이 비어 있으면 먼저 장착한다. 아니면 false(컨테이너 이동으로 넘어감).
+	// 인벤토리 슬롯 Shift 빠른이동: 장착 가능하면 대상 장비칸에 장착하고, 점유 중이면 원본 인벤토리 칸과 교체한다.
 	bool TryHandleEquipFromInventoryQuickTransfer();
-	// 인벤토리 아이템 호버 시, 장착 가능하고 대상 장비칸이 비어 있으면 후보 하이라이트를 켠다(드래그 없이도 힌트). 호버 해제 시 끈다.
+	// 인벤토리 아이템 호버 시 장착 가능하면 점유 여부와 관계없이 대상 장비칸 후보 하이라이트를 켠다. 호버 해제 시 끈다.
 	void UpdateEquipHoverHint();
 	void ClearEquipHoverHint();
 	// 지정 장비칸(인덱스=타입)이 비어 있는지. 레이드=세션 미러, 로비=세이브 기준.

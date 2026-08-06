@@ -27,6 +27,7 @@ public:
 	const TArray<FLSSessionItem>& GetSessionEquipmentSlots() const { return SessionEquipmentSlots; }
 
 	bool TryAddSessionItem(FName ItemRowName, int32 Amount, const TArray<FLSChipResolvedStat>& ChipStats, FLSSessionItem& OutRemainingItem);
+	bool TransferSafeSlotToInventory(int32 SafeSlotIndex);
 	void SortSessionInventory();
 	bool DropSessionSlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool DropExternalItemToSessionSlot(FLSSessionItem& InOutExternalItem, ELSInventorySlotArea ToArea, int32 ToIndex);

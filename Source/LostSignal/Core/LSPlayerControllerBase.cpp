@@ -1485,6 +1485,37 @@ bool ALSPlayerControllerBase::TransferInventorySlotToOpenContainer(const ELSInve
 	return bTransferred;
 }
 
+bool ALSPlayerControllerBase::TransferSafeSlotToInventory(const int32 SafeSlotIndex)
+{
+	ULSRaidInventoryComponent* InventoryComponent = GetRaidInventoryComponent();
+	if (!InventoryComponent || !InventoryComponent->IsRaidActive())
+	{
+		return false;
+	}
+
+	if (!HasAuthority())
+	{
+		ServerTransferSafeSlotToInventory(SafeSlotIndex);
+		return true;
+	}
+
+	const bool bChanged = InventoryComponent->TransferSafeSlotToInventory(SafeSlotIndex);
+	if (bChanged)
+	{
+		SyncRaidInventoryToClient();
+	}
+	return bChanged;
+}
+
+void ALSPlayerControllerBase::ServerTransferSafeSlotToInventory_Implementation(const int32 SafeSlotIndex)
+{
+	ULSRaidInventoryComponent* InventoryComponent = GetRaidInventoryComponent();
+	if (InventoryComponent && InventoryComponent->IsRaidActive() && InventoryComponent->TransferSafeSlotToInventory(SafeSlotIndex))
+	{
+		SyncRaidInventoryToClient();
+	}
+}
+
 bool ALSPlayerControllerBase::DropInventorySlot(const ELSInventorySlotArea FromArea, const int32 FromIndex, const ELSInventorySlotArea ToArea, const int32 ToIndex)
 {
 	if (FromIndex == INDEX_NONE || ToIndex == INDEX_NONE)
@@ -1823,10 +1854,7 @@ bool ALSPlayerControllerBase::DropSessionSlotToWorldInternal(const ELSInventoryS
 	FVector ManualDropDirection = DropDirection;
 	float ManualDropDistance = DroppedItemForwardDistance;
 	BuildManualWorldDropTrajectory(DropDirection, ManualDropDirection, ManualDropDistance);
-	const float DropAnimationDurationScale = DroppedItemForwardDistance > KINDA_SMALL_NUMBER
-		? FMath::Max(1.0f, ManualDropDistance / DroppedItemForwardDistance)
-		: 1.0f;
-	if (!SpawnDroppedItemToWorld(SlotItem, DroppedItemClass, ManualDropDirection, ManualDropDistance, false, DropAnimationDurationScale))
+	if (!SpawnDroppedItemToWorld(SlotItem, DroppedItemClass, ManualDropDirection, ManualDropDistance, false))
 	{
 		UE_LOG(LogLS, Warning, TEXT("Failed to spawn dropped item for slot. Area=%d Index=%d"),
 			static_cast<int32>(SlotArea), SlotIndex);
@@ -1942,21 +1970,38 @@ void ALSPlayerControllerBase::BuildManualWorldDropTrajectory(
 			: FVector::ForwardVector;
 	}
 
-	FVector CombinedDropOffset = RequestedDropDirection * DroppedItemForwardDistance;
-	const UPawnMovementComponent* MovementComponent = ControlledPawn ? ControlledPawn->GetMovementComponent() : nullptr;
-	const float MaxSpeed = MovementComponent ? MovementComponent->GetMaxSpeed() : 0.0f;
-	if (ControlledPawn && MaxSpeed > KINDA_SMALL_NUMBER)
+	// 방향은 마우스가 100% 결정하고, 이동속도는 거리 스칼라만 키운다.
+	// 이동 벡터를 방향에 더하면 최고속에서 이동 성분이 마우스 성분보다 커져 지정한 방향이 뒤집히므로 쓰지 않는다.
+	OutDropDirection = RequestedDropDirection;
+	OutDropDistance = DroppedItemForwardDistance + (ManualDropMaxSpeedDistanceBonus * ResolveManualDropSpeedRatio());
+}
+
+float ALSPlayerControllerBase::ResolveManualDropSpeedRatio() const
+{
+	const APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
 	{
-		FVector MovementVelocity = ControlledPawn->GetVelocity();
-		MovementVelocity.Z = 0.0f;
-		const float SpeedRatio = FMath::Clamp(MovementVelocity.Size() / MaxSpeed, 0.0f, 1.0f);
-		CombinedDropOffset += MovementVelocity.GetSafeNormal() * ManualDropMaxSpeedDistanceBonus * SpeedRatio;
+		return 0.0f;
 	}
 
-	OutDropDistance = CombinedDropOffset.Size2D();
-	OutDropDirection = OutDropDistance > KINDA_SMALL_NUMBER
-		? CombinedDropOffset / OutDropDistance
-		: RequestedDropDirection;
+	// 기준은 걸음새와 무관한 최고 이동속도다. MaxWalkSpeed는 걷기/달리기에 따라 같이 내려가므로
+	// 그걸로 나누면 걷기 최고속도에서도 비율이 1.0이 되어 걷기와 달리기가 구분되지 않는다.
+	float ReferenceSpeed = 0.0f;
+	if (const ALSPlayerCharacter* PlayerCharacter = Cast<ALSPlayerCharacter>(ControlledPawn))
+	{
+		ReferenceSpeed = PlayerCharacter->GetMaxRunSpeed();
+	}
+	if (ReferenceSpeed <= KINDA_SMALL_NUMBER)
+	{
+		const UPawnMovementComponent* MovementComponent = ControlledPawn->GetMovementComponent();
+		ReferenceSpeed = MovementComponent ? MovementComponent->GetMaxSpeed() : 0.0f;
+	}
+	if (ReferenceSpeed <= KINDA_SMALL_NUMBER)
+	{
+		return 0.0f;
+	}
+
+	return FMath::Clamp(ControlledPawn->GetVelocity().Size2D() / ReferenceSpeed, 0.0f, 1.0f);
 }
 
 void ALSPlayerControllerBase::FlushPendingOverflowWorldDrops()
@@ -2025,8 +2070,7 @@ bool ALSPlayerControllerBase::SpawnDroppedItemToWorld(
 	TSubclassOf<ALSWorldDroppedItem> DroppedItemClass,
 	const FVector DropDirection,
 	const float DropDistance,
-	const bool bRequireGround,
-	const float DropAnimationDurationScale)
+	const bool bRequireGround)
 {
 	if (!LSInventorySlotUtils::IsFilled(SlotItem))
 	{
@@ -2076,6 +2120,12 @@ bool ALSPlayerControllerBase::SpawnDroppedItemToWorld(
 	const FVector DropAnimationStartLocation = ControlledPawn
 		? ControlledPawn->GetActorLocation()
 		: SpawnTransform.GetLocation();
+	// 연출 시간은 요청 거리가 아니라 장애물 판정까지 끝난 확정 착지점 기준으로 늘린다.
+	// 요청 거리로 계산하면 벽 앞에서 거리가 깎였을 때 발밑에 떨어진 아이템이 느린 포물선을 재생한다.
+	const float ResolvedDropDistance = FVector::Dist2D(DropAnimationStartLocation, SpawnTransform.GetLocation());
+	const float DropAnimationDurationScale = DroppedItemForwardDistance > KINDA_SMALL_NUMBER
+		? FMath::Max(1.0f, ResolvedDropDistance / DroppedItemForwardDistance)
+		: 1.0f;
 	DroppedItem->InitializeDroppedItem(SlotItem, DropAnimationStartLocation, DropAnimationDurationScale);
 	DroppedItem->FinishSpawning(SpawnTransform);
 	return true;

@@ -73,6 +73,16 @@ Project Settings > LS Session Settings
 현재 사용처:
 
 ```text
+Title -> Lobby (Listen Server / Dedicated Server)
+- ULSTitleMenuWidget::OpenLobbyLevel
+- Settings->LobbyLevel
+- World->ServerTravel(LobbyLevelPath)
+
+Title -> Lobby (Standalone)
+- ULSTitleMenuWidget::OpenLobbyLevel
+- Settings->LobbyLevel
+- UGameplayStatics::OpenLevelBySoftObjectPtr
+
 Lobby -> Farming
 - ALSLobbyGameMode::TryStartRaidWithSubmittedData
 - Settings->FarmingLevel
@@ -94,6 +104,10 @@ Result -> Lobby
 - UGameplayStatics::OpenLevelBySoftObjectPtr
 ```
 
+`ALSGameModeBase`는 `bUseSeamlessTravel=true`를 기본 적용한다. 따라서 리슨 서버의 Title→Lobby와 Lobby→Farming 전환은 기존 NetDriver와 참가자 연결을 유지한다. 타이틀에서 로컬 `OpenLevel`로 리슨 서버를 닫는 경로는 Standalone에서만 사용한다. PIE는 엔진 기본값으로 seamless travel을 비활성화하므로 `DefaultEngine.ini`의 `net.AllowPIESeamlessTravel=1`을 함께 사용한다.
+
+리슨 서버의 타이틀에서 Continue/New을 누르면 `ALSTitleGameMode::RequestOpenLobbyLevel`이 로그인 중인 ClientConnection을 먼저 확인한다. 참가자의 `PostLogin`이 끝나면 Lobby로 ServerTravel하며, 10초 안에 로그인이 끝나지 않으면 참가자를 버리고 이동하지 않고 로비 전환을 취소한다.
+
 `FarmingLevel` 또는 `ResultLevel`이 비어 있으면 레벨 이동을 하지 않고 `UE_LOG(LogLS, Warning, ...)`를 남긴다.
 
 ## 레이드 입장 흐름
@@ -102,11 +116,15 @@ Result -> Lobby
 
 ```text
 ALSLobbyGameMode::StartRaid
--> bRaidStartRequested / bWaitingForRaidEntryData 설정
+-> bRaidStartRequested 설정
 -> 10초 RaidEntryDataTimeout 타이머 시작
+-> NetDriver에 로그인 중인 ClientConnection이 있으면 완료될 때까지 폴링
+-> 로그인 완료 후 bWaitingForRaidEntryData 설정
 -> RequestRaidEntryDataFromPlayers
 -> TryStartRaidWithSubmittedData
 ```
+
+리슨 서버가 클라이언트 접속을 수락했지만 아직 `PlayerController`를 생성하지 못한 상태에서 호스트가 출발을 누르면, 해당 연결의 `ClientLoginState`가 `ReceivedJoin`이 될 때까지 입장 payload 수집을 시작하지 않는다. `PostLogin`으로 뒤늦게 참가한 플레이어가 payload 수집 중 합류한 경우에도 그 컨트롤러에 입장 데이터를 요청한다. `Logout`이 발생하면 남아 있는 컨트롤러 기준으로 준비 상태를 다시 평가한다.
 
 플레이어별 입장 데이터 제출:
 
@@ -306,10 +324,13 @@ ALSFarmingGameMode::TravelToResultLevel
 타임아웃: 10초
 처리: ALSLobbyGameMode::HandleRaidEntryDataTimeout
 동작:
+- 로그인 중인 ClientConnection이 남아 있으면 Warning 로그로 남김
 - 제출하지 않은 PlayerController를 Warning 로그로 남김
 - ClearRaidEntryDataWait
 - 레이드 시작 취소
 ```
+
+타이틀의 로비 전환도 로그인 중인 ClientConnection에 대해 10초 타임아웃을 사용하며, 초과 시 `ALSTitleGameMode::HandlePendingPlayerConnectionTimeout`이 전환을 취소한다.
 
 결과 저장 ACK 대기:
 
@@ -326,6 +347,7 @@ ALSFarmingGameMode::TravelToResultLevel
 주의할 점:
 
 - timeout 값은 현재 cpp 내부 `constexpr`이다. 기획/QA에서 조정해야 하면 `ULSSessionSettings`로 빼는 것이 좋다.
+- 로그인 대기와 입장 데이터 제출 대기는 같은 10초 제한을 공유한다.
 - 결과 저장 ACK가 누락되면 ResultLevel 이동이 멈춘다. 멀티 테스트에서 가장 먼저 확인해야 할 지점이다.
 - `ServerTravel` 실패 시 현재 `ClearRaidEntryDataWait`를 호출하지만 일부 `RaidInventoryComponent`는 이미 시작된 뒤일 수 있다. 이 경우 복구 처리가 더 필요할 수 있다.
 

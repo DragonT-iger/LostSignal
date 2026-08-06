@@ -172,7 +172,7 @@ void ALSInteractableObject::RefreshWidgetVisibility()
 
 	InteractWidget->SetHiddenInGame(!bShouldShow);
 	ApplyOutlineState(bShouldShow);
-	SetActorTickEnabled(Pawn != nullptr);
+	SetActorTickEnabled(Pawn != nullptr || ShouldKeepTickEnabled());
 }
 
 void ALSInteractableObject::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
@@ -204,7 +204,7 @@ void ALSInteractableObject::OnSphereEndOverlap(UPrimitiveComponent* OverlappedCo
 	InteractWidget->SetHiddenInGame(true);
 	// 이 경로는 RefreshWidgetVisibility를 호출하지 않으므로 아웃라인을 명시적으로 끈다.
 	ApplyOutlineState(false);
-	SetActorTickEnabled(false);
+	SetActorTickEnabled(ShouldKeepTickEnabled());
 }
 
 APawn* ALSInteractableObject::FindOverlappingLocalPawn() const

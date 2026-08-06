@@ -88,7 +88,7 @@ Source/LostSignal/Inventory/LSInventorySlotUtils.cpp
 - **레이드 중 월드 드랍 / 룻박스 직행:** 레이드 중에는 장착칸을 창 밖으로 드래그해 월드에 버리거나(익스트렉션 리스크), 룻박스로 이송하거나, 룻박스에서 장착칸으로 직접 장착(타입 일치 시)할 수 있다. 로비에서는 장착 장비를 창 밖으로 드래그해도 월드에 버리지 않는다(장착 유지, 로비 장비 월드 드랍은 범위 밖).
 - **GAS 스탯 적용:** 장착 무기/방어구의 전투 스탯은 칩과 같은 패턴으로 GAS 어트리뷰트에 적용된다. `ULSEquipmentStatComponent`(`ALSPlayerCharacter`에 부착)가 스탯 소스를 `ResolveEquipmentSource()`로 결정하고(**레이드 중이면 `RaidInventoryComponent::GetSessionEquipmentSlots()`, 로비면 `SaveSubsystem->GetEquipmentSlots()`**) `LSEquipmentStats::ComputeEquipmentStatTotals`로 합산해, 무한 지속 GE(`ULSGE_EquipmentStats`, SetByCaller `LS.Data.Equip.*`)를 remove & reapply로 적용한다(서버 권한 전용). 초기 적용은 캐릭터 BeginPlay에서 칩 적용 뒤 풀피로, 이후 갱신은 체력 클램프만 한다(교체가 회복 수단이 되지 않게). 갱신 트리거는 로비=`ULSSaveSubsystem::OnEquipmentChanged`, 레이드=`ALSPlayerControllerBase::RefreshEquipmentStatsIfEquipmentTouched`(장착칸을 건드리는 모든 서버 확정 경로: 인벤↔장착, 월드 드랍, 룻박스 이송, 룻→장착)다. 스탯→어트리뷰트 매핑: 무기 `Item_Attack`→Attack, `Item_Attack_Speed`→AttackSpeed, `Item_Skill_Haste`→CooldownReduction, `Item_Critical_Rate`→CritChance, `Item_Critical_Damage`→CritDamage, `Item_Defense_Penetration`→ArmorPenetration / 방어구 `Item_Health`→MaxHealth, `Item_Defense`→Defence, `Item_Recovery`→Recovery. 비율 스탯(공속/스킬가속/치확/치피/방관)은 칩과 동일하게 ÷100 환산해 가산한다.
 - **드래그 하이라이트:** 아이템 드래그를 시작하면 그 아이템이 장착될 장비칸 1개에 후보 하이라이트(후보 색 틴트 + 스케일 펄스)를 켜, 어디에 놓아야 할지 보이게 한다. 대상 판정은 타입 매핑(`ResolveEquipmentSlotType`)과 동일하며, 장착 불가 아이템이면 어느 칸도 켜지지 않는다. 장비칸에 진입했을 때 타입이 맞지 않으면 해당 칸을 빨간색으로 표시하고, 놓으면 이동 API를 호출하지 않은 채 드롭을 소비해 아이템을 원래 칸에 유지하며 짧은 감쇠 흔들림을 재생한다. 시작은 `ULSItemSlotWidget::NativeOnDragDetected`가 PC에 등록된 현재 `WBP_Inventory`를 통해 `ULSInventoryWidget::SetEquipmentDragHighlight`를 호출하고, 종료(성공/취소 공용)는 `RestoreDragSourceVisual`이 `ClearEquipmentDragHighlight`로 끈다. 같은 C++ 위젯을 사용하는 로드아웃·플레이 중 인벤토리에 공통 적용된다.
-- **호버 힌트:** 인벤토리의 장착 가능한 아이템에 마우스를 올리기만 해도(드래그 전) 대상 장비칸이 **비어 있으면** 같은 후보 하이라이트를 켠다. `NativeOnMouseEnter`가 `UpdateEquipHoverHint`로 켜고 `NativeOnMouseLeave`가 `ClearEquipHoverHint`로 끈다. 대상 칸이 이미 차 있으면 켜지 않는다(Shift 빠른이동이 빈 칸에만 장착하는 규칙과 일치). 호버 상태에서 그대로 드래그를 시작하면 `NativeOnDragDetected`가 드래그 하이라이트로 소유권을 넘겨(`bShowingEquipHoverHint` 해제), 드래그 시작 직후 오는 `NativeOnMouseLeave`가 하이라이트를 지우지 않게 한다. 드래그 하이라이트와 동일 경로(`GetLobbyInventoryWidget`)를 쓰므로 로비 전용이다.
+- **호버 힌트:** 인벤토리의 장착 가능한 아이템에 마우스를 올리기만 해도(드래그 전) 대상 장비칸에 같은 후보 하이라이트를 켠다. `NativeOnMouseEnter`가 `UpdateEquipHoverHint`로 켜고 `NativeOnMouseLeave`가 `ClearEquipHoverHint`로 끈다. 대상 칸이 차 있어도 Shift 빠른이동 교체 대상을 알리기 위해 표시한다. 호버 상태에서 그대로 드래그를 시작하면 `NativeOnDragDetected`가 드래그 하이라이트로 소유권을 넘겨(`bShowingEquipHoverHint` 해제), 드래그 시작 직후 오는 `NativeOnMouseLeave`가 하이라이트를 지우지 않게 한다. 드래그 하이라이트와 동일 경로(`GetLobbyInventoryWidget`)를 쓰므로 로비 전용이다.
 
 ```text
 RebuildInventorySlots
@@ -160,13 +160,13 @@ SetWarehouseSlotContext
 
 슬롯은 배경과 아이콘을 별도 위젯으로 겹쳐 표시한다. 슬롯 루트는 `Overlay`이고, 바닥에 `SlotBackgroundImage`(항상 표시되는 슬롯 배경 프레임), 그 위에 `ItemIconImage`(아이템 아이콘), 그 위에 `AmountText`를 둔다. `AmountText`는 DataTable의 최대 스택(`Item_Max`)이 2 이상인 아이템에서만 표시하고, 최대 스택이 1인 아이템은 수량 텍스트를 생략한다. 아이템 아이콘이 배경을 덮어쓰지 않으므로 아이템이 있어도 슬롯 배경이 유지된다.
 
-`SlotBackgroundImage` 브러시는 `DefaultSlotTexture`로 C++가 설정한다. 공용 슬롯 프레임은 에셋 경로를 C++에 하드코딩하지 않고 WBP 클래스 기본값의 `DefaultSlotTexture`에 매핑한다. 값이 비어 있으면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다(이때 `UE_LOG(LogLS, Warning, ...)`). 호버/드래그 틴트는 배경과 아이콘 양쪽에 적용해 빈 슬롯에서도 피드백이 보인다. 잠금 틴트는 아이템이 있는 슬롯에서는 아이콘에만 적용하고 배경은 등급색을 유지한다. 아이템이 없는 잠금 슬롯은 배경에도 잠금 틴트를 적용한다.
+`SlotBackgroundImage` 브러시는 `DefaultSlotTexture`로 C++가 설정한다. 공용 슬롯 프레임은 에셋 경로를 C++에 하드코딩하지 않고 WBP 클래스 기본값의 `DefaultSlotTexture`에 매핑한다. 값이 비어 있으면 WBP 디자이너에서 설정한 배경 브러시를 그대로 둔다(이때 `UE_LOG(LogLS, Warning, ...)`). 호버/드래그 틴트는 배경과 아이콘 양쪽에 적용해 빈 슬롯에서도 피드백이 보인다. 장착 후보는 배경과 아이콘의 색을 바꾸지 않고 크기 펄스로만 강조한다. 잠금 틴트는 아이템이 있는 슬롯에서는 아이콘에만 적용하고 배경은 등급색을 유지한다. 아이템이 없는 잠금 슬롯은 배경에도 잠금 틴트를 적용한다.
 
-평상시(특수 상태가 아닐 때) 배경 틴트는 아이템 등급색으로 칠한다. 등급은 Row Name 토큰에서 파싱하며(`LSInventorySlotUtils::ResolveItemGradeFromRowName`, 툴팁 등급 표기와 동일 출처), 6등급(`Supply/Standard/Precision/Tuning/Prototype/Masterpiece`)별 색은 `ULSItemSlotWidget`의 `*GradeColor` `UPROPERTY` 기본값으로 두고 디자이너가 조정한다. 등급이 없는 아이템은 `DefaultGradeColor`(UI 시그니처 블루 `#124B6B` 기본값), 아이템이 없는 빈 슬롯은 `EmptySlotBackgroundColor`(`#969696` 불투명도 66% 기본값)를 쓴다. 슬롯 배경 텍스처가 흰색 베이스라 이 틴트 값이 곧 화면에 보이는 슬롯 색이 된다. 호버/드래그 등 특수 상태에서는 기존 피드백 틴트가 우선하고, 잠긴 아이템 슬롯은 아이콘만 흐리게 처리해 등급 배경을 유지한다.
+평상시(특수 상태가 아닐 때) 배경 틴트는 아이템 등급색으로 칠한다. 등급은 Row Name 토큰에서 파싱하며(`LSInventorySlotUtils::ResolveItemGradeFromRowName`, 툴팁 등급 표기와 동일 출처), 6등급(`Supply/Standard/Precision/Tuning/Prototype/Masterpiece`)별 색은 `ULSItemSlotWidget`의 `*GradeColor` `UPROPERTY` 기본값으로 두고 디자이너가 조정한다. 등급이 없는 아이템은 `DefaultGradeColor`(UI 시그니처 블루 `#124B6B` 기본값), 아이템이 없는 빈 슬롯은 `EmptySlotBackgroundColor`(`#969696` 불투명도 66% 기본값)를 쓴다. 슬롯 배경 텍스처가 흰색 베이스라 이 틴트 값이 곧 화면에 보이는 슬롯 색이 된다. 호버/드래그 등 특수 상태에서는 기존 피드백 틴트가 우선하고, 장착 후보는 현재 배경색을 유지한다. 잠긴 아이템 슬롯은 아이콘만 흐리게 처리해 등급 배경을 유지한다.
 
 아이콘은 슬롯의 `ItemRowName`을 기준으로 `LSInventorySlotUtils::LoadItemIconTexture`가 접두사별 폴더와 에셋 이름을 조합해 로드한다. 일반 아이템은 Row Name과 같은 에셋 이름을 쓰고, 칩은 Row Name의 기능 토큰을 공용 기능별 아이콘 이름으로 매핑한다. 월드 드랍 액터도 같은 접두사 규칙을 사용하며 `Consumable_`은 `UI/Icons/Consumables`에서 로드한다. 아이콘 로드에 실패하면 기본 아이콘 텍스처를 표시하고, 빈 슬롯은 `ItemIconImage`를 `Collapsed`로 숨겨 배경만 보이게 한다.
 
-빈 칸 기본 아이콘(장비칸 실루엣)은 `ULSItemSlotWidget`의 `EmptySlotIconTexture`로 지정한다. 값이 있으면 `ClearItem()`이 아이콘을 숨기는 대신 그 텍스처를 표시하고, 미지정이면 기존대로 숨긴다(룻박스·창고 등 일반 슬롯은 영향 없음). 슬롯 타입이 고정된 칸에만 쓰므로 매핑은 WBP 위젯 인스턴스별로 아트가 담당한다(로직 아님). 표시 중인 기본 아이콘의 틴트는 `EmptySlotIconTint`이며, 호버·드래그 대상·장착 후보·타입 불일치·잠금 상태에서는 기존 피드백 틴트가 우선한다. 기본 아이콘은 장식이라 `bHasItem`은 계속 false이고 클릭·드래그·툴팁 대상이 아니다.
+빈 칸 기본 아이콘(장비칸 실루엣)은 `ULSItemSlotWidget`의 `EmptySlotIconTexture`로 지정한다. 값이 있으면 `ClearItem()`이 아이콘을 숨기는 대신 그 텍스처를 표시하고, 미지정이면 기존대로 숨긴다(룻박스·창고 등 일반 슬롯은 영향 없음). 슬롯 타입이 고정된 칸에만 쓰므로 매핑은 WBP 위젯 인스턴스별로 아트가 담당한다(로직 아님). 표시 중인 기본 아이콘의 틴트는 `EmptySlotIconTint`이며, 호버·드래그 대상·타입 불일치·잠금 상태에서는 기존 피드백 틴트가 우선한다. 장착 후보 상태에서는 이 기본 틴트를 유지한다. 기본 아이콘은 장식이라 `bHasItem`은 계속 false이고 클릭·드래그·툴팁 대상이 아니다.
 
 ## 드래그 앤 드롭
 
@@ -203,22 +203,27 @@ WorldDroppedItem -> Inventory
 
 ## Shift-click / 더블 클릭 빠른 이동
 
-빠른 이동은 열린 컨테이너 기준으로 동작한다.
+일반 인벤토리의 빠른 이동은 열린 컨테이너 기준으로 동작하며, 보호 슬롯은 일반 인벤토리 복귀가 우선이다.
 
 ```text
 LootBox 슬롯 Shift+좌클릭 또는 더블 클릭
 -> LootBox에서 Inventory로 이동
 
-Inventory/Safe 슬롯 Shift+좌클릭 또는 더블 클릭
+Inventory 슬롯 Shift+좌클릭 또는 더블 클릭
 -> LootBox가 열려 있으면 LootBox로 이동
 -> LootBox가 없고 LobbyStorage가 열려 있으며 레이드가 아니면 Warehouse로 이동
 -> 인벤토리만 열려 있으면 아무 동작도 하지 않음
+
+Safe 슬롯 Shift+좌클릭 또는 더블 클릭
+-> 열린 LootBox/LobbyStorage와 관계없이 Inventory로 이동
+-> 기존 스택을 먼저 채우고 빈 슬롯을 사용하며, 일부만 들어가면 나머지는 Safe에 유지
+-> 전혀 들어갈 공간이 없으면 인벤토리 가득 참 알림 표시
 
 Warehouse 슬롯 Shift+좌클릭 또는 더블 클릭
 -> Inventory로 이동
 ```
 
-중요한 의도는 "인벤토리만 켜져 있는 상태에서는 빠른 이동이 동작하지 않는다"이다. 빠른 이동은 대상 컨테이너가 명확할 때만 처리한다.
+중요한 의도는 일반 인벤토리는 대상 컨테이너가 명확할 때만 빠른 이동하고, Safe는 인벤토리만 열려 있어도 보호 해제를 위해 Inventory로 이동하는 것이다.
 
 단, Shift+좌클릭 빠른이동이 대상 부재 등으로 실패하면(`TryHandleQuickTransfer`가 false) 클릭을 소비하지 않고 일반 드래그 감지로 넘어간다. 달리기 키가 `LeftShift`라 뛰는 동안 Shift가 눌려 있어도 아이템을 슬롯 밖으로 드래그하는 제스처는 남지만, **로비에서는 월드 드랍이 막혀 있어 실수로 버려지지 않는다**(레이드에서만 실제로 버려진다 — 아래 "루팅과 월드 드랍"). 더블 클릭은 같은 빠른 이동 함수를 호출하되 실패하면 이동 없이 상위 더블 클릭 처리로 넘긴다.
 
@@ -240,16 +245,17 @@ Warehouse 슬롯 Shift+좌클릭 또는 더블 클릭
 
 ```text
 인벤토리 슬롯의 장착 가능 아이템 Shift+좌클릭 또는 더블 클릭
--> 대상 장비칸(타입=인덱스)이 비어 있으면 "먼저" 그 칸에 장착
+-> 대상 장비칸(타입=인덱스)이 비어 있으면 그 칸에 장착
+-> 대상 장비칸이 차 있으면 기존 장비를 클릭한 인벤토리 원본 칸으로 보내고 새 장비를 장착
 -> ULSItemSlotWidget::TryHandleEquipFromInventoryQuickTransfer
--> 장착 불가 아이템이거나 대상 장비칸이 차 있으면 false → 기존 컨테이너(룻박스/창고) 이동으로 넘어감
+-> 장착 불가 아이템이면 false → 기존 컨테이너(룻박스/창고) 이동으로 넘어감
 
 무기/방어구 장착칸 Shift+좌클릭 또는 더블 클릭
 -> 인벤토리 첫 빈 칸으로 해제 (로비=SaveSubsystem::MoveEquipmentSlot, 레이드=PlayerController::DropInventorySlot)
 -> ULSItemSlotWidget::TryHandleEquipmentQuickTransfer
 ```
 
-즉 인벤토리 아이템 Shift 빠른이동의 우선순위는 **빈 장비칸 장착 > 컨테이너(룻박스/창고) 이동**이다. 장착 가능하고 대상 장비칸이 비어 있으면 컨테이너가 열려 있어도 장착이 먼저다. 대상 장비칸이 이미 차 있거나 장착 불가 아이템이면 빠른이동으로 교체하지 않고 컨테이너 이동으로 넘긴다(교체는 드래그로).
+즉 인벤토리 아이템 Shift 빠른이동의 우선순위는 **장비 장착·교체 > 컨테이너(룻박스/창고) 이동**이다. 장착 가능하면 대상 장비칸의 점유 여부와 관계없이 장착 또는 교체가 먼저이며, 장착 불가 아이템만 컨테이너 이동으로 넘긴다. 교체 후 같은 Shift 제스처가 원본 칸으로 돌아온 기존 장비를 다시 장착하지 않도록 해당 슬롯의 재호출을 제스처 동안 억제한다.
 
 인벤토리 첫 빈 칸 탐색은 공용 `LSInventorySlotUtils::FindFirstEmptySlotIndex`로, 레이드=클라 세션 미러(`GetSessionInventory`)·로비=세이브(`GetInventory`)를 최대 슬롯 수 안에서 스캔한다. **빈 칸이 없으면 이동하지 않고 "인벤토리가 가득 찼습니다" 알림 다이얼로그**(`ULSInventoryWidget::ShowInventoryFullNotification`, `ULSConfirmDialogWidget` 기반, 칩 스테이션 용량 알림과 동일 패턴)를 띄운다. 다이얼로그 클래스는 `WBP_Inventory`에서 `WBP_ConfirmDialog`를 매핑해야 하며(아트 매핑 필요), 미할당 시 알림 없이 `UE_LOG(LogLS, Warning, ...)`만 남는다. Shift 쓸기 재호출로 알림이 중복되지 않게 이미 떠 있으면 재생성하지 않고, 이동 성공 시 소스 칸을 즉시 `ClearItem()`한다(칩 장착칸 패턴).
 
@@ -300,13 +306,21 @@ LootBox 슬롯 -> 인벤토리
 
 수동 월드 드랍은 `IsSessionSlotAccessible` 검사를 통과한 현재 용량 안의 슬롯만 허용한다. 초과분 정리는 클라이언트가 슬롯 인덱스를 지정하지 않으며, 서버가 `ExtractOverflowInventoryItems`로 현재 최대 슬롯 수 뒤의 채워진 `Inventory` 슬롯을 한 번에 비운다. 꺼낸 아이템은 서버의 월드 드랍 대기 목록으로 옮겨 즉시 스폰하고, 실패한 항목만 1초 뒤 재시도한다. 실패한 아이템을 인벤토리 초과 슬롯으로 되돌리지 않는다. 자동 드랍은 `LS Drop Settings`의 `WorldDroppedItemClass`를 사용하므로 서버·패키지 빌드에서도 `BP_WorldDroppedItem`에 설정된 상호작용 안내 위젯을 유지한다. 설정이 없으면 UI 없는 네이티브 액터로 폴백하지 않고 스폰을 보류해 대기 목록에서 재시도한다.
 
-월드 드랍 액터의 실제 위치와 상호작용 충돌은 서버가 확정한 착지점에 처음부터 고정한다. `ALSWorldDroppedItem`은 복제된 시작 위치에서 `ItemIconWidgetComponent`만 포물선으로 이동시키며, `bHasLanded`가 확정되기 전에는 클라이언트 타겟 선택과 서버 획득 판정을 모두 거부한다. 착지 후 상호작용 안내·아웃라인·거리 마커·미니맵 표시를 다시 활성화한다. 수동 드랍은 마우스 방향의 기본 이동 벡터에 캐릭터의 실제 수평 이동 벡터를 더해 착지 방향과 거리를 함께 정한다. 정지 중에는 마우스 방향 기본 거리만 사용하고, 최고속도에서 이동 방향으로 더하는 거리는 `ALSPlayerControllerBase::ManualDropMaxSpeedDistanceBonus`가 소유한다. 늘어난 거리가 순간이동처럼 보이지 않도록 수동 드랍에만 기본 거리 대비 증가 비율만큼 애니메이션 시간도 늘리고, 이 시간 배율을 월드 드랍 액터에 복제해 서버 착지 판정과 각 클라이언트 연출 시간을 맞춘다. 수동 드랍도 목표점까지 장애물을 검사해 벽 앞에서 거리를 줄이지만, 목표점 아래에 바닥이 없다는 이유만으로 드랍을 실패시키지는 않는다. 초과분 자동 드랍은 같은 애니메이션을 공유하되, 서버가 한 링의 아이템을 사방에 균등 배치하고 수용 개수를 넘으면 바깥 링을 추가한다. 각 대기 항목에 방향과 링 거리를 함께 고정 저장하므로 일부 스폰이 실패해도 재시도 위치가 바뀌지 않는다. 초과분 위치는 목표점 아래에서 지면을 찾지 못하면 스폰하지 않고 대기 목록에 남긴다. 링당 개수와 간격은 `ALSPlayerControllerBase`의 설정 필드가 소유한다.
+월드 드랍 액터의 실제 위치와 상호작용 충돌은 서버가 확정한 착지점에 처음부터 고정한다. `ALSWorldDroppedItem`은 복제된 시작 위치에서 `ItemIconWidgetComponent`만 포물선으로 이동시키며, `bHasLanded`가 확정되기 전에는 클라이언트 타겟 선택과 서버 획득 판정을 모두 거부한다. 착지 후 상호작용 안내·아웃라인·거리 마커·미니맵 표시를 다시 활성화한다.
+
+수동 드랍의 **방향은 마우스가 단독으로 결정하고, 이동속도는 거리만 늘린다.** 이동 벡터를 방향에 합산하지 않는다 — 최고속에서는 이동 성분이 마우스 성분보다 커져 지정한 방향이 뒤집히기 때문이다. 거리는 `기본 거리 + 보너스 × 속도비율`이고, 최고속도 보너스는 `ALSPlayerControllerBase::ManualDropMaxSpeedDistanceBonus`가 소유한다. **속도비율의 기준은 걸음새와 무관한 최고 이동속도(`ALSPlayerCharacter::GetMaxRunSpeed`)다.** `MaxWalkSpeed`는 걷기/달리기에 따라 같이 내려가므로 그걸로 나누면 걷기 최고속도에서도 비율이 1.0이 되어 걷기와 달리기가 구분되지 않는다.
+
+연출 시간은 **장애물 판정까지 끝난 확정 착지점까지의 실제 수평 거리**를 기본 거리로 나눈 배율만큼 늘린다(`SpawnDroppedItemToWorld`에서 산출, 수동·초과분 공통). 요청 거리로 계산하면 벽 앞에서 거리가 깎였을 때 발밑에 떨어진 아이템이 느린 포물선을 재생한다. 이 시간 배율을 월드 드랍 액터에 복제해 서버 착지 판정과 각 클라이언트 연출 시간을 맞춘다. 수동 드랍도 목표점까지 장애물을 검사해 벽 앞에서 거리를 줄이지만, 목표점 아래에 바닥이 없다는 이유만으로 드랍을 실패시키지는 않는다.
+
+**연출 Tick 소유권:** 포물선은 `ALSInteractableObject`의 Tick을 공유하는데, 그 Tick은 근접 폰이 없으면 스스로 꺼진다(상호작용 힌트 갱신 전용). 그래서 `ShouldKeepTickEnabled()` 가드를 두고 `ALSWorldDroppedItem`이 비행 중 true를 돌려 Tick을 유지한다. 이 가드가 없으면 달리며 버렸을 때 상호작용 구를 벗어나는 순간 연출이 얼어붙고, 뒤늦게 도착한 착지 확정이 아이콘을 착지점으로 스냅해 **중간 순간이동**으로 보인다. 같은 이유로 `bHasLanded` 도착 시 즉시 스냅하지 않고, 남은 구간을 배속으로 이어 재생한다(`CompressRemainingDropVisualAnimation`).
+
+초과분 자동 드랍은 같은 애니메이션을 공유하되, 서버가 한 링의 아이템을 사방에 균등 배치하고 수용 개수를 넘으면 바깥 링을 추가한다. 각 대기 항목에 방향과 링 거리를 함께 고정 저장하므로 일부 스폰이 실패해도 재시도 위치가 바뀌지 않는다. 초과분 위치는 목표점 아래에서 지면을 찾지 못하면 스폰하지 않고 대기 목록에 남긴다. 링당 개수와 간격은 `ALSPlayerControllerBase`의 설정 필드가 소유한다.
 
 ```text
 DropSessionSlotToWorld
 -> 로비면(레이드 아님) 거부 (아이템 손실 방지)
 -> 레이드 중이면 RaidInventoryComponent 슬롯을 원본으로 사용
--> 드래그 취소 이벤트 위치에서 캐릭터 위치로 향하는 2D 단위 방향을 서버에 전달하고, 서버가 현재 수평 이동 벡터를 합쳐 캐릭터 발 위치 기준 드랍 방향·거리를 확정
+-> 드래그 취소 이벤트 위치에서 캐릭터 위치로 향하는 2D 단위 방향을 서버에 전달하고, 서버가 그 방향을 그대로 쓰면서 현재 수평 속력 비율만큼 거리를 늘려 캐릭터 발 위치 기준 드랍 방향·거리를 확정
 -> 슬롯을 먼저 비움
 -> WorldDroppedItem 스폰
 -> 스폰 실패 시 원래 슬롯 복구

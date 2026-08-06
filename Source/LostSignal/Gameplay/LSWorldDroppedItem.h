@@ -47,6 +47,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="LS/Minimap")
 	TObjectPtr<ULSMinimapMarkerComponent> MinimapMarkerComponent;
 
+	// 포물선 연출이 진행 중이면 근접 폰이 없어도 Tick을 유지한다(달리며 버려 상호작용 범위를 벗어나도 연출이 끊기지 않게).
+	virtual bool ShouldKeepTickEnabled() const override;
+
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_ItemData)
 	FName ItemRowName;
@@ -76,6 +79,8 @@ private:
 	float GetDropVisualAnimationDurationSeconds() const;
 	void StartDropVisualAnimation();
 	void UpdateDropVisualAnimation(float NormalizedTime);
+	void ApplyDropLandedVisualState();
+	void CompressRemainingDropVisualAnimation();
 	void FinishDropVisualAnimation();
 	void CompleteDropLanding();
 	UTexture2D* LoadIconTextureByRowName(FName InItemRowName) const;
@@ -85,6 +90,8 @@ private:
 
 	bool bDropVisualAnimating;
 	float DropVisualAnimationElapsedSeconds;
+	// 연출 재생 배속. 착지 확정(bHasLanded)이 연출보다 먼저 도착했을 때 남은 구간을 빠르게 이어 붙이는 데만 쓴다(1.0 = 정상).
+	float DropVisualPlayRateMultiplier;
 	FVector DropVisualLandedRelativeLocation;
 	FTimerHandle DropLandingTimerHandle;
 };

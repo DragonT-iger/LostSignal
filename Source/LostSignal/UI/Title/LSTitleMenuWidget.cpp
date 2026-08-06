@@ -1,5 +1,6 @@
 #include "UI/Title/LSTitleMenuWidget.h"
 
+#include "Core/LSTitleGameMode.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -192,6 +193,19 @@ void ULSTitleMenuWidget::OpenLobbyLevel()
 	if (!Settings || Settings->LobbyLevel.IsNull())
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Title] LobbyLevel is not set. Check Project Settings > LS Session Settings."));
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (World && World->GetNetMode() != NM_Standalone)
+	{
+		if (ALSTitleGameMode* TitleGameMode = World->GetAuthGameMode<ALSTitleGameMode>())
+		{
+			TitleGameMode->RequestOpenLobbyLevel();
+			return;
+		}
+
+		UE_LOG(LogLS, Warning, TEXT("[Title] Cannot server travel to lobby because TitleGameMode is missing."));
 		return;
 	}
 

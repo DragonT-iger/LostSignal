@@ -2,6 +2,8 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Core/LSPlayerControllerBase.h"
+#include "Engine/NetConnection.h"
+#include "Engine/NetDriver.h"
 #include "GameFramework/PlayerController.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "LostSignal.h"
@@ -13,7 +15,8 @@
 
 namespace
 {
-constexpr float RaidEntryDataTimeoutSeconds = 10.0f;
+constexpr float LSLobbyRaidEntryDataTimeoutSeconds = 10.0f;
+constexpr float LSLobbyPendingConnectionPollIntervalSeconds = 0.1f;
 }
 
 ALSLobbyGameMode::ALSLobbyGameMode()
@@ -27,6 +30,48 @@ void ALSLobbyGameMode::BeginPlay()
 	Super::BeginPlay();
 	RestoreLobbySignalGauge();
 	CreateLobbyMenuWidget();
+}
+
+void ALSLobbyGameMode::PostLogin(APlayerController* NewPlayer)
+{
+	Super::PostLogin(NewPlayer);
+	UE_LOG(LogLS, Log, TEXT("[Lobby] Player login completed. Player=%s ConnectedPlayers=%d"),
+		*GetNameSafe(NewPlayer), GetNumPlayers());
+
+	if (!bRaidStartRequested)
+	{
+		return;
+	}
+
+	if (bWaitingForRaidEntryData)
+	{
+		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(NewPlayer))
+		{
+			PlayerController->RequestRaidEntryDataForRaidStart();
+		}
+		return;
+	}
+
+	TryBeginRaidEntryDataCollection();
+}
+
+void ALSLobbyGameMode::Logout(AController* Exiting)
+{
+	Super::Logout(Exiting);
+	UE_LOG(LogLS, Log, TEXT("[Lobby] Player logged out. Player=%s ConnectedPlayers=%d"),
+		*GetNameSafe(Exiting), GetNumPlayers());
+
+	if (bRaidStartRequested)
+	{
+		if (bWaitingForRaidEntryData)
+		{
+			TryStartRaidWithSubmittedData();
+		}
+		else
+		{
+			TryBeginRaidEntryDataCollection();
+		}
+	}
 }
 
 void ALSLobbyGameMode::RestoreLobbySignalGauge()
@@ -93,21 +138,14 @@ void ALSLobbyGameMode::StartRaid()
 	}
 
 	bRaidStartRequested = true;
-	bWaitingForRaidEntryData = true;
 	GetWorldTimerManager().SetTimer(
 		RaidEntryDataTimeoutTimerHandle,
 		this,
 		&ALSLobbyGameMode::HandleRaidEntryDataTimeout,
-		RaidEntryDataTimeoutSeconds,
+		LSLobbyRaidEntryDataTimeoutSeconds,
 		false);
 
-	if (!RequestRaidEntryDataFromPlayers())
-	{
-		ClearRaidEntryDataWait();
-		return;
-	}
-
-	TryStartRaidWithSubmittedData();
+	TryBeginRaidEntryDataCollection();
 }
 
 void ALSLobbyGameMode::StartRaidToTestLevel()
@@ -187,6 +225,77 @@ bool ALSLobbyGameMode::AreRaidEntryDataReady() const
 	}
 
 	return bFoundPlayer;
+}
+
+bool ALSLobbyGameMode::HasPendingPlayerConnections() const
+{
+	const UWorld* World = GetWorld();
+	const UNetDriver* NetDriver = World ? World->GetNetDriver() : nullptr;
+	if (!NetDriver)
+	{
+		return false;
+	}
+
+	for (const UNetConnection* Connection : NetDriver->ClientConnections)
+	{
+		if (Connection
+			&& !Connection->IsClosingOrClosed()
+			&& Connection->ClientLoginState != EClientLoginState::ReceivedJoin)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void ALSLobbyGameMode::TryBeginRaidEntryDataCollection()
+{
+	if (!bRaidStartRequested || bWaitingForRaidEntryData)
+	{
+		return;
+	}
+
+	if (HasPendingPlayerConnections())
+	{
+		if (!GetWorldTimerManager().IsTimerActive(PendingPlayerConnectionPollTimerHandle))
+		{
+			UE_LOG(LogLS, Log, TEXT("[Lobby] Raid start is waiting for pending player login."));
+			GetWorldTimerManager().SetTimer(
+				PendingPlayerConnectionPollTimerHandle,
+				this,
+				&ALSLobbyGameMode::PollPendingPlayerConnections,
+				LSLobbyPendingConnectionPollIntervalSeconds,
+				true);
+		}
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(PendingPlayerConnectionPollTimerHandle);
+	bWaitingForRaidEntryData = true;
+	if (!RequestRaidEntryDataFromPlayers())
+	{
+		ClearRaidEntryDataWait();
+		return;
+	}
+
+	TryStartRaidWithSubmittedData();
+}
+
+void ALSLobbyGameMode::PollPendingPlayerConnections()
+{
+	if (!bRaidStartRequested)
+	{
+		GetWorldTimerManager().ClearTimer(PendingPlayerConnectionPollTimerHandle);
+		return;
+	}
+
+	if (!HasPendingPlayerConnections())
+	{
+		UE_LOG(LogLS, Log, TEXT("[Lobby] Pending player login completed. Collecting raid entry data from %d players."),
+			GetNumPlayers());
+		TryBeginRaidEntryDataCollection();
+	}
 }
 
 void ALSLobbyGameMode::TryStartRaidWithSubmittedData()
@@ -279,12 +388,16 @@ void ALSLobbyGameMode::TryStartRaidWithSubmittedData()
 
 void ALSLobbyGameMode::HandleRaidEntryDataTimeout()
 {
-	if (!bWaitingForRaidEntryData)
+	if (!bRaidStartRequested)
 	{
 		return;
 	}
 
-	if (UWorld* World = GetWorld())
+	if (!bWaitingForRaidEntryData)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Timed out waiting for a pending player login. Raid start cancelled."));
+	}
+	else if (UWorld* World = GetWorld())
 	{
 		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 		{
@@ -304,4 +417,5 @@ void ALSLobbyGameMode::ClearRaidEntryDataWait()
 	bRaidStartRequested = false;
 	bWaitingForRaidEntryData = false;
 	GetWorldTimerManager().ClearTimer(RaidEntryDataTimeoutTimerHandle);
+	GetWorldTimerManager().ClearTimer(PendingPlayerConnectionPollTimerHandle);
 }

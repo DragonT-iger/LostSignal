@@ -82,6 +82,11 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Movement")
 	bool IsRunning() const { return bIsRunning; }
 
+	// 걸음새와 무관한 최고 이동속도(달리기 속도 × MoveSpeed 배수).
+	// 현재 속력을 "얼마나 빠른가"로 정규화할 때 쓴다. MaxWalkSpeed는 걸음새에 따라 바뀌므로 기준으로 쓸 수 없다.
+	UFUNCTION(BlueprintPure, Category="LS/Movement")
+	float GetMaxRunSpeed() const;
+
 	AActor* ResolveBestInteractTarget();
 
 protected:
@@ -366,6 +371,7 @@ private:
 	void UpdateRunStamina(float DeltaSeconds);
 	void UpdateStaminaRecovery(float DeltaSeconds);
 	void UpdateHealthRecovery(float DeltaSeconds);
+	float GetMoveSpeedMultiplier() const;
 	void RefreshMaxWalkSpeed();
 	void HandleMoveSpeedChanged(const struct FOnAttributeChangeData& ChangeData);
 	void UpdateClimbCeiling();

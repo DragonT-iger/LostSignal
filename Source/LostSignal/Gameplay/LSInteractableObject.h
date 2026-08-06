@@ -59,6 +59,11 @@ protected:
 
 	virtual void HandleLocalPawnEndOverlap(APawn* Pawn);
 
+	// 근접 폰이 없어도 Tick을 유지해야 하는 파생 클래스용 가드.
+	// 이 클래스의 Tick은 상호작용 힌트 갱신 전용이라 폰이 범위를 벗어나면 스스로 Tick을 끈다.
+	// 같은 Tick에 자기 연출을 태운 파생 클래스(예: 드랍 아이템 포물선)는 그 순간 연출이 얼어붙으므로 여기서 true를 돌려 막는다.
+	virtual bool ShouldKeepTickEnabled() const { return false; }
+
 private:
 	TWeakObjectPtr<APawn> FocusedLocalPawn;
 	bool bLoggedMissingInteractWidget = false;

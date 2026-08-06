@@ -29,7 +29,7 @@ IP 직접 / 친구 방        리슨 (호스트 클라)   친구를 신뢰      
 >
 > 둘은 **양립한다.** 레이드 중에는 서버가 권위를 갖고, 영속 저장은 각 클라이언트 로컬 파일에 남는 구조가 현재 설계다.
 
-**현재 구현 상태: 미착수.** 서버 빌드 타깃이 없어 데디케이티드 빌드가 불가능하고, 플레이어 접속·이탈 처리와 전역 상태 정리도 되어 있지 않아 리슨 3인도 아직 성립하지 않는다.
+**현재 구현 상태: 일부 착수.** 리슨 서버의 Title→Lobby→Raid 연결 유지와 로비 접속 완료 대기는 구현됐지만, 서버 빌드 타깃·세션/매칭·안정적인 플레이어 키 기반 상태 분리는 아직 없어 완전한 3인 서비스 경로는 성립하지 않는다.
 
 ---
 
@@ -42,6 +42,9 @@ GameMode 4종        LSTitleGameMode / LSLobbyGameMode / LSFarmingGameMode / LSR
                     (+ 공통 베이스 LSGameModeBase)
 서버 권위 레이드    ULSRaidInventoryComponent 기반 루팅·사용·드랍·사망·탈출 확정
 입장/결과 ACK       제출 ACK, 결과 저장 ACK, 각각 타임아웃 처리까지 구현됨
+리슨 맵 전환        ALSGameModeBase의 SeamlessTravel과 ServerTravel로 Title→Lobby→Raid 연결 유지
+접속 완료 대기      Title/Lobby에서 로그인 중 ClientConnection을 전환 전에 대기
+로비 접속 처리      PostLogin / Logout 로그와 로그인 중 ClientConnection의 레이드 출발 대기
 데디 대비 분기      NM_DedicatedServer 분기 12곳
                     렌더/위젯/프리뷰 계열이 서버에서 스킵되도록 이미 처리됨
 ```
@@ -55,11 +58,10 @@ GameMode 4종        LSTitleGameMode / LSLobbyGameMode / LSFarmingGameMode / LSR
                     LostSignalEditor.Target.cs 만 존재
                     → LostSignalServer.Target.cs 부재 = 데디 빌드 불가
 
-플레이어 접속 처리  PostLogin / Logout / GetNumPlayers 사용처 0곳
-                    누가 언제 들어오고 나갔는지 다루는 코드가 없다
+플레이어 로스터     PostLogin / Logout의 기본 추적은 있으나 PlayerState 기반 파티 로스터와
+                    예상 인원·준비 상태·재접속 복구는 없다
 
-SeamlessTravel      bUseSeamlessTravel 사용처 0곳
-                    ServerTravel 시 연결이 끊겼다 다시 붙는다
+여행 상태 식별      SeamlessTravel은 적용됐지만 PendingRaidEntries가 여전히 접속 순서에 의존한다
 
 세션 / 매칭         CreateSession / FindSession / JoinSession / OnlineSubsystem 0곳
                     Build.cs 의 OnlineSubsystem 은 주석 처리된 템플릿 기본값
@@ -213,8 +215,9 @@ PvE 코옵이라 위조 로드아웃의 피해는 "판이 시시해진다" 정�
 ### D. 여행 / 세션 상태
 
 ```text
-D1  bUseSeamlessTravel 도입 여부 판단
-    끄면 ServerTravel 마다 연결이 끊겨 재접속 처리가 필요하다
+D1  ✅ bUseSeamlessTravel 도입
+    ALSGameModeBase에서 활성화하고 리슨 Title→Lobby와 Lobby→Raid를 ServerTravel로 연결
+    PIE 검증용 net.AllowPIESeamlessTravel=1 적용
 D2  EnqueuePendingRaidEntry 순서 기반 큐를 플레이어 키 기반으로 교체
 D3  MirrorRaidSessionState / bHasLegacySessionLoadout 등 단일 플레이어 전역 경로 제거
 D4  ULSSessionSubsystem 의 남은 전역 상태 정리 (데디에서는 인스턴스가 하나뿐)

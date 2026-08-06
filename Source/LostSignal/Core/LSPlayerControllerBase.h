@@ -203,6 +203,7 @@ public:
 
 	bool TransferInventorySlotToLootDrop(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex);
 	bool TransferInventorySlotToOpenContainer(ELSInventorySlotArea FromSlotArea, int32 FromSlotIndex, bool bRefreshOpenContainer = true);
+	bool TransferSafeSlotToInventory(int32 SafeSlotIndex);
 	bool DropInventorySlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 	bool DropLootDropSlot(ALSLootBox* SourceLootBox, int32 FromLootSlotIndex, int32 ToLootSlotIndex);
 	bool SortRaidInventory();
@@ -337,6 +338,9 @@ private:
 	void ServerDropInventorySlot(ELSInventorySlotArea FromArea, int32 FromIndex, ELSInventorySlotArea ToArea, int32 ToIndex);
 
 	UFUNCTION(Server, Reliable)
+	void ServerTransferSafeSlotToInventory(int32 SafeSlotIndex);
+
+	UFUNCTION(Server, Reliable)
 	void ServerDropLootDropSlot(ALSLootBox* SourceLootBox, int32 FromLootSlotIndex, int32 ToLootSlotIndex);
 
 	UFUNCTION(Server, Reliable)
@@ -415,9 +419,11 @@ private:
 	FVector BuildOverflowWorldDropDirection(int32 ItemIndex, int32 ItemCount) const;
 	float BuildOverflowWorldDropDistance(int32 ItemIndex) const;
 	void BuildManualWorldDropTrajectory(FVector RequestedDropDirection, FVector& OutDropDirection, float& OutDropDistance) const;
+	// 현재 수평 속력 ÷ 걸음새 무관 최고 이동속도(0~1). 수동 드랍 거리 보너스의 계수.
+	float ResolveManualDropSpeedRatio() const;
 	void FlushPendingOverflowWorldDrops();
 	void SchedulePendingOverflowWorldDropRetry();
-	bool SpawnDroppedItemToWorld(const FLSSessionItem& SlotItem, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection, float DropDistance = -1.0f, bool bRequireGround = false, float DropAnimationDurationScale = 1.0f);
+	bool SpawnDroppedItemToWorld(const FLSSessionItem& SlotItem, TSubclassOf<ALSWorldDroppedItem> DroppedItemClass, FVector DropDirection, float DropDistance = -1.0f, bool bRequireGround = false);
 	bool ResolveServerDroppedItemTransform(FTransform& OutDropTransform, FVector DropDirection, float DropDistance, bool bRequireGround) const;
 	bool ResolveServerDroppedItemGroundLocation(FVector& OutGroundLocation, FVector DropDirection, float DropDistance, bool bRequireGround) const;
 	bool TransferLootDropSlotToSessionInternal(ALSLootBox* SourceLootBox, int32 LootSlotIndex, FLSSessionItem& OutLootItem);

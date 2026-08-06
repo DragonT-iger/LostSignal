@@ -66,6 +66,26 @@ bool ULSRaidInventoryComponent::TryAddSessionItem(const FName ItemRowName, const
 	return LSInventorySlotUtils::TryAddItemsToSlotArray(SessionInventory, ItemRowName, Amount, GetMaxInventorySlotCount(), ChipStats, OutRemainingItem);
 }
 
+bool ULSRaidInventoryComponent::TransferSafeSlotToInventory(const int32 SafeSlotIndex)
+{
+	if (!IsSessionSlotAccessible(ELSInventorySlotArea::Safe, SafeSlotIndex)
+		|| !SessionSafeInventory.IsValidIndex(SafeSlotIndex)
+		|| !LSInventorySlotUtils::IsFilled(SessionSafeInventory[SafeSlotIndex]))
+	{
+		return false;
+	}
+
+	FLSSessionItem& SafeItem = SessionSafeInventory[SafeSlotIndex];
+	FLSSessionItem RemainingItem;
+	if (!TryAddSessionItem(SafeItem.ItemRowName, SafeItem.Amount, SafeItem.ChipStats, RemainingItem))
+	{
+		return false;
+	}
+
+	SafeItem = RemainingItem;
+	return true;
+}
+
 void ULSRaidInventoryComponent::SortSessionInventory()
 {
 	LSInventorySlotUtils::SortAndCompactSlotArray(SessionInventory);

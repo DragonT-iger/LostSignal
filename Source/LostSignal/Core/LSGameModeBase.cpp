@@ -6,6 +6,8 @@
 
 ALSGameModeBase::ALSGameModeBase()
 {
+	bUseSeamlessTravel = true;
+
 	//PlayerControllerClass = ALSPlayerControllerBase::StaticClass();
 	//DefaultPawnClass = ALSCharacterBase::StaticClass();
 }

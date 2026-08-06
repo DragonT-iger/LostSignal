@@ -1904,6 +1904,17 @@ void ALSPlayerCharacter::ApplyRunState(bool bNewIsRunning)
 	RefreshMaxWalkSpeed();
 }
 
+float ALSPlayerCharacter::GetMoveSpeedMultiplier() const
+{
+	// MoveSpeed 어트리뷰트 = 이동속도 배수(기본 1.0, 칩/장비로 가산). 0 이하 방지로 하한 클램프.
+	return PlayerAttributeSet ? FMath::Max(0.01f, PlayerAttributeSet->GetMoveSpeed()) : 1.0f;
+}
+
+float ALSPlayerCharacter::GetMaxRunSpeed() const
+{
+	return RunSpeed * GetMoveSpeedMultiplier();
+}
+
 void ALSPlayerCharacter::RefreshMaxWalkSpeed()
 {
 	UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
@@ -1912,9 +1923,7 @@ void ALSPlayerCharacter::RefreshMaxWalkSpeed()
 		return;
 	}
 
-	// MoveSpeed 어트리뷰트 = 이동속도 배수(기본 1.0, 칩/장비로 가산). 0 이하 방지로 하한 클램프.
-	const float Multiplier = PlayerAttributeSet ? FMath::Max(0.01f, PlayerAttributeSet->GetMoveSpeed()) : 1.0f;
-	MovementComponent->MaxWalkSpeed = (bIsRunning ? RunSpeed : WalkSpeed) * Multiplier;
+	MovementComponent->MaxWalkSpeed = (bIsRunning ? RunSpeed : WalkSpeed) * GetMoveSpeedMultiplier();
 }
 
 void ALSPlayerCharacter::HandleMoveSpeedChanged(const FOnAttributeChangeData& ChangeData)
