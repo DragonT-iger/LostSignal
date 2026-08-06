@@ -366,5 +366,10 @@ FString ALSWorldDroppedItem::GetIconBaseFolderByRowName(const FName InItemRowNam
 		return TEXT("/Game/LostSignal/UI/Icons/Armors/");
 	}
 
+	if (RowNameString.StartsWith(TEXT("Consumable_")))
+	{
+		return TEXT("/Game/LostSignal/UI/Icons/Consumables/");
+	}
+
 	return TEXT("/Game/LostSignal/UI/Icons/Items/");
 }

@@ -247,6 +247,33 @@ TArray<FLSDropResult> ULSDropSubsystem::OpenRootingObject(const FName& RootingOb
 	return Results;
 }
 
+FText ULSDropSubsystem::GetRootingObjectText(const FName& RootingObjectRowName) const
+{
+	if (!RootingObjectTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("RootingObjectTable 없음: 루트 오브젝트 이름을 조회할 수 없습니다."));
+		return FText::GetEmpty();
+	}
+
+	const FLSRootingObjectRow* Row = RootingObjectTable->FindRow<FLSRootingObjectRow>(
+		RootingObjectRowName, TEXT("GetRootingObjectText"), /*bWarnIfMissing*/ false);
+	if (!Row)
+	{
+		UE_LOG(LogLS, Warning, TEXT("RootingObject '%s' 없음: 루트 오브젝트 이름을 조회할 수 없습니다."),
+			*RootingObjectRowName.ToString());
+		return FText::GetEmpty();
+	}
+
+	if (Row->Loot_Object_Text.IsEmpty())
+	{
+		UE_LOG(LogLS, Warning, TEXT("RootingObject '%s'의 Loot_Object_Text가 비어 있습니다."),
+			*RootingObjectRowName.ToString());
+		return FText::GetEmpty();
+	}
+
+	return Row->Loot_Object_Text;
+}
+
 void ULSDropSubsystem::TestDrop(const FName& RootingObjectRowName)
 {
 	UE_LOG(LogLS, Log, TEXT("========== 드랍 테스트: %s =========="), *RootingObjectRowName.ToString());

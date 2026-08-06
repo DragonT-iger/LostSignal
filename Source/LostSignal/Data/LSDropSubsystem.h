@@ -41,6 +41,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Drop")
 	TArray<FLSDropResult> OpenRootingObject(const FName& RootingObjectRowName);
 
+	UFUNCTION(BlueprintPure, Category="LS/Drop")
+	FText GetRootingObjectText(const FName& RootingObjectRowName) const;
+
 	UFUNCTION(BlueprintCallable, Category="LS/Drop")
 	void TestDrop(const FName& RootingObjectRowName);
 

@@ -81,6 +81,8 @@
 | [Docs/Systems/LobbyScreenStructure.md](Docs/Systems/LobbyScreenStructure.md) | 로비 상단 메뉴·배타 패널·입력 계단·패널 갱신·포커스 가드 구조 |
 | [Docs/Systems/CraftingSystem.md](Docs/Systems/CraftingSystem.md) | 제작 레시피·UI 필터·재료 소비·완성품 지급·원자적 저장 규칙 |
 | [Docs/Systems/CharacterNodeSystem.md](Docs/Systems/CharacterNodeSystem.md) | 캐릭터 강화 노드 그래프·링 해금·활성화 비용·노드 진행 저장·노드 UI |
+| [Docs/Systems/SaveBackendMigration.md](Docs/Systems/SaveBackendMigration.md) | 서버 권위 저장 전환 계획·단계·백엔드 선택 근거 + 출시 Steam Cloud 실무 (**학습용, 출시 방침 아님**) |
+| [Docs/Systems/DedicatedServerBuildout.md](Docs/Systems/DedicatedServerBuildout.md) | 데디케이티드 서버 구축 — 빌드 타깃·서버 부팅·접속/이탈·전역 상태 정리·매치 접속·운영·검증 |
 
 ### 트러블슈팅 (버그 원인·수정 기록)
 

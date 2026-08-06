@@ -281,6 +281,8 @@ C: 50+60+120=230 ≥ 137 → C 당첨
 
 파일: `Source/LostSignal/Gameplay/LSLootBox.cpp` `Interact_Implementation`
 
+루트 UI 제목의 단일 출처는 RootingObject Row의 `Loot_Object_Text`다. 서버가 `ULSDropSubsystem::GetRootingObjectText`로 조회해 기존 `FText` RPC 경로로 클라이언트에 전달하며, 테이블·Row·텍스트가 유효하지 않을 때만 진단용으로 `RootingObjectRowName`을 표시한다. `InteractText`는 루트 UI 제목에 사용하지 않는다.
+
 1. **서버만** `DropSubsystem->OpenRootingObject()` 호출 (`HasAuthority()` 체크)
 2. 전체 결과는 **서버 전용 `PendingLootResults`(복제 안 함)** 에 보관한다. 복제되는 `LootResults`는 빈 배열로 시작한다.
 3. 총 드랍 개수는 **`TotalLootCount`(복제)** 로 즉시 내려간다 — 클라가 미공개 placeholder 슬롯을 그리기 위함이며, 개수만 알 뿐 아이템 정체는 모른다.

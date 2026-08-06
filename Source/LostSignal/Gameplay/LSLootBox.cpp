@@ -42,10 +42,10 @@ void ALSLootBox::Interact_Implementation(APawn* Interactor)
 
 	UGameInstance* GI = GetGameInstance();
 	if (!GI) return;
+	ULSDropSubsystem* DropSubsystem = GI->GetSubsystem<ULSDropSubsystem>();
 
 	if (!bIsOpened)
 	{
-		ULSDropSubsystem* DropSubsystem = GI->GetSubsystem<ULSDropSubsystem>();
 		if (!DropSubsystem)
 		{
 			UE_LOG(LogLS, Warning, TEXT("ALSLootBox: DropSubsystem 없음"));
@@ -85,9 +85,18 @@ void ALSLootBox::Interact_Implementation(APawn* Interactor)
 
 	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Interactor ? Interactor->GetController() : nullptr))
 	{
-		const FText InteractObjectText = GetInteractText_Implementation();
+		FText LootObjectText;
+		if (DropSubsystem)
+		{
+			LootObjectText = DropSubsystem->GetRootingObjectText(RootingObjectRowName);
+		}
+		else
+		{
+			UE_LOG(LogLS, Warning, TEXT("ALSLootBox: DropSubsystem 없음 — Row Name을 루트 UI 제목으로 사용합니다."));
+		}
+
 		PlayerController->ShowLootDropWidget(
-			InteractObjectText.IsEmpty() ? FText::FromName(RootingObjectRowName) : InteractObjectText,
+			LootObjectText.IsEmpty() ? FText::FromName(RootingObjectRowName) : LootObjectText,
 			LootResults,
 			this);
 	}

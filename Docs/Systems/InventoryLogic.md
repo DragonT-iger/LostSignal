@@ -164,7 +164,7 @@ SetWarehouseSlotContext
 
 평상시(특수 상태가 아닐 때) 배경 틴트는 아이템 등급색으로 칠한다. 등급은 Row Name 토큰에서 파싱하며(`LSInventorySlotUtils::ResolveItemGradeFromRowName`, 툴팁 등급 표기와 동일 출처), 6등급(`Supply/Standard/Precision/Tuning/Prototype/Masterpiece`)별 색은 `ULSItemSlotWidget`의 `*GradeColor` `UPROPERTY` 기본값으로 두고 디자이너가 조정한다. 등급이 없는 아이템은 `DefaultGradeColor`(UI 시그니처 블루 `#124B6B` 기본값), 아이템이 없는 빈 슬롯은 `EmptySlotBackgroundColor`(`#969696` 불투명도 66% 기본값)를 쓴다. 슬롯 배경 텍스처가 흰색 베이스라 이 틴트 값이 곧 화면에 보이는 슬롯 색이 된다. 호버/드래그 등 특수 상태에서는 기존 피드백 틴트가 우선하고, 잠긴 아이템 슬롯은 아이콘만 흐리게 처리해 등급 배경을 유지한다.
 
-아이콘은 슬롯의 `ItemRowName`을 기준으로 `LSInventorySlotUtils::LoadItemIconTexture`가 접두사별 폴더와 에셋 이름을 조합해 로드한다. 일반 아이템은 Row Name과 같은 에셋 이름을 쓰고, 칩은 Row Name의 기능 토큰을 공용 기능별 아이콘 이름으로 매핑한다. 아이콘 로드에 실패하면 기본 아이콘 텍스처를 표시하고, 빈 슬롯은 `ItemIconImage`를 `Collapsed`로 숨겨 배경만 보이게 한다.
+아이콘은 슬롯의 `ItemRowName`을 기준으로 `LSInventorySlotUtils::LoadItemIconTexture`가 접두사별 폴더와 에셋 이름을 조합해 로드한다. 일반 아이템은 Row Name과 같은 에셋 이름을 쓰고, 칩은 Row Name의 기능 토큰을 공용 기능별 아이콘 이름으로 매핑한다. 월드 드랍 액터도 같은 접두사 규칙을 사용하며 `Consumable_`은 `UI/Icons/Consumables`에서 로드한다. 아이콘 로드에 실패하면 기본 아이콘 텍스처를 표시하고, 빈 슬롯은 `ItemIconImage`를 `Collapsed`로 숨겨 배경만 보이게 한다.
 
 빈 칸 기본 아이콘(장비칸 실루엣)은 `ULSItemSlotWidget`의 `EmptySlotIconTexture`로 지정한다. 값이 있으면 `ClearItem()`이 아이콘을 숨기는 대신 그 텍스처를 표시하고, 미지정이면 기존대로 숨긴다(룻박스·창고 등 일반 슬롯은 영향 없음). 슬롯 타입이 고정된 칸에만 쓰므로 매핑은 WBP 위젯 인스턴스별로 아트가 담당한다(로직 아님). 표시 중인 기본 아이콘의 틴트는 `EmptySlotIconTint`이며, 호버·드래그 대상·장착 후보·타입 불일치·잠금 상태에서는 기존 피드백 틴트가 우선한다. 기본 아이콘은 장식이라 `bHasItem`은 계속 false이고 클릭·드래그·툴팁 대상이 아니다.
 
