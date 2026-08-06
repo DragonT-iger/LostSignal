@@ -609,6 +609,10 @@ TryPredictFastMovementSkill
 
 ## 강화 스킬 구조
 
+이 섹션은 **런타임 교체 계약**만 담당한다. 어떤 강화를 언제 어떤 조건으로 획득·적용하는지(노드 그래프·해금·비용·저장·UI)는 [CharacterNodeSystem.md](CharacterNodeSystem.md)가 소유한다.
+
+> **용어 주의:** 여기서 말하는 "강화 스킬"은 캐릭터 강화 노드 기획의 **스킬 진화**(스킬 작동 구조 변경, 동일 스킬 1개만 활성)에 해당한다. 기획의 **스킬 강화**(계수·범위·쿨타임·타수를 수치로 상향)는 DataAsset 교체가 아니라 DataTable row 값에 델타를 적용하는 **별개 경로**이며, 그 구조도 [CharacterNodeSystem.md](CharacterNodeSystem.md)가 소유한다.
+
 강화 스킬은 별도 DataAsset으로 만든 뒤, 원본 스킬 DataAsset의 `EnhancementVariants`에 등록한다.
 
 ```text
@@ -618,19 +622,21 @@ BaseSkillData
     └── EnhancedSkillData_1
 ```
 
-강화 적용 흐름:
+교체 메커니즘:
 
 ```text
-ULSPlayerSkillComponent::ApplySkillEnhancementByIndex
--> 현재 슬롯 SkillData 확인
--> SkillData.GetEnhancementVariant(Index)
--> 슬롯 SkillData 교체
+슬롯 SkillData 교체
+-> 이후 입력부터 교체된 SkillData 기준으로 실행
 -> Skill UI 갱신
 ```
 
 강화 버전이 DataTable에서 다른 row를 읽어야 하면 강화 DataAsset의 `Skill_ID`를 다른 row로 지정한다.
 
-즉, 강화 스킬은 원본 DataAsset 안에서 분기 플래그만 늘리는 방식이 아니라 “다른 DataAsset으로 교체”하는 방식이다.
+즉, 강화 스킬은 원본 DataAsset 안에서 분기 플래그만 늘리는 방식이 아니라 "다른 DataAsset으로 교체"하는 방식이다.
+
+교체를 실제로 수행하는 경로는 `ULSPlayerSkillComponent::ApplyEquippedSkillLoadout`이다. 세이브 로드아웃의 기본 `Skill_ID`를 해석 결과로 치환한 뒤 `SkillPool->FindSkillByID`로 DataAsset을 얻는다. 이 함수는 서버 권한/로컬 조종 가드를 이미 갖고 있다.
+
+⚠️ `ApplySkillEnhancementByIndex`는 **교체 적용 경로로 쓰지 않는다.** RPC가 아니고 `SkillSlots`가 Replicated도 아니라 로컬 호출만 반영되며 멀티에서 깨진다. 현재 호출자가 없다.
 
 ## 스킬 추가 절차
 
@@ -667,7 +673,8 @@ ULSPlayerSkillComponent::ApplySkillEnhancementByIndex
 1. 강화 버전 DataAsset을 별도로 만든다.
 2. 강화 버전의 Skill_ID를 필요한 row로 지정한다.
 3. 원본 스킬 DataAsset의 EnhancementVariants에 등록한다.
-4. 강화 선택 시스템에서 ApplySkillEnhancementByIndex를 호출한다.
+   (강화 DataAsset은 SkillPool의 SelectableSkills에 등록하지 않는다 — 로드아웃 후보로 새면 안 된다.)
+4. 획득 조건과 교체 트리거는 CharacterNodeSystem.md를 따른다.
 5. 강화 후 UI와 쿨타임 태그가 의도대로 바뀌는지 확인한다.
 ```
 
