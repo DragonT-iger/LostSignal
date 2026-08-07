@@ -64,6 +64,8 @@ struct FLSLoadoutSnapshot
 namespace LSNetRejectReason
 {
 	inline const TCHAR* RaidInProgress = TEXT("LS_RAID_IN_PROGRESS");
+	// 타이틀은 접속 지점이 아니다. 방은 로비에서 열고 참가도 로비에서 한다.
+	inline const TCHAR* LobbyNotReady = TEXT("LS_LOBBY_NOT_READY");
 }
 
 UCLASS()

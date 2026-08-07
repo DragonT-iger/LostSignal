@@ -7,7 +7,7 @@
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
 #include "Session/LSSessionSettings.h"
-#include "UI/Lobby/LSLobbyMenuWidget.h"
+#include "Session/LSSessionSubsystem.h"
 #include "UI/Title/LSTitleMenuWidget.h"
 
 namespace
@@ -20,6 +20,20 @@ ALSTitleGameMode::ALSTitleGameMode()
 {
 	// 타이틀은 조작할 폰이 없다. 기본 폰 스폰을 막는다.
 	DefaultPawnClass = nullptr;
+}
+
+void ALSTitleGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+	if (!ErrorMessage.IsEmpty())
+	{
+		return;
+	}
+
+	// 타이틀은 접속 지점이 아니다. 방은 로비에서 열고 참가도 로비에서 한다.
+	// (PreLogin은 원격 접속에만 불린다 — 로컬 플레이어는 Login으로 바로 들어온다)
+	ErrorMessage = LSNetRejectReason::LobbyNotReady;
+	UE_LOG(LogLS, Log, TEXT("[Title] Rejected a join from %s. The title screen does not accept connections."), *Address);
 }
 
 void ALSTitleGameMode::HandleSeamlessTravelPlayer(AController*& C)
@@ -131,16 +145,10 @@ void ALSTitleGameMode::HandlePendingPlayerConnectionTimeout()
 
 void ALSTitleGameMode::ShowTitleMenuFor(AController* Controller)
 {
+	// 타이틀은 접속을 받지 않으므로(PreLogin에서 거절) 여기 오는 건 로컬 플레이어뿐이다.
 	APlayerController* PlayerController = Cast<APlayerController>(Controller);
-	if (!PlayerController)
+	if (!PlayerController || !PlayerController->IsLocalController())
 	{
-		return;
-	}
-
-	// 손님(원격)에게는 타이틀 메뉴가 아니라 자기 로비 화면을 띄운다.
-	if (!PlayerController->IsLocalController())
-	{
-		ShowGuestLobbyMenuFor(PlayerController);
 		return;
 	}
 
@@ -158,27 +166,6 @@ void ALSTitleGameMode::ShowTitleMenuFor(AController* Controller)
 	}
 
 	CreateTitleMenuLocally(PlayerController);
-}
-
-void ALSTitleGameMode::ShowGuestLobbyMenuFor(APlayerController* PlayerController)
-{
-	ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(PlayerController);
-	if (!LSPlayerController)
-	{
-		// Client RPC 경로가 없어 손님 화면이 검은 채로 남는다.
-		UE_LOG(LogLS, Warning, TEXT("[Title] Guest %s cannot be shown any UI. Set PlayerControllerClass to BP_PC_Test on BP_TitleGameMode."),
-			*GetNameSafe(PlayerController));
-		return;
-	}
-
-	if (!GuestLobbyMenuWidgetClass)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Title] GuestLobbyMenuWidgetClass is not set on %s. Check BP_TitleGameMode."), *GetNameSafe(this));
-		return;
-	}
-
-	UE_LOG(LogLS, Log, TEXT("[Title] Guest %s joined while the host is on the title. Showing the lobby screen."), *GetNameSafe(PlayerController));
-	LSPlayerController->ShowLobbyMenuWidget(GuestLobbyMenuWidgetClass);
 }
 
 void ALSTitleGameMode::CreateTitleMenuLocally(APlayerController* PlayerController)

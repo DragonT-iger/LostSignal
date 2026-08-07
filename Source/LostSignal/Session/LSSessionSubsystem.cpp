@@ -59,6 +59,10 @@ void ULSSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 		// 서버가 PreLogin에서 거절한 경우. 표식만 오므로 여기서 사람이 읽을 문장으로 바꾼다.
 		Reason = LOCTEXT("RaidInProgress", "호스트가 <Emph>레이드 진행 중</>이라 참가할 수 없습니다. 로비로 돌아올 때까지 기다려 주세요.");
 	}
+	else if (ErrorString.Contains(LSNetRejectReason::LobbyNotReady))
+	{
+		Reason = LOCTEXT("LobbyNotReady", "호스트가 아직 <Emph>로비에 들어오지 않았습니다</>. 잠시 후 다시 시도해 주세요.");
+	}
 	else if (FailureType == ENetworkFailure::NetChecksumMismatch)
 	{
 		Reason = LOCTEXT("NetChecksumMismatch", "호스트와 <Emph>게임 버전</>이 달라 접속이 끊겼습니다. 양쪽 모두 같은 빌드인지 확인해 주세요.");
