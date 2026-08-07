@@ -21,6 +21,12 @@ struct FLSSkillNodeLayoutParams
 	// 실측 데이터에서 가장 가까운 두 노드는 같은 각도에 놓이는 서브(깊이1)와 강화(깊이3)이고,
 	// 그 간격이 이 값의 2배다. 값을 줄이면 그 둘이 먼저 붙는다.
 	float InRingDepthStep = 0.07f;
+
+	// 그래프 전체 회전(도). 음수가 반시계(왼쪽)다.
+	//
+	// 각도 계산이 끝난 뒤 좌표 변환 지점에서 한 번만 더해지므로, 노드 사이의 상대 위치는 바뀌지 않는다.
+	// -45 는 첫 메인 노드를 12시에서 좌상단(-45도)으로 옮긴다. 링 배경 원은 원이라 회전에 영향이 없다.
+	float RotationDegrees = -45.0f;
 };
 
 namespace LSSkillNodeLayout

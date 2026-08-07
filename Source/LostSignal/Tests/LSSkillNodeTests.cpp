@@ -136,7 +136,11 @@ bool FLSSkillNodeAutoLayoutTest::RunTest(const FString& Parameters)
 	TArray<FLSSkillNodeView> Views;
 	LSSkillNodeViews::BuildViews(Refs, Activated, Views);
 
-	const FLSSkillNodeLayoutParams Params;
+	// 배치 규칙 검증은 회전 0으로 고정한다. 전체 회전은 각도 계산과 분리된 후처리이므로 아래에서 따로 본다.
+	// 이렇게 두면 아트 요청으로 기본 회전값이 바뀌어도 이 검증들이 깨지지 않는다.
+	FLSSkillNodeLayoutParams Params;
+	Params.RotationDegrees = 0.0f;
+
 	TMap<FName, FVector2D> Positions;
 	LSSkillNodeLayout::ComputeAutoLayout(Views, Params, Positions);
 
@@ -163,6 +167,18 @@ bool FLSSkillNodeAutoLayoutTest::RunTest(const FString& Parameters)
 	// 원형 평균이면 10시 30분 방향(x<0, y<0)이고, 단순 산술 평균이면 6시 방향(y>0)으로 정반대가 된다.
 	const FVector2D WrapAroundPosition = Positions.FindRef(TEXT("S04"));
 	TestTrue(TEXT("랩어라운드 노드가 좌상단에 놓인다(원형 평균)"), WrapAroundPosition.X < 0.0f && WrapAroundPosition.Y < 0.0f);
+
+	// 전체 회전. 강체 변환이라 M01 하나로 부호와 크기를 확인하면 충분하다.
+	// -45도면 12시에 있던 M01이 좌상단으로 간다(x<0, y<0, 두 성분의 크기가 같다).
+	FLSSkillNodeLayoutParams RotatedParams;
+	RotatedParams.RotationDegrees = -45.0f;
+
+	TMap<FName, FVector2D> RotatedPositions;
+	LSSkillNodeLayout::ComputeAutoLayout(Views, RotatedParams, RotatedPositions);
+
+	const float Diagonal = MainRadius * FMath::Sqrt(0.5f);
+	TestTrue(TEXT("-45도 회전이면 M01이 좌상단으로 간다"),
+		RotatedPositions.FindRef(TEXT("M01")).Equals(FVector2D(-Diagonal, -Diagonal), 0.001f));
 
 	// 겹침 검사. 어떤 두 노드도 같은 자리에 놓이지 않는다.
 	TArray<FName> Keys;

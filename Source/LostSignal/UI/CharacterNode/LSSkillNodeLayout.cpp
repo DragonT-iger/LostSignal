@@ -246,7 +246,12 @@ void ComputeAutoLayout(
 		{
 			const float Radius = GetRingNormalizedRadius(Ring, Params)
 				+ static_cast<float>(Pair.Value.DepthInRing - 1) * Params.InRingDepthStep;
-			OutNormalizedPositions.Add(Pair.Key, SkillNodeLayoutPolarToNormalized(AnglesByKey.FindRef(Pair.Key), Radius));
+
+			// 회전은 여기서 한 번만 더한다. 각도 계산(섹터 분할·원형 평균)은 회전을 모르므로
+			// 노드 사이의 상대 위치가 틀어지지 않는다.
+			OutNormalizedPositions.Add(
+				Pair.Key,
+				SkillNodeLayoutPolarToNormalized(AnglesByKey.FindRef(Pair.Key) + Params.RotationDegrees, Radius));
 		}
 	}
 }

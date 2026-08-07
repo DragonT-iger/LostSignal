@@ -950,30 +950,35 @@ Phase 4-13은 `Char_Poise`를 포함한 스탯 11종을 구현한다.
 
 ### 화면을 보려면 필요한 에디터 작업
 
-DataTable uasset과 WBP는 코드로 만들 수 없다. 아래는 **전부 완료됐다.**
+DataTable uasset과 WBP는 코드로 만들 수 없다.
 
 1. ✅ DataTable 5개 — Row 구조체 지정, CSV 임포트 (§결정: Kind별 테이블 5개 / Row 구조체 4개)
 2. ✅ 각 에셋의 `Ignore Extra Fields`
 3. ✅ Project Settings > LS Game Data Settings 5개 지정 (`DefaultGame.ini`)
-4. ✅ `WBP_Node`(= `ULSSkillNodeWidget` 상속) / `WBP_NodeGraph`(= `ULSSkillNodeGraphWidget` 상속, `CanvasPanel` 이름 `NodeCanvas`, `NodeWidgetClass` → `WBP_Node`) — `Content/LostSignal/UI/EnhanceNode/`
+4. ✅ `WBP_Node`(= `ULSSkillNodeWidget` 상속) / `WBP_NodeGraph`(= `ULSSkillNodeGraphWidget` 상속, `CanvasPanel` 이름 `NodeCanvas`) — `Content/LostSignal/UI/EnhanceNode/`
+5. ⬜ **`WBP_NodeGraph`의 `NodeWidgetClass`에 `WBP_Node` 매핑** — 미설정이면 링·연결선만 그려지고 노드가 0개다
+6. ⬜ **`WBP_Node`에 루트 위젯 하나**(`Overlay` / `SizeBox` 등). 크기는 그래프 위젯이 캔버스 슬롯으로 강제하므로 무관하다
 
-**남은 것은 `WBP_CharacterPanel` 하나다.** 정식 진입 경로가 이미 코드로 들어갔으므로 임시로 얹어 보는 단계는 필요 없다.
+> 6번을 "트리 비움"으로 안내했던 것을 바로잡는다. C++ 가 전부 그리므로 **자식은** 필요 없지만, 루트 위젯이 아예 없는 `UUserWidget` 이 `NativePaint` 를 정상적으로 타는지는 확인되지 않았다. 이 프로젝트에서 `NativePaint` 로 그리는 다른 위젯(`ULSCraftingRowWidget`·`ULSMinimapWidget`)은 전부 트리가 채워져 있어 비교 대상이 없다. 루트를 하나 두는 비용이 0이므로 두는 쪽으로 간다.
 
-5. `WBP_CharacterPanel`(= `ULSCharacterPanelWidget` 상속) 생성
+7. `WBP_CharacterPanel`(= `ULSCharacterPanelWidget` 상속) 생성
    - 빈 `WidgetSwitcher` 하나, 이름을 `SubTabSwitcher`로
    - `WBP_LobbyTab` 2개, 이름을 `SkillLoadoutTab` / `NodeGraphTab`으로
    - 루트와 스위처는 `SelfHitTestInvisible` (위 §진입 경로 경고)
    - `SkillLoadoutPageClass` → 기존 스킬 로드아웃 WBP, `NodeGraphPageClass` → `WBP_NodeGraph`
-6. `WBP_LobbyMenu`의 `CharacterPanelClass`에 `WBP_CharacterPanel` 매핑 (이전 `SkillLoadoutPanelClass` 자리)
+8. `WBP_LobbyMenu`의 `CharacterPanelClass`에 `WBP_CharacterPanel` 매핑 (이전 `SkillLoadoutPanelClass` 자리)
 
 증상별 원인:
 
 | 증상 | 원인 |
 |---|---|
+| **링·연결선은 그려지는데 도형이 없다** | `NodeWidgetClass` 미설정(5번). 경고는 1회만 찍힌다 |
+| 도형만 없고 경고도 없다 | `WBP_Node`에 루트 위젯이 없다(6번). `bDrawDebugKey`로 위젯 생존을 먼저 가른다 |
 | 아무것도 없음 + `NodeCanvas가 바인드되지 않았다` | `CanvasPanel` 이름 |
-| 링·연결선만 있고 노드 없음 + `NodeWidgetClass가 미설정` | 노드 위젯 클래스 매핑 |
 | 빈 화면인데 경고 0건 | 조회 결과 0개 — `CharacterID` 기본값이 101이다 |
 | `ULSGameDataSubsystem을 찾을 수 없다` | `GameInstance` 없는 컨텍스트에서 띄웠다 |
+
+**링·연결선이 보인다는 것 자체가 데이터 계층·인덱스·자동 배치가 정상이라는 증거다** — `DrawRings`/`DrawConnections`가 `NodeViews`와 `NormalizedPositions`를 순회하기 때문이다. 그 상태에서 도형만 없으면 원인은 노드 위젯 경로 하나로 좁혀진다.
 
 ---
 
