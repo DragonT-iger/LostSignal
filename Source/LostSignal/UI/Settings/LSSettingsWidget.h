@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
@@ -110,7 +110,7 @@ private:
 	void HandleBackClicked();
 
 	UFUNCTION()
-	void HandleReturnToTitleConfirmed();
+	void HandleReturnToLobbyConfirmed();
 
 	UFUNCTION()
 	void HandleDialogCancelled();
@@ -119,7 +119,7 @@ private:
 	bool IsRaidActive() const;
 
 	// 레이드 중 메인메뉴 클릭 시: 확인 다이얼로그를 띄운다. 이미 떠 있으면 nullptr 반환.
-	ULSConfirmDialogWidget* ShowReturnToTitleConfirmDialog();
+	ULSConfirmDialogWidget* ShowReturnToLobbyConfirmDialog();
 
 	// 아직 구현되지 않은 항목(Graphics/Language) 클릭 시 안내창을 띄운다.
 	void ShowNotImplementedNotice();

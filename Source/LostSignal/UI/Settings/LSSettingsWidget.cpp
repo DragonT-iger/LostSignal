@@ -1,4 +1,4 @@
-#include "UI/Settings/LSSettingsWidget.h"
+﻿#include "UI/Settings/LSSettingsWidget.h"
 
 #include "Components/Button.h"
 #include "Core/LSPlayerControllerBase.h"
@@ -200,15 +200,15 @@ void ULSSettingsWidget::HandleLanguageClicked()
 
 void ULSSettingsWidget::HandleMainMenuClicked()
 {
-	// "메인메뉴로 돌아가기"는 레이드 여부와 무관하게 타이틀로 나간다.
-	// 단, 레이드 중이면 파밍 성과를 포기하는 행동이라 확인 다이얼로그를 먼저 거친다.
+	// 나가는 곳은 한 단계씩이다 — 레이드에서는 로비로, 로비에서는 타이틀로.
+	// 레이드 이탈은 파밍 성과를 포기하는 행동이라 확인 다이얼로그를 먼저 거친다.
 	if (IsRaidActive())
 	{
-		ShowReturnToTitleConfirmDialog();
+		ShowReturnToLobbyConfirmDialog();
 		return;
 	}
 
-	// 레이드 중이 아니면(타이틀/로비) 바로 타이틀 레벨로 이동한다.
+	// 레이드 중이 아니면(타이틀/로비) 타이틀 레벨로 나간다.
 	TravelToTitle();
 }
 
@@ -257,10 +257,10 @@ void ULSSettingsWidget::SetMainMenuButtonVisible(bool bVisible)
 	}
 }
 
-void ULSSettingsWidget::HandleReturnToTitleConfirmed()
+void ULSSettingsWidget::HandleReturnToLobbyConfirmed()
 {
 	// 이탈 확정은 서버가 한다. 클라이언트에는 GameMode가 없으므로 PlayerController RPC로 넘긴다.
-	// 타이틀 복귀는 파밍 성과를 포기하는 대신 항상 출발 장비를 복구하므로 bAllowRecovery=true.
+	// 레이드 이탈은 파밍 성과를 포기하는 대신 항상 출발 장비를 복구하므로 bAllowRecovery=true.
 	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 	{
 		PlayerController->RequestQuitRaid(true);
@@ -285,16 +285,16 @@ bool ULSSettingsWidget::IsRaidActive() const
 	return RaidInventory && RaidInventory->IsRaidActive();
 }
 
-ULSConfirmDialogWidget* ULSSettingsWidget::ShowReturnToTitleConfirmDialog()
+ULSConfirmDialogWidget* ULSSettingsWidget::ShowReturnToLobbyConfirmDialog()
 {
 	ULSConfirmDialogWidget* Dialog = CreateDialog(
-		LOCTEXT("ReturnToTitleConfirm", "레이드를 포기하고 타이틀로 돌아가시겠습니까? 파밍한 아이템은 사라지고 출발 장비만 복구됩니다."));
+		LOCTEXT("ReturnToLobbyConfirm", "레이드를 포기하고 <Emph>로비</>로 돌아가시겠습니까? 파밍한 아이템은 사라지고 출발 장비만 복구됩니다."));
 	if (!Dialog)
 	{
 		return nullptr;
 	}
 
-	Dialog->OnConfirmed.AddDynamic(this, &ULSSettingsWidget::HandleReturnToTitleConfirmed);
+	Dialog->OnConfirmed.AddDynamic(this, &ULSSettingsWidget::HandleReturnToLobbyConfirmed);
 	Dialog->OnCancelled.AddDynamic(this, &ULSSettingsWidget::HandleDialogCancelled);
 	return Dialog;
 }

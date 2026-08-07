@@ -50,9 +50,9 @@ ULSSettingsWidget
 - 세팅 화면(WBP_Settings). 타이틀/로비/레이드(ESC) 어디서든 동일한 위젯을 재사용한다 — 레이드 전용 별도 메뉴는 없다
 - 로비 기본 Play 화면에서는 ULSLobbyMenuWidget이 ESC 입력을 받아 설정 버튼과 같은 ShowSettingsWidget 경로로 이 위젯을 띄운다
 - 레이드 중에는 ALSPlayerControllerBase가 ESC로 이 위젯을 직접 토글해서 띄운다
-- "메인메뉴로 돌아가기"(MainMenuButton, ULSTitleMenuButtonWidget) 클릭 시: 레이드 여부와 무관하게 항상 타이틀로 나간다.
-  - 레이드 중이 아니면(로비): 바로 TitleLevel로 OpenLevel
-  - 레이드 중이면: 확인 다이얼로그 → ALSPlayerControllerBase::ServerRequestQuitRaid(true) → 서버가 QuitRaidForPlayer로 그 사람만 TitleLevel로 내보낸다
+- "메인메뉴로 돌아가기"(MainMenuButton, ULSTitleMenuButtonWidget) 클릭 시: **한 단계씩 나간다.**
+  - 레이드 중이면: 확인 다이얼로그 → ALSPlayerControllerBase::ServerRequestQuitRaid(true) → 서버가 **로비로** 내보낸다
+  - 레이드 중이 아니면(로비): TitleLevel로 OpenLevel
   - 타이틀에서 열 때는 이미 메인메뉴라 불필요하므로 이 버튼을 숨긴다(SetMainMenuButtonVisible(false), 타이틀 메뉴가 세팅 생성 시 호출)
 - BackButton(일반 UButton)은 세팅 패널만 닫는다(OnBackToMenu 브로드캐스트). ESC/TAB 키로도 동일하게 닫힌다
   (ESC: ULSSettingsWidget::NativeOnKeyDown → CloseSettings, TAB: NativeOnPreviewKeyDown → CloseSettings). 레이드 중에는 이 위젯이 스스로 RemoveFromParent 하므로
@@ -102,15 +102,15 @@ Farming -> Lobby (Extracted / Dead)
 - Settings->LobbyLevel
 - ALSFarmingGameMode::ServerTravelToLevel -> World->ServerTravel
 
-Farming -> Title (개인 이탈)
-- ALSFarmingGameMode::QuitRaidForPlayer -> SendPlayerToTitle
-- Settings->TitleLevel
-- PlayerController->ClientTravel (그 클라이언트만 나간다)
+Farming -> Lobby (개인 이탈)
+- ALSFarmingGameMode::QuitRaidForPlayer -> SendPlayerToOwnLobby
+- Settings->LobbyLevel + "?listen"
+- PlayerController->ClientTravel (그 클라이언트만 호스트 세션을 떠나 자기 로비를 연다)
 
-Farming -> Title (호스트 이탈 = 전원 Quit)
+Farming -> Lobby (호스트 이탈 = 전원 Quit)
 - ALSFarmingGameMode::TravelToResultLevel (PendingRaidResult == Quit)
-- Settings->TitleLevel
-- ALSFarmingGameMode::ServerTravelToLevel -> World->ServerTravel
+- Settings->LobbyLevel
+- ALSFarmingGameMode::ServerTravelToLevel -> World->ServerTravel (파티 유지)
 
 Result -> Lobby
 - ALSResultGameMode::ReturnToLobby
@@ -247,15 +247,19 @@ ALSFarmingGameMode::OnQuit
 -> EndRaid(ELSRaidResult::Quit)          전원 종료 (호스트 이탈 전용)
 
 ALSFarmingGameMode::QuitRaidForPlayer(PC)
--> 호스트면 OnQuit()으로 위 경로
+-> 호스트면 OnQuit()으로 위 경로 (전원 확정 후 파티째 로비로)
 -> 아니면 그 PC만 BuildRaidResultForPlayer(Quit) -> RequestRaidResultSave
-   -> ACK 수신 시 EndRaidInventory + ClearSubmittedRaidEntryData + SendPlayerToTitle
+   -> ACK 수신 시 EndRaidInventory + ClearSubmittedRaidEntryData + SendPlayerToOwnLobby
    -> 남은 사람의 레이드는 계속된다
 ```
 
+**나가는 방향은 한 단계씩이다 — 레이드에서는 로비로, 로비에서는 타이틀로.** 레이드에서 곧바로 타이틀로 나가는 경로는 없다.
+
+개인 이탈자는 호스트 세션에 남을 수 없다(접속 상태에서는 서버와 같은 맵에 있어야 한다). 그래서 접속을 끊고 자기 로비를 `?listen`으로 열어 준다 — 돌아온 로비에서 바로 다시 친구를 받을 수 있다. 파티에 남아 관전하는 형태는 개별 탈출·관전자(C6·C7) 작업에 속하며 [DedicatedServerBuildout.md](DedicatedServerBuildout.md)가 소유한다.
+
 개인 이탈 진입점은 `ULSSettingsWidget::HandleReturnToTitleConfirmed`다. 클라이언트에는 GameMode가 없으므로 위젯이 `ALSPlayerControllerBase::ServerRequestQuitRaid(bAllowRecovery)` RPC로 넘기고, 서버가 그 RPC 안에서 `ULSSessionSubsystem::bAllowQuitRecovery`를 세운 뒤 `QuitRaidForPlayer`를 호출한다. (클라가 자기 쪽 SessionSubsystem에 켜봐야 결과를 만드는 서버는 그 값을 보지 못한다)
 
-**호스트 이탈은 아직 구멍이다.** 리슨 서버는 호스트가 곧 서버 프로세스라 혼자 빠질 수 없어 전원을 타이틀로 데려간다. 생존자 소지품 확정(C2 규칙)은 [DedicatedServerBuildout.md](DedicatedServerBuildout.md)가 단일 출처이며 아직 구현되지 않았다.
+**호스트 이탈은 아직 구멍이다.** 리슨 서버는 호스트가 곧 서버 프로세스라 혼자 빠질 수 없어 전원을 로비로 데려간다. 생존자 소지품 확정(C2 규칙)은 [DedicatedServerBuildout.md](DedicatedServerBuildout.md)가 단일 출처이며 아직 구현되지 않았다.
 
 `OnPlayerDied`는 플레이어 캐릭터 사망에서 호출된다. 체력 0 도달 시
 `ULSCharacterCombatComponent`가 `OnDeathStateChanged(true)` 훅을 호출하고,
@@ -338,14 +342,14 @@ ALSFarmingGameMode::TravelToResultLevel
 -> 각 PlayerController->ClearSubmittedRaidEntryData
 -> SessionSubsystem->ClearRaidSessionState
 -> 종료 결과가 Extracted 또는 Dead면 LobbyLevel로 ServerTravel (일단 ResultLevel 건너뜀)
--> 종료 결과가 Quit이면 TitleLevel로 ServerTravel (ResultLevel 건너뜀)
+-> 종료 결과가 Quit이면 LobbyLevel로 ServerTravel (ResultLevel 건너뜀)
 ```
 
-`NotifyRaidResultSaved`는 개인 이탈 ACK와 전원 종료 ACK를 둘 다 받는다. `PendingQuitControllers`에 있으면 그 사람만 타이틀로 내보내고, 이어서 `PendingRaidResultSaveControllers`에서도 제거한다(두 대기가 겹쳤을 때 그룹 전환이 막히지 않도록 early return 하지 않는다).
+`NotifyRaidResultSaved`는 개인 이탈 ACK와 전원 종료 ACK를 둘 다 받는다. `PendingQuitControllers`에 있으면 그 사람만 자기 로비로 내보내고, 이어서 `PendingRaidResultSaveControllers`에서도 제거한다(두 대기가 겹쳤을 때 그룹 전환이 막히지 않도록 early return 하지 않는다).
 
 > 현재 탈출(Extracted) 성공과 사망(Dead)은 임시로 ResultLevel을 거치지 않고 바로 `LobbyLevel`로 복귀한다. 결과 레벨(전리품 정산 등)이 준비되면 이 분기를 제거하고 다시 ResultLevel을 거치도록 되돌린다.
 >
-> 중도 포기(Quit)는 레이드 자체를 그만두는 행동이라 결과를 보여줄 필요가 없어 `TitleLevel`로 바로 나간다. 레이드 중 ESC로 띄운 `ULSSettingsWidget`(WBP_Settings, 타이틀/로비와 동일한 위젯)의 "메인메뉴로 돌아가기"(BackButton)가 이 경로를 탄다 — 확인 다이얼로그를 거친 뒤 `ULSSessionSubsystem::bAllowQuitRecovery`를 true로 설정하고 `ALSFarmingGameMode::OnQuit()`을 호출해 출발 장비(SubmittedRaidLoadout)를 복구한다.
+> 중도 포기(Quit)도 결과를 보여줄 필요가 없어 ResultLevel을 건너뛰지만, 목적지는 다른 결과와 같은 `LobbyLevel`이다. 레이드 중 ESC로 띄운 `ULSSettingsWidget`(WBP_Settings, 타이틀/로비와 동일한 위젯)의 "메인메뉴로 돌아가기"가 이 경로를 탄다 — 확인 다이얼로그를 거친 뒤 `ALSPlayerControllerBase::ServerRequestQuitRaid(true)`로 서버에 넘기고, 서버가 `bAllowQuitRecovery`를 세운 뒤 출발 장비를 복구한다.
 
 ## 타임아웃과 실패 처리
 
@@ -453,12 +457,12 @@ Raid End
   -> ServerConfirmRaidResultSaved ACK
   -> All ACKed
   -> EndRaidInventory / ClearSubmittedRaidEntryData / ClearRaidSessionState
-  -> ServerTravel(Extracted/Dead: LobbyLevel, 전원 Quit: TitleLevel)   파티 유지
+  -> ServerTravel(Extracted/Dead/전원 Quit: LobbyLevel)   파티 유지
 
 Individual Quit
   -> ServerRequestQuitRaid -> QuitRaidForPlayer
   -> Build result(Quit) -> ClientApplyRaidResult -> ServerConfirmRaidResultSaved
-  -> ClientTravel(TitleLevel)   그 사람만 나간다
+  -> ClientTravel(LobbyLevel?listen)   그 사람만 자기 로비로 나간다
 
 Result
   -> ResultGameMode::ReturnToLobby

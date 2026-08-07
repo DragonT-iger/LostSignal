@@ -17,6 +17,9 @@ class LOSTSIGNAL_API ALSFarmingGameMode : public ALSGameModeBase
 
 public:
 	virtual void StartPlay() override;
+	// 레이드 중 난입을 거절한다. 뒤늦게 들어온 플레이어는 로비에서 입장 payload를 제출한 적이 없어
+	// RaidInventoryComponent가 활성화되지 않고, 그 결과 루팅·인벤토리·ESC 메뉴·결과 저장이 전부 죽는다.
+	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	// 결과 저장 ACK를 기다리는 중 접속이 끊기면 그 컨트롤러를 대기 목록에서 빼야 한다.
 	// 빼지 않으면 남은 인원이 전부 ACK해도 목록이 비지 않아 레벨 전환이 영구히 막힌다.
 	virtual void Logout(AController* Exiting) override;
@@ -33,8 +36,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Farming")
 	void OnQuit();
 
-	// 개인 이탈 — 요청한 플레이어만 결과를 확정하고 타이틀로 내보낸다. 남은 사람의 레이드는 계속된다.
-	// 호스트(리슨 서버)는 나가면 서버가 함께 사라지므로 예외적으로 OnQuit()으로 전원 종료한다.
+	// 개인 이탈 — 요청한 플레이어만 결과를 확정하고 자기 로비로 내보낸다. 남은 사람의 레이드는 계속된다.
+	// 호스트는 혼자 빠질 수 없으므로(서버가 곧 호스트다) OnQuit()으로 전원 종료하고 다 같이 로비로 간다.
 	void QuitRaidForPlayer(ALSPlayerControllerBase* QuittingPlayer);
 
 	void NotifyRaidResultSaved(ALSPlayerControllerBase* PlayerController);
@@ -61,8 +64,8 @@ private:
 
 	// 파티를 유지한 채 레벨을 옮긴다. OpenLevel을 쓰면 안 된다 — 아래 cpp 구현의 주석 참고.
 	bool ServerTravelToLevel(const TSoftObjectPtr<UWorld>& Level, const TCHAR* LevelLabel);
-	// 개인 이탈자 한 명만 접속을 끊고 타이틀로 내보낸다(서버는 그대로 유지).
-	void SendPlayerToTitle(ALSPlayerControllerBase* PlayerController);
+	// 개인 이탈자 한 명만 접속을 끊고 자기 로비로 내보낸다(호스트 세션은 그대로 유지).
+	void SendPlayerToOwnLobby(ALSPlayerControllerBase* PlayerController);
 
 	// 레이드 진입 후 1분마다 다음 장착 칩까지 빈 슬롯을 건너뛰며 신호 게이지를 감소시킨다.
 	void StartSignalGaugeDrain();

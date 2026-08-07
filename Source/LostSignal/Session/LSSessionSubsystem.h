@@ -59,6 +59,13 @@ struct FLSLoadoutSnapshot
 	UPROPERTY(BlueprintReadOnly) TArray<FLSSessionItem> Items;
 };
 
+// PreLogin 거절 사유 표식. 서버가 ErrorMessage에 실어 보내면 클라의 네트워크 실패 문자열로 들어온다.
+// 그대로 화면에 쓰지 않고(로컬라이징 대상이 아니다) 클라에서 FText 메시지로 바꿔 보여준다.
+namespace LSNetRejectReason
+{
+	inline const TCHAR* RaidInProgress = TEXT("LS_RAID_IN_PROGRESS");
+}
+
 UCLASS()
 class LOSTSIGNAL_API ULSSessionSubsystem : public UGameInstanceSubsystem
 {

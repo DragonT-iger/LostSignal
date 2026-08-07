@@ -53,9 +53,20 @@ void ULSSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDri
 	}
 
 	// 체크섬 불일치는 액터 수만큼 브로드캐스트된다. 첫 사유만 남기고 나머지는 무시한다.
-	const FText Reason = (FailureType == ENetworkFailure::NetChecksumMismatch)
-		? LOCTEXT("NetChecksumMismatch", "호스트와 <Emph>게임 버전</>이 달라 접속이 끊겼습니다. 양쪽 모두 같은 빌드인지 확인해 주세요.")
-		: LOCTEXT("NetworkFailure", "호스트와의 <Emph>접속이 끊겼습니다</>.");
+	FText Reason;
+	if (ErrorString.Contains(LSNetRejectReason::RaidInProgress))
+	{
+		// 서버가 PreLogin에서 거절한 경우. 표식만 오므로 여기서 사람이 읽을 문장으로 바꾼다.
+		Reason = LOCTEXT("RaidInProgress", "호스트가 <Emph>레이드 진행 중</>이라 참가할 수 없습니다. 로비로 돌아올 때까지 기다려 주세요.");
+	}
+	else if (FailureType == ENetworkFailure::NetChecksumMismatch)
+	{
+		Reason = LOCTEXT("NetChecksumMismatch", "호스트와 <Emph>게임 버전</>이 달라 접속이 끊겼습니다. 양쪽 모두 같은 빌드인지 확인해 주세요.");
+	}
+	else
+	{
+		Reason = LOCTEXT("NetworkFailure", "호스트와의 <Emph>접속이 끊겼습니다</>.");
+	}
 
 	ReturnToLobbyAfterFailure(Reason, FString::Printf(TEXT("NetworkFailure=%s Error=%s"), ENetworkFailure::ToString(FailureType), *ErrorString));
 }

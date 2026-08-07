@@ -197,9 +197,10 @@ void ULSTitleMenuWidget::OpenLobbyLevel()
 	}
 
 	UWorld* World = GetWorld();
-	if (World && World->GetNetMode() != NM_Standalone)
+
+	// 우리가 서버면 참가자를 데리고 함께 로비로 간다(레이드에서 타이틀로 돌아온 경우 등).
+	if (World && World->GetNetMode() == NM_ListenServer)
 	{
-		// 이미 리슨 서버다(레이드에서 타이틀로 돌아온 경우 등). 참가자를 데리고 로비로 간다.
 		if (ALSTitleGameMode* TitleGameMode = World->GetAuthGameMode<ALSTitleGameMode>())
 		{
 			TitleGameMode->RequestOpenLobbyLevel();
@@ -208,6 +209,14 @@ void ULSTitleMenuWidget::OpenLobbyLevel()
 
 		UE_LOG(LogLS, Warning, TEXT("[Title] Cannot server travel to lobby because TitleGameMode is missing."));
 		return;
+	}
+
+	// 클라이언트면 남의 세션에 얹혀 있는 상태다(호스트가 타이틀에 있거나, 끊긴 뒤 타이틀에 남았거나).
+	// GameMode가 없어 ServerTravel을 걸 수 없으므로, 그 세션에서 빠져나와 내 로비를 새로 연다.
+	// 이 분기가 없으면 Continue가 경고만 남기고 아무 일도 하지 않아 타이틀에 영구히 갇힌다.
+	if (World && World->GetNetMode() == NM_Client)
+	{
+		UE_LOG(LogLS, Log, TEXT("[Title] Leaving the host session and opening our own lobby."));
 	}
 
 	// 로비를 리슨 서버로 연다. 혼자 놀 때도 리슨이면 호스트=서버+클라라 동작이 같고,

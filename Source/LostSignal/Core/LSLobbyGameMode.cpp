@@ -38,6 +38,22 @@ void ALSLobbyGameMode::HandleSeamlessTravelPlayer(AController*& C)
 	ShowLobbyMenuFor(C);
 }
 
+void ALSLobbyGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+	if (!ErrorMessage.IsEmpty())
+	{
+		return;
+	}
+
+	// 이미 ServerTravel을 걸었으면 이 접속자는 payload 없이 레이드로 실려 간다. 파밍과 같은 이유로 거절한다.
+	if (bRaidTravelStarted)
+	{
+		ErrorMessage = LSNetRejectReason::RaidInProgress;
+		UE_LOG(LogLS, Log, TEXT("[Lobby] Rejected a join from %s because the raid is already starting."), *Address);
+	}
+}
+
 void ALSLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);

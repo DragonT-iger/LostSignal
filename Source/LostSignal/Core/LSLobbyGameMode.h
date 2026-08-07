@@ -17,6 +17,9 @@ public:
 	ALSLobbyGameMode();
 
 	virtual void BeginPlay() override;
+	// 출발 절차가 시작된 뒤에는 새 참가자를 받지 않는다. 지금 받으면 입장 payload 수집이 끝난 뒤라
+	// 그 플레이어만 빈 손으로 레이드에 실려 간다.
+	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	// seamless travel로 들어온 플레이어는 PostLogin을 타지 않으므로 여기서도 로비 메뉴를 띄운다.
 	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
