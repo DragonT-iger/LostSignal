@@ -36,7 +36,7 @@ UENUM(BlueprintType)
 enum class ELSTenacityTier : uint8
 {
 	None = 0 UMETA(Hidden),
-	Normal = 2,
+	Normal = 1,
 	SuperArmor = 4,
 	Invincible = 6
 };
@@ -73,7 +73,7 @@ struct FLSImpactResolution
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Combat")
-	ELSTenacityTier TargetTenacity = ELSTenacityTier::Normal;
+	float TargetTenacity = 1.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category="LS/Combat")
 	ELSBreakPowerTier IncomingBreakPower = ELSBreakPowerTier::NormalAttack;

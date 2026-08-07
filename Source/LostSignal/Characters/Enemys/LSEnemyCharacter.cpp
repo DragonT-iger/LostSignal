@@ -291,6 +291,7 @@ void ALSEnemyCharacter::ApplyMonsterAttributes(const FLSMonsterArchetypeRow& Row
 
 	MonsterAttributeSet->InitAttack(FMath::Max(0.0f, Row.Monster_ATK));
 	MonsterAttributeSet->InitDefence(FMath::Max(0.0f, Row.Monster_DEF));
+	MonsterAttributeSet->InitTenacity(FMath::Max(0.0f, static_cast<float>(Row.Monster_Guard)));
 	MonsterAttributeSet->InitArmorPenetrationResistance(FMath::Max(0.0f, Row.Monster_ArmorPen_Resist));
 	MonsterAttributeSet->InitCritChanceResistance(FMath::Max(0.0f, Row.Monster_Crit_Resist));
 }

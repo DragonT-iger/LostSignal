@@ -7,6 +7,7 @@ void ULSCharacterAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+	DOREPLIFETIME_CONDITION_NOTIFY(ULSCharacterAttributeSet, Tenacity, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(ULSCharacterAttributeSet, MaxStamina, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(ULSCharacterAttributeSet, CurrentStamina, COND_None, REPNOTIFY_Always);
 }
@@ -15,7 +16,11 @@ void ULSCharacterAttributeSet::PreAttributeChange(const FGameplayAttribute& Attr
 {
 	Super::PreAttributeChange(Attribute, NewValue);
 
-	if (Attribute == GetCurrentStaminaAttribute())
+	if (Attribute == GetTenacityAttribute())
+	{
+		NewValue = FMath::Max(0.0f, NewValue);
+	}
+	else if (Attribute == GetCurrentStaminaAttribute())
 	{
 		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxStamina());
 	}
@@ -29,7 +34,11 @@ void ULSCharacterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectMo
 {
 	Super::PostGameplayEffectExecute(Data);
 
-	if (Data.EvaluatedData.Attribute == GetCurrentStaminaAttribute())
+	if (Data.EvaluatedData.Attribute == GetTenacityAttribute())
+	{
+		SetTenacity(FMath::Max(0.0f, GetTenacity()));
+	}
+	else if (Data.EvaluatedData.Attribute == GetCurrentStaminaAttribute())
 	{
 		ClampCurrentStamina();
 	}
@@ -43,6 +52,11 @@ void ULSCharacterAttributeSet::PostGameplayEffectExecute(const FGameplayEffectMo
 void ULSCharacterAttributeSet::ClampCurrentStamina()
 {
 	SetCurrentStamina(FMath::Clamp(GetCurrentStamina(), 0.0f, GetMaxStamina()));
+}
+
+void ULSCharacterAttributeSet::OnRep_Tenacity(const FGameplayAttributeData& OldTenacity) const
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(ULSCharacterAttributeSet, Tenacity, OldTenacity);
 }
 
 void ULSCharacterAttributeSet::OnRep_MaxStamina(const FGameplayAttributeData& OldMaxStamina) const

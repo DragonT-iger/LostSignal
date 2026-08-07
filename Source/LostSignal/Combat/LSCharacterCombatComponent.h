@@ -44,7 +44,7 @@ public:
 	bool CanStartAttack() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
-	ELSTenacityTier GetCurrentTenacityTier() const;
+	float GetCurrentTenacity() const;
 
 	UFUNCTION(BlueprintPure, Category="LS/Combat")
 	FLSImpactResolution ResolveIncomingImpact(ELSBreakPowerTier BreakPowerTier) const;

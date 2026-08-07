@@ -312,10 +312,12 @@ AttributeSet 역할 분리:
 
 ```text
 ULSCombatAttributeSet     생명력 풀 전담 (MaxHealth / CurrentHealth + 데미지 적용용 임시 Damage)
-ULSCharacterAttributeSet  캐릭터 능력치 전담 (공격/방어/치명/관통/쿨감/이동/대시/스태미나)
+ULSCharacterAttributeSet  캐릭터 능력치 전담 (공격/방어/강인도/치명/관통/쿨감/이동/대시/스태미나)
 ```
 
 데미지 계산은 `ULSCharacterAttributeSet`의 공격/방어 수치를 읽어 최종값을 `ULSCombatAttributeSet.CurrentHealth`에 반영한다.
+
+강인도는 `ULSCharacterAttributeSet.Tenacity`의 실시간 수치와 공격의 붕괴력을 비교한다. 플레이어는 별도 캐릭터 스탯 DataTable 컬럼 없이 기본값 `1`로 시작하고, 몬스터는 `Monster_Guard`로 초기화한다. `State_SuperArmor`와 `State_Invincible`은 각각 유효 강인도를 최소 `4`와 `6`으로 보정하며, 무적의 데미지 차단은 태그가 담당한다.
 
 ASC와 AttributeSet 관계:
 

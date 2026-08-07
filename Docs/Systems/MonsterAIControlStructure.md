@@ -137,7 +137,7 @@ Monster_Rank
 -> Row에는 보관하되(ELSMonsterRank: Normal/Boss), 등급별 분기(스폰/보스 처리) 정책이 정해지기 전까지 직접 적용하지 않는다
 
 Monster_Guard
--> Row에는 보관하되(int32), Tenacity/Guard 적용 정책이 정해지기 전까지 직접 적용하지 않는다
+-> 몬스터 생성 시 ULSCharacterAttributeSet.Tenacity의 기본값으로 초기화한다
 
 Action_Group
 -> Row에는 보관하되(TArray<FName>, DT_MonsterAction row 참조), 어빌리티 소비 정책이 정해지기 전까지 직접 적용하지 않는다
@@ -710,6 +710,6 @@ AI 코드를 수정한 뒤 다음을 확인한다.
   - **충돌형 돌진:** **구현 완료**. 별도 Row/CSV 필드 없이 `ULSAN_MonsterActionChargeStart` 배치로 선택한다. 서버 캡슐의 blocking hit에서 첫 살아 있는 플레이어에게 기존 GAS 데미지/CC를 1회 적용한다. 결과별 `ChargeHit`/`ChargeMiss` 섹션이 있으면 즉시 전환하고, 없으면 `ChargeLoop` 자기 연결을 해제해 현재 루프 끝에서 종료한다. 섹션 계약과 Row 값 재사용 규칙은 위 "공격 제어 규칙" 참고.
   - **미구현(후속):** 실제 공중 포물선(JumpForce)·도약 중 호밍, `Erosion_Value`(침식)·`Action_Guard`(액션 중 포이즈) 적용, `bCanCrit`(현재 false 고정).
   - **전역 에셋 셋업:** `DT_MonsterAction`은 `ULSGameDataSettings`, 텔레그래프 Circle/Box 머티리얼은 `ULSMonsterPresentationSettings`에서 공급한다. 프리뷰 메시는 `ULSSkillPreviewComponent` 생성자가 Engine Plane을 기본값으로 사용하므로 몬스터 BP에서 별도 할당하지 않는다.
-- **강인도(Monster_Guard):** Row에는 존재하나(int32) 적용 정책 미정(위 "몬스터 DataTable 규칙" 참고).
+- **강인도(Monster_Guard):** 몬스터 생성 시 공용 `ULSCharacterAttributeSet::Tenacity`에 초기화되며, 피격 CC 게이트가 이 실시간 수치를 읽는다.
 - **보스 몬스터(골렘형):** AI 코드 구조 구현 완료 — 교전 영역(`bUseEngageArea`), 복귀 시 전투 리셋(`LS Reset Monster Combat` + `ULSGE_FullHeal`, 일반 몬스터에도 사용 가능한 범용 태스크), 전용 evaluator 없이 StateTree 에셋 수준 분리(위 "보스 몬스터 구조" 참고). **미완(에셋/데이터):** ST_Boss StateTree 에셋, 보스 BP(교전 영역 설정), 보스 아키타입 row·DT_MonsterAction 액션 row.
 - **구체 몬스터 클래스:** `ALSEnemyHyena`(ALSEnemyCharacter 상속, 생성자에서 `MonsterRowName="10001"`만 설정), `ALSEnemyBuff`(`MonsterRowName="10004"`만 설정), `ALSEnemyBossBuff`(보스 골렘, `MonsterRowName="10101"`만 설정) 추가 완료. 그 외 몬스터는 같은 패턴의 얇은 서브클래스 + BP로 확장.

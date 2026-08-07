@@ -21,6 +21,7 @@
 #include "Engine/GameInstance.h"
 #include "GAS/Effects/LSGE_HealthChange.h"
 #include "GAS/Effects/LSGE_StaminaChange.h"
+#include "GAS/LSCharacterAttributeSet.h"
 #include "GAS/LSCombatAttributeSet.h"
 #include "GAS/LSGameplayTags.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -66,28 +67,32 @@ bool ULSCharacterCombatComponent::CanStartAttack() const
 	return !IsDead() && !HasCombatTag(LSGameplayTags::Combat_Attacking);
 }
 
-ELSTenacityTier ULSCharacterCombatComponent::GetCurrentTenacityTier() const
+float ULSCharacterCombatComponent::GetCurrentTenacity() const
 {
+	const UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	float EffectiveTenacity = ASC
+		? ASC->GetNumericAttribute(ULSCharacterAttributeSet::GetTenacityAttribute())
+		: static_cast<float>(ELSTenacityTier::Normal);
+
 	if (HasCombatTag(LSGameplayTags::State_Invincible))
 	{
-		return ELSTenacityTier::Invincible;
+		EffectiveTenacity = FMath::Max(EffectiveTenacity, static_cast<float>(ELSTenacityTier::Invincible));
 	}
-
-	if (HasCombatTag(LSGameplayTags::State_SuperArmor))
+	else if (HasCombatTag(LSGameplayTags::State_SuperArmor))
 	{
-		return ELSTenacityTier::SuperArmor;
+		EffectiveTenacity = FMath::Max(EffectiveTenacity, static_cast<float>(ELSTenacityTier::SuperArmor));
 	}
 
-	return ELSTenacityTier::Normal;
+	return FMath::Max(0.0f, EffectiveTenacity);
 }
 
 FLSImpactResolution ULSCharacterCombatComponent::ResolveIncomingImpact(ELSBreakPowerTier BreakPowerTier) const
 {
 	FLSImpactResolution Resolution;
-	Resolution.TargetTenacity = GetCurrentTenacityTier();
+	Resolution.TargetTenacity = GetCurrentTenacity();
 	Resolution.IncomingBreakPower = BreakPowerTier;
-	Resolution.bDamageBlocked = Resolution.TargetTenacity == ELSTenacityTier::Invincible;
-	Resolution.bCrowdControlBlocked = static_cast<int32>(BreakPowerTier) < static_cast<int32>(Resolution.TargetTenacity);
+	Resolution.bDamageBlocked = HasCombatTag(LSGameplayTags::State_Invincible);
+	Resolution.bCrowdControlBlocked = static_cast<float>(BreakPowerTier) < Resolution.TargetTenacity;
 	Resolution.bImpactAllowed = !Resolution.bDamageBlocked && !Resolution.bCrowdControlBlocked;
 	return Resolution;
 }
@@ -217,11 +222,11 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 		UE_LOG(
 			LogLS,
 			Log,
-			TEXT("DamageBlocked %s -> %s | BreakPower=%d TargetTenacity=%d"),
+			TEXT("DamageBlocked %s -> %s | BreakPower=%d TargetTenacity=%.2f"),
 			*GetNameSafe(GetOwner()),
 			*GetNameSafe(TargetActor),
 			static_cast<int32>(BreakPowerTier),
-			static_cast<int32>(ImpactResolution.TargetTenacity));
+			ImpactResolution.TargetTenacity);
 		return false;
 	}
 
@@ -250,7 +255,7 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 	UE_LOG(
 		LogLS,
 		Log,
-		TEXT("DamageApply %s -> %s | GE=%s Level=%.1f Fixed=%.2f Coef=%.2f CanCrit=%d BreakPower=%d TargetTenacity=%d CCBlocked=%d | HP %.1f -> %.1f (Delta %.1f)"),
+		TEXT("DamageApply %s -> %s | GE=%s Level=%.1f Fixed=%.2f Coef=%.2f CanCrit=%d BreakPower=%d TargetTenacity=%.2f CCBlocked=%d | HP %.1f -> %.1f (Delta %.1f)"),
 		*GetNameSafe(GetOwner()),
 		*GetNameSafe(TargetActor),
 		*GetNameSafe(DamageEffectClass),
@@ -259,7 +264,7 @@ bool ULSCharacterCombatComponent::ApplyDamageEffectToTarget(
 		AttackCoefficient,
 		bCanCrit ? 1 : 0,
 		static_cast<int32>(BreakPowerTier),
-		static_cast<int32>(ImpactResolution.TargetTenacity),
+		ImpactResolution.TargetTenacity,
 		ImpactResolution.bCrowdControlBlocked ? 1 : 0,
 		BeforeHealth,
 		AfterHealth,

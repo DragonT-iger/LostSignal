@@ -6,7 +6,7 @@
 #include "GAS/LSAttributeSetMacros.h"
 #include "LSCharacterAttributeSet.generated.h"
 
-// 캐릭터 능력치 전담 AttributeSet: 공격/방어/치명/관통/쿨감/이동/대시/스태미나.
+// 캐릭터 능력치 전담 AttributeSet: 공격/방어/강인도/치명/관통/쿨감/이동/대시/스태미나.
 // 체력(MaxHealth/CurrentHealth)은 ULSCombatAttributeSet이 보유한다.
 UCLASS()
 class LOSTSIGNAL_API ULSCharacterAttributeSet : public UAttributeSet
@@ -60,6 +60,10 @@ public:
 	FGameplayAttributeData Defence = 0.0f;
 	LS_ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Defence)
 
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Tenacity, Category="LS/Stats")
+	FGameplayAttributeData Tenacity = 1.0f;
+	LS_ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, Tenacity)
+
 	UPROPERTY(BlueprintReadOnly, Category="LS/Stats")
 	FGameplayAttributeData DamageReduction = 0.0f;
 	LS_ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DamageReduction)
@@ -93,6 +97,9 @@ public:
 	LS_ATTRIBUTE_ACCESSORS(ULSCharacterAttributeSet, DashCooldown)
 
 private:
+	UFUNCTION()
+	void OnRep_Tenacity(const FGameplayAttributeData& OldTenacity) const;
+
 	UFUNCTION()
 	void OnRep_MaxStamina(const FGameplayAttributeData& OldMaxStamina) const;
 
