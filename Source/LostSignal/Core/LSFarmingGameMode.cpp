@@ -5,7 +5,6 @@
 #include "Core/LSPlayerControllerBase.h"
 #include "Data/LSChipStats.h"
 #include "Inventory/LSRaidInventoryComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSettings.h"
@@ -28,6 +27,30 @@ void ALSFarmingGameMode::StartPlay()
 	}
 
 	StartSignalGaugeDrain();
+}
+
+void ALSFarmingGameMode::Logout(AController* Exiting)
+{
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Exiting);
+	if (PlayerController)
+	{
+		// 이탈자는 더 이상 ACK를 보내지 못한다. 남은 인원의 레벨 전환이 막히지 않도록 대기 목록에서 뺀다.
+		const int32 RemovedQuitWaits = PendingQuitControllers.Remove(PlayerController);
+		const int32 RemovedResultWaits = PendingRaidResultSaveControllers.Remove(PlayerController);
+		if (RemovedQuitWaits > 0 || RemovedResultWaits > 0)
+		{
+			UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] %s left while a raid result save was pending. Dropping the wait."),
+				*GetNameSafe(PlayerController));
+		}
+	}
+
+	Super::Logout(Exiting);
+
+	// 남은 사람이 전부 ACK를 끝낸 상태였다면 이탈로 비워진 지금 전환한다.
+	if (bWaitingForRaidResultSave && PendingRaidResultSaveControllers.IsEmpty())
+	{
+		TravelToResultLevel();
+	}
 }
 
 void ALSFarmingGameMode::OnPlayerDied()
@@ -59,8 +82,63 @@ void ALSFarmingGameMode::OnQuit()
 	EndRaid(ELSRaidResult::Quit);
 }
 
+void ALSFarmingGameMode::QuitRaidForPlayer(ALSPlayerControllerBase* QuittingPlayer)
+{
+	if (!QuittingPlayer)
+	{
+		return;
+	}
+
+	// 리슨 서버의 호스트가 나가면 서버 프로세스도 함께 사라진다. 개인 이탈이 성립하지 않으므로
+	// 기존처럼 전원 Quit으로 확정하고 다 같이 타이틀로 나간다.
+	if (QuittingPlayer->IsLocalPlayerController())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] Host quit the raid. Ending the raid for everyone."));
+		OnQuit();
+		return;
+	}
+
+	const ULSRaidInventoryComponent* RaidInventory = QuittingPlayer->GetRaidInventoryComponent();
+	if (!RaidInventory || !RaidInventory->IsRaidActive())
+	{
+		SendPlayerToTitle(QuittingPlayer);
+		return;
+	}
+
+	TArray<FLSSessionItem> InventoryItems;
+	TArray<FLSSessionItem> SafeItems;
+	TArray<FLSSessionItem> EquipmentItems;
+	bool bSaveInventory = false;
+	bool bSaveSafeStash = false;
+	bool bSaveEquipment = false;
+
+	if (!BuildRaidResultForPlayer(QuittingPlayer, ELSRaidResult::Quit, InventoryItems, SafeItems, EquipmentItems, bSaveInventory, bSaveSafeStash, bSaveEquipment))
+	{
+		UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] Failed to build quit result for %s. Sending to title without saving."), *GetNameSafe(QuittingPlayer));
+		SendPlayerToTitle(QuittingPlayer);
+		return;
+	}
+
+	PendingQuitControllers.AddUnique(QuittingPlayer);
+	QuittingPlayer->RequestRaidResultSave(ELSRaidResult::Quit, InventoryItems, SafeItems, EquipmentItems, bSaveInventory, bSaveSafeStash, bSaveEquipment);
+}
+
 void ALSFarmingGameMode::NotifyRaidResultSaved(ALSPlayerControllerBase* PlayerController)
 {
+	// 개인 이탈 ACK — 그 사람만 정리해서 타이틀로 내보내고 남은 사람의 레이드는 그대로 둔다.
+	if (PlayerController && PendingQuitControllers.Remove(PlayerController) > 0)
+	{
+		if (ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
+		{
+			RaidInventory->EndRaidInventory();
+		}
+		PlayerController->ClearSubmittedRaidEntryData();
+		UE_LOG(LogLS, Log, TEXT("[FarmingGameMode] Quit result saved by %s. Sending to title."), *GetNameSafe(PlayerController));
+		SendPlayerToTitle(PlayerController);
+		// return하지 않는다 — 이탈 요청과 전원 종료가 겹쳤으면 이 사람 몫의 그룹 대기도 함께 풀어야
+		// PendingRaidResultSaveControllers가 비고 레벨 전환이 진행된다.
+	}
+
 	if (!bWaitingForRaidResultSave)
 	{
 		return;
@@ -145,11 +223,20 @@ void ALSFarmingGameMode::BeginRaidResultSave(const ELSRaidResult Result)
 
 		if (!BuildRaidResultForPlayer(PlayerController, Result, InventoryItems, SafeItems, EquipmentItems, bSaveInventory, bSaveSafeStash, bSaveEquipment))
 		{
-			UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] Failed to build raid result for %s."), *GetNameSafe(PlayerController));
+			// 결과를 못 만들었으면 저장 요청도 못 보낸다. 대기 목록에 남겨두면 ACK가 영영 오지 않아
+			// 레벨 전환이 막히므로 여기서 같이 뺀다.
+			UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] Failed to build raid result for %s. Dropping it from the save wait."), *GetNameSafe(PlayerController));
+			PendingRaidResultSaveControllers.Remove(PlayerController);
 			continue;
 		}
 
 		PlayerController->RequestRaidResultSave(Result, InventoryItems, SafeItems, EquipmentItems, bSaveInventory, bSaveSafeStash, bSaveEquipment);
+	}
+
+	// 전원이 build 실패로 빠졌으면 여기서 이미 비어 있다. 대기만 걸어두고 멈추지 않도록 바로 전환한다.
+	if (bWaitingForRaidResultSave && PendingRaidResultSaveControllers.IsEmpty())
+	{
+		TravelToResultLevel();
 	}
 }
 
@@ -270,43 +357,67 @@ void ALSFarmingGameMode::TravelToResultLevel()
 	ClearRaidResultSaveWait();
 
 	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
+	if (!Settings)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] Cannot leave the raid level because LS Session Settings is missing."));
+		return;
+	}
 
 	// 탈출 성공·사망은 일단 ResultLevel을 건너뛰고 바로 로비로 복귀한다. (결과 레벨이 준비되면 되돌린다)
 	if (PendingRaidResult == ELSRaidResult::Extracted || PendingRaidResult == ELSRaidResult::Dead)
 	{
-		if (Settings && !Settings->LobbyLevel.IsNull())
-		{
-			UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->LobbyLevel);
-		}
-		else
-		{
-			UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] LobbyLevel is not set. Check Project Settings > LS Session Settings."));
-		}
+		ServerTravelToLevel(Settings->LobbyLevel, TEXT("LobbyLevel"));
 		return;
 	}
 
-	// 중도 포기(Quit)는 레이드 자체를 그만두는 행동이라 ResultLevel을 건너뛰고 바로 타이틀로 나간다.
+	// 전원 Quit(호스트 이탈)은 레이드 자체를 그만두는 행동이라 ResultLevel을 건너뛰고 바로 타이틀로 나간다.
+	// 개인 이탈은 여기까지 오지 않는다 — QuitRaidForPlayer가 그 사람만 ClientTravel로 내보낸다.
 	if (PendingRaidResult == ELSRaidResult::Quit)
 	{
-		if (Settings && !Settings->TitleLevel.IsNull())
-		{
-			UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->TitleLevel);
-		}
-		else
-		{
-			UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] TitleLevel is not set. Check Project Settings > LS Session Settings."));
-		}
+		ServerTravelToLevel(Settings->TitleLevel, TEXT("TitleLevel"));
 		return;
 	}
 
-	if (Settings && !Settings->ResultLevel.IsNull())
+	ServerTravelToLevel(Settings->ResultLevel, TEXT("ResultLevel"));
+}
+
+bool ALSFarmingGameMode::ServerTravelToLevel(const TSoftObjectPtr<UWorld>& Level, const TCHAR* LevelLabel)
+{
+	// OpenLevel(=UEngine::SetClientTravel)을 쓰면 안 된다. 넷드라이버를 파괴해 클라 전원이 끊기고,
+	// LastURL에서 Listen 옵션까지 떼어내 호스트가 리슨 서버를 그만둔다. 그러면 두 번째 레이드부터
+	// 멀티가 성립하지 않는다. ServerTravel은 세션과 참가자를 유지한 채 맵만 바꾼다.
+	UWorld* World = GetWorld();
+	if (!World || Level.IsNull())
 	{
-		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->ResultLevel);
+		UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] %s is not set. Check Project Settings > LS Session Settings."), LevelLabel);
+		return false;
 	}
-	else
+
+	const FString LevelPath = Level.ToSoftObjectPath().GetLongPackageName();
+	if (LevelPath.IsEmpty() || !World->ServerTravel(LevelPath))
 	{
-		UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] ResultLevel is not set. Check Project Settings > LS Session Settings."));
+		UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] Failed to server travel to %s: %s"), LevelLabel, *LevelPath);
+		return false;
 	}
+
+	return true;
+}
+
+void ALSFarmingGameMode::SendPlayerToTitle(ALSPlayerControllerBase* PlayerController)
+{
+	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
+	const FString TitlePath = (Settings && !Settings->TitleLevel.IsNull())
+		? Settings->TitleLevel.ToSoftObjectPath().GetLongPackageName()
+		: FString();
+	if (!PlayerController || TitlePath.IsEmpty())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[FarmingGameMode] Cannot send %s to the title level. Check Project Settings > LS Session Settings."),
+			*GetNameSafe(PlayerController));
+		return;
+	}
+
+	// 개인 이탈이므로 서버 전체를 옮기지 않는다. 그 클라이언트만 접속을 끊고 타이틀을 로컬로 연다.
+	PlayerController->ClientTravel(TitlePath, TRAVEL_Absolute);
 }
 
 void ALSFarmingGameMode::ClearRaidResultSaveWait()

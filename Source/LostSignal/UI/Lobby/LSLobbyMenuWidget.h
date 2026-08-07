@@ -7,6 +7,7 @@
 
 class UBorder;
 class UButton;
+class UEditableTextBox;
 class UOverlay;
 class UTextBlock;
 class UWidgetSwitcher;
@@ -123,6 +124,14 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
 	TObjectPtr<UButton> MissionStartButton;
 
+	// --- 친구 방 참가 (IP 직접 접속) ---
+	// 호스트는 타이틀에서 로비를 리슨 서버로 열고, 참가자는 자기 로비에서 여기에 주소를 넣어 합류한다.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
+	TObjectPtr<UButton> JoinButton;
+
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
+	TObjectPtr<UEditableTextBox> JoinAddressTextBox;
+
 	// BP(WBP_LobbyMenu)에서 WBP_Settings를 매핑한다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Lobby")
 	TSubclassOf<ULSSettingsWidget> SettingsWidgetClass;
@@ -179,6 +188,11 @@ private:
 
 	UFUNCTION()
 	void HandleMissionStartClicked();
+
+	// --- 세션 / 멀티플레이 (LSLobbyMenuWidget_Session.cpp) ---
+	// JoinAddressTextBox의 주소로 ClientTravel 한다. 호스트의 현재 맵(로비)으로 들어간다.
+	UFUNCTION()
+	void HandleJoinClicked();
 
 	// --- 입력 / 포커스 / 오버레이 (LSLobbyMenuWidget_Input.cpp) ---
 	// TAB 동작: 보급소 안쪽 화면이면 한 단계 뒤로, 그 외에는 가방 패널을 토글한다.

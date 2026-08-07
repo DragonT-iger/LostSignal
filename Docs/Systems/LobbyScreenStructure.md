@@ -9,7 +9,12 @@
 
 ## 화면 구성
 
-`WBP_LobbyMenu` 하나가 로비 화면의 루트다. 상단 아이콘 바는 항상 보이고, 가운데 `TabSwitcher`와
+`WBP_LobbyMenu` 하나가 로비 화면의 루트다. **생성 주체는 각 플레이어의 `ALSPlayerControllerBase`다** —
+`ALSLobbyGameMode`가 `PostLogin` / `HandleSeamlessTravelPlayer`에서 위젯 클래스를 넘기면
+`ShowLobbyMenuWidget`이 로컬이면 직접, 원격이면 Client RPC로 만든다. GameMode에서 직접 만들면 서버(호스트)
+화면에만 뜨므로 그렇게 하면 안 된다. BP 매핑(`LobbyMenuWidgetClass`)은 `BP_LobbyGameMode`에 그대로 둔다.
+
+상단 아이콘 바는 항상 보이고, 가운데 `TabSwitcher`와
 `QuestPanelHost` 중 하나만 활성화된다. 보유 골드는 패널과 무관하게 계속 표시하고, 임무 시작 버튼은
 로비 기본 상태에서만 표시한다.
 
@@ -23,6 +28,8 @@
 | 퀘스트 | `QuestTab` | 퀘스트 |
 | 지도 | `MapTab` | 없음, 미구현 안내 |
 | 설정 | `SettingsTab` | 배타 패널이 아닌 설정 오버레이 |
+
+우하단 상시 영역에는 임무 시작 버튼과 **친구 방 참가**(`JoinButton` + `JoinAddressTextBox`)가 있다. 참가는 자기 로비(리슨 서버)를 버리고 호스트의 로비로 `ClientTravel` 하는 동작이며, 핸들러는 `LSLobbyMenuWidget_Session.cpp`가 소유한다. 접속 경로 전체는 [DedicatedServerBuildout.md](DedicatedServerBuildout.md)가 단일 출처다.
 
 패널 종류는 `ELSLobbyPanel`로 표현하지만 enum 값과 스위처 인덱스는 대응하지 않는다.
 `ULSLobbyMenuWidget::ShowPanel`은 `SetActiveWidget`에 바인딩된 페이지 포인터를 넘긴다. 페이지 순서를

@@ -59,18 +59,6 @@ struct FLSLoadoutSnapshot
 	UPROPERTY(BlueprintReadOnly) TArray<FLSSessionItem> Items;
 };
 
-// ServerTravel 이후 플레이어별 인벤토리 복원용 큐 항목
-USTRUCT()
-struct FLSPendingRaidEntry
-{
-	GENERATED_BODY()
-
-	TArray<FLSSessionItem> Inventory;
-	TArray<FLSSessionItem> SafeInventory;
-	// 무기/방어구 장착 5칸. 인덱스=슬롯 타입이므로 정렬/압축 금지.
-	TArray<FLSSessionItem> EquipmentSlots;
-};
-
 UCLASS()
 class LOSTSIGNAL_API ULSSessionSubsystem : public UGameInstanceSubsystem
 {
@@ -85,18 +73,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
 	void StartRaid(const TArray<FLSSessionItem>& Loadout);
 
-	void StartRaidClientMirror(const TArray<FLSSessionItem>& Loadout);
-	void MirrorRaidSessionState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);
 	void ClearRaidSessionState();
-
-	// MO 레이드 입장 시 플레이어별 데이터를 큐에 저장. ServerTravel 후 각 PC가 순서대로 꺼내 씀.
-	void EnqueuePendingRaidEntry(const TArray<FLSSessionItem>& Inventory, const TArray<FLSSessionItem>& SafeInventory, const TArray<FLSSessionItem>& EquipmentItems);
-	bool DequeuePendingRaidEntry(TArray<FLSSessionItem>& OutInventory, TArray<FLSSessionItem>& OutSafeInventory, TArray<FLSSessionItem>& OutEquipmentItems);
-	bool HasPendingRaidEntries() const;
-
-	// 레이드 종료 - 결과 처리 후 결과 레벨로 전환
-	UFUNCTION(BlueprintCallable, Category="LS/Session")
-	void EndRaid(ELSRaidResult Result);
 
 	// 파밍으로 획득한 아이템 추가
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
@@ -126,16 +103,10 @@ public:
 	void ConsumeItem(FName ItemRowName, int32 Amount);
 
 	UFUNCTION(BlueprintPure, Category="LS/Session")
-	ELSRaidResult GetLastRaidResult() const { return LastRaidResult; }
-
-	UFUNCTION(BlueprintPure, Category="LS/Session")
 	const TArray<FLSSessionItem>& GetSessionInventory() const { return SessionInventory; }
 
 	UFUNCTION(BlueprintPure, Category="LS/Session")
 	const TArray<FLSSessionItem>& GetSessionSafeInventory() const { return SessionSafeInventory; }
-
-	// 레거시/보조 미러의 장착 장비. RaidInventoryComponent 폴백 초기화에서만 읽는다.
-	const TArray<FLSSessionItem>& GetSessionEquipmentSlots() const { return SessionEquipmentSlots; }
 
 	UFUNCTION(BlueprintPure, Category="LS/Session")
 	bool IsRaidActive() const { return bRaidActive; }
@@ -146,23 +117,12 @@ public:
 	UFUNCTION(BlueprintPure, Category="LS/Session")
 	int32 GetMaxSafeSlotCount() const;
 
-	// 결과 레벨에서 최종 확정된 아이템 목록 조회 (EndRaid 이후 유효)
-	UFUNCTION(BlueprintPure, Category="LS/Session")
-	const TArray<FLSSessionItem>& GetResolvedItems() const { return ResolvedItems; }
-
 private:
 	bool bRaidActive = false;
 	FLSLoadoutSnapshot LoadoutSnapshot;
 	TArray<FLSSessionItem> SessionInventory;
 	TArray<FLSSessionItem> SessionSafeInventory;
-	TArray<FLSSessionItem> SessionEquipmentSlots;
 	TArray<FLSSessionItem> ConsumedItems;
-	TArray<FLSSessionItem> ResolvedItems;
-	ELSRaidResult LastRaidResult = ELSRaidResult::Dead;
-
-	TArray<FLSPendingRaidEntry> PendingRaidEntries;
-	int32 PendingRaidEntryIndex = 0;
 
 	void StartRaidInternal(const TArray<FLSSessionItem>& Loadout, bool bPersistRaidSave);
-	TArray<FLSSessionItem> BuildQuitRecovery() const;
 };

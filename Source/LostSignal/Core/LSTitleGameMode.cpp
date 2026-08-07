@@ -1,6 +1,7 @@
 #include "Core/LSTitleGameMode.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Core/LSPlayerControllerBase.h"
 #include "Engine/NetConnection.h"
 #include "Engine/NetDriver.h"
 #include "GameFramework/PlayerController.h"
@@ -20,10 +21,12 @@ ALSTitleGameMode::ALSTitleGameMode()
 	DefaultPawnClass = nullptr;
 }
 
-void ALSTitleGameMode::BeginPlay()
+void ALSTitleGameMode::HandleSeamlessTravelPlayer(AController*& C)
 {
-	Super::BeginPlay();
-	CreateTitleMenuWidget();
+	Super::HandleSeamlessTravelPlayer(C);
+
+	// seamless travel로 들어온 플레이어는 PostLogin을 타지 않는다. 타이틀 메뉴는 여기서 띄운다.
+	ShowTitleMenuFor(C);
 }
 
 void ALSTitleGameMode::PostLogin(APlayerController* NewPlayer)
@@ -31,6 +34,8 @@ void ALSTitleGameMode::PostLogin(APlayerController* NewPlayer)
 	Super::PostLogin(NewPlayer);
 	UE_LOG(LogLS, Log, TEXT("[Title] Player login completed. Player=%s ConnectedPlayers=%d"),
 		*GetNameSafe(NewPlayer), GetNumPlayers());
+
+	ShowTitleMenuFor(NewPlayer);
 
 	if (bLobbyTravelRequested)
 	{
@@ -123,29 +128,40 @@ void ALSTitleGameMode::HandlePendingPlayerConnectionTimeout()
 	GetWorldTimerManager().ClearTimer(PendingPlayerConnectionPollTimerHandle);
 }
 
-void ALSTitleGameMode::CreateTitleMenuWidget()
+void ALSTitleGameMode::ShowTitleMenuFor(AController* Controller)
 {
-	APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
-	if (!PlayerController)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Title] Cannot create title menu because PlayerController is missing."));
-		return;
-	}
-
 	if (!TitleMenuWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Title] TitleMenuWidgetClass is not set on %s. Check BP_TitleGameMode."), *GetNameSafe(this));
 		return;
 	}
 
-	TitleMenuWidgetInstance = CreateWidget<ULSTitleMenuWidget>(PlayerController, TitleMenuWidgetClass);
-	if (!TitleMenuWidgetInstance)
+	// GameMode는 서버에만 존재한다. 위젯은 각 PlayerController가 자기 화면에 만든다(원격은 Client RPC).
+	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(Controller))
+	{
+		LSPlayerController->ShowTitleMenuWidget(TitleMenuWidgetClass);
+		return;
+	}
+
+	// 타이틀 레벨은 PlayerControllerClass를 지정하지 않아 엔진 기본 APlayerController가 온다.
+	// 그 경우엔 Client RPC 경로가 없으므로 로컬 컨트롤러에 한해 여기서 직접 만든다.
+	// (타이틀은 접속 지점이 아니라 원격 참가자가 올 일이 없다 — 참가는 로비에서 한다)
+	APlayerController* PlayerController = Cast<APlayerController>(Controller);
+	if (!PlayerController || !PlayerController->IsLocalController())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Title] Cannot show the title menu for %s. Set PlayerControllerClass to ALSPlayerControllerBase on BP_TitleGameMode to support remote players."),
+			*GetNameSafe(Controller));
+		return;
+	}
+
+	ULSTitleMenuWidget* TitleMenuWidget = CreateWidget<ULSTitleMenuWidget>(PlayerController, TitleMenuWidgetClass);
+	if (!TitleMenuWidget)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Title] Failed to create title menu widget on %s."), *GetNameSafe(this));
 		return;
 	}
 
-	TitleMenuWidgetInstance->AddToViewport();
+	TitleMenuWidget->AddToViewport();
 
 	PlayerController->bShowMouseCursor = true;
 	FInputModeUIOnly InputMode;

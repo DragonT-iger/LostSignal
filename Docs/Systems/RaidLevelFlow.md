@@ -23,7 +23,8 @@ ALSFarmingGameMode
 - 사망/탈출/중도 종료 결과 확정
 - 각 PlayerController의 RaidInventoryComponent 기준으로 결과 payload 생성
 - 클라이언트 로컬 SaveGame 저장 ACK 대기
-- 모든 ACK 수신 후 ResultLevel 이동
+- 모든 ACK 수신 후 ServerTravel (파티 유지)
+- 개인 이탈은 QuitRaidForPlayer로 그 PC만 ClientTravel
 
 ALSResultGameMode
 - 결과 레벨에서 LobbyLevel 복귀
@@ -36,11 +37,14 @@ ALSPlayerControllerBase
 ULSRaidInventoryComponent
 - 레이드 중 플레이어별 Inventory/Safe 상태의 서버 원본
 
+ALSPlayerState
+- 레이드 입장 payload(Inventory/SafeStash/Equipment)의 원본
+- CopyProperties로 seamless travel을 건너간다 — 컨트롤러는 travel마다 새로 스폰되므로 여기 둬야 한다
+- 서버 전용(리플리케이트 안 함). 클라는 RaidInventoryComponent 미러로 본다
+
 ULSSessionSubsystem
-- ServerTravel 후 플레이어별 인벤토리 복원용 PendingRaidEntries 큐 보유
-- 1인/legacy 호환용 세션 미러 상태(SessionInventory/SessionSafeInventory)도 함께 보유
+- bAllowQuitRecovery: 중도 포기 시 출발 장비 복구 여부 (레이드 경로에서 남은 유일한 용도)
 - 레이드 중 아이템의 원본은 PlayerController별 RaidInventoryComponent
-- bAllowQuitRecovery: 중도 포기 시 출발 장비 복구 여부
 
 ULSSettingsWidget
 - 세팅 화면(WBP_Settings). 타이틀/로비/레이드(ESC) 어디서든 동일한 위젯을 재사용한다 — 레이드 전용 별도 메뉴는 없다
@@ -48,7 +52,7 @@ ULSSettingsWidget
 - 레이드 중에는 ALSPlayerControllerBase가 ESC로 이 위젯을 직접 토글해서 띄운다
 - "메인메뉴로 돌아가기"(MainMenuButton, ULSTitleMenuButtonWidget) 클릭 시: 레이드 여부와 무관하게 항상 타이틀로 나간다.
   - 레이드 중이 아니면(로비): 바로 TitleLevel로 OpenLevel
-  - 레이드 중이면: 확인 다이얼로그 → bAllowQuitRecovery=true → ALSFarmingGameMode::OnQuit() → TitleLevel
+  - 레이드 중이면: 확인 다이얼로그 → ALSPlayerControllerBase::ServerRequestQuitRaid(true) → 서버가 QuitRaidForPlayer로 그 사람만 TitleLevel로 내보낸다
   - 타이틀에서 열 때는 이미 메인메뉴라 불필요하므로 이 버튼을 숨긴다(SetMainMenuButtonVisible(false), 타이틀 메뉴가 세팅 생성 시 호출)
 - BackButton(일반 UButton)은 세팅 패널만 닫는다(OnBackToMenu 브로드캐스트). ESC/TAB 키로도 동일하게 닫힌다
   (ESC: ULSSettingsWidget::NativeOnKeyDown → CloseSettings, TAB: NativeOnPreviewKeyDown → CloseSettings). 레이드 중에는 이 위젯이 스스로 RemoveFromParent 하므로
@@ -78,10 +82,15 @@ Title -> Lobby (Listen Server / Dedicated Server)
 - Settings->LobbyLevel
 - World->ServerTravel(LobbyLevelPath)
 
-Title -> Lobby (Standalone)
+Title -> Lobby (Standalone = 방 열기)
 - ULSTitleMenuWidget::OpenLobbyLevel
 - Settings->LobbyLevel
-- UGameplayStatics::OpenLevelBySoftObjectPtr
+- UGameplayStatics::OpenLevel(..., Options="listen")   로비를 리슨 서버로 연다
+
+Lobby -> 남의 방 참가
+- ULSLobbyMenuWidget::HandleJoinClicked (LSLobbyMenuWidget_Session.cpp)
+- JoinAddressTextBox의 주소
+- PlayerController->ClientTravel(주소, TRAVEL_Absolute)
 
 Lobby -> Farming
 - ALSLobbyGameMode::TryStartRaidWithSubmittedData
@@ -91,20 +100,29 @@ Lobby -> Farming
 Farming -> Lobby (Extracted / Dead)
 - ALSFarmingGameMode::TravelToResultLevel
 - Settings->LobbyLevel
-- UGameplayStatics::OpenLevelBySoftObjectPtr
+- ALSFarmingGameMode::ServerTravelToLevel -> World->ServerTravel
 
-Farming -> Title (Quit)
+Farming -> Title (개인 이탈)
+- ALSFarmingGameMode::QuitRaidForPlayer -> SendPlayerToTitle
+- Settings->TitleLevel
+- PlayerController->ClientTravel (그 클라이언트만 나간다)
+
+Farming -> Title (호스트 이탈 = 전원 Quit)
 - ALSFarmingGameMode::TravelToResultLevel (PendingRaidResult == Quit)
 - Settings->TitleLevel
-- UGameplayStatics::OpenLevelBySoftObjectPtr
+- ALSFarmingGameMode::ServerTravelToLevel -> World->ServerTravel
 
 Result -> Lobby
 - ALSResultGameMode::ReturnToLobby
 - Settings->LobbyLevel
-- UGameplayStatics::OpenLevelBySoftObjectPtr
+- World->ServerTravel
 ```
 
-`ALSGameModeBase`는 `bUseSeamlessTravel=true`를 기본 적용한다. 따라서 리슨 서버의 Title→Lobby와 Lobby→Farming 전환은 기존 NetDriver와 참가자 연결을 유지한다. 타이틀에서 로컬 `OpenLevel`로 리슨 서버를 닫는 경로는 Standalone에서만 사용한다. PIE는 엔진 기본값으로 seamless travel을 비활성화하므로 `DefaultEngine.ini`의 `net.AllowPIESeamlessTravel=1`을 함께 사용한다.
+**레벨 이동에 `UGameplayStatics::OpenLevel` 계열을 쓰지 않는다.** `OpenLevel`은 `UEngine::SetClientTravel`을 부르는데, 이어지는 `Browse`가 넷드라이버를 파괴해 클라이언트가 전원 끊기고, 거기에 더해 `LastURL`에서 `Listen` 옵션까지 제거한다(`UnrealEngine.cpp`의 "Prevent crashing the game by attempting to connect to own listen server"). 즉 호스트가 리슨 서버를 그만두게 되어 **첫 레이드 이후 멀티가 성립하지 않는다.** 서버 전체를 옮길 때는 `World->ServerTravel`, 한 명만 내보낼 때는 `PlayerController->ClientTravel`을 쓴다.
+
+`ALSGameModeBase`는 `bUseSeamlessTravel=true`를 기본 적용한다. 따라서 리슨 서버의 Title→Lobby, Lobby→Farming, Farming→Lobby 전환은 기존 NetDriver와 참가자 연결을 유지한다. 타이틀에서 로컬 `OpenLevel`로 리슨 서버를 닫는 경로는 Standalone에서만 사용한다. PIE는 엔진 기본값으로 seamless travel을 비활성화하므로 `DefaultEngine.ini`의 `net.AllowPIESeamlessTravel=1`을 함께 사용한다.
+
+seamless travel은 **PlayerController를 호스트 것까지 전부 새로 스폰한다**(`AGameModeBase::HandleSeamlessTravelPlayer`). PlayerState도 같은 객체가 넘어오는 것이 아니라 `APlayerState::CopyProperties`로 값만 복사된다. 따라서 레벨 전환을 건너뛰어야 하는 상태는 PlayerController 멤버에 두면 안 되고, PlayerState에 두더라도 `CopyProperties` 오버라이드가 필요하다.
 
 리슨 서버의 타이틀에서 Continue/New을 누르면 `ALSTitleGameMode::RequestOpenLobbyLevel`이 로그인 중인 ClientConnection을 먼저 확인한다. 참가자의 `PostLogin`이 끝나면 Lobby로 ServerTravel하며, 10초 안에 로그인이 끝나지 않으면 참가자를 버리고 이동하지 않고 로비 전환을 취소한다.
 
@@ -149,7 +167,9 @@ ALSPlayerControllerBase::ServerSubmitRaidEntryData
 -> ALSLobbyGameMode::NotifyRaidEntryDataSubmitted
 ```
 
-서버는 각 `PlayerController`가 제출한 `Inventory`와 `SafeStash`를 `SubmittedRaidLoadout`, `SubmittedRaidSafeItems`에 저장한다. 저장 전에 `LSInventorySlotUtils::NormalizeSlotArray`로 슬롯 배열을 정규화한다. 무기/방어구 장비도 함께 제출해 `SubmittedRaidEquipment`에 저장하지만, 장비는 인덱스=슬롯타입 불변식이라 **Normalize하지 않고 SetNum(5) 패딩만** 한다. 이 3종(Inventory/SafeStash/Equipment)이 `EnqueuePendingRaidEntry`→`StartRaidInventory`→`ClientStartRaidSession` 체인을 타고 세션에 주입된다.
+서버는 각 `PlayerController`가 제출한 payload를 그 플레이어의 `ALSPlayerState`에 저장한다(`StoreRaidEntryData`). 저장 전에 `LSInventorySlotUtils::NormalizeSlotArray`로 인벤토리와 금고를 정규화한다. 무기/방어구 장비도 함께 제출하지만, 장비는 인덱스=슬롯타입 불변식이라 **Normalize하지 않고 SetNum(5) 패딩만** 한다.
+
+`ALSPlayerControllerBase`의 `GetSubmittedRaid*` / `HasSubmittedRaidEntryData` / `ClearSubmittedRaidEntryData`는 이제 PlayerState로 포워딩하는 얇은 래퍼다. **컨트롤러에 payload를 다시 들이면 안 된다** — seamless travel에서 전원 유실된다.
 
 모든 플레이어가 제출을 완료하면:
 
@@ -157,16 +177,15 @@ ALSPlayerControllerBase::ServerSubmitRaidEntryData
 ALSLobbyGameMode::TryStartRaidWithSubmittedData
 -> 모든 PlayerController의 HasSubmittedRaidEntryData 확인
 -> 각 PlayerController마다:
-   - SessionSubsystem->EnqueuePendingRaidEntry(PlayerLoadout, PlayerSafeItems)
-   - RaidInventoryComponent->StartRaidInventory(PlayerLoadout, PlayerSafeItems)
-   - ClientStartRaidSession(PlayerLoadout, PlayerSafeItems)
--> ULSSessionSubsystem::StartRaid / MirrorRaidSessionState 호출 (첫 번째 제출 데이터)
+   - RaidInventoryComponent->StartRaidInventory(PlayerLoadout, PlayerSafeItems, PlayerEquipment)
+   - ClientStartRaidSession(PlayerLoadout, PlayerSafeItems, PlayerEquipment)
+-> bRaidTravelStarted = true
 -> FarmingLevel로 ServerTravel
 ```
 
-각 `PlayerController`의 제출 payload는 `SessionSubsystem`의 `PendingRaidEntries` 큐에 순서대로 적재된다. ServerTravel로 컨트롤러/컴포넌트가 새로 생성되면 직접 주입한 `StartRaidInventory` 결과는 유실되므로, 이 큐가 ServerTravel 이후 플레이어별 인벤토리를 복원하는 실제 경로다 (아래 "레이드 중 상태 원본" 참고).
+여기서 주입한 `StartRaidInventory`는 ServerTravel로 컨트롤러/컴포넌트가 새로 생성되면 유실된다. 실제 복원 경로는 `ALSPlayerState`에 실려 건너간 payload다(아래 "레이드 중 상태 원본" 참고).
 
-`ULSSessionSubsystem`에는 첫 번째 제출 데이터를 legacy 세션 상태로 미러링한다. 2인 이상 MO 기준의 실제 레이드 중 원본은 각 `PlayerController`의 `ULSRaidInventoryComponent`다.
+`bRaidTravelStarted`는 seamless travel 중에 원격 PC가 하나씩 Logout될 때 `Logout` 핸들러가 입장 데이터를 다시 수집하고 `ServerTravel`을 또 거는 것을 막는다. 이 가드가 없으면 인원수만큼 재수집·재전환이 반복된다.
 
 `ClientStartRaidSession`은 클라이언트의 `RaidInventoryComponent`를 미러링한 뒤 로컬 `SaveSubsystem->BeginRaidSave(Loadout)`로 복구용 레이드 저장을 시작한다.
 
@@ -195,20 +214,20 @@ ULSRaidInventoryComponent
 -> 인벤토리/루팅 UI 갱신
 ```
 
-ServerTravel 이후 `BeginPlay`에서 각 `PlayerController`가 자기 인벤토리를 복원한다.
+ServerTravel 이후 각 `PlayerController`가 자기 `PlayerState`에서 인벤토리를 복원한다.
 
 ```text
-ALSPlayerControllerBase::InitializeRaidInventoryFromSessionSubsystem
+ALSPlayerControllerBase::InitializeRaidInventoryFromPlayerState
 -> RaidInventoryComponent가 이미 active면 (서버면 ClientSyncRaidSessionAndLoot 후) 종료
--> SessionSubsystem이 active가 아니면 종료
--> SessionSubsystem::DequeuePendingRaidEntry 성공하면
-   -> RaidInventoryComponent->StartRaidInventory(꺼낸 Inventory/Safe)   ← 정상 MO 복원 경로
--> 큐가 비어 있으면 (fallback)
-   -> SessionSubsystem의 SessionInventory/SessionSafeInventory를 MirrorRaidInventoryState
--> 서버면 ClientSyncRaidSessionAndLoot
+-> 클라이언트면 종료 (payload는 서버에만 있다)
+-> PlayerState에 입장 데이터가 없으면 종료
+-> RaidInventoryComponent->StartRaidInventory(PlayerState의 Loadout/Safe/Equipment)
+-> ClientSyncRaidSessionAndLoot
 ```
 
-정상 MO 입장 경로에서는 `ALSLobbyGameMode`가 `EnqueuePendingRaidEntry`로 적재해 둔 플레이어별 payload를 각 `PlayerController`가 `DequeuePendingRaidEntry`로 꺼내 복원한다. 큐가 비는 경우(legacy/1인 미러 경로)에만 `SessionSubsystem`의 세션 미러 상태로 폴백한다.
+**호출 시점이 `BeginPlay`가 아니라 `PostSeamlessTravel`이다.** `AGameModeBase::HandleSeamlessTravelPlayer`는 컨트롤러를 먼저 스폰하고(=BeginPlay가 여기서 돈다) 그 뒤에 `SeamlessTravelFrom`으로 PlayerState 값을 복사한다. 그래서 `BeginPlay`에서 읽으면 아직 비어 있다. `BeginPlay`에서도 한 번 호출하지만 그건 travel이 아닌 진입(초기 로그인·PIE 비 seamless)용 폴백이고, 실제 MO 복원은 `PostSeamlessTravel`이 담당한다.
+
+순서 기반 큐(`PendingRaidEntries`)와 전역 미러(`MirrorRaidSessionState`)는 제거됐다. 접속 순서에 의존해 3인에서 인벤토리를 섞던 경로이며, `PendingRaidEntryIndex`가 GameInstance에 누적돼 두 번째 레이드에서 반드시 어긋났다.
 
 ## 레이드 종료 트리거
 
@@ -225,8 +244,18 @@ ALSFarmingGameMode::OnPlayerDied
 -> EndRaid(ELSRaidResult::Dead)
 
 ALSFarmingGameMode::OnQuit
--> EndRaid(ELSRaidResult::Quit)
+-> EndRaid(ELSRaidResult::Quit)          전원 종료 (호스트 이탈 전용)
+
+ALSFarmingGameMode::QuitRaidForPlayer(PC)
+-> 호스트면 OnQuit()으로 위 경로
+-> 아니면 그 PC만 BuildRaidResultForPlayer(Quit) -> RequestRaidResultSave
+   -> ACK 수신 시 EndRaidInventory + ClearSubmittedRaidEntryData + SendPlayerToTitle
+   -> 남은 사람의 레이드는 계속된다
 ```
+
+개인 이탈 진입점은 `ULSSettingsWidget::HandleReturnToTitleConfirmed`다. 클라이언트에는 GameMode가 없으므로 위젯이 `ALSPlayerControllerBase::ServerRequestQuitRaid(bAllowRecovery)` RPC로 넘기고, 서버가 그 RPC 안에서 `ULSSessionSubsystem::bAllowQuitRecovery`를 세운 뒤 `QuitRaidForPlayer`를 호출한다. (클라가 자기 쪽 SessionSubsystem에 켜봐야 결과를 만드는 서버는 그 값을 보지 못한다)
+
+**호스트 이탈은 아직 구멍이다.** 리슨 서버는 호스트가 곧 서버 프로세스라 혼자 빠질 수 없어 전원을 타이틀로 데려간다. 생존자 소지품 확정(C2 규칙)은 [DedicatedServerBuildout.md](DedicatedServerBuildout.md)가 단일 출처이며 아직 구현되지 않았다.
 
 `OnPlayerDied`는 플레이어 캐릭터 사망에서 호출된다. 체력 0 도달 시
 `ULSCharacterCombatComponent`가 `OnDeathStateChanged(true)` 훅을 호출하고,
@@ -308,9 +337,11 @@ ALSFarmingGameMode::TravelToResultLevel
 -> 각 RaidInventoryComponent->EndRaidInventory
 -> 각 PlayerController->ClearSubmittedRaidEntryData
 -> SessionSubsystem->ClearRaidSessionState
--> 종료 결과가 Extracted 또는 Dead면 LobbyLevel로 OpenLevel (일단 ResultLevel 건너뜀)
--> 종료 결과가 Quit이면 TitleLevel로 OpenLevel (ResultLevel 건너뜀)
+-> 종료 결과가 Extracted 또는 Dead면 LobbyLevel로 ServerTravel (일단 ResultLevel 건너뜀)
+-> 종료 결과가 Quit이면 TitleLevel로 ServerTravel (ResultLevel 건너뜀)
 ```
+
+`NotifyRaidResultSaved`는 개인 이탈 ACK와 전원 종료 ACK를 둘 다 받는다. `PendingQuitControllers`에 있으면 그 사람만 타이틀로 내보내고, 이어서 `PendingRaidResultSaveControllers`에서도 제거한다(두 대기가 겹쳤을 때 그룹 전환이 막히지 않도록 early return 하지 않는다).
 
 > 현재 탈출(Extracted) 성공과 사망(Dead)은 임시로 ResultLevel을 거치지 않고 바로 `LobbyLevel`로 복귀한다. 결과 레벨(전리품 정산 등)이 준비되면 이 분기를 제거하고 다시 ResultLevel을 거치도록 되돌린다.
 >
@@ -349,13 +380,14 @@ ALSFarmingGameMode::TravelToResultLevel
 - timeout 값은 현재 cpp 내부 `constexpr`이다. 기획/QA에서 조정해야 하면 `ULSSessionSettings`로 빼는 것이 좋다.
 - 로그인 대기와 입장 데이터 제출 대기는 같은 10초 제한을 공유한다.
 - 결과 저장 ACK가 누락되면 ResultLevel 이동이 멈춘다. 멀티 테스트에서 가장 먼저 확인해야 할 지점이다.
+- **개인 이탈(`PendingQuitControllers`)에는 아직 타임아웃이 없다.** ACK가 안 오면 그 플레이어만 레이드에 갇힌다. (접속이 끊기는 경우는 `Logout`이 잡는다)
+
+`ALSFarmingGameMode::Logout`이 이탈자를 두 대기 목록(`PendingQuitControllers` / `PendingRaidResultSaveControllers`)에서 모두 제거하고, 그 결과 목록이 비면 곧바로 레벨 전환을 진행한다. 이 처리가 없으면 ACK를 못 보내는 이탈자 때문에 남은 인원이 전부 ACK해도 전환이 영구히 막힌다 — 3인 이상에서 "로비로 안 넘어감"의 주 원인이었다. `BeginRaidResultSave`에서 결과 생성에 실패한 컨트롤러도 같은 이유로 대기 목록에서 즉시 제거한다.
 - `ServerTravel` 실패 시 현재 `ClearRaidEntryDataWait`를 호출하지만 일부 `RaidInventoryComponent`는 이미 시작된 뒤일 수 있다. 이 경우 복구 처리가 더 필요할 수 있다.
 
-## 현재 남아 있는 legacy 경로
+## 레이드 종료의 단일 경로
 
-`ULSSessionSubsystem::EndRaid`는 자체적으로 결과 저장 후 `ResultLevel`로 이동하는 legacy 흐름을 갖고 있다.
-
-현재 MO 기준 주 경로는 다음이다.
+레이드 종료는 `ALSFarmingGameMode` 하나만 담당한다.
 
 ```text
 ALSFarmingGameMode::EndRaid
@@ -365,7 +397,9 @@ ALSFarmingGameMode::EndRaid
 -> ALSFarmingGameMode::TravelToResultLevel
 ```
 
-새 레이드 종료 로직을 추가할 때는 `ULSSessionSubsystem::EndRaid`를 직접 호출하지 말고, `ALSFarmingGameMode`의 결과 확정 경로를 기준으로 확장한다.
+`ULSSessionSubsystem::EndRaid`(자체 결과 저장 + `OpenLevel`)와 `StartRaidClientMirror`, `MirrorRaidSessionState`, `PendingRaidEntries` 큐는 제거됐다. 새 레이드 종료 로직은 위 경로를 기준으로 확장한다.
+
+`ULSSessionSubsystem`에 레이드 경로로 남은 것은 `bAllowQuitRecovery`와 `ClearRaidSessionState`뿐이다. 나머지 세션 인벤토리 API(`AddSessionItem`/`SwapSessionSlots` 등)는 싱글 시절 잔재이며 호출부가 없다.
 
 ## 테스트 체크리스트
 
@@ -419,7 +453,12 @@ Raid End
   -> ServerConfirmRaidResultSaved ACK
   -> All ACKed
   -> EndRaidInventory / ClearSubmittedRaidEntryData / ClearRaidSessionState
-  -> OpenLevel(Extracted/Dead: LobbyLevel, Quit: TitleLevel)
+  -> ServerTravel(Extracted/Dead: LobbyLevel, 전원 Quit: TitleLevel)   파티 유지
+
+Individual Quit
+  -> ServerRequestQuitRaid -> QuitRaidForPlayer
+  -> Build result(Quit) -> ClientApplyRaidResult -> ServerConfirmRaidResultSaved
+  -> ClientTravel(TitleLevel)   그 사람만 나간다
 
 Result
   -> ResultGameMode::ReturnToLobby

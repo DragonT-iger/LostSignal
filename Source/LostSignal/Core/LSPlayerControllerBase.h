@@ -16,6 +16,8 @@ class ALSLootBox;
 class ALSWorldDroppedItem;
 class UInputMappingContext;
 class ULSLobbyStorageWidget;
+class ULSLobbyMenuWidget;
+class ULSTitleMenuWidget;
 class ULSInventoryWidget;
 class ULSQuickSlotBarWidget;
 class ULSChipStationWidget;
@@ -135,11 +137,22 @@ public:
 	void SyncRaidInventoryToClient();
 	void RequestRaidEntryDataForRaidStart();
 	void RequestRaidResultSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, bool bSaveInventory, bool bSaveSafeStash, bool bSaveEquipment);
+
+	// 레이드 중 "메인메뉴로 돌아가기" 진입점(세팅 위젯). 이탈 확정은 서버가 하므로 RPC로 넘긴다.
+	// bAllowRecovery: 출발 로드아웃을 되돌려줄지 (타이틀 복귀는 항상 true)
+	void RequestQuitRaid(bool bAllowRecovery);
+
+	// 로비/타이틀 메뉴를 이 플레이어 화면에 띄운다. GameMode는 서버에만 있으므로 위젯 클래스를 RPC로 내려준다.
+	// (호스트는 로컬이라 RPC 없이 바로 만든다 — ShowLobbyStorageWidget과 같은 패턴)
+	void ShowLobbyMenuWidget(TSubclassOf<ULSLobbyMenuWidget> LobbyMenuWidgetClass);
+	void ShowTitleMenuWidget(TSubclassOf<ULSTitleMenuWidget> TitleMenuWidgetClass);
+	// 입장 payload의 원본은 ALSPlayerState다(seamless travel에서 컨트롤러는 새로 스폰되므로).
+	// 아래는 기존 호출부를 위한 포워딩이다.
 	void ClearSubmittedRaidEntryData();
-	bool HasSubmittedRaidEntryData() const { return bHasSubmittedRaidEntryData; }
-	const TArray<FLSSessionItem>& GetSubmittedRaidLoadout() const { return SubmittedRaidLoadout; }
-	const TArray<FLSSessionItem>& GetSubmittedRaidSafeItems() const { return SubmittedRaidSafeItems; }
-	const TArray<FLSSessionItem>& GetSubmittedRaidEquipment() const { return SubmittedRaidEquipment; }
+	bool HasSubmittedRaidEntryData() const;
+	const TArray<FLSSessionItem>& GetSubmittedRaidLoadout() const;
+	const TArray<FLSSessionItem>& GetSubmittedRaidSafeItems() const;
+	const TArray<FLSSessionItem>& GetSubmittedRaidEquipment() const;
 
 	UFUNCTION(BlueprintCallable, Category="LS/UI")
 	bool TransferHoveredLootDropItemToInventory();
@@ -250,6 +263,12 @@ protected:
 	TObjectPtr<ULSLobbyStorageWidget> LobbyStorageWidgetInstance;
 
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSLobbyMenuWidget> LobbyMenuWidgetInstance;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
+	TObjectPtr<ULSTitleMenuWidget> TitleMenuWidgetInstance;
+
+	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/UI")
 	TObjectPtr<ULSChipStationWidget> ChipStationWidgetInstance;
 
 	// 로비 오버레이에 배치돼 PC에 등록된 인벤토리 위젯(폰 없는 로비용). 폰이 있으면 사용하지 않는다.
@@ -287,19 +306,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="LS/Inventory", meta=(ClampMin="0"))
 	float OverflowDropRingSpacing = 75.0f;
 
-	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
-	bool bHasSubmittedRaidEntryData = false;
-
-	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
-	TArray<FLSSessionItem> SubmittedRaidLoadout;
-
-	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
-	TArray<FLSSessionItem> SubmittedRaidSafeItems;
-
-	// 레이드 입장 시점 무기/방어구 장착 5칸. 인덱스=슬롯 타입이므로 Normalize 금지.
-	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Inventory")
-	TArray<FLSSessionItem> SubmittedRaidEquipment;
-
 	UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly, Category="LS/Debug", meta=(ClampMin="-1"))
 	int32 SurvivalProtocolTestLevel = -1;
 
@@ -314,6 +320,9 @@ protected:
 
 protected:
 	virtual void BeginPlay() override;
+	// seamless travel 직후 훅. BeginPlay는 PlayerState 값이 복사되기 전에 돌기 때문에
+	// 레이드 인벤토리 복원은 여기서 해야 한다.
+	virtual void PostSeamlessTravel() override;
 	virtual void SetupInputComponent() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void AcknowledgePossession(APawn* InPawn) override;
@@ -358,6 +367,9 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerConfirmRaidResultSaved();
 
+	UFUNCTION(Server, Reliable)
+	void ServerRequestQuitRaid(bool bAllowRecovery);
+
 	UFUNCTION(Client, Reliable)
 	void ClientShowLootDropWidget(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 
@@ -366,6 +378,12 @@ private:
 
 	UFUNCTION(Client, Reliable)
 	void ClientShowLobbyStorageWidget(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass);
+
+	UFUNCTION(Client, Reliable)
+	void ClientShowLobbyMenuWidget(TSubclassOf<ULSLobbyMenuWidget> LobbyMenuWidgetClass);
+
+	UFUNCTION(Client, Reliable)
+	void ClientShowTitleMenuWidget(TSubclassOf<ULSTitleMenuWidget> TitleMenuWidgetClass);
 
 	UFUNCTION(Client, Reliable)
 	void ClientHideLobbyStorageWidget();
@@ -392,11 +410,13 @@ private:
 	void ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox);
 	void HideLootDropWidgetLocal();
 	void ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass);
+	void ShowLobbyMenuWidgetLocal(TSubclassOf<ULSLobbyMenuWidget> LobbyMenuWidgetClass);
+	void ShowTitleMenuWidgetLocal(TSubclassOf<ULSTitleMenuWidget> TitleMenuWidgetClass);
 	void HideLobbyStorageWidgetLocal();
 	void ShowChipStationWidgetLocal(TSubclassOf<ULSChipStationWidget> ChipStationWidgetClass);
 	void HideChipStationWidgetLocal();
 	void CreatePlayerHUDWidgetLocal();
-	void InitializeRaidInventoryFromSessionSubsystem();
+	void InitializeRaidInventoryFromPlayerState();
 	void SubmitLocalRaidEntryData();
 	void StoreSubmittedRaidEntryData(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems);
 	void ApplyRaidResultToLocalSave(ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, bool bSaveInventory, bool bSaveSafeStash, bool bSaveEquipment);

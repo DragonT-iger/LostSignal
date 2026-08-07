@@ -1,14 +1,12 @@
 #include "UI/Settings/LSSettingsWidget.h"
 
 #include "Components/Button.h"
-#include "Core/LSFarmingGameMode.h"
 #include "Core/LSPlayerControllerBase.h"
 #include "GameFramework/PlayerController.h"
 #include "Inventory/LSRaidInventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
 #include "Session/LSSessionSettings.h"
-#include "Session/LSSessionSubsystem.h"
 #include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/LSUILayer.h"
 #include "UI/Settings/LSControlSettingsWidget.h"
@@ -261,19 +259,15 @@ void ULSSettingsWidget::SetMainMenuButtonVisible(bool bVisible)
 
 void ULSSettingsWidget::HandleReturnToTitleConfirmed()
 {
-	if (ULSSessionSubsystem* SessionSub = GetGameInstance() ? GetGameInstance()->GetSubsystem<ULSSessionSubsystem>() : nullptr)
+	// 이탈 확정은 서버가 한다. 클라이언트에는 GameMode가 없으므로 PlayerController RPC로 넘긴다.
+	// 타이틀 복귀는 파밍 성과를 포기하는 대신 항상 출발 장비를 복구하므로 bAllowRecovery=true.
+	if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(GetOwningPlayer()))
 	{
-		// 타이틀 복귀는 파밍 성과를 포기하는 대신 항상 출발 장비를 복구한다.
-		SessionSub->bAllowQuitRecovery = true;
-	}
-
-	if (ALSFarmingGameMode* FarmingGameMode = Cast<ALSFarmingGameMode>(UGameplayStatics::GetGameMode(this)))
-	{
-		FarmingGameMode->OnQuit();
+		PlayerController->RequestQuitRaid(true);
 	}
 	else
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Settings] Failed to quit raid: ALSFarmingGameMode not found."));
+		UE_LOG(LogLS, Warning, TEXT("[Settings] Failed to quit raid: ALSPlayerControllerBase not found."));
 	}
 }
 

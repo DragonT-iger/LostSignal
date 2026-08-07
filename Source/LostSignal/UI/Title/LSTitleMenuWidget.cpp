@@ -67,6 +67,7 @@ void ULSTitleMenuWidget::NativeConstruct()
 	{
 		UE_LOG(LogLS, Warning, TEXT("ExitButton is not bound on %s."), *GetNameSafe(this));
 	}
+
 }
 
 void ULSTitleMenuWidget::NativeDestruct()
@@ -91,7 +92,6 @@ void ULSTitleMenuWidget::NativeDestruct()
 	{
 		ExitButton->OnClicked.RemoveDynamic(this, &ULSTitleMenuWidget::HandleExitClicked);
 	}
-
 	Super::NativeDestruct();
 }
 
@@ -199,6 +199,7 @@ void ULSTitleMenuWidget::OpenLobbyLevel()
 	UWorld* World = GetWorld();
 	if (World && World->GetNetMode() != NM_Standalone)
 	{
+		// 이미 리슨 서버다(레이드에서 타이틀로 돌아온 경우 등). 참가자를 데리고 로비로 간다.
 		if (ALSTitleGameMode* TitleGameMode = World->GetAuthGameMode<ALSTitleGameMode>())
 		{
 			TitleGameMode->RequestOpenLobbyLevel();
@@ -209,7 +210,11 @@ void ULSTitleMenuWidget::OpenLobbyLevel()
 		return;
 	}
 
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->LobbyLevel);
+	// 로비를 리슨 서버로 연다. 혼자 놀 때도 리슨이면 호스트=서버+클라라 동작이 같고,
+	// 친구가 IP로 로비에 바로 합류할 수 있다. 접속 경로는 DedicatedServerBuildout.md의 E2(IP 직접/친구 방) 참고.
+	const FString LobbyMapName = Settings->LobbyLevel.ToSoftObjectPath().GetLongPackageName();
+	UE_LOG(LogLS, Log, TEXT("[Title] Opening lobby as a listen server: %s"), *LobbyMapName);
+	UGameplayStatics::OpenLevel(this, FName(*LobbyMapName), true, TEXT("listen"));
 }
 
 ULSConfirmDialogWidget* ULSTitleMenuWidget::ShowConfirmDialog(const FText& Message)

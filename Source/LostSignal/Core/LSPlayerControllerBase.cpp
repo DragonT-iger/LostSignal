@@ -12,6 +12,7 @@
 #include "Characters/LSPlayerCharacter.h"
 #include "Core/LSFarmingGameMode.h"
 #include "Core/LSLobbyGameMode.h"
+#include "Core/LSPlayerState.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
@@ -36,7 +37,9 @@
 #include "UI/LootDrop/LSLootDropWidget.h"
 #include "UI/Protocol/LSProtocolUIWidget.h"
 #include "UI/QuickSlot/LSQuickSlotBarWidget.h"
+#include "UI/Lobby/LSLobbyMenuWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
+#include "UI/Title/LSTitleMenuWidget.h"
 #include "UI/ChipSystem/LSChipStationWidget.h"
 
 namespace
@@ -69,7 +72,7 @@ void ALSPlayerControllerBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	InitializeRaidInventoryFromSessionSubsystem();
+	InitializeRaidInventoryFromPlayerState();
 
 	if (!IsLocalPlayerController())
 	{
@@ -142,7 +145,16 @@ void ALSPlayerControllerBase::SetupInputComponent()
 	}
 }
 
-void ALSPlayerControllerBase::InitializeRaidInventoryFromSessionSubsystem()
+void ALSPlayerControllerBase::PostSeamlessTravel()
+{
+	Super::PostSeamlessTravel();
+
+	// BeginPlay는 PlayerState 값이 복사되기 전에 돈다(SpawnPlayerControllerCommon이 먼저,
+	// SeamlessTravelFrom의 CopyProperties가 나중). 그래서 복원은 반드시 여기서 한 번 더 시도한다.
+	InitializeRaidInventoryFromPlayerState();
+}
+
+void ALSPlayerControllerBase::InitializeRaidInventoryFromPlayerState()
 {
 	if (!RaidInventoryComponent)
 	{
@@ -159,28 +171,30 @@ void ALSPlayerControllerBase::InitializeRaidInventoryFromSessionSubsystem()
 		return;
 	}
 
-	UGameInstance* GameInstance = GetGameInstance();
-	ULSSessionSubsystem* SessionSub = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
-	if (!SessionSub || !SessionSub->IsRaidActive())
+	// 입장 payload는 PlayerState에 실려 seamless travel을 건너온다. 서버에만 있다.
+	// 클라이언트는 아래 SyncRaidInventoryToClient가 내려주는 미러를 받는다.
+	if (!HasAuthority())
 	{
 		return;
 	}
 
-	TArray<FLSSessionItem> PendingInventory;
-	TArray<FLSSessionItem> PendingSafeInventory;
-	TArray<FLSSessionItem> PendingEquipment;
-	if (SessionSub->DequeuePendingRaidEntry(PendingInventory, PendingSafeInventory, PendingEquipment))
+	const ALSPlayerState* LSPlayerState = GetPlayerState<ALSPlayerState>();
+	if (!LSPlayerState || !LSPlayerState->HasRaidEntryData())
 	{
-		RaidInventoryComponent->StartRaidInventory(PendingInventory, PendingSafeInventory, PendingEquipment);
+		return;
 	}
-	else
-	{
-		RaidInventoryComponent->MirrorRaidInventoryState(SessionSub->GetSessionInventory(), SessionSub->GetSessionSafeInventory(), SessionSub->GetSessionEquipmentSlots());
-	}
-	if (HasAuthority())
-	{
-		SyncRaidInventoryToClient();
-	}
+
+	RaidInventoryComponent->StartRaidInventory(
+		LSPlayerState->GetRaidLoadout(),
+		LSPlayerState->GetRaidSafeItems(),
+		LSPlayerState->GetRaidEquipment());
+
+	UE_LOG(LogLS, Log, TEXT("Raid inventory restored from PlayerState on %s. LoadoutSlots=%d SafeSlots=%d"),
+		*GetNameSafe(this),
+		LSPlayerState->GetRaidLoadout().Num(),
+		LSPlayerState->GetRaidSafeItems().Num());
+
+	SyncRaidInventoryToClient();
 }
 
 void ALSPlayerControllerBase::ClientStartRaidSession_Implementation(const TArray<FLSSessionItem>& Loadout, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems)
@@ -577,10 +591,37 @@ void ALSPlayerControllerBase::RequestRaidEntryDataForRaidStart()
 
 void ALSPlayerControllerBase::ClearSubmittedRaidEntryData()
 {
-	bHasSubmittedRaidEntryData = false;
-	SubmittedRaidLoadout.Reset();
-	SubmittedRaidSafeItems.Reset();
-	SubmittedRaidEquipment.Reset();
+	if (ALSPlayerState* LSPlayerState = GetPlayerState<ALSPlayerState>())
+	{
+		LSPlayerState->ClearRaidEntryData();
+	}
+}
+
+bool ALSPlayerControllerBase::HasSubmittedRaidEntryData() const
+{
+	const ALSPlayerState* LSPlayerState = GetPlayerState<ALSPlayerState>();
+	return LSPlayerState && LSPlayerState->HasRaidEntryData();
+}
+
+const TArray<FLSSessionItem>& ALSPlayerControllerBase::GetSubmittedRaidLoadout() const
+{
+	static const TArray<FLSSessionItem> EmptyItems;
+	const ALSPlayerState* LSPlayerState = GetPlayerState<ALSPlayerState>();
+	return LSPlayerState ? LSPlayerState->GetRaidLoadout() : EmptyItems;
+}
+
+const TArray<FLSSessionItem>& ALSPlayerControllerBase::GetSubmittedRaidSafeItems() const
+{
+	static const TArray<FLSSessionItem> EmptyItems;
+	const ALSPlayerState* LSPlayerState = GetPlayerState<ALSPlayerState>();
+	return LSPlayerState ? LSPlayerState->GetRaidSafeItems() : EmptyItems;
+}
+
+const TArray<FLSSessionItem>& ALSPlayerControllerBase::GetSubmittedRaidEquipment() const
+{
+	static const TArray<FLSSessionItem> EmptyItems;
+	const ALSPlayerState* LSPlayerState = GetPlayerState<ALSPlayerState>();
+	return LSPlayerState ? LSPlayerState->GetRaidEquipment() : EmptyItems;
 }
 
 void ALSPlayerControllerBase::ClientRequestRaidEntryData_Implementation()
@@ -637,20 +678,21 @@ void ALSPlayerControllerBase::StoreSubmittedRaidEntryData(const TArray<FLSSessio
 		return;
 	}
 
-	SubmittedRaidLoadout = Loadout;
-	SubmittedRaidSafeItems = SafeItems;
-	LSInventorySlotUtils::NormalizeSlotArray(SubmittedRaidLoadout);
-	LSInventorySlotUtils::NormalizeSlotArray(SubmittedRaidSafeItems);
-	// 장비는 인덱스=슬롯 타입이므로 Normalize(빈 칸 압축) 금지 — 5칸 패딩만 한다.
-	SubmittedRaidEquipment = EquipmentItems;
-	SubmittedRaidEquipment.SetNum(LSInventorySlotUtils::EquipmentSlotCount);
-	bHasSubmittedRaidEntryData = true;
+	ALSPlayerState* LSPlayerState = GetPlayerState<ALSPlayerState>();
+	if (!LSPlayerState)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Cannot store raid entry data because ALSPlayerState is missing on %s. Check PlayerStateClass on the GameMode."),
+			*GetNameSafe(this));
+		return;
+	}
+
+	LSPlayerState->StoreRaidEntryData(Loadout, SafeItems, EquipmentItems);
 
 	UE_LOG(LogLS, Log, TEXT("Raid entry data submitted for %s. LoadoutSlots=%d SafeSlots=%d EquipmentSlots=%d"),
 		*GetNameSafe(this),
-		SubmittedRaidLoadout.Num(),
-		SubmittedRaidSafeItems.Num(),
-		SubmittedRaidEquipment.Num());
+		LSPlayerState->GetRaidLoadout().Num(),
+		LSPlayerState->GetRaidSafeItems().Num(),
+		LSPlayerState->GetRaidEquipment().Num());
 }
 
 void ALSPlayerControllerBase::RequestRaidResultSave(const ELSRaidResult Result, const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems, const bool bSaveInventory, const bool bSaveSafeStash, const bool bSaveEquipment)
@@ -726,6 +768,31 @@ void ALSPlayerControllerBase::ServerConfirmRaidResultSaved_Implementation()
 	}
 }
 
+void ALSPlayerControllerBase::RequestQuitRaid(const bool bAllowRecovery)
+{
+	ServerRequestQuitRaid(bAllowRecovery);
+}
+
+void ALSPlayerControllerBase::ServerRequestQuitRaid_Implementation(const bool bAllowRecovery)
+{
+	// 복구 여부는 서버의 SessionSubsystem을 보고 결정된다(BuildRaidResultForPlayer).
+	// 클라가 자기 쪽 서브시스템에 켜봐야 서버는 모르므로 여기서 서버 값을 세운다.
+	UGameInstance* GameInstance = GetGameInstance();
+	if (ULSSessionSubsystem* SessionSub = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr)
+	{
+		SessionSub->bAllowQuitRecovery = bAllowRecovery;
+	}
+
+	ALSFarmingGameMode* FarmingGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<ALSFarmingGameMode>() : nullptr;
+	if (!FarmingGameMode)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Quit raid requested by %s but FarmingGameMode is missing."), *GetNameSafe(this));
+		return;
+	}
+
+	FarmingGameMode->QuitRaidForPlayer(this);
+}
+
 void ALSPlayerControllerBase::ShowLootDropWidgetLocal(const FText& LootSourceName, const TArray<FLSDropResult>& Results, ALSLootBox* SourceLootBox)
 {
 	if (!IsLocalPlayerController())
@@ -767,6 +834,106 @@ void ALSPlayerControllerBase::HideLootDropWidgetLocal()
 		LootDropWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
 		LootDropWidgetInstance->ClearLootItems();
 	}
+}
+
+void ALSPlayerControllerBase::ShowLobbyMenuWidget(TSubclassOf<ULSLobbyMenuWidget> LobbyMenuWidgetClass)
+{
+	if (IsLocalPlayerController())
+	{
+		ShowLobbyMenuWidgetLocal(LobbyMenuWidgetClass);
+		return;
+	}
+
+	ClientShowLobbyMenuWidget(LobbyMenuWidgetClass);
+}
+
+void ALSPlayerControllerBase::ClientShowLobbyMenuWidget_Implementation(TSubclassOf<ULSLobbyMenuWidget> LobbyMenuWidgetClass)
+{
+	ShowLobbyMenuWidgetLocal(LobbyMenuWidgetClass);
+}
+
+void ALSPlayerControllerBase::ShowLobbyMenuWidgetLocal(TSubclassOf<ULSLobbyMenuWidget> LobbyMenuWidgetClass)
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	if (!LobbyMenuWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("LobbyMenuWidgetClass is not set on %s. Check BP_LobbyGameMode."), *GetNameSafe(this));
+		return;
+	}
+
+	if (LobbyMenuWidgetInstance && LobbyMenuWidgetInstance->IsInViewport())
+	{
+		return;
+	}
+
+	LobbyMenuWidgetInstance = CreateWidget<ULSLobbyMenuWidget>(this, LobbyMenuWidgetClass);
+	if (!LobbyMenuWidgetInstance)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Failed to create lobby menu widget on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	LobbyMenuWidgetInstance->AddToViewport(LSUILayer::LobbyMenu);
+
+	bShowMouseCursor = true;
+	FInputModeUIOnly InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	// 로비 메뉴에 포커스를 줘서 TAB 등 키 입력이 위젯으로 전달되게 한다.
+	InputMode.SetWidgetToFocus(LobbyMenuWidgetInstance->TakeWidget());
+	SetInputMode(InputMode);
+}
+
+void ALSPlayerControllerBase::ShowTitleMenuWidget(TSubclassOf<ULSTitleMenuWidget> TitleMenuWidgetClass)
+{
+	if (IsLocalPlayerController())
+	{
+		ShowTitleMenuWidgetLocal(TitleMenuWidgetClass);
+		return;
+	}
+
+	ClientShowTitleMenuWidget(TitleMenuWidgetClass);
+}
+
+void ALSPlayerControllerBase::ClientShowTitleMenuWidget_Implementation(TSubclassOf<ULSTitleMenuWidget> TitleMenuWidgetClass)
+{
+	ShowTitleMenuWidgetLocal(TitleMenuWidgetClass);
+}
+
+void ALSPlayerControllerBase::ShowTitleMenuWidgetLocal(TSubclassOf<ULSTitleMenuWidget> TitleMenuWidgetClass)
+{
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
+	if (!TitleMenuWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("TitleMenuWidgetClass is not set on %s. Check BP_TitleGameMode."), *GetNameSafe(this));
+		return;
+	}
+
+	if (TitleMenuWidgetInstance && TitleMenuWidgetInstance->IsInViewport())
+	{
+		return;
+	}
+
+	TitleMenuWidgetInstance = CreateWidget<ULSTitleMenuWidget>(this, TitleMenuWidgetClass);
+	if (!TitleMenuWidgetInstance)
+	{
+		UE_LOG(LogLS, Warning, TEXT("Failed to create title menu widget on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	TitleMenuWidgetInstance->AddToViewport();
+
+	bShowMouseCursor = true;
+	FInputModeUIOnly InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
 }
 
 void ALSPlayerControllerBase::ShowLobbyStorageWidgetLocal(TSubclassOf<ULSLobbyStorageWidget> LobbyStorageWidgetClass)

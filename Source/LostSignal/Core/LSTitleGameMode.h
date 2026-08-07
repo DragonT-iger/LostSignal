@@ -16,8 +16,9 @@ class LOSTSIGNAL_API ALSTitleGameMode : public ALSGameModeBase
 public:
 	ALSTitleGameMode();
 
-	virtual void BeginPlay() override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
+	// seamless travel로 들어온 플레이어는 PostLogin을 타지 않으므로 여기서도 타이틀 메뉴를 띄운다.
+	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
 
 	void RequestOpenLobbyLevel();
 
@@ -27,10 +28,9 @@ protected:
 	TSubclassOf<ULSTitleMenuWidget> TitleMenuWidgetClass;
 
 private:
-	UPROPERTY(Transient)
-	TObjectPtr<ULSTitleMenuWidget> TitleMenuWidgetInstance;
-
-	void CreateTitleMenuWidget();
+	// 해당 플레이어 화면에 타이틀 메뉴를 띄운다. 위젯 생성은 각 PlayerController가 한다
+	// (GameMode는 서버에만 있어서 여기서 만들면 호스트만 보인다).
+	void ShowTitleMenuFor(AController* Controller);
 	bool HasPendingPlayerConnections() const;
 	void TryOpenLobbyLevel();
 	void HandlePendingPlayerConnectionTimeout();

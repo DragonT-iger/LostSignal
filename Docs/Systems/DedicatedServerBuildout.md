@@ -42,7 +42,7 @@ GameMode 4종        LSTitleGameMode / LSLobbyGameMode / LSFarmingGameMode / LSR
                     (+ 공통 베이스 LSGameModeBase)
 서버 권위 레이드    ULSRaidInventoryComponent 기반 루팅·사용·드랍·사망·탈출 확정
 입장/결과 ACK       제출 ACK, 결과 저장 ACK, 각각 타임아웃 처리까지 구현됨
-리슨 맵 전환        ALSGameModeBase의 SeamlessTravel과 ServerTravel로 Title→Lobby→Raid 연결 유지
+리슨 맵 전환        ALSGameModeBase의 SeamlessTravel과 ServerTravel로 Title→Lobby→Raid→Lobby 연결 유지
 접속 완료 대기      Title/Lobby에서 로그인 중 ClientConnection을 전환 전에 대기
 로비 접속 처리      PostLogin / Logout 로그와 로그인 중 ClientConnection의 레이드 출발 대기
 데디 대비 분기      NM_DedicatedServer 분기 12곳
@@ -61,7 +61,8 @@ GameMode 4종        LSTitleGameMode / LSLobbyGameMode / LSFarmingGameMode / LSR
 플레이어 로스터     PostLogin / Logout의 기본 추적은 있으나 PlayerState 기반 파티 로스터와
                     예상 인원·준비 상태·재접속 복구는 없다
 
-여행 상태 식별      SeamlessTravel은 적용됐지만 PendingRaidEntries가 여전히 접속 순서에 의존한다
+준비 상태 / 레디    로비에 파티 로스터 UI와 레디 토글이 없다. 출발은 호스트가 버튼을 누르는 즉시 진행된다
+                    임무 시작 버튼도 아직 호스트만 눌린다 (ULSLobbyMenuWidget이 GetAuthGameMode를 직접 호출)
 
 세션 / 매칭         CreateSession / FindSession / JoinSession / OnlineSubsystem 0곳
                     Build.cs 의 OnlineSubsystem 은 주석 처리된 템플릿 기본값
@@ -72,22 +73,7 @@ GameMode 4종        LSTitleGameMode / LSLobbyGameMode / LSFarmingGameMode / LSR
 
 ### 주의가 필요한 기존 구조
 
-**① 전역 세션 상태의 순서 기반 큐**
-
-`ALSLobbyGameMode::StartRaid`가 `ServerTravel` 직전에 각 플레이어 데이터를 `ULSSessionSubsystem`에 순서대로 넣는다.
-
-```text
-SessionSub->EnqueuePendingRaidEntry(PlayerLoadout, PlayerSafeItems, PlayerEquipment);
-// 주석: "ServerTravel 이후 각 PC가 자신의 데이터를 꺼낼 수 있도록 순서대로 큐에 저장"
-```
-
-`ULSSessionSubsystem`은 GameInstance 서브시스템이라 **데디서버에는 전 플레이어가 공유하는 인스턴스가 하나뿐이다.** 순서에 의존해 자기 데이터를 꺼내는 방식은 접속 순서·재접속·중도 이탈에 취약하다. [ItemSaveNetworkStructure.md](ItemSaveNetworkStructure.md)에도 "이 보호가 없으면 ServerTravel 이후 모든 플레이어 인벤토리가 첫 번째 플레이어 데이터로 덮일 수 있다"고 기록된 알려진 취약점이다.
-
-같은 함수에 `bHasLegacySessionLoadout` / `MirrorRaidSessionState`처럼 단일 플레이어 시절의 전역 미러링 경로도 남아 있다. 3인 환경에서 전역 미러는 정의상 누군가에겐 틀린 값이다.
-
-→ **PlayerState 또는 안정적인 플레이어 키 기반으로 교체해야 한다.** 데디 전환의 선행 정리 항목.
-
-**② 글로벌 기본 GameMode가 블루프린트**
+**① 글로벌 기본 GameMode가 블루프린트**
 
 ```text
 GlobalDefaultGameMode=/Game/TopDown/Blueprints/BP_TopDownGameMode
@@ -216,21 +202,25 @@ PvE 코옵이라 위조 로드아웃의 피해는 "판이 시시해진다" 정�
 
 ```text
 D1  ✅ bUseSeamlessTravel 도입
-    ALSGameModeBase에서 활성화하고 리슨 Title→Lobby와 Lobby→Raid를 ServerTravel로 연결
+    ALSGameModeBase에서 활성화하고 리슨 Title→Lobby→Raid→Lobby를 ServerTravel로 연결
     PIE 검증용 net.AllowPIESeamlessTravel=1 적용
-D2  EnqueuePendingRaidEntry 순서 기반 큐를 플레이어 키 기반으로 교체
-D3  MirrorRaidSessionState / bHasLegacySessionLoadout 등 단일 플레이어 전역 경로 제거
-D4  ULSSessionSubsystem 의 남은 전역 상태 정리 (데디에서는 인스턴스가 하나뿐)
+D2  ✅ 순서 기반 PendingRaidEntries 큐를 제거하고 ALSPlayerState 보관으로 교체
+D3  ✅ MirrorRaidSessionState / bHasLegacySessionLoadout / ULSSessionSubsystem::EndRaid 등
+    단일 플레이어 전역 경로 제거
+D4  ULSSessionSubsystem 에 남은 세션 인벤토리 API 정리 (호출부 없음, 데디에서는 인스턴스가 하나뿐)
 ```
 
-D2·D3는 **리슨·데디 양쪽 모두의 선행 조건**이다. "데디를 안 하니 건너뛴다"가 성립하지 않는다 — 순서 기반 큐와 전역 미러링은 리슨 3인에서도 똑같이 인벤토리를 섞는다. C·D·E는 데디 작업이 아니라 **멀티플레이 작업**이고, 데디 전용은 A·B·F·G1뿐이다.
+D2·D3는 **리슨·데디 양쪽 모두의 선행 조건**이었다. 순서 기반 큐와 전역 미러링은 리슨 3인에서도 똑같이 인벤토리를 섞는다. C·D·E는 데디 작업이 아니라 **멀티플레이 작업**이고, 데디 전용은 A·B·F·G1뿐이다.
+
+입장 payload는 이제 `ALSPlayerState`가 보관하고 `CopyProperties`로 seamless travel을 건너간다. 구조와 주의점은 [RaidLevelFlow.md](RaidLevelFlow.md)가 단일 출처다.
 
 ### E. 매치 할당 / 접속
 
 ```text
 E1  ✅ 결정됨 - 매칭/방 목록은 발견 계층, 접속 경로는 셋 (아래 참조)
+    ✅ 구현됨 - IP 직접 접속 (호스트: 로비를 listen으로 / 참가: 타이틀에서 주소 입력)
 E2  ✅ 결정됨 - 공개 = 데디 / IP 직접 = 리슨, 로비는 클라 로컬 (아래 참조)
-E3  레이드 종료 후 클라이언트 복귀 경로 (서버 유지 / 해산 후 로컬 복귀)
+E3  ✅ 결정됨 - 서버를 유지하고 파티째 로비로 돌아온다 (아래 참조)
 E4  OnlineSubsystem(Steam) 도입 여부 — 세션 검색·NAT 통과에 필요할 수 있음
 ```
 
@@ -277,6 +267,34 @@ IP 직접 입력  플레이어가 주소를 직접 넣는다
 ```
 
 **부팅 경로 제약이 가장 중요하다.** 여기가 깨지면 매칭 서비스 장애가 곧 게임 실행 불가가 되어, 이 절의 목적이 통째로 무의미해진다.
+
+#### E1 구현: IP 직접 접속
+
+```text
+호스트   타이틀 Continue/New -> 로비를 listen 서버로 OpenLevel
+         (혼자여도 리슨이다 — 호스트=서버+클라라 싱글과 동작이 같고, 친구가 언제든 합류할 수 있다)
+참가자   타이틀 Continue/New -> 자기 로비 -> JoinAddressTextBox에 주소 입력 -> JoinButton
+         -> ClientTravel(주소, TRAVEL_Absolute) -> 호스트의 현재 맵(로비)으로 들어간다
+```
+
+**참가 UI는 타이틀이 아니라 로비에 둔다.** 로비가 장비·창고·제작을 다루는 허브이고 "친구 방 참가"도 그 허브의 행동이다. 타이틀은 Continue/New/설정만 남긴다. 구현은 `ULSLobbyMenuWidget`의 `JoinButton` / `JoinAddressTextBox`이며 핸들러는 `LSLobbyMenuWidget_Session.cpp`가 소유한다(3단계 레디도 이 파일에 들어온다).
+
+**타이틀·로비 메뉴 위젯은 각 PlayerController가 만든다.** GameMode는 서버에만 존재하므로 거기서 `CreateWidget`을 하면 호스트 화면에만 뜬다. GameMode는 `PostLogin`과 `HandleSeamlessTravelPlayer`에서 위젯 **클래스**를 넘기고, `ALSPlayerControllerBase::ShowLobbyMenuWidget` / `ShowTitleMenuWidget`이 로컬이면 직접, 원격이면 Client RPC로 생성한다. (`ClientShowLobbyStorageWidget`과 같은 패턴이라 BP 매핑은 그대로 GameMode에 둔다)
+
+`HandleSeamlessTravelPlayer`를 함께 오버라이드해야 한다 — seamless travel로 들어온 플레이어는 `PostLogin`을 타지 않는다.
+
+#### E3 결정: 레이드 종료 후에도 서버를 유지하고 파티째 로비로 돌아온다
+
+해산하지 않는다. 같은 팀이 로비에 그대로 모여 다음 레이드를 준비한다.
+
+```text
+전원 결과 확정  → World->ServerTravel(LobbyLevel)   파티 유지
+개인 이탈       → PlayerController->ClientTravel(TitleLevel)   그 사람만 나간다
+```
+
+전환 방식 자체가 이 결정을 강제한다. `UGameplayStatics::OpenLevel` 계열은 넷드라이버를 파괴하고 `LastURL`의 `Listen` 옵션까지 제거해 **호스트가 리슨 서버를 그만두게 만든다.** 즉 해산을 고르면 "다음 레이드는 싱글"이 되고, 이는 선택지가 아니라 버그다. 실제로 그렇게 구현돼 있었고, 첫 레이드 이후 멀티가 되지 않는 원인이었다. 근거와 호출부는 [RaidLevelFlow.md](RaidLevelFlow.md)가 단일 출처다.
+
+로비 재집결이 성립하려면 **로비 게임모드가 재진입을 견뎌야 한다.** 순서 기반 `PendingRaidEntries` 큐, sticky한 `bRaidStartRequested`, `Logout` 중 재수집 루프가 모두 두 번째 출발에서 깨졌고, D2·D3에서 함께 닫았다.
 
 #### E2 결정: 신뢰 수준에 서버 모델을 맞춘다 (3계층)
 
@@ -386,7 +404,7 @@ G3은 기존 테스트 체크리스트([ItemSaveNetworkStructure.md](ItemSaveNet
 
 | 단계 | 범위 | 끝나면 | 경로 |
 |---|---|---|---|
-| **D-1** | D2~D4 (전역 상태 정리) | 3인 데이터가 안 섞이는 구조 | 공통 |
+| **D-1** | ✅ D2·D3 (전역 상태 정리) / D4 남음 | 3인 데이터가 안 섞이는 구조 | 공통 |
 | **D-2** | C1~C4 (접속/이탈) + C2 이탈 규칙 | 입장·이탈이 정의된 동작을 한다 | 공통 |
 | **D-3** | C6~C7 (개별 탈출 + 관전자) | 각자 원할 때 빠지고 관전한다 | 공통 |
 | **D-4** | E1·E3 (IP 직접 연결) | **친구끼리 리슨으로 레이드 완주** | 리슨 |
@@ -433,7 +451,6 @@ A(서버 타깃)는 나머지와 독립적이라 먼저 손대도 무방하다. 
 - C7  탈출한 플레이어에게 로비 UI 오버레이를 줄지 (대기 시간을 로비 시간으로)
       결과 저장 확정 후에 열어야 저장 미확정 상태의 창고 조작과 충돌하지 않는다
 - D1  SeamlessTravel 사용 여부
-- E3  레이드 종료 후 복귀 경로 (서버 유지 vs 해산)
 - E4  OnlineSubsystem(Steam) 도입 시점 — 세션 검색·NAT 통과 필요 여부에 달림
 - F1  서버 프로세스 재사용 vs 매치마다 신규
 - A2  렌더 모듈(LostSignalVisionShaders)의 서버 타깃 빌드 가부

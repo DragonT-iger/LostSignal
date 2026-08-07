@@ -221,8 +221,8 @@ ULSRaidInventoryComponent
 주의할 점:
 
 - 레이드 입장 데이터 제출은 ACK 대기 방식이며, 제한 시간 안에 제출하지 않은 PlayerController가 있으면 레이드 시작을 중단하고 로그를 남긴다.
-- `ALSPlayerControllerBase::InitializeRaidInventoryFromSessionSubsystem`은 이미 `RaidInventoryComponent`가 활성 상태면 전역 `SessionSubsystem` 데이터로 다시 덮어쓰지 않는다.
-- 이 보호가 없으면 ServerTravel 이후 모든 플레이어 인벤토리가 첫 번째 플레이어 데이터로 덮일 수 있다.
+- 입장 payload는 플레이어별 `ALSPlayerState`가 보관한다. 예전의 전역 순서 큐(모든 플레이어 인벤토리가 첫 번째 플레이어 데이터로 덮일 수 있던 경로)는 제거됐다.
+- `ALSPlayerControllerBase::InitializeRaidInventoryFromPlayerState`는 이미 `RaidInventoryComponent`가 활성 상태면 다시 덮어쓰지 않는다.
 
 레이드 중 조작:
 

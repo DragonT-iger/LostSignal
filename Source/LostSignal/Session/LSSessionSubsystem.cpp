@@ -1,9 +1,7 @@
-#include "Session/LSSessionSubsystem.h"
-#include "Session/LSSessionSettings.h"
+﻿#include "Session/LSSessionSubsystem.h"
 #include "Session/LSSaveSubsystem.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "LostSignal.h"
-#include "Kismet/GameplayStatics.h"
 
 namespace
 {
@@ -16,62 +14,13 @@ void ULSSessionSubsystem::StartRaid(const TArray<FLSSessionItem>& Loadout)
 	StartRaidInternal(Loadout, true);
 }
 
-void ULSSessionSubsystem::StartRaidClientMirror(const TArray<FLSSessionItem>& Loadout)
-{
-	StartRaidInternal(Loadout, false);
-}
-
-void ULSSessionSubsystem::MirrorRaidSessionState(const TArray<FLSSessionItem>& InventoryItems, const TArray<FLSSessionItem>& SafeItems, const TArray<FLSSessionItem>& EquipmentItems)
-{
-	SessionInventory = InventoryItems;
-	SessionSafeInventory = SafeItems;
-	SessionEquipmentSlots = EquipmentItems;
-	bRaidActive = true;
-}
-
 void ULSSessionSubsystem::ClearRaidSessionState()
 {
 	LoadoutSnapshot.Items.Reset();
 	SessionInventory.Reset();
 	SessionSafeInventory.Reset();
-	SessionEquipmentSlots.Reset();
 	ConsumedItems.Reset();
-	ResolvedItems.Reset();
 	bRaidActive = false;
-	PendingRaidEntries.Reset();
-	PendingRaidEntryIndex = 0;
-}
-
-void ULSSessionSubsystem::EnqueuePendingRaidEntry(
-	const TArray<FLSSessionItem>& Inventory,
-	const TArray<FLSSessionItem>& SafeInventory,
-	const TArray<FLSSessionItem>& EquipmentItems)
-{
-	FLSPendingRaidEntry& Entry = PendingRaidEntries.AddDefaulted_GetRef();
-	Entry.Inventory = Inventory;
-	Entry.SafeInventory = SafeInventory;
-	Entry.EquipmentSlots = EquipmentItems;
-}
-
-bool ULSSessionSubsystem::DequeuePendingRaidEntry(
-	TArray<FLSSessionItem>& OutInventory,
-	TArray<FLSSessionItem>& OutSafeInventory,
-	TArray<FLSSessionItem>& OutEquipmentItems)
-{
-	if (PendingRaidEntryIndex >= PendingRaidEntries.Num())
-	{
-		return false;
-	}
-	const FLSPendingRaidEntry& Entry = PendingRaidEntries[PendingRaidEntryIndex++];
-	OutInventory = Entry.Inventory;
-	OutSafeInventory = Entry.SafeInventory;
-	OutEquipmentItems = Entry.EquipmentSlots;
-	return true;
-}
-
-bool ULSSessionSubsystem::HasPendingRaidEntries() const
-{
-	return PendingRaidEntryIndex < PendingRaidEntries.Num();
 }
 
 void ULSSessionSubsystem::StartRaidInternal(const TArray<FLSSessionItem>& Loadout, const bool bPersistRaidSave)
@@ -80,7 +29,6 @@ void ULSSessionSubsystem::StartRaidInternal(const TArray<FLSSessionItem>& Loadou
 	SessionInventory = Loadout;
 	SessionSafeInventory.Empty();
 	ConsumedItems.Empty();
-	ResolvedItems.Empty();
 	bRaidActive = true;
 
 	if (ULSSaveSubsystem* SaveSub = GetGameInstance()->GetSubsystem<ULSSaveSubsystem>())
@@ -93,77 +41,6 @@ void ULSSessionSubsystem::StartRaidInternal(const TArray<FLSSessionItem>& Loadou
 	}
 
 	UE_LOG(LogLS, Log, TEXT("[Session] Raid started with %d inventory slots."), SessionInventory.Num());
-}
-
-void ULSSessionSubsystem::EndRaid(ELSRaidResult Result)
-{
-	LastRaidResult = Result;
-	ResolvedItems.Empty();
-	bool bShouldSaveResolvedItems = false;
-	bool bShouldSaveSafeStash = false;
-
-	switch (Result)
-	{
-	case ELSRaidResult::Extracted:
-		ResolvedItems = SessionInventory;
-		bShouldSaveResolvedItems = true;
-		bShouldSaveSafeStash = true;
-		UE_LOG(LogLS, Log, TEXT("[Session] 탈출 성공 - 획득 아이템 %d종 보관"), ResolvedItems.Num());
-		break;
-
-	case ELSRaidResult::Quit:
-		if (bAllowQuitRecovery)
-		{
-			ResolvedItems = BuildQuitRecovery();
-			bShouldSaveResolvedItems = true;
-			UE_LOG(LogLS, Log, TEXT("[Session] 탈주 - 장비 복구 %d종"), ResolvedItems.Num());
-		}
-		else
-		{
-			UE_LOG(LogLS, Log, TEXT("[Session] 탈주 - 장비 복구 비활성화, 전부 소실"));
-		}
-		break;
-
-	case ELSRaidResult::Dead:
-		ResolvedItems.Empty();
-		bShouldSaveResolvedItems = true;
-		bShouldSaveSafeStash = true;
-		UE_LOG(LogLS, Log, TEXT("[Session] 사망 - 전부 소실"));
-		break;
-	}
-
-	// 스태시에 저장 (레벨 전환 전에 처리)
-	if (ULSSaveSubsystem* SaveSub = GetGameInstance()->GetSubsystem<ULSSaveSubsystem>())
-	{
-		if (bShouldSaveResolvedItems)
-		{
-			UE_LOG(LogLS, Log, TEXT("[Session] Applying raid result save. Result=%d InventorySlots=%d SafeSlots=%d"),
-				static_cast<int32>(Result),
-				ResolvedItems.Num(),
-				SessionSafeInventory.Num());
-			SaveSub->ReplaceInventory(ResolvedItems);
-		}
-
-		if (bShouldSaveSafeStash)
-		{
-			SaveSub->ReplaceSafeStash(SessionSafeInventory);
-		}
-
-		SaveSub->ClearRaidSave();
-	}
-
-	bRaidActive = false;
-
-	// 결과 레벨로 전환
-	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
-	if (!Settings->ResultLevel.IsNull())
-	{
-		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->ResultLevel);
-	}
-	else
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Session] ResultLevel 미설정 - 프로젝트 설정 > LS Session Settings 확인"));
-	}
 }
 
 void ULSSessionSubsystem::AddSessionItem(FName ItemRowName, int32 Amount)
@@ -394,18 +271,4 @@ void ULSSessionSubsystem::ConsumeItem(FName ItemRowName, int32 Amount)
 	{
 		SaveSub->UpdateRaidConsumedItems(ConsumedItems);
 	}
-}
-
-TArray<FLSSessionItem> ULSSessionSubsystem::BuildQuitRecovery() const
-{
-	// 출발 장비에서 소모된 수량을 차감해 반환
-	TArray<FLSSessionItem> Recovery = LoadoutSnapshot.Items;
-
-	for (const FLSSessionItem& Consumed : ConsumedItems)
-	{
-		LSInventorySlotUtils::RemoveItemsFromSlotArray(Recovery, Consumed.ItemRowName, Consumed.Amount);
-	}
-
-	// 수량이 0이 된 항목 제거
-	return Recovery;
 }

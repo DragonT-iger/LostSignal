@@ -75,6 +75,20 @@ void ULSLobbyMenuWidget::BindActionButtons()
 	{
 		UE_LOG(LogLS, Warning, TEXT("MissionStartButton is not bound on %s."), *GetNameSafe(this));
 	}
+
+	if (JoinButton)
+	{
+		JoinButton->OnClicked.AddDynamic(this, &ULSLobbyMenuWidget::HandleJoinClicked);
+	}
+	else
+	{
+		UE_LOG(LogLS, Warning, TEXT("JoinButton is not bound on %s."), *GetNameSafe(this));
+	}
+
+	if (!JoinAddressTextBox)
+	{
+		UE_LOG(LogLS, Warning, TEXT("JoinAddressTextBox is not bound on %s."), *GetNameSafe(this));
+	}
 }
 
 void ULSLobbyMenuWidget::CreatePanelWidgets()
@@ -251,6 +265,11 @@ void ULSLobbyMenuWidget::NativeDestruct()
 	if (MissionStartButton)
 	{
 		MissionStartButton->OnClicked.RemoveDynamic(this, &ULSLobbyMenuWidget::HandleMissionStartClicked);
+	}
+
+	if (JoinButton)
+	{
+		JoinButton->OnClicked.RemoveDynamic(this, &ULSLobbyMenuWidget::HandleJoinClicked);
 	}
 
 	if (ULSSaveSubsystem* SaveSubsystem = GetSaveSubsystem())

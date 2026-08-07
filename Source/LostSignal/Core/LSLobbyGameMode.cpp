@@ -10,7 +10,6 @@
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSettings.h"
 #include "Session/LSSessionSubsystem.h"
-#include "UI/LSUILayer.h"
 #include "UI/Lobby/LSLobbyMenuWidget.h"
 
 namespace
@@ -29,7 +28,14 @@ void ALSLobbyGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	RestoreLobbySignalGauge();
-	CreateLobbyMenuWidget();
+}
+
+void ALSLobbyGameMode::HandleSeamlessTravelPlayer(AController*& C)
+{
+	Super::HandleSeamlessTravelPlayer(C);
+
+	// seamless travel로 들어온 플레이어는 PostLogin을 타지 않는다. 로비 메뉴는 여기서 띄운다.
+	ShowLobbyMenuFor(C);
 }
 
 void ALSLobbyGameMode::PostLogin(APlayerController* NewPlayer)
@@ -38,7 +44,9 @@ void ALSLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 	UE_LOG(LogLS, Log, TEXT("[Lobby] Player login completed. Player=%s ConnectedPlayers=%d"),
 		*GetNameSafe(NewPlayer), GetNumPlayers());
 
-	if (!bRaidStartRequested)
+	ShowLobbyMenuFor(NewPlayer);
+
+	if (!bRaidStartRequested || bRaidTravelStarted)
 	{
 		return;
 	}
@@ -61,16 +69,20 @@ void ALSLobbyGameMode::Logout(AController* Exiting)
 	UE_LOG(LogLS, Log, TEXT("[Lobby] Player logged out. Player=%s ConnectedPlayers=%d"),
 		*GetNameSafe(Exiting), GetNumPlayers());
 
-	if (bRaidStartRequested)
+	// ServerTravel이 이미 걸렸으면 여기 들어오는 Logout은 seamless travel이 원격 PC를 정리하는 과정이다.
+	// 그때 입장 데이터를 다시 수집하면 큐가 중복 적재되고 ServerTravel이 여러 번 걸린다.
+	if (!bRaidStartRequested || bRaidTravelStarted)
 	{
-		if (bWaitingForRaidEntryData)
-		{
-			TryStartRaidWithSubmittedData();
-		}
-		else
-		{
-			TryBeginRaidEntryDataCollection();
-		}
+		return;
+	}
+
+	if (bWaitingForRaidEntryData)
+	{
+		TryStartRaidWithSubmittedData();
+	}
+	else
+	{
+		TryBeginRaidEntryDataCollection();
 	}
 }
 
@@ -98,41 +110,31 @@ void ALSLobbyGameMode::RestoreLobbySignalGauge()
 	SaveSubsystem->SetChipSignalGaugePercent(1.0f);
 }
 
-void ALSLobbyGameMode::CreateLobbyMenuWidget()
+void ALSLobbyGameMode::ShowLobbyMenuFor(AController* Controller)
 {
-	APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
-	if (!PlayerController)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot create lobby menu because PlayerController is missing."));
-		return;
-	}
-
 	if (!LobbyMenuWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Lobby] LobbyMenuWidgetClass is not set on %s. Check BP_LobbyGameMode."), *GetNameSafe(this));
 		return;
 	}
 
-	LobbyMenuWidgetInstance = CreateWidget<ULSLobbyMenuWidget>(PlayerController, LobbyMenuWidgetClass);
-	if (!LobbyMenuWidgetInstance)
+	// GameMode는 서버에만 존재하므로 위젯을 여기서 직접 만들면 호스트 화면에만 뜬다.
+	// 각 PlayerController가 자기 화면에 만들도록 위젯 클래스를 넘긴다(원격은 Client RPC).
+	ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(Controller);
+	if (!PlayerController)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] Failed to create lobby menu widget on %s."), *GetNameSafe(this));
+		// 로비는 참가자가 들어오는 지점이라 폴백을 두지 않는다. PlayerControllerClass가 잘못됐다는 뜻이다.
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot show the lobby menu for %s. PlayerControllerClass must derive from ALSPlayerControllerBase. Check BP_LobbyGameMode."),
+			*GetNameSafe(Controller));
 		return;
 	}
 
-	LobbyMenuWidgetInstance->AddToViewport(LSUILayer::LobbyMenu);
-
-	PlayerController->bShowMouseCursor = true;
-	FInputModeUIOnly InputMode;
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	// 로비 메뉴에 포커스를 줘서 TAB 등 키 입력이 위젯으로 전달되게 한다.
-	InputMode.SetWidgetToFocus(LobbyMenuWidgetInstance->TakeWidget());
-	PlayerController->SetInputMode(InputMode);
+	PlayerController->ShowLobbyMenuWidget(LobbyMenuWidgetClass);
 }
 
 void ALSLobbyGameMode::StartRaid()
 {
-	if (bRaidStartRequested)
+	if (bRaidStartRequested || bRaidTravelStarted)
 	{
 		return;
 	}
@@ -251,7 +253,7 @@ bool ALSLobbyGameMode::HasPendingPlayerConnections() const
 
 void ALSLobbyGameMode::TryBeginRaidEntryDataCollection()
 {
-	if (!bRaidStartRequested || bWaitingForRaidEntryData)
+	if (!bRaidStartRequested || bWaitingForRaidEntryData || bRaidTravelStarted)
 	{
 		return;
 	}
@@ -300,17 +302,8 @@ void ALSLobbyGameMode::PollPendingPlayerConnections()
 
 void ALSLobbyGameMode::TryStartRaidWithSubmittedData()
 {
-	if (!bRaidStartRequested || !bWaitingForRaidEntryData || !AreRaidEntryDataReady())
+	if (!bRaidStartRequested || !bWaitingForRaidEntryData || bRaidTravelStarted || !AreRaidEntryDataReady())
 	{
-		return;
-	}
-
-	UGameInstance* GameInstance = GetGameInstance();
-	ULSSessionSubsystem* SessionSub = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;
-	if (!SessionSub)
-	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] Cannot start raid because SessionSubsystem is missing."));
-		ClearRaidEntryDataWait();
 		return;
 	}
 
@@ -343,47 +336,43 @@ void ALSLobbyGameMode::TryStartRaidWithSubmittedData()
 		return;
 	}
 
-	TArray<FLSSessionItem> Loadout;
-	TArray<FLSSessionItem> SafeItems;
-	TArray<FLSSessionItem> Equipment;
-	bool bHasLegacySessionLoadout = false;
-
+	// 플레이어별 payload의 원본은 각 ALSPlayerState다. seamless travel에서 컨트롤러는 전부 새로 스폰되지만
+	// PlayerState는 CopyProperties로 값이 건너가므로, 파밍 레벨에서 각자 자기 것을 그대로 복원한다.
+	// (예전의 SessionSubsystem 순서 큐는 접속 순서에 의존해 3인에서 인벤토리를 섞었다)
+	int32 StartedPlayerCount = 0;
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
-		if (ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(It->Get()))
+		ALSPlayerControllerBase* PlayerController = Cast<ALSPlayerControllerBase>(It->Get());
+		if (!PlayerController)
 		{
-			const TArray<FLSSessionItem>& PlayerLoadout = PlayerController->GetSubmittedRaidLoadout();
-			const TArray<FLSSessionItem>& PlayerSafeItems = PlayerController->GetSubmittedRaidSafeItems();
-			const TArray<FLSSessionItem>& PlayerEquipment = PlayerController->GetSubmittedRaidEquipment();
-			if (!bHasLegacySessionLoadout)
-			{
-				Loadout = PlayerLoadout;
-				SafeItems = PlayerSafeItems;
-				Equipment = PlayerEquipment;
-				bHasLegacySessionLoadout = true;
-			}
-
-			// ServerTravel 이후 각 PC가 자신의 데이터를 꺼낼 수 있도록 순서대로 큐에 저장
-			SessionSub->EnqueuePendingRaidEntry(PlayerLoadout, PlayerSafeItems, PlayerEquipment);
-
-			if (ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
-			{
-				RaidInventory->StartRaidInventory(PlayerLoadout, PlayerSafeItems, PlayerEquipment);
-			}
-			PlayerController->ClientStartRaidSession(PlayerLoadout, PlayerSafeItems, PlayerEquipment);
+			continue;
 		}
+
+		const TArray<FLSSessionItem>& PlayerLoadout = PlayerController->GetSubmittedRaidLoadout();
+		const TArray<FLSSessionItem>& PlayerSafeItems = PlayerController->GetSubmittedRaidSafeItems();
+		const TArray<FLSSessionItem>& PlayerEquipment = PlayerController->GetSubmittedRaidEquipment();
+
+		if (ULSRaidInventoryComponent* RaidInventory = PlayerController->GetRaidInventoryComponent())
+		{
+			RaidInventory->StartRaidInventory(PlayerLoadout, PlayerSafeItems, PlayerEquipment);
+		}
+		PlayerController->ClientStartRaidSession(PlayerLoadout, PlayerSafeItems, PlayerEquipment);
+		++StartedPlayerCount;
 	}
 
-	SessionSub->StartRaid(Loadout);
-	SessionSub->MirrorRaidSessionState(Loadout, SafeItems, Equipment);
+	// 레이드 복구 저장(BeginRaidSave)은 각자 ClientStartRaidSession에서 자기 로드아웃으로 시작한다.
+	// SessionSubsystem의 전역 세션 상태는 3인에서 정의상 누군가에게 틀린 값이라 더 이상 쓰지 않는다.
 	ClearRaidEntryDataWait();
-	bRaidStartRequested = true;
+	bRaidTravelStarted = true;
 
 	if (!World->ServerTravel(RaidLevelPath))
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Lobby] Failed to server travel to raid level: %s"), *RaidLevelPath);
-		ClearRaidEntryDataWait();
+		bRaidTravelStarted = false;
+		return;
 	}
+
+	UE_LOG(LogLS, Log, TEXT("[Lobby] Raid start travel issued for %d players. Level=%s"), StartedPlayerCount, *RaidLevelPath);
 }
 
 void ALSLobbyGameMode::HandleRaidEntryDataTimeout()

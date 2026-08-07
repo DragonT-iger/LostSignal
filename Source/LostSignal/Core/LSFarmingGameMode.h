@@ -4,6 +4,7 @@
 #include "Core/LSGameModeBase.h"
 #include "Session/LSSessionSubsystem.h"
 #include "TimerManager.h"
+#include "UObject/SoftObjectPtr.h"
 #include "LSFarmingGameMode.generated.h"
 
 class ALSPlayerControllerBase;
@@ -16,6 +17,9 @@ class LOSTSIGNAL_API ALSFarmingGameMode : public ALSGameModeBase
 
 public:
 	virtual void StartPlay() override;
+	// 결과 저장 ACK를 기다리는 중 접속이 끊기면 그 컨트롤러를 대기 목록에서 빼야 한다.
+	// 빼지 않으면 남은 인원이 전부 ACK해도 목록이 비지 않아 레벨 전환이 영구히 막힌다.
+	virtual void Logout(AController* Exiting) override;
 
 	// 플레이어 사망 시 — 캐릭터 사망 처리에서 호출
 	UFUNCTION(BlueprintCallable, Category="LS/Farming")
@@ -25,9 +29,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LS/Farming")
 	void OnExtraction();
 
-	// UI 탈주 버튼 or 강제 종료 시 호출
+	// UI 탈주 버튼 or 강제 종료 시 호출 — 전원 Quit으로 레이드를 끝낸다.
 	UFUNCTION(BlueprintCallable, Category="LS/Farming")
 	void OnQuit();
+
+	// 개인 이탈 — 요청한 플레이어만 결과를 확정하고 타이틀로 내보낸다. 남은 사람의 레이드는 계속된다.
+	// 호스트(리슨 서버)는 나가면 서버가 함께 사라지므로 예외적으로 OnQuit()으로 전원 종료한다.
+	void QuitRaidForPlayer(ALSPlayerControllerBase* QuittingPlayer);
 
 	void NotifyRaidResultSaved(ALSPlayerControllerBase* PlayerController);
 
@@ -50,6 +58,11 @@ private:
 	void HandleRaidResultSaveTimeout();
 	void TravelToResultLevel();
 	void ClearRaidResultSaveWait();
+
+	// 파티를 유지한 채 레벨을 옮긴다. OpenLevel을 쓰면 안 된다 — 아래 cpp 구현의 주석 참고.
+	bool ServerTravelToLevel(const TSoftObjectPtr<UWorld>& Level, const TCHAR* LevelLabel);
+	// 개인 이탈자 한 명만 접속을 끊고 타이틀로 내보낸다(서버는 그대로 유지).
+	void SendPlayerToTitle(ALSPlayerControllerBase* PlayerController);
 
 	// 레이드 진입 후 1분마다 다음 장착 칩까지 빈 슬롯을 건너뛰며 신호 게이지를 감소시킨다.
 	void StartSignalGaugeDrain();
@@ -81,6 +94,11 @@ private:
 
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Farming")
 	TArray<TObjectPtr<ALSPlayerControllerBase>> PendingRaidResultSaveControllers;
+
+	// 개인 이탈로 결과 저장 ACK를 기다리는 컨트롤러. 전원 종료 대기(PendingRaidResultSaveControllers)와
+	// 섞이면 안 된다 — 이쪽 ACK는 레벨 전환이 아니라 그 사람만 타이틀로 내보내는 신호다.
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Farming")
+	TArray<TObjectPtr<ALSPlayerControllerBase>> PendingQuitControllers;
 
 	FTimerHandle RaidResultSaveTimeoutTimerHandle;
 };

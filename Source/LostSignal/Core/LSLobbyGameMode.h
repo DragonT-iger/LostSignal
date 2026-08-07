@@ -18,6 +18,8 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
+	// seamless travel로 들어온 플레이어는 PostLogin을 타지 않으므로 여기서도 로비 메뉴를 띄운다.
+	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
 	virtual void Logout(AController* Exiting) override;
 
 	// 로비에서 레이드 시작 (로드아웃은 인벤토리 시스템 구현 후 연결)
@@ -41,11 +43,9 @@ private:
 	// 로비 적재 프로토콜 용량을 축소해 인벤토리 overflow를 만드는 문제를 막는다.
 	void RestoreLobbySignalGauge();
 
-	// 레벨 진입 즉시 로비 메뉴 UI를 뷰포트에 올리고 UI 입력 모드로 전환한다.
-	void CreateLobbyMenuWidget();
-
-	UPROPERTY(Transient)
-	TObjectPtr<ULSLobbyMenuWidget> LobbyMenuWidgetInstance;
+	// 해당 플레이어 화면에 로비 메뉴를 띄운다. 위젯 생성은 각 PlayerController가 한다
+	// (GameMode는 서버에만 있어서 여기서 만들면 호스트만 보인다).
+	void ShowLobbyMenuFor(AController* Controller);
 
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Lobby")
 	bool bRaidStartRequested = false;
@@ -56,6 +56,11 @@ private:
 
 	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Lobby")
 	bool bWaitingForRaidEntryData = false;
+
+	// ServerTravel을 이미 걸었다. seamless travel 중에는 원격 PC가 하나씩 Logout되는데, 그때마다
+	// Logout 핸들러가 입장 데이터를 다시 수집하고 ServerTravel을 또 거는 것을 막는다.
+	UPROPERTY(Transient, VisibleAnywhere, Category="LS/Lobby")
+	bool bRaidTravelStarted = false;
 
 	bool RequestRaidEntryDataFromPlayers();
 	bool AreRaidEntryDataReady() const;
