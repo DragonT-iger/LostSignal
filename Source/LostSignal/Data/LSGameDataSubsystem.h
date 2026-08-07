@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Data/LSProtocolTypes.h"
+#include "Data/LSSkillNodeIndex.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "LSGameDataSubsystem.generated.h"
 
@@ -54,9 +55,14 @@ public:
 	int32 GetVisibleProtocolEnableValueSum(ELSProtocolType ProtocolType, FName EnableName, int32 CurrentLevel, int32 PreviousLevel, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
 	bool IsProtocolUnlockVisible(const FLSProtocolUnlockRow& Row, int32 CurrentLevel, int32 PreviousLevel, bool* bOutProtected = nullptr) const;
 
+	// 캐릭터 강화 노드. 5테이블은 통합 인덱스로만 노출한다 — 종류가 늘어도 호출부가 늘지 않게 한다.
+	const FLSSkillNodeRef* FindSkillNode(FName NodeKey, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+	void GetSkillNodesForCharacter(int32 CharacterID, TArray<const FLSSkillNodeRef*>& OutNodes, const TCHAR* Context = TEXT("LSGameDataSubsystem")) const;
+
 private:
 	void LoadTables();
 	void LogMissingTables() const;
+	void RebuildSkillNodeIndex();
 	void NormalizeActiveSkillRows() const;
 	void NormalizePassiveSkillRows() const;
 	void NormalizeComboAttackRows() const;
@@ -90,4 +96,22 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UDataTable> NoiseProfileTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> SkillNodeCoreTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> SkillNodeMainStatTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> SkillNodeSubStatTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> SkillNodeEnhanceTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> SkillNodeEvolveTable;
+
+	// 노드 테이블 5개를 합친 통합 인덱스. 개별 테이블은 밖으로 노출하지 않는다.
+	FLSSkillNodeIndex SkillNodeIndex;
 };

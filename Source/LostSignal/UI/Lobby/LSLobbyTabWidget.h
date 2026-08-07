@@ -12,10 +12,13 @@ class ULSLobbyTabWidget;
 // 탭마다 핸들러를 따로 만들지 않는다(ULSCraftingTabWidget/ULSVendingButtonWidget과 같은 형태).
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLSLobbyTabClicked, ULSLobbyTabWidget*, ClickedTab);
 
-// 로비 상단 아이콘 탭 하나(WBP_LobbyTab / WBP_LoadoutPreparationTab)의 부모 클래스.
+// 아이콘 탭 하나(WBP_LobbyTab / WBP_LoadoutPreparationTab)의 부모 클래스.
 // Border 안에 Button + Text/Icon 구조이지만 Border와 Text는 아트가 다루므로 Button만 바인딩한다.
 // 로비 메뉴(WBP_LobbyMenu)에서 이 위젯을 8개 배치한다(로비/칩 세팅/정비/캐릭터/가방/퀘스트/지도/설정).
 // 설정은 배타 패널이 아닌 오버레이지만 상단 탭의 표현과 선택 상태를 공유한다.
+//
+// 로비 전용이 아니다 — 패널 안 서브탭도 같은 계약(클릭 시 자기 자신을 넘김 + SetSelected)이면 재사용한다.
+// ULSCharacterPanelWidget이 스킬 로드아웃/노드 그래프 서브탭 버튼으로 쓴다.
 UCLASS(BlueprintType, Blueprintable)
 class LOSTSIGNAL_API ULSLobbyTabWidget : public UUserWidget
 {

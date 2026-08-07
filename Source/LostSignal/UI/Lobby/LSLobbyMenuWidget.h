@@ -11,6 +11,7 @@ class UEditableTextBox;
 class UOverlay;
 class UTextBlock;
 class UWidgetSwitcher;
+class ULSCharacterPanelWidget;
 class ULSChipStationWidget;
 class ULSConfirmDialogWidget;
 class ULSInventoryWidget;
@@ -19,7 +20,6 @@ class ULSLobbyStorageWidget;
 class ULSLobbyTabWidget;
 class ULSSaveSubsystem;
 class ULSSettingsWidget;
-class ULSSkillLoadoutWidget;
 class ULSStoreWidget;
 
 // 로비 메뉴 루트(WBP_LobbyMenu). 상단 아이콘 바 + 배타 패널 스위처 + 우하단 상시 버튼을 소유한다.
@@ -95,8 +95,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Lobby")
 	TSubclassOf<ULSStoreWidget> StorePanelClass;
 
+	// 캐릭터 탭. 스킬 로드아웃과 노드 그래프는 이 패널이 서브탭으로 소유하므로 로비는 페이지 클래스를 모른다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Lobby")
-	TSubclassOf<ULSSkillLoadoutWidget> SkillLoadoutPanelClass;
+	TSubclassOf<ULSCharacterPanelWidget> CharacterPanelClass;
 
 	// 가방은 별도 패널 WBP 없이 인벤토리와 물품창고를 런타임 오버레이에 함께 배치한다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Lobby")
@@ -252,7 +253,7 @@ private:
 	TObjectPtr<ULSStoreWidget> StorePanelInstance;
 
 	UPROPERTY(Transient)
-	TObjectPtr<ULSSkillLoadoutWidget> SkillLoadoutPanelInstance;
+	TObjectPtr<ULSCharacterPanelWidget> CharacterPanelInstance;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UOverlay> BagPanelInstance;

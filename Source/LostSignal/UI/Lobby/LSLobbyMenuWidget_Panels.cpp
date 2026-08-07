@@ -7,12 +7,12 @@
 #include "Components/Overlay.h"
 #include "Components/WidgetSwitcher.h"
 #include "LostSignal.h"
+#include "UI/CharacterNode/LSCharacterPanelWidget.h"
 #include "UI/ChipSystem/LSChipStationWidget.h"
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/Lobby/LSLobbyQuestWidget.h"
 #include "UI/Lobby/LSLobbyTabWidget.h"
 #include "UI/Lobby/Store/LSStoreWidget.h"
-#include "UI/Skill/LSSkillLoadoutWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
 
 // 세 cpp 모두 같은 네임스페이스를 쓴다. 다르게 두면 LOCTEXT 키가 갈려 번역이 끊긴다.
@@ -96,7 +96,7 @@ UWidget* ULSLobbyMenuWidget::ResolvePanelPage(const ELSLobbyPanel Panel) const
 	{
 	case ELSLobbyPanel::ChipStation:  return ChipStationPanelInstance;
 	case ELSLobbyPanel::Supply:       return StorePanelInstance;
-	case ELSLobbyPanel::SkillLoadout: return SkillLoadoutPanelInstance;
+	case ELSLobbyPanel::Character:    return CharacterPanelInstance;
 	case ELSLobbyPanel::Bag:          return BagPanelInstance;
 	case ELSLobbyPanel::Quest:
 	case ELSLobbyPanel::None:
@@ -140,10 +140,11 @@ void ULSLobbyMenuWidget::RefreshPanelOnOpen(const ELSLobbyPanel Panel)
 		}
 		break;
 
-	case ELSLobbyPanel::SkillLoadout:
-		if (SkillLoadoutPanelInstance)
+	// 활성 서브탭만 갱신한다. 서브탭 전환 시점의 갱신은 패널이 스스로 한다.
+	case ELSLobbyPanel::Character:
+		if (CharacterPanelInstance)
 		{
-			SkillLoadoutPanelInstance->RefreshSkillLoadout();
+			CharacterPanelInstance->RefreshCharacterPanel();
 		}
 		break;
 
@@ -202,7 +203,7 @@ void ULSLobbyMenuWidget::UpdateSelectedTab(const ELSLobbyPanel Panel, const bool
 	}
 	if (CharacterTab)
 	{
-		CharacterTab->SetSelected(!bSettingsSelected && Panel == ELSLobbyPanel::SkillLoadout);
+		CharacterTab->SetSelected(!bSettingsSelected && Panel == ELSLobbyPanel::Character);
 	}
 	if (BagTab)
 	{
@@ -262,7 +263,7 @@ void ULSLobbyMenuWidget::HandleLobbyTabClicked(ULSLobbyTabWidget* ClickedTab)
 	}
 	else if (ClickedTab == CharacterTab)
 	{
-		ShowPanel(ELSLobbyPanel::SkillLoadout);
+		ShowPanel(ELSLobbyPanel::Character);
 	}
 	else if (ClickedTab == BagTab)
 	{

@@ -15,13 +15,13 @@
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
 #include "Session/LSSaveSubsystem.h"
+#include "UI/CharacterNode/LSCharacterPanelWidget.h"
 #include "UI/ChipSystem/LSChipStationWidget.h"
 #include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/Inventory/LSInventoryWidget.h"
 #include "UI/Lobby/LSLobbyQuestWidget.h"
 #include "UI/Lobby/LSLobbyTabWidget.h"
 #include "UI/Lobby/Store/LSStoreWidget.h"
-#include "UI/Skill/LSSkillLoadoutWidget.h"
 #include "UI/Storage/LSLobbyStorageWidget.h"
 
 // 세 cpp 모두 같은 네임스페이스를 쓴다. 다르게 두면 LOCTEXT 키가 갈려 번역이 끊긴다.
@@ -100,7 +100,7 @@ void ULSLobbyMenuWidget::CreatePanelWidgets()
 	}
 
 	const bool bHasRuntimePanel =
-		ChipStationPanelInstance || StorePanelInstance || SkillLoadoutPanelInstance || BagPanelInstance || QuestPanelInstance;
+		ChipStationPanelInstance || StorePanelInstance || CharacterPanelInstance || BagPanelInstance || QuestPanelInstance;
 	if (!bHasRuntimePanel && TabSwitcher->GetChildrenCount() > 0)
 	{
 		UE_LOG(LogLS, Warning,
@@ -116,9 +116,9 @@ void ULSLobbyMenuWidget::CreatePanelWidgets()
 	{
 		StorePanelInstance = Cast<ULSStoreWidget>(CreatePanelWidget(StorePanelClass.Get(), TEXT("StorePanelClass")));
 	}
-	if (!SkillLoadoutPanelInstance)
+	if (!CharacterPanelInstance)
 	{
-		SkillLoadoutPanelInstance = Cast<ULSSkillLoadoutWidget>(CreatePanelWidget(SkillLoadoutPanelClass.Get(), TEXT("SkillLoadoutPanelClass")));
+		CharacterPanelInstance = Cast<ULSCharacterPanelWidget>(CreatePanelWidget(CharacterPanelClass.Get(), TEXT("CharacterPanelClass")));
 	}
 	if (!BagPanelInstance)
 	{
@@ -332,9 +332,9 @@ void ULSLobbyMenuWidget::ValidatePanelBindings() const
 int32 ULSLobbyMenuWidget::ValidatePanelPages() const
 {
 	const TObjectPtr<UWidget> PanelPages[] = {
-		ChipStationPanelInstance, StorePanelInstance, SkillLoadoutPanelInstance, BagPanelInstance };
+		ChipStationPanelInstance, StorePanelInstance, CharacterPanelInstance, BagPanelInstance };
 	const TCHAR* PanelPageNames[] = {
-		TEXT("ChipStationPanel"), TEXT("StorePanel"), TEXT("SkillLoadoutPanel"), TEXT("BagPanel") };
+		TEXT("ChipStationPanel"), TEXT("StorePanel"), TEXT("CharacterPanel"), TEXT("BagPanel") };
 
 	int32 BoundPageCount = 0;
 	for (int32 PageIndex = 0; PageIndex < UE_ARRAY_COUNT(PanelPages); ++PageIndex)

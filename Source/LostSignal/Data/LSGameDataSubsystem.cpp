@@ -430,10 +430,16 @@ void ULSGameDataSubsystem::LoadTables()
 	MonsterArchetypeTable = Settings->MonsterArchetypeTable.LoadSynchronous();
 	MonsterActionTable = Settings->MonsterActionTable.LoadSynchronous();
 	NoiseProfileTable = Settings->NoiseProfileTable.LoadSynchronous();
+	SkillNodeCoreTable = Settings->SkillNodeCoreTable.LoadSynchronous();
+	SkillNodeMainStatTable = Settings->SkillNodeMainStatTable.LoadSynchronous();
+	SkillNodeSubStatTable = Settings->SkillNodeSubStatTable.LoadSynchronous();
+	SkillNodeEnhanceTable = Settings->SkillNodeEnhanceTable.LoadSynchronous();
+	SkillNodeEvolveTable = Settings->SkillNodeEvolveTable.LoadSynchronous();
 
 	NormalizeActiveSkillRows();
 	NormalizePassiveSkillRows();
 	NormalizeComboAttackRows();
+	RebuildSkillNodeIndex();
 	LogMissingTables();
 }
 
@@ -482,6 +488,87 @@ void ULSGameDataSubsystem::LogMissingTables() const
 	if (!NoiseProfileTable)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[GameData] NoiseProfileTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!SkillNodeCoreTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] SkillNodeCoreTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!SkillNodeMainStatTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] SkillNodeMainStatTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!SkillNodeSubStatTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] SkillNodeSubStatTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!SkillNodeEnhanceTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] SkillNodeEnhanceTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+
+	if (!SkillNodeEvolveTable)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[GameData] SkillNodeEvolveTable 미설정 - 프로젝트 설정 > LS Game Data Settings 확인"));
+	}
+}
+
+void ULSGameDataSubsystem::RebuildSkillNodeIndex()
+{
+	LSSkillNodes::BuildIndex(
+		SkillNodeIndex,
+		SkillNodeCoreTable,
+		SkillNodeMainStatTable,
+		SkillNodeSubStatTable,
+		SkillNodeEnhanceTable,
+		SkillNodeEvolveTable);
+
+#if WITH_EDITOR
+	// 그래프 무결성은 에디터에서만 검사한다. 경고만 남기고 동작은 바꾸지 않는다.
+	if (!SkillNodeIndex.IsEmpty())
+	{
+		LSSkillNodes::ValidateGraph(SkillNodeIndex);
+	}
+#endif
+}
+
+const FLSSkillNodeRef* ULSGameDataSubsystem::FindSkillNode(const FName NodeKey, const TCHAR* Context) const
+{
+	if (NodeKey.IsNone())
+	{
+		return nullptr;
+	}
+
+	const FLSSkillNodeRef* Node = SkillNodeIndex.Find(NodeKey);
+	if (!Node)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[SkillNode] %s: 노드 '%s'를 인덱스에서 찾을 수 없다"), Context, *NodeKey.ToString());
+	}
+
+	return Node;
+}
+
+void ULSGameDataSubsystem::GetSkillNodesForCharacter(const int32 CharacterID, TArray<const FLSSkillNodeRef*>& OutNodes, const TCHAR* Context) const
+{
+	OutNodes.Reset();
+
+	const TArray<FName>* NodeKeys = SkillNodeIndex.NodeKeysByCharacter.Find(CharacterID);
+	if (!NodeKeys)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[SkillNode] %s: 캐릭터 %d의 노드가 인덱스에 없다"), Context, CharacterID);
+		return;
+	}
+
+	OutNodes.Reserve(NodeKeys->Num());
+	for (const FName NodeKey : *NodeKeys)
+	{
+		if (const FLSSkillNodeRef* Node = SkillNodeIndex.Find(NodeKey))
+		{
+			OutNodes.Add(Node);
+		}
 	}
 }
 

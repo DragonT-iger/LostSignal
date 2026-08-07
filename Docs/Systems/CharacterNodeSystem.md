@@ -121,8 +121,12 @@
 
 | 어긋남 | 상세 | 처리 |
 |---|---|---|
-| `Char_HP_Recovery` | 코드 필드명은 **`Char_Recovery`**(회복력)다 | 테이블을 코드 이름에 맞춘다 |
+| `Char_HP_Recovery` | 코드 필드명은 **`Char_Recovery`**(회복력)다 | **시트 토큰을 그대로 받는다** — 아래 |
 | 단위 `정수`인데 값이 소수 16건 | 어트리뷰트가 `float`이라 런타임은 통과한다. 표기와 모순이므로 UI 표시 규칙(내림·반올림)이 필요하다 | 기획 확인 항목 |
+
+**`Char_HP_Recovery`는 CSV를 고치지 않는다.** `Stat_Field`는 **시트 어휘의 토큰**이고 `FLSCharacterStatRow`의 필드명과 같아야 할 이유가 없다 — 토큰을 어트리뷰트로 번역하는 지점이 `LSSkillNodes::GetKnownStatFields()` 한 곳이므로, 거기에 이 토큰을 두면 어휘가 이원화되지 않는다. 별칭(토큰 2개 → 어트리뷰트 1개)이 아니라 토큰 1개 → 어트리뷰트 1개다.
+
+CSV를 고치면 기획자가 시트를 다시 내보낼 때 되돌아오고, 그동안 4개 노드가 조용히 skip된다. 토큰명 통일은 기획 확인 항목으로 남긴다.
 
 ### 강인도(Tenacity)는 수치 어트리뷰트다
 
@@ -271,13 +275,15 @@ UI 위젯(`ULSSkillLoadoutEntryWidget`, `ULSSkillLoadoutWidget`)은 이름·설�
 
 기획 시트 구조를 그대로 따른다. **MainStat과 SubStat은 컬럼이 완전히 같으므로 Row 구조체를 공유**한다 — 테이블은 5개지만 구조체는 4개다.
 
+에셋은 전부 `Content/LostSignal/Data/DataTables/Character/CharacterEnhanced/` 아래에 있다.
+
 | DataTable | Row 구조체 | 행 수(3캐릭터) |
 |---|---|---|
-| `DT_SkillNodeCore` | `FLSSkillNodeCoreRow` | 3 |
-| `DT_SkillNodeMainStat` | `FLSSkillNodeStatRow` | 36 |
-| `DT_SkillNodeSubStat` | `FLSSkillNodeStatRow` (공유) | 72 |
-| `DT_SkillNodeEnhance` | `FLSSkillNodeEnhanceRow` | 12 |
-| `DT_SkillNodeEvolve` | `FLSSkillNodeEvolveRow` | 12 |
+| `DT_CoreNode` | `FLSSkillNodeCoreRow` | 3 |
+| `DT_MainStatNode` | `FLSSkillNodeStatRow` | 36 |
+| `DT_SubStatNode` | `FLSSkillNodeStatRow` (공유) | 72 |
+| `DT_SkillEnhancedNode` | `FLSSkillNodeEnhanceRow` | 12 |
+| `DT_SkillEvolveNode` | `FLSSkillNodeEvolveRow` | 12 |
 
 **노드 Kind는 컬럼이 아니라 테이블이 결정한다.** 따라서 `Node_Kind` 컬럼과 기획 시트의 `Node_Type` 컬럼은 만들지 않는다. Kind별 필수 컬럼 검증도 구조체가 다르므로 컴파일 단계에서 절반이 해결된다.
 
@@ -297,7 +303,7 @@ FLSSkillNodeRef        인덱스 엔트리
 ├── Kind               어느 테이블에서 왔는지
 ├── Ring / Slot
 ├── Prereq[2]
-├── Cost               Chip_Grade / Required_Count / Required_Coin
+├── Cost               Chip_Grade / Required_Quantity / Coin_Cost
 └── Payload            Kind별 원본 row 포인터
 
 TMap<FName, FLSSkillNodeRef>   키 = 노드 키(RowName)
@@ -305,44 +311,79 @@ TMap<FName, FLSSkillNodeRef>   키 = 노드 키(RowName)
 
 > ⚠️ **공통 컬럼을 Row 구조체 상속으로 공통화하지 않는다.** `Data/`의 Row 구조체 21개가 **예외 없이** `FTableRowBase`를 직접 상속하며, Row가 Row를 상속하는 선례가 0건이다. 중첩 USTRUCT 멤버로 묶는 방법도 쓰지 않는다 — CSV 셀이 `(A=..,B=..)` 형식이 되어 기획자 편집성이 크게 나빠진다. 9컬럼 반복이 5분할의 실제 비용이다.
 
-### 공통 컬럼 (4개 구조체 전부)
+### 공통 컬럼
+
+구조체는 [LSSkillNodeRow.h](../../Source/LostSignal/Data/LSSkillNodeRow.h)가 소유한다. 아래는 컬럼의 의미만 적는다.
 
 ```text
-[RowName]         노드 키 — FName. 예: CORE-101 / N101-S01 / N101-M05 / N101-K01 / N101-E01
-Character_ID      캐릭터 식별자 (ULSSkillPoolDataAsset::CharacterID와 같은 키)
-Node_Name         UI 표시명 — FText 필수 (기획 정의는 String이지만 FString 금지)
-Ring              소속 링 (0=코어). 해금 판정에는 아직 쓰지 않는다 (§먼저 확인할 것 1)
-Slot              배치 라벨 — FName. **정수 각도 인덱스가 아니다** (CORE / R1-01 / R2-M03 / R3-E01)
-Prerequisite_1    선행 노드 키
-Prerequisite_2    두 번째 선행 노드 키 — 둘 중 하나만 활성이면 충족 (ANY)
-Chip_Grade        요구 칩 등급 (ResolveItemGradeFromRowName이 반환하는 토큰)
-Required_Count    요구 칩 개수
-Required_Coin     요구 코인 (= ULSSaveGame::Gold)
+[RowName]           노드 키 — FName. 예: CORE-101 / N101-S01 / N101-M05 / N101-K01 / N101-E01
+Character_ID        캐릭터 식별자 (ULSSkillPoolDataAsset::CharacterID와 같은 키)
+Node_Name           UI 표시명 — FText 필수 (기획 정의는 String이지만 FString 금지)
+Ring                소속 링 (0=코어). 해금 판정에는 아직 쓰지 않는다 (§먼저 확인할 것 1)
+Slot                배치 라벨 — FName. **정수 각도 인덱스가 아니다** (CORE / R1-01 / R2-M03 / R3-E01)
+Prerequisite_1      선행 노드 키                    ← 코어 구조체에는 없다
+Prerequisite_2      둘 중 하나만 활성이면 충족(ANY)  ← 코어 구조체에는 없다
+Chip_Grade          요구 칩 등급 (ResolveItemGradeFromRowName이 반환하는 토큰)
+Required_Quantity   요구 칩 개수
+Coin_Cost           요구 코인 (= ULSSaveGame::Gold)
 ```
+
+> **코어 Row에는 선행 컬럼이 없다.** `DT_CoreNodes.csv`에 그 컬럼이 아예 없고, 코어는 "선행이 없는 노드"라는 것이 정의다. 구조체에 넣으면 `"Expected column 'Prerequisite_1' not found in input."` 임포트 문제가 난다. 통합 인덱스가 코어의 선행을 빈 값으로 채우므로 순회 코드는 종류를 구분하지 않는다.
 
 ### Kind별 고유 컬럼
 
 ```text
-Stat (Main/Sub)   Stat_Field    변경 대상 스탯 (FLSCharacterStatRow 필드명)
-                  Operation     Add / Multiply
+Stat (Main/Sub)   Stat_Field    변경 대상 스탯 토큰 — FName
+                  Operation     ELSSkillNodeOperation (Add / Multiply)
                   Value         변화량
                   Unit          정수 / % / %p — UI 표시 전용
 
 Enhance           Skill_ID          강화 대상 기본 스킬 ID (int32)
-                  Parameter_Field   Skill_Multiplier / Range_X / Skill_Cooldown
+                  Parameter_Field   Skill_Multiplier / Range_X / Skill_Cooldown — FName
                   Operation         Multiply (실측 12건 전부)
                   Value             비율
                   Unit              % — UI 표시 전용
 
 Evolve            Base_Skill_ID       진화 전 기본 스킬 ID (int32)
                   Evolution_Skill_ID  교체될 진화 스킬 ID (int32)
-                  Change_Type         연계 / 제어 / 버프 / 형태변경 … — UI 분류
+                  Change_Type         연계 / 제어 / 버프 / 형태변경 … — FText (플레이어에게 보이는 라벨)
                   Change_Summary      진화 동작 요약 — FText
 
 Core              고유 컬럼 없음. 비용도 전부 0이다
 ```
 
+**`Stat_Field`와 `Parameter_Field`는 enum이 아니라 `FName`이다.** 이 값들은 다른 구조체의 필드를 가리키는 문자열 키이고, 프로젝트가 이미 같은 방식을 쓴다 — `ULSChipStatComponent`(`LSChipStatComponent.cpp:99`)가 `TEXT("Chip_Attack")` 같은 `FName` 키로 SetByCaller를 채운다. 알려진 토큰 목록은 `LSSkillNodes::GetKnownStatFields()` / `GetKnownParameterFields()`가 단일 출처이며, 목록 밖의 값은 로드 시 skip + 경고다.
+
+`Operation`만 enum(`ELSSkillNodeOperation`)이다. 값이 2개뿐이고 밑줄이 없어서 오타가 CSV 임포트 단계에서 바로 잡힌다.
+
 `Pos_X`/`Pos_Y`는 만들지 않는다. 화면 좌표는 위젯이 계산하며, **배치 규칙은 §⑤ UI가 소유한다**(§노드 배치 좌표). `Slot`은 각도 정보를 주지 못하므로 로그·디버그 표시용 라벨로만 쓴다.
+
+### CSV와 에셋 이름이 다르다
+
+기획 CSV는 시트 이름을 따르고 DataTable 에셋은 짧은 단수형을 쓴다. 짝은 이렇다.
+
+```text
+DT_CoreNodes.csv            -> DT_CoreNode
+DT_MainStatNodes.csv        -> DT_MainStatNode
+DT_SubStatNodes.csv         -> DT_SubStatNode
+DT_SkillEnhanceNodes.csv    -> DT_SkillEnhancedNode
+DT_SkillEvolutionNodes.csv  -> DT_SkillEvolveNode
+DT_NodeConnections.csv      -> 에셋을 만들지 않는다 (아래)
+```
+
+> **일괄 재임포트 툴(`Tools > Reimport DataTables`)은 노드 테이블을 다루지 않는다.** `GDataTableImportTargets`(`LostSignalEditorDataToolsModule.cpp:26`)는 에셋 디렉터리를 `/Game/LostSignal/Data/DataTables` 하나로 박아둬서 하위 폴더에 있는 에셋을 찾지 못한다. 등록하면 매번 실패 5건이 뜬다. 노드 CSV는 에디터에서 에셋별로 재임포트한다. `DT_ActiveSkill` 등 다른 하위 폴더 테이블도 같은 이유로 목록에 없다.
+
+### 잉여 컬럼은 `Ignore Extra Fields`로 무시한다
+
+> ⚠️ **노드 DataTable 5개는 에셋 디테일 패널에서 `Ignore Extra Fields`를 켠다.**
+
+기획 CSV는 **시트 전체를 내보낸 것**이라 아래 표의 컬럼이 그대로 들어 있다. `UDataTable::GetTablePropertyArray`(`DataTable.cpp:827`)는 구조체에 없는 컬럼마다 `"Cannot find Property for column 'X'"`를 임포트 문제로 올린다. 켜지 않으면 재임포트할 때마다 이 경고가 테이블당 9건씩 쌓여서, 진짜 문제가 그 안에 묻힌다.
+
+일괄 재임포트 툴에 노드 테이블을 등록했다면 더 나빴다 — 그 툴은 문제가 하나라도 있으면 테이블을 **저장하지 않고 실패 처리한다**(`LostSignalEditorDataToolsModule.cpp:140`). 지금은 등록하지 않았다(§CSV와 에셋 이름이 다르다).
+
+`bIgnoreExtraFields`는 `UPROPERTY(EditAnywhere, Category=ImportOptions)`이므로 에셋 체크박스다. 켜면 그 경고가 사라진다.
+
+이 방식을 고른 이유는 **CSV를 손대면 기획자가 시트를 다시 내보낼 때 되돌아오기 때문**이다. Row 구조체는 쓰는 컬럼만 갖고(죽은 데이터 0), 잉여 컬럼은 임포트 단계에서 조용히 버린다.
 
 ### 런타임에 임포트하지 않는 컬럼
 
@@ -449,14 +490,16 @@ CanActivateNode(N) =
 
 검사 항목. **전부 통합 인덱스만 보고 돈다** — 개별 테이블을 순회하지 않는다.
 
-| 검사 | 내용 |
-|---|---|
-| 키 중복 | 서로 다른 테이블이 같은 노드 키를 쓴다 (5분할 고유 위험) |
-| 미존재 선행 | 선행이 인덱스에 없는 노드를 가리킨다 |
-| 사이클 | 선행 관계를 따라가면 자기 자신에 도달한다 |
-| 섬 | 코어에서 선행 역방향으로 도달할 수 없는 노드가 있다 |
-| Ring 역행 | **선행 노드의 `Ring`이 대상 노드의 `Ring`보다 크다** |
-| 캐릭터 교차 | 선행 노드의 `Character_ID`가 대상과 다르다 |
+| 검사 | 내용 | 도는 곳 |
+|---|---|---|
+| 키 중복 | 서로 다른 테이블이 같은 노드 키를 쓴다 (5분할 고유 위험) | `BuildIndex` (런타임 포함) |
+| 미존재 선행 | 선행이 인덱스에 없는 노드를 가리킨다 | `ValidateGraph` |
+| 사이클 | 선행 관계를 따라가면 자기 자신에 도달한다 | `ValidateGraph` |
+| 섬 | 코어에서 선행 역방향으로 도달할 수 없는 노드가 있다 | `ValidateGraph` |
+| Ring 역행 | **선행 노드의 `Ring`이 대상 노드의 `Ring`보다 크다** | `ValidateGraph` |
+| 캐릭터 교차 | 선행 노드의 `Character_ID`가 대상과 다르다 | `ValidateGraph` |
+
+키 중복만 `BuildIndex`에 있는 이유는 **인덱스를 만드는 행위 자체가 그 검사**이기 때문이다(같은 키를 두 번 넣을 수 없다). 나머지는 인덱스가 완성된 뒤에야 판정할 수 있어 `#if WITH_EDITOR` 검증으로 분리했다. `ValidateGraph`는 발견한 문제 수를 반환하므로 테스트가 그 값을 본다.
 
 > ⚠️ **Ring 역행 검사는 동일 링을 허용해야 한다.** 실측에 같은 링 안의 연결이 120건 있고 전부 정상이다 — 1차 링의 메인↔서브 분기와 2차 링의 서브→메인 머지가 동일 링 안에서 일어난다. `>=`로 잡으면 정상 데이터의 62%가 경고로 뜬다.
 
@@ -501,7 +544,7 @@ CanActivateNode(N) =
 
 - `Character_ID`가 `ULSSkillPoolDataAsset`에 없는 값 → skip + warn
 - `Chip_Grade`가 `GetKnownGrades()`에 없는 토큰 → skip + warn
-- `Required_Count`/`Required_Coin`이 음수 → skip + warn
+- `Required_Quantity`/`Coin_Cost`가 음수 → skip + warn
 
 Kind별:
 
@@ -532,7 +575,7 @@ Kind별:
 | `Char_Recovery` | `Recovery` | ✓ | 4 |
 | `Char_Poise` | `Tenacity` | ✗ | 5 |
 
-`Char_Recovery`는 기획 시트가 `Char_HP_Recovery`로 적었으나 코드 필드명은 `Char_Recovery`다. `Char_Poise`는 기존 `ULSGE_ChipStats`에는 없으므로 노드 전용 `ULSGE_SkillNodeStats`에 새 모디파이어를 등록한다.
+표의 왼쪽 열은 **시트 토큰**이다(`Char_HP_Recovery` 포함). 토큰 → 어트리뷰트 번역은 이 표와 `LSSkillNodes::GetKnownStatFields()`가 짝이며, 토큰이 코드 필드명과 다를 수 있다는 것이 전제다 — §코드와 어긋나는 것 참고. `Char_Poise`는 기존 `ULSGE_ChipStats`에는 없으므로 노드 전용 `ULSGE_SkillNodeStats`에 새 모디파이어를 등록한다.
 
 #### 결정: ChipStat 패턴을 복제한다
 
@@ -625,8 +668,8 @@ ULSSaveGame
 ```text
 1. ③의 CanActivateNode로 활성 가능 여부 검증
 2. Inventory / WarehouseItems / Gold 를 복사본에 담기
-3. 지정된 칩 슬롯의 등급이 Chip_Grade 조건을 만족하는지 확인 → Required_Count 개만큼 복사본에서 제거
-4. Gold >= Required_Coin 확인 → 복사본에서 차감
+3. 지정된 칩 슬롯의 등급이 Chip_Grade 조건을 만족하는지 확인 → Required_Quantity 개만큼 복사본에서 제거
+4. Gold >= Coin_Cost 확인 → 복사본에서 차감
 5. 전부 성공했을 때만 커밋 + ActivatedNodeIDs 추가 + Save() + 델리게이트 발행
 ```
 
@@ -699,45 +742,79 @@ BeginPlay
 
 ## ⑤ UI
 
-### 진입 경로 — `ELSLobbyPanel`에 값 추가 (최상위 배타 패널)
+### 진입 경로 — 캐릭터 래퍼 패널 + 내부 서브탭 (결정)
 
 기획: *"캐릭터 탭에서 OS활성화 탭 진입"*
 
-현재 **캐릭터 탭 하위에 서브탭이 없다.** `CharacterTab` 클릭이 곧바로 `ShowPanel(ELSLobbyPanel::SkillLoadout)`이다. 또 2단 구조를 담당했던 `ULSLoadoutPreparationWidget` / `WBP_LoadoutPreparation`은 **죽은 코드**다(참조자 없음 — 중첩 스위처 한 단계를 제거하는 리팩터가 이미 끝났고, `LSLobbyPanelTypes.h` 주석이 이를 명시한다).
+`ELSLobbyPanel::Character` 하나가 캐릭터 탭 전체를 맡고, `ULSCharacterPanelWidget`이 스킬 로드아웃과 노드 그래프를 **내부 서브탭**으로 묶는다. 구조 계약은 [LobbyScreenStructure.md](LobbyScreenStructure.md) §패널 안의 서브탭이 소유한다.
 
-**권장: `ELSLobbyPanel`에 값을 추가하고 최상위 배타 패널로 둔다.** 캐릭터 탭 아래에 서브탭 바를 그리더라도 패널 전환 자체는 최상위에서 처리한다. 패널 등록은 `ResolvePanelPage` / `RefreshPanelOnOpen` / `ValidatePanelBindings` 세 곳에 **쌍으로** 넣는다. → [LobbyScreenStructure.md](LobbyScreenStructure.md)
+**이 문서는 원래 반대를 권했다.** 최상위 배타 패널 값 2개로 두고 서브탭 바만 그리는 쪽을 권했고, 래퍼 패널 + 내부 스위처는 [UIEquipDropWidgetSwitcher.md](../Troubleshooting/UIEquipDropWidgetSwitcher.md)의 미해결 드롭 실패 버그를 재도입한다는 이유로 기각했다. 결정을 뒤집은 이유는 **두 페이지가 서로 대화해야 한다**는 점이다 — 진화 노드가 장착 스킬을 치환하고 강화 노드가 계수를 바꾸므로(Phase 4-11·4-12) 노드를 찍으면 로드아웃 표시가 갱신돼야 한다. 최상위 분리안은 그 배선을 로비 루트로 올려보내고, "현재 캐릭터"의 전파 지점도 둘로 갈린다.
 
-대안(캐릭터 래퍼 패널 + 내부 스위처)은 기획 문구와 일치하지만 [UIEquipDropWidgetSwitcher.md](../Troubleshooting/UIEquipDropWidgetSwitcher.md)가 다루는 **미해결(조사 중) 드롭 실패 버그**를 재도입한다. 이 화면의 핵심 인터랙션이 재료 슬롯에 칩을 드롭하는 것이므로 택하지 않는다.
+대신 기각 이유였던 위험을 **WBP 계약으로 옮긴다.**
 
-### 노드 그래프 위젯 — 재사용 지점
+> ⚠️ **캐릭터 패널의 루트와 `SubTabSwitcher`는 히트테스트를 먹지 않아야 한다**(`SelfHitTestInvisible`). 배경 이미지·보더를 `Visible`로 깔면 그것이 드롭 실패 후보 1(겹친 히트테스트 패널이 드롭을 가로챔)의 표면적이 된다. 중첩이 한 단계 늘어난 대가가 정확히 이 한 줄이다.
 
-방사형 노드 그래프나 연결선 위젯은 프로젝트에 **없다.** 다음 조각들의 패턴을 복사한다.
+지금은 두 페이지 모두 드래그앤드롭이 없어 실제 위험이 0이다. **Phase 5-16에서 재료 슬롯에 칩을 드롭하는 순간부터** 이 계약이 실효한다. 그때 `[EquipDiag]` 절차로 이 화면에서도 재현 여부를 측정한다.
 
-| 필요 | 재사용 대상 |
+2단 구조를 담당했던 `ULSLoadoutPreparationWidget` / `WBP_LoadoutPreparation`은 여전히 **죽은 코드**다(참조자 없음). 이번 서브탭은 그 위젯을 되살린 것이 아니다.
+
+### 노드 그래프 위젯
+
+구조는 헤더가 소유한다.
+
+| 클래스 | 담당 |
 |---|---|
-| 연결선 | `ULSMinimapWidget::DrawPolyline` — `NativePaint` override + `FSlateDrawElement::MakeLines` + `Geometry.ToPaintGeometry()` |
-| 노드 원 / 외곽선 | 같은 파일 `DrawCircleOutline` / `DrawFilledCircle` |
-| 노드 아이콘 | 같은 파일 `DrawMarkerTexture` |
-| 선택 하이라이트 | `ULSCraftingRowWidget::NativePaint` — `FSlateRoundedBoxBrush` + `MaxLayer + 1` 레이어 처리 |
-| 노드 좌표 배치 | 동적 `UCanvasPanel` + `AddChildToCanvas` / `SetPosition` (선례: `ULSProtocolDebugWidget`). 좌표는 데이터에 없고 위젯이 계산한다 → §노드 배치 좌표 |
-| 우측 상세 패널 | `ULSSkillLoadoutWidget::SelectedSlotEntry` 패턴(선택 항목을 전용 엔트리 위젯에 표시) |
-| 칩 인벤토리 목록 | `ULSChipStationWidget::RefreshChipSlots`(인벤토리+창고에서 칩만 수집·정렬) + 등급 필터 추가 |
-| 첫 프레임 레이아웃 튐 방지 | 루트를 `ULSLayoutRevealWidget` 상속 |
+| [ULSCharacterPanelWidget](../../Source/LostSignal/UI/CharacterNode/LSCharacterPanelWidget.h) | 캐릭터 탭 콘텐츠. 스킬 로드아웃/노드 그래프 서브탭, 캐릭터 전파 |
+| [ULSSkillNodeWidget](../../Source/LostSignal/UI/CharacterNode/LSSkillNodeWidget.h) | 노드 하나. 종류별 도형 + 상태 3종 색 + 호버·선택 테두리 |
+| [ULSSkillNodeGraphWidget](../../Source/LostSignal/UI/CharacterNode/LSSkillNodeGraphWidget.h) | 전체. 노드 위젯 생성·배치, 링 배경과 연결선, 선택 전파 |
+| [FLSSkillNodeView](../../Source/LostSignal/UI/CharacterNode/LSSkillNodeGraphTypes.h) | 위젯이 소비하는 표시용 스냅샷. 위젯이 DataTable을 직접 모르게 하는 경계 |
 
-미니맵 헬퍼들은 전부 `private`이고 "미니맵 원 안"이라는 좌표계를 전제하므로, 직접 호출이 아니라 **패턴 복사**가 현실적이다.
+**캐릭터 전파 지점은 `ULSCharacterPanelWidget::ApplyCharacterToPages()` 한 곳이다.** 지금은 노드 그래프 한 줄뿐이다. 스킬 로드아웃은 `SkillPool`이 `EditDefaultsOnly` 자산이라 캐릭터가 WBP에 구워져 있고, `CharacterID`로 `SkillPool`을 찾는 경로가 프로젝트에 없어서 아직 대상이 아니다(101 고정). 캐릭터 선택이 생기면 그 해석 경로를 만드는 것이 실제 작업이고, 세터 추가는 이 함수에 한 줄 붙이는 일이다.
+
+**종류 구분은 도형 하나로 처리한다.** 정다각형 변 수만 바꾼다 — 원(32각), 마름모(4각), 육각형(6각). 크기는 종류별 반지름 파라미터다. 종류마다 다른 그리기 함수를 두지 않는다.
+
+**표시용 enum을 따로 만들지 않는다.** `FLSSkillNodeView`가 `ELSSkillNodeKind`를 그대로 쓴다. 표시 전용 enum을 두면 두 어휘 사이에 번역표가 생기고 그게 어긋난다.
+
+방사형 노드 그래프나 연결선 위젯은 프로젝트에 선례가 없었으므로 다음 패턴을 복사했다.
+
+| 필요 | 복사 대상 |
+|---|---|
+| 연결선·외곽선 | `ULSMinimapWidget::DrawPolyline` — `FSlateDrawElement::MakeLines` + `Geometry.ToPaintGeometry()` |
+| 도형 채우기 | 같은 파일 `DrawFilledCircle` — 가로 띠를 `MakeBox`로 쌓는다. Slate에 다각형 채우기 프리미티브가 없다 |
+| 클릭 도리갯 | `ULSCraftingRowWidget` — `DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam`에 위젯 자신을 넘긴다 |
+| 노드 위젯 풀 | `ULSCombatBuffListWidget::GetOrCreateBuffIcon` — 배열 풀 + 1회만 남기는 미설정 경고 |
+| 첫 프레임 레이아웃 튐 방지 | 루트를 `ULSLayoutRevealWidget` 상속 |
+| 우측 상세 패널 (추후) | `ULSSkillLoadoutWidget::SelectedSlotEntry` 패턴 |
+| 칩 인벤토리 목록 (추후) | `ULSChipStationWidget::RefreshChipSlots` + 등급 필터 |
+
+미니맵 헬퍼들은 전부 `private`이고 "미니맵 원 안"이라는 좌표계를 전제하므로 직접 호출이 아니라 패턴 복사다.
+
+> ⚠️ **연결선은 자식보다 아래 레이어에 그린다.** `ULSCraftingRowWidget`은 `Super::NativePaint`를 먼저 부르고 그 위에 강조를 얹는데, 그래프는 정반대다 — 배경과 연결선을 `LayerId`에 그린 뒤 `Super`를 `LayerId + 1`로 부른다.
+
+> ⚠️ **캔버스는 필수 `BindWidget`이다**(`NodeCanvas`). `RebuildWidget()`에서 트리를 C++로 만드는 길(`ULSProtocolDebugWidget` 선례)은 택하지 않았다 — WBP 트리를 무시하게 되므로 아트가 나중에 아이콘·이름을 `BindWidget`으로 추가할 수 없다.
+
+**노드 위젯에는 아직 `BindWidget`이 없다.** 아트가 붙을 때 아이콘·이름을 **필수 `BindWidget`**으로 추가한다. `BindWidgetOptional`로 "있으면 쓰고 없으면 넘기는" 구조를 만들지 않는다. 그때까지는 C++가 전부 그리므로 WBP의 위젯 트리를 비워둬도 화면이 나온다.
 
 ### 노드 배치 좌표
 
 > ⚠️ **`Slot`에서 각도를 계산할 수 없다.** 이전 판의 이 문서는 "`Ring` + `Slot`에서 방사형 좌표를 계산한다"고 썼는데, 실측값을 보면 `Slot`은 정수가 아니라 `CORE` / `R1-01` / `R2-M03` / `R3-E01` 같은 **라벨 문자열**이고 번호가 **종류별로 따로 1부터 다시 시작한다.** 사전순 정렬하면 2차 링이 `서브 12개 → 강화 4개 → 메인 8개` 순으로 뭉쳐서, 실제 배치(메인·서브 교대)와 전혀 다른 그림이 나온다.
 
-**반지름은 `Ring`이 준다. 각도는 데이터에 없다.** 각도를 얻는 길이 둘이다.
+**반지름은 `Ring`이 준다. 각도는 데이터에 없다.** 그래서 그래프에서 유도한다 — [LSSkillNodeLayout](../../Source/LostSignal/UI/CharacterNode/LSSkillNodeLayout.h)이 규칙을 소유한다.
 
-| 방법 | 내용 | 판단 |
-|---|---|---|
-| **기획에 정수 각도 요청** | `Slot` 값을 링 내 0-기준 각도 인덱스(정수)로 바꿔 달라고 한다. 각도 = `SlotIndex / 링 노드 수 × 360°` | **권장.** 컬럼 추가 없이 값 표기만 바뀌고, 배치 통제권이 기획에 남는다 |
-| 그래프에서 유도 | 코어의 자식 순서로 섹터를 나누고, 섹터 안에서 선행 깊이·`Slot` 순번으로 각도를 배분 | 아래 대칭성이 **깨지는 순간 배치가 무너진다.** 폴백으로만 |
+```text
+반지름 = 링 반지름 + (링 안에서의 선행 깊이 - 1) × 깊이 간격
+각도   = 코어 자식은 360° 균등 분할
+         그 아래 깊이 1은 부모 각도를 중심으로 섹터 폭 안에 균등 분할
+         같은 링의 머지 노드는 선행들 각도의 원형 평균
+```
 
-유도가 위험한 이유는 현재 데이터가 우연히 완전 대칭이라는 데 있다. 세 캐릭터 모두 동일하게:
+> ⚠️ **원형 평균이어야 한다. 산술 평균이면 1차 링 하나가 정반대로 날아간다.** 1차 링은 닫힌 고리이고 마지막 서브 노드는 `270°`와 `0°`를 선행으로 갖는다. 산술 평균은 `135°`(정반대)를 내놓고, 원형 평균은 `315°`를 낸다. 자동화 테스트 `LostSignal.SkillNode.AutoLayout`이 이 한 케이스를 직접 검사한다.
+
+실측 데이터에 넣으면 참조 그림과 일치한다 — 1차 링이 메인 4개(0/90/180/270)와 서브 4개(45/135/225/315)로 닫힌 8각형이 되고, 2차 링 24개가 15° 간격, 강화·진화가 섹터 중심 최외곽에 온다.
+
+**같은 링 안에 선행 깊이가 3단 있어서 깊이 간격이 필요하다.** 2차 링은 `서브 → 메인 → 강화`로 한 링 안에서 두 번 머지한다. 24개를 모두 같은 반지름에 놓으면 이 연결선이 원주를 따라 흘러 노드 원과 겹친다. 실측에서 가장 가까운 두 노드는 **같은 각도에 놓이는 서브(깊이1)와 강화(깊이3)**이고 그 간격이 깊이 간격의 2배다 — 이 값을 줄이면 그 둘이 먼저 붙는다.
+
+**자동 배치는 현재 데이터가 우연히 완전 대칭이라는 데 기대고 있다.** 세 캐릭터 모두 동일하게:
 
 ```text
 코어 자식 4개 = 섹터 4개 (90°씩)
@@ -745,17 +822,27 @@ BeginPlay
 링 노드 수     1차 8(45°) / 2차 24(15°) / 3차 12(30°)
 ```
 
-섹터가 5개가 되거나 캐릭터별로 분기 수가 달라지면 "코어 자식 수로 360°를 나눈다"는 규칙이 바로 깨진다. 각도는 기획이 데이터로 주는 편이 안전하다.
+섹터가 5개가 되거나 캐릭터별로 분기 수가 달라지면 배치가 읽기 어려워진다(깨지지는 않는다 — 규칙이 자식 수에서 섹터 폭을 다시 계산한다). 그때는 좌표를 데이터로 받는 쪽으로 전환한다 → §노드 좌표를 데이터로 받는 경우.
 
-**섹터는 완전히 분리되지 않는다.** 섹터 간 자손 중첩은 1차 링 서브스탯 4개뿐이며(예: `S01`이 `M01`·`M02` 양쪽 섹터에 속한다), 이 4개가 1차 링을 **닫힌 8각 고리**로 만든다 — `S04`는 `M04`와 `M01`을 선행으로 갖는 랩어라운드다. 각도 배분 시 이 4개는 두 섹터의 경계(45° 지점)에 놓아야 한다.
-
-**같은 링 안에 선행 깊이가 3단 있다.** 2차 링은 `서브 → 메인 → 강화`로 한 링 안에서 두 번 머지한다. 24개를 모두 같은 반지름에 놓으면 이 연결선이 원주를 따라 흘러 노드 원과 겹친다. → **링 내 선행 깊이만큼 반지름을 미세 가산**한다. 깊이는 그래프에서 나오므로 데이터가 필요 없다.
+**섹터는 완전히 분리되지 않는다.** 섹터 간 자손 중첩은 1차 링 서브스탯 4개뿐이며(예: `S01`이 `M01`·`M02` 양쪽 섹터에 속한다), 이 4개가 1차 링을 **닫힌 8각 고리**로 만든다. 원형 평균을 쓰면 이 4개가 자동으로 두 섹터의 경계(45° 지점)에 놓이므로 경계 처리를 따로 하지 않는다.
 
 | 링 | 링 내 흐름 |
 |---|---|
 | 1차 | 메인 4 → (인접 두 메인을 머지하는) 서브 4 |
 | 2차 | 서브 12 → (두 서브 머지) 메인 8 → (두 메인 머지) 강화 4 |
 | 3차 | 서브 8 → (두 서브 머지) 진화 4 |
+
+> ⚠️ **정규화 좌표를 화면으로 옮길 때 짧은 변 하나로만 스케일한다**(`LSSkillNodeLayout::ToLocalOffset`). X·Y에 각각 폭과 높이를 곱하면 원형 링이 타원이 된다. 캔버스 슬롯 앵커를 좌표로 쓰는 방법(앵커 분수를 축별로 주는 방법)은 리사이즈에 자동 대응하지만 이 보정이 불가능하다. 그래서 앵커를 중앙에 고정하고 오프셋으로 배치하며, 크기 변화를 `NativeTick`에서 감지해 다시 계산한다.
+
+### 노드 좌표를 데이터로 받는 경우 (추후)
+
+자동 배치로 부족해지면 좌표를 데이터로 받는다. 그때 **DataTable이 아니라 DataAsset이어야 한다.**
+
+`DT_ActiveSkill.uasset`에 재임포트 경로가 박혀 있고, 프로젝트에 일괄 재임포트 툴이 있다 — `CreateTableFromCSVString`(`LostSignalEditorDataToolsModule.cpp:139`)은 **테이블을 전부 비우고 CSV로 다시 만든다.** 에디터에서 손으로 넣은 좌표는 그 메뉴 한 번에 사라진다.
+
+`ULSSkillPoolDataAsset`이 선례다 — `CharacterID` 필드를 갖고 캐릭터당 하나씩 있으며 BP에서 매핑한다. 노드 좌표도 **캐릭터당 에셋 하나**(`TMap<FName, FVector2D>` 정규화 좌표)가 맞다. `uasset`은 바이너리라 머지가 안 되므로, 한 에셋에 세 캐릭터를 담으면 서로 다른 캐릭터를 동시에 만질 때 충돌한다.
+
+에디터 배치 툴을 만든다면 **게임의 노드 위젯 자체를 편집기로 쓰는 쪽**이 별도 Slate 탭보다 낫다. 좌표만 공유하면 종횡비·노드 크기·Y축 방향 셋 때문에 툴과 UI의 모양이 어긋나는데, 같은 위젯이 그리면 그 어긋남이 구조적으로 불가능해진다. 맵 타일 툴이 별도 탭이어야 했던 이유는 레벨 액터를 만져야 해서이고, 노드 배치에는 그 이유가 없다.
 
 > `Upgrade_Line1~4` / `Upgrade_Cuser` / `Upgrade_NoCuser` 텍스처는 노드 연결선용이 아니다. 죽은 탭 위젯(`WBP_LoadoutPreparation` / `WBP_LoadoutPreparationTab`)의 탭 장식·버튼 브러시이며, 두 에셋 모두 참조자가 없다. `Upgrade_BG`는 완전 미사용. 노드 그래프에 재사용할 수 있는 기존 텍스처는 없다고 본다.
 
@@ -789,7 +876,10 @@ BeginPlay
 | 강화 대상 필드 | `Skill_Multiplier` / `Range_X` / `Skill_Cooldown` 3종. `Skill_HitCount` 제외 | §스킬 강화 |
 | 배타 그룹 | `Base_Skill_ID`가 겸한다. 컬럼 만들지 않음 | §스킬 진화 |
 | 링 해금 | **추후 개발 예정.** `RingUnlocked()` 자리표시자 | §먼저 확인할 것 1 |
-| 노드 좌표 | `Pos_X`/`Pos_Y` 없음. 반지름은 `Ring`, **각도는 기획에 정수 요청** | §노드 배치 좌표 |
+| 노드 좌표 | `Pos_X`/`Pos_Y` 없음. **선행 관계에서 자동 유도**(각도는 원형 평균) | §노드 배치 좌표 |
+| 스탯 토큰 타입 | `Stat_Field`/`Parameter_Field`는 **`FName`**. enum을 만들지 않는다 | §Kind별 고유 컬럼 |
+| 잉여 CSV 컬럼 | 에셋의 **`Ignore Extra Fields`**로 무시. CSV를 다듬지 않는다 | §잉여 컬럼은 Ignore Extra Fields로 무시한다 |
+| 코어 선행 컬럼 | 코어 Row에는 **두지 않는다**. 인덱스가 빈 값으로 채운다 | §공통 컬럼 |
 
 미확정으로 남은 것은 전부 **기획 결정**이며 §기획 확인 항목에 있다. `Char_Poise`는 `Tenacity` Attribute로 적용 경로가 확정됐다.
 
@@ -800,12 +890,13 @@ BeginPlay
 새 Row·네임스페이스를 만들 때 따를 것. AGENTS.md가 이미 규정한 일반 규칙은 반복하지 않고 **이 테이블에 특유한 부분만** 적는다.
 
 - **Row 구조체 4개를 `Source/LostSignal/Data/LSSkillNodeRow.h` 한 헤더에 담는다.** `.cpp` 없음(`Data/` 21개 Row가 예외 없이 그렇다). 한 헤더에 Row 여럿을 두는 선례는 `LSConsumableRow.h`(2개)다. include 순서 `CoreMinimal.h` → `Engine/DataTable.h` → `.generated.h`
-- ⚠️ **Row가 Row를 상속하지 않는다.** `Data/`의 21개가 전부 `FTableRowBase` 직접 상속이며 선례가 0건이다. 공통 컬럼 9개는 4개 구조체에 반복해서 적는다(§① 정적 정의)
+- ⚠️ **Row가 Row를 상속하지 않는다.** `Data/`의 21개가 전부 `FTableRowBase` 직접 상속이며 선례가 0건이다. 공통 컬럼은 4개 구조체에 반복해서 적는다 — 코어는 선행 2개가 없어 7개, 나머지는 9개다(§① 정적 정의)
 - 모든 UPROPERTY는 예외 없이 `EditAnywhere, BlueprintReadOnly, Category="LS/SkillNode[/서브]"` + **스칼라 기본값 초기화자**. `Data/*Row.h`에 `EditDefaultsOnly`/`BlueprintReadWrite` 사용례가 0건이다
 - ⚠️ **Category 구분자**: UE는 `|`만 계층으로 처리하고 `/`는 카테고리 이름의 리터럴 문자로 본다. 즉 `"LS/SkillNode/Cost"`는 평평한 이름 하나가 된다. 그래도 `Data/*Row.h` 이웃 다수가 `/`를 쓰므로 **이웃 일관성을 따른다**(Diff 최소화). 계층이 실제로 만들어지지 않는다는 사실만 알고 쓴다
-- enum(`ELSSkillNodeKind`, `ELSSkillNodeStatOperation`, `ELSSkillNodeParameterField`)은 **같은 헤더 최상단**, `UENUM(BlueprintType)` + `: uint8` + **`None`을 첫 값으로**. CSV 셀이 빌 수 있는 컬럼 enum은 `None`으로 시작하는 것이 프로젝트 관례다
+- enum(`ELSSkillNodeKind`, `ELSSkillNodeOperation`)은 **같은 헤더 최상단**, `UENUM(BlueprintType)` + `: uint8` + **`None`을 첫 값으로**. CSV 셀이 빌 수 있는 컬럼 enum은 `None`으로 시작하는 것이 프로젝트 관례다
   - `ELSSkillNodeKind`는 **컬럼이 아니다.** 통합 인덱스가 "이 노드가 어느 테이블에서 왔는지"를 담는 데만 쓴다(§① 정적 정의)
-- `LSSkillNodeResolve`는 `Data/` 아래 **`namespace`**(프로젝트에 `class { static }` 방식이 0건), 함수마다 `LOSTSIGNAL_API`. `.cpp`에서는 `namespace`를 다시 열어 정의한다(한정자 방식이 아니다). 파일 로컬 헬퍼는 명명된 네임스페이스 앞의 익명 `namespace`에 두고 `SkillNode` 도메인 접두사를 붙인다
+  - **`Stat_Field`·`Parameter_Field`용 enum은 만들지 않는다.** `FName` 토큰이고 알려진 목록이 단일 출처다(§Kind별 고유 컬럼)
+- `LSSkillNodes`는 `Data/` 아래 **`namespace`**(프로젝트에 `class { static }` 방식이 0건), 함수마다 `LOSTSIGNAL_API`. `.cpp`에서는 `namespace`를 다시 열어 정의한다(한정자 방식이 아니다). 파일 로컬 헬퍼는 명명된 네임스페이스 앞의 익명 `namespace`에 두고 `SkillNode` 도메인 접두사를 붙인다
   - ⚠️ `LSDropSubsystem.cpp`에 접두사 없는 `ExtractRowNamePrefix`가 있다. 유사한 RowName 파싱 헬퍼를 만들 때 같은 이름을 쓰면 유니티 빌드에서 중복 정의로 터진다
 - `FLSCharacterNodeTotals`만 `USTRUCT`(복제 대상). `FLSSkillRowRatio`와 `FLSSkillNodeRef`는 plain struct로 충분하다(`FLSChipProtocolTotals`가 같은 선례)
 - 테스트는 `Tests/LSSkillNodeTests.cpp`, `IMPLEMENT_SIMPLE_AUTOMATION_TEST` + 경로 `"LostSignal.SkillNode.<동작>"` + `EditorContext | EngineFilter`. **build.cs 수정 불필요** — `Tests/`의 `.cpp`는 일반 모듈 소스로 컴파일된다. 테스트 대상 헤더 include는 `#if WITH_DEV_AUTOMATION_TESTS` **밖**에 둔다(TU가 비지 않게)
@@ -818,40 +909,89 @@ BeginPlay
 계층 순으로 간다. 각 단계가 앞 단계의 계약만 알면 되도록 한다.
 
 ```text
-Phase 1  데이터·해석 (게임플레이 영향 0)
-  1. LSSkillNodeRow.h — Row 구조체 4개 + enum, CSV 5개 임포트
+Phase 1  데이터·인덱스 (게임플레이 영향 0)                              [완료]
+  1. LSSkillNodeRow.h — Row 구조체 4개 + enum
      ULSGameDataSettings에 테이블 참조 5개 (+ LogMissingTables 경고 5쌍)
   2. 통합 인덱스 구축 + ULSGameDataSubsystem 조회 API 2개
-     Kind별 로드 검증(skip-and-warn) — 키 중복 포함
-  3. 그래프 무결성 검증 (WITH_EDITOR — 6종. Ring 역행은 동일 링 허용)
-  4. LSSkillNodeResolve + 단위 테스트
+     Kind별 로드 검증(skip-and-warn)
+  3. 그래프 무결성 검증 (WITH_EDITOR — 5종. 사이클은 유향, Ring 역행은 동일 링 허용)
 
-Phase 2  세이브·소비
-  5. ULSSaveGame / ULSSaveSubsystem 노드 진행 저장 (코어 3개는 기본 활성)
-  6. 칩 + 골드 원자적 소비 (칩은 슬롯 인덱스 지정)
+Phase 2  시각화 (표시·선택까지)                                        [완료]
+  4. FLSSkillNodeView + 상태 판정(ANY) / 자동 배치(LSSkillNodeLayout)
+  5. ULSSkillNodeWidget — 종류별 도형 + 상태 3종 + 호버·선택
+  6. ULSSkillNodeGraphWidget — 배치, 링 배경, 연결선, 선택 전파
+  7. 자동화 테스트 3종 (ANY 선행 / 자동 배치 / 그래프 검증)
 
-Phase 3  적용
-  7. 스킬 진화: FindSkillByID 재귀 탐색 + ApplyEquippedSkillLoadout 치환
-  8. 스킬 강화: ResolveActiveSkillRow 값 반환 전환 + 비율 곱, (나)(다) 리다이렉트
-  9. 스탯 노드: ULSGE_SkillNodeStats + ULSSkillNodeStatComponent (스탯 11종)
- 10. FLSCharacterNodeTotals 복제 배선 (MO 대비)
+Phase 3  세이브·소비
+  8. ULSSaveGame / ULSSaveSubsystem 노드 진행 저장 (코어 3개는 기본 활성)
+  9. 칩 + 골드 원자적 소비 (칩은 슬롯 인덱스 지정)
+ 10. CanActivateNode에 비용·배타 판정 합류 + 노드 활성화 인터랙션
 
-Phase 4  UI
- 11. ELSLobbyPanel 값 추가 + 패널 등록(3곳 쌍)
- 12. 노드 그래프 위젯 (방사형 좌표, 연결선, 상태 3종 시각화)
- 13. 노드 클릭 확대 + 우측 상세 패널 + 재료 슬롯 칩 드롭
- 14. 진화 노드 마우스오버 스킬 정보/영상 (영상 재생 방식은 별도 확인)
+Phase 4  적용
+ 11. 스킬 진화: FindSkillByID 재귀 탐색 + ApplyEquippedSkillLoadout 치환
+ 12. 스킬 강화: ResolveActiveSkillRow 값 반환 전환 + 비율 곱, (나)(다) 리다이렉트
+ 13. 스탯 노드: ULSGE_SkillNodeStats + ULSSkillNodeStatComponent (스탯 11종)
+ 14. FLSCharacterNodeTotals 복제 배선 (MO 대비)
+
+Phase 5  UI 마무리
+ 15. ELSLobbyPanel::Character + ULSCharacterPanelWidget 서브탭             [완료]
+ 16. 노드 클릭 확대 + 우측 상세 패널 + 재료 슬롯 칩 드롭
+ 17. 진화 노드 마우스오버 스킬 정보/영상 (영상 재생 방식은 별도 확인)
 
 추후  링 해금 조건 (RingUnlocked 자리표시자를 채운다)
+      노드 좌표 DataAsset + 에디터 배치 툴 (자동 배치로 부족해지면)
 ```
 
-Phase 1~2는 게임플레이에 영향을 주지 않으므로 먼저 넣고 테스트로 굳힐 수 있다. **구조 결정이 전부 확정됐으므로 Phase 1을 바로 시작할 수 있다.**
+**Phase 1~2가 완료됐다.** 게임플레이에 영향이 0이고, 노드 그래프가 실제 데이터로 그려지며 호버·선택이 된다. 활성화는 아직 안 된다.
 
-Phase 3-9는 `Char_Poise`를 포함한 스탯 11종을 구현한다.
+Phase 2를 먼저 한 이유는 배치 규칙·상태 표현·비용 표시가 맞는지 기획과 **눈으로** 합의한 뒤에 활성화·세이브·GAS를 붙이는 편이 안전하기 때문이다.
+
+Phase 4-13은 `Char_Poise`를 포함한 스탯 11종을 구현한다.
+
+### 화면을 보려면 필요한 에디터 작업
+
+DataTable uasset과 WBP는 코드로 만들 수 없다. 아래는 **전부 완료됐다.**
+
+1. ✅ DataTable 5개 — Row 구조체 지정, CSV 임포트 (§결정: Kind별 테이블 5개 / Row 구조체 4개)
+2. ✅ 각 에셋의 `Ignore Extra Fields`
+3. ✅ Project Settings > LS Game Data Settings 5개 지정 (`DefaultGame.ini`)
+4. ✅ `WBP_Node`(= `ULSSkillNodeWidget` 상속) / `WBP_NodeGraph`(= `ULSSkillNodeGraphWidget` 상속, `CanvasPanel` 이름 `NodeCanvas`, `NodeWidgetClass` → `WBP_Node`) — `Content/LostSignal/UI/EnhanceNode/`
+
+**남은 것은 `WBP_CharacterPanel` 하나다.** 정식 진입 경로가 이미 코드로 들어갔으므로 임시로 얹어 보는 단계는 필요 없다.
+
+5. `WBP_CharacterPanel`(= `ULSCharacterPanelWidget` 상속) 생성
+   - 빈 `WidgetSwitcher` 하나, 이름을 `SubTabSwitcher`로
+   - `WBP_LobbyTab` 2개, 이름을 `SkillLoadoutTab` / `NodeGraphTab`으로
+   - 루트와 스위처는 `SelfHitTestInvisible` (위 §진입 경로 경고)
+   - `SkillLoadoutPageClass` → 기존 스킬 로드아웃 WBP, `NodeGraphPageClass` → `WBP_NodeGraph`
+6. `WBP_LobbyMenu`의 `CharacterPanelClass`에 `WBP_CharacterPanel` 매핑 (이전 `SkillLoadoutPanelClass` 자리)
+
+증상별 원인:
+
+| 증상 | 원인 |
+|---|---|
+| 아무것도 없음 + `NodeCanvas가 바인드되지 않았다` | `CanvasPanel` 이름 |
+| 링·연결선만 있고 노드 없음 + `NodeWidgetClass가 미설정` | 노드 위젯 클래스 매핑 |
+| 빈 화면인데 경고 0건 | 조회 결과 0개 — `CharacterID` 기본값이 101이다 |
+| `ULSGameDataSubsystem을 찾을 수 없다` | `GameInstance` 없는 컨텍스트에서 띄웠다 |
 
 ---
 
 ## 검증 계획
+
+### 이미 있는 테스트
+
+[Tests/LSSkillNodeTests.cpp](../../Source/LostSignal/Tests/LSSkillNodeTests.cpp) — 3종 전부 통과.
+
+| 테스트 | 잡는 것 |
+|---|---|
+| `LostSignal.SkillNode.PrerequisiteAny` | 선행 하나만 활성일 때 열리는가. ALL로 잘못 구현하면 여기서 걸린다 |
+| `LostSignal.SkillNode.AutoLayout` | 각도·반지름·겹침. **랩어라운드 노드가 원형 평균으로 놓이는지**를 직접 본다 |
+| `LostSignal.SkillNode.GraphValidation` | 정상 그래프 0건 + 사이클·미존재 선행·Ring 역행 검출 |
+
+**DataTable 에셋에 의존하지 않는다.** 인덱스를 손으로 채워 1차 링 8각 고리를 만들고 그 위에서 돈다. 에셋이 없어도 로직 회귀를 잡을 수 있고, 실제 데이터 검사는 로드 시 `ValidateGraph` 경고가 담당한다.
+
+### 남은 계층 (Phase 3 이후)
 
 **③ 해석 계층 — 자동화 테스트** (`Tests/LSProtocolUnlockTests.cpp` 형식)
 
@@ -896,8 +1036,25 @@ Phase 3-9는 `Char_Poise`를 포함한 스탯 11종을 구현한다.
 
 ## 기획 확인 항목
 
-1. **`Char_Poise`(강인도) 노드 5개 — 해소됨.** `ULSCharacterAttributeSet::Tenacity`에 가산한다. 플레이어는 별도 DataTable 컬럼 없이 기본값 `1`, 몬스터는 `Monster_Guard`로 초기화한다. 슈퍼아머·무적 태그는 각각 유효 강인도를 최소 `4`·`6`으로 보정한다.
-2. **`Char_HP_Recovery` 표기** — 코드 필드명이 `Char_Recovery`다. 테이블을 그쪽에 맞추면 된다(단순 수정).
+1. **`Char_Poise` 증분이 선형이 아니다 — 2개째와 4개째에서만 체감이 생긴다.**
+
+   적용 경로는 해소됐다(`ULSCharacterAttributeSet::Tenacity`에 가산. 플레이어 기본값 `1`, 몬스터는 `Monster_Guard`. 슈퍼아머·무적 태그가 최소 `4`·`6`으로 보정). 그런데 수치가 붙으면서 실제 효과가 계산 가능해졌고, **띄엄띄엄한 정수 티어 때문에 계단이 생긴다.**
+
+   CC 차단은 `BreakPowerTier < TargetTenacity`(`LSCharacterCombatComponent.cpp:95`)이고 붕괴력 티어는 `NormalAttack=2 / SpecialAttack=3 / HardCrowdControl=5`(`LSCombatTypes.h:44`)다. `Char_Poise` 노드는 캐릭터 103에만 5개 있고 합계가 `+3.0`이다(메인 1개가 `+1`, 서브 4개가 각 `+0.5`).
+
+   | 찍은 노드 | Tenacity | 결과 |
+   |---|---|---|
+   | 0 | 1.0 | 전부 CC 적용 |
+   | 1 | 2.0 | 변화 없음 — 경계에 정확히 걸린다 |
+   | **2** | 2.5 | **일반 공격 CC 면역** |
+   | 3 | 3.0 | 변화 없음 — 또 경계 |
+   | **4** | 3.5 | **특수 공격 CC까지 면역** |
+   | 5 | 4.0 | `SuperArmor` 티어와 동값. 하드 CC만 통한다 |
+
+   확인할 것 둘. (a) 1·3·5번째 노드가 아무 변화도 못 주는 것이 의도인가(`<` 비교라 같은 값은 차단되지 않는다). (b) 로비에서 영구히 얻는 노드 5개로 하드 CC 외 전부 면역이 되는 강도가 맞는가.
+
+   조정 수단이 노드 `Value`만은 아니다. **붕괴력 티어 간격** 자체를 늘리는 쪽이 더 근본적일 수 있다.
+2. **`Char_HP_Recovery` 토큰명** — 코드가 시트 토큰을 그대로 받으므로 **지금 막히는 것은 없다**. 다만 나머지 10종은 토큰 = 코드 필드명이라, 이 하나만 예외로 남으면 읽는 사람이 매번 헷갈린다. 시트를 `Char_Recovery`로 바꾸면 `GetKnownStatFields()`에서 한 줄만 고치면 된다.
 3. **`Unit`이 `정수`인데 값이 소수인 row 16건** — 런타임은 `float`이라 통과한다. UI에 어떻게 표시할지(내림 / 반올림 / 소수 그대로)를 정해야 한다.
 4. **"분기"가 스탯에도 하드 배타인가** — 기획서의 *"분기 = 둘 이상의 노드 중 선택하는 지점, 능력치·스킬 특화 선택 유도"*를 현재는 "재화 제약에 의한 사실상의 선택"으로 해석했다. 데이터도 이 해석과 일치한다(배타 그룹 컬럼이 진화 시트에만 있다). 스탯 분기도 하드 배타여야 하면 스탯 Row에 배타 그룹 컬럼을 추가해야 한다.
 5. **"노드 교체"의 의미** — 리스펙(해제)이 있는가? 있으면 환불 규칙과, 해제로 생긴 고아 노드 처리 정책(연쇄 해제 vs 해제 거부)이 필요하다. 기획서 비용 섹션에 환불 언급이 없다. **칩은 소모되면 인스턴스 스탯째로 사라지므로 환불이 원본 복구가 아니다** — 등급만 돌려줄지도 정해야 한다.

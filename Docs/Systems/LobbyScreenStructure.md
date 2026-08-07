@@ -23,7 +23,7 @@
 | 로비 | `LobbyTab` | 없음 |
 | 칩 세팅 | `ChipTab` | 칩 스테이션 |
 | 정비 | `SupplyTab` | 에이베리 보급소 |
-| 캐릭터 | `CharacterTab` | 스킬 로드아웃 |
+| 캐릭터 | `CharacterTab` | 캐릭터 패널 (스킬 로드아웃 + 강화 노드 그래프) |
 | 가방 | `BagTab` | 인벤토리 + 물품창고 |
 | 퀘스트 | `QuestTab` | 퀘스트 |
 | 지도 | `MapTab` | 없음, 미구현 안내 |
@@ -36,11 +36,30 @@
 바꾸더라도 동작이 달라져서는 안 된다. 로비 상태에서는 스위처 자체를 `Collapsed`로 둔다.
 
 `WBP_LobbyMenu`의 `TabSwitcher`는 디자인 타임에 비워 둔다. 로비 루트는 클래스 디폴트의
-`ChipStationPanelClass`, `StorePanelClass`, `SkillLoadoutPanelClass`를 생성해 스위처 직속 자식으로
+`ChipStationPanelClass`, `StorePanelClass`, `CharacterPanelClass`를 생성해 스위처 직속 자식으로
 추가한다. 가방은 `LobbyInventoryClass`와 `LobbyStorageClass`를 각각 생성한 뒤 C++ 런타임 오버레이
 하나에 함께 넣어 단일 스위처 페이지로 등록한다. 퀘스트는 `QuestPanelClass`를 생성해 WBP에 바인딩된
 빈 `QuestPanelHost` Border의 자식으로 넣는다. 따라서 각 패널의 큰 위젯 트리가 로비 디자이너에
 펼쳐지지 않으면서 퀘스트 위치는 WBP가 정한다.
+
+## 패널 안의 서브탭
+
+패널이 콘텐츠 둘을 담아야 할 때 방식이 두 가지이고, **둘이 서로 대화하는지**로 고른다.
+
+| 방식 | 쓰는 곳 | 성립 조건 |
+|---|---|---|
+| C++ 런타임 컨테이너에 나란히 | 가방(인벤토리 + 물품창고) | 두 콘텐츠가 서로를 몰라도 된다. 둘 다 세이브만 읽는다 |
+| 전용 패널 클래스 + 서브탭 | 캐릭터(`ULSCharacterPanelWidget`) | 한쪽 조작이 다른 쪽 표시를 바꾼다 |
+
+캐릭터 패널은 로비 루트의 규약을 한 단계 아래에서 되풀이한다 — `SubTabSwitcher`를 WBP에서 비워 두고
+`SkillLoadoutPageClass` / `NodeGraphPageClass`를 런타임에 생성해 직속 자식으로 넣으며, 전환은 인덱스가
+아니라 `SetActiveWidget(포인터)`로 한다. 서브탭 버튼은 `ULSLobbyTabWidget`을 재사용한다.
+
+서브탭 전환 시 여는 쪽 페이지를 다시 그린다(가방의 열 때마다 리빌드와 같은 방어선). 로비가 부르는
+`RefreshCharacterPanel`은 **활성 서브탭만** 갱신한다. 캐릭터 탭을 떠났다 돌아오면 서브탭 선택은
+유지한다 — 초기 상태로 되돌리는 것은 보급소의 명시적 예외다.
+
+`ELSLobbyPanel::Character`는 패널 하나이므로 서브탭이 늘어도 로비 루트의 등록 지점은 늘지 않는다.
 
 보유 골드는 루트의 `GoldText`에 표시한다. 초기값은 `ULSSaveSubsystem::GetGold()`에서 읽고,
 `OnGoldChanged`를 구독해 구매·판매·제작 등으로 값이 바뀌면 즉시 갱신한다.
@@ -90,6 +109,10 @@
 - 띄운다면 `HasActivePanelModal`의 포커스 예외에 합류했는가
 - 패널을 떠날 때 `ClosePanelModal`이 그 모달을 닫는가
 - `RefreshPanelOnOpen`에 필요한 최신 데이터 갱신이 있는가
+
+서브탭을 가진 패널은 **그 안의 페이지가 띄우는 모달도 같은 검사를 받아야 한다.** 로비 루트는 페이지를
+모르므로 패널이 중간에서 위임해야 한다. 캐릭터 패널은 현재 두 페이지 모두 모달이 없어 해당 없음이지만,
+노드 활성화 확인 다이얼로그가 붙으면 그때 합류시킨다.
 
 자세한 원인과 진단 기록은
 [UILobbyModalFocusReclaim.md](../Troubleshooting/UILobbyModalFocusReclaim.md)를 본다.

@@ -17,7 +17,7 @@ enum class ELSLobbyPanel : uint8
 	None,          // 패널 없음(로비 기본 상태). 스위처 자체를 Collapsed 하고 기본 배경을 보여준다.
 	ChipStation,   // 칩 세팅 (칩 스테이션)
 	Supply,        // 정비 = 에이베리 보급소 (자판기/제작대)
-	SkillLoadout,  // 캐릭터 = 스킬 로드아웃 (액티브/궁극기 선택)
+	Character,     // 캐릭터 = 스킬 로드아웃 + 강화 노드 그래프 (ULSCharacterPanelWidget이 서브탭으로 묶는다)
 	Bag,           // 가방 = 인벤토리 + 물품창고
 	Quest          // 퀘스트
 };
