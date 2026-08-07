@@ -38,7 +38,9 @@ public class LostSignal : ModuleRules
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
-			"LostSignalVisionShaders"
+			"LostSignalVisionShaders",
+			// 초대 코드에 넣을 호스트 주소·리슨 포트를 읽는다 (LSInviteCode).
+			"Sockets"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {

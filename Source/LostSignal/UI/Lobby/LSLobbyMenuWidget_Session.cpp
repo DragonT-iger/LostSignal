@@ -1,12 +1,17 @@
-// 로비의 세션·멀티플레이 조작(친구 방 참가, 접속 결과 안내). 패널 전환·입력과 분리해 둔다.
+// 로비의 세션·멀티플레이 조작(초대 코드, 친구 방 참가, 접속 결과 안내). 패널 전환·입력과 분리해 둔다.
 #include "UI/Lobby/LSLobbyMenuWidget.h"
 
 #include "Components/EditableTextBox.h"
+#include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
+#include "Engine/NetDriver.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "IPAddress.h"
 #include "LostSignal.h"
+#include "Session/LSInviteCode.h"
 #include "Session/LSSessionSubsystem.h"
+#include "SocketSubsystem.h"
 #include "UI/Common/LSConfirmDialogWidget.h"
 #include "UI/LSUILayer.h"
 
@@ -20,11 +25,19 @@ void ULSLobbyMenuWidget::HandleJoinClicked()
 		return;
 	}
 
-	const FString Address = JoinAddressTextBox->GetText().ToString().TrimStartAndEnd();
-	if (Address.IsEmpty())
+	const FString RawInput = JoinAddressTextBox->GetText().ToString().TrimStartAndEnd();
+	if (RawInput.IsEmpty())
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Lobby] Join clicked but the address is empty."));
-		ShowSessionNotice(LOCTEXT("JoinAddressEmpty", "접속할 <Emph>IP 주소</>를 입력해 주세요."));
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Join clicked but the invite code is empty."));
+		ShowSessionNotice(LOCTEXT("JoinInputEmpty", "<Emph>초대 코드</>를 입력해 주세요."));
+		return;
+	}
+
+	const FString JoinUrl = ResolveJoinUrl(RawInput);
+	if (JoinUrl.IsEmpty())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Could not resolve a join address from '%s'."), *RawInput);
+		ShowSessionNotice(LOCTEXT("JoinInputInvalid", "<Emph>초대 코드</>를 다시 확인해 주세요."));
 		return;
 	}
 
@@ -43,14 +56,73 @@ void ULSLobbyMenuWidget::HandleJoinClicked()
 	}
 
 	// 내 로비(리슨 서버)를 버리고 호스트의 현재 맵으로 넘어간다.
-	// 실패하면 SessionSubsystem이 로비로 되돌리고 사유를 남긴다.
+	// 실패하면 SessionSubsystem이 로비로 되돌리고 사유를 다이얼로그로 알린다.
 	bJoinInProgress = true;
-	UE_LOG(LogLS, Log, TEXT("[Lobby] Joining server at %s"), *Address);
-	OwningPlayer->ClientTravel(Address, TRAVEL_Absolute);
+	UE_LOG(LogLS, Log, TEXT("[Lobby] Joining server at %s (input: %s)"), *JoinUrl, *RawInput);
+	OwningPlayer->ClientTravel(JoinUrl, TRAVEL_Absolute);
+}
+
+FString ULSLobbyMenuWidget::ResolveJoinUrl(const FString& RawInput)
+{
+	// 초대 코드만 받는다. 코드에 포트가 들어 있어 리슨 포트가 밀려도 정확히 찾아간다.
+	// 생 IP 입력을 허용하면 포트를 빠뜨린 채 기본 포트로 붙어 조용히 타임아웃 나는 경로가 다시 생긴다.
+	FString DecodedAddress;
+	int32 DecodedPort = 0;
+	if (!LSInviteCode::Decode(RawInput, DecodedAddress, DecodedPort))
+	{
+		return FString();
+	}
+
+	return FString::Printf(TEXT("%s:%d"), *DecodedAddress, DecodedPort);
+}
+
+void ULSLobbyMenuWidget::RefreshInviteCode() const
+{
+	if (!InviteCodeText)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] InviteCodeText is not bound on %s."), *GetNameSafe(this));
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	const UNetDriver* NetDriver = World ? World->GetNetDriver() : nullptr;
+	if (!World || World->GetNetMode() == NM_Client || !NetDriver)
+	{
+		// 남의 방에 들어와 있으면 초대할 방이 없다.
+		InviteCodeText->SetText(LOCTEXT("InviteCodeUnavailable", "참가 중"));
+		return;
+	}
+
+	// 포트는 실제로 바인딩된 값을 읽는다. 7777이 이미 잡혀 있으면 UE가 7778로 올리기 때문에
+	// 설정값을 그대로 믿으면 안 된다.
+	const TSharedPtr<const FInternetAddr> LocalAddr = const_cast<UNetDriver*>(NetDriver)->GetLocalAddr();
+	const int32 Port = LocalAddr.IsValid() ? LocalAddr->GetPort() : 0;
+
+	// 주소는 리슨 소켓이 0.0.0.0에 묶여 있어 소켓 서브시스템에서 따로 얻는다.
+	FString HostIPv4;
+	if (ISocketSubsystem* Sockets = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM))
+	{
+		bool bCanBindAll = false;
+		const TSharedRef<FInternetAddr> HostAddr = Sockets->GetLocalHostAddr(*GLog, bCanBindAll);
+		HostIPv4 = HostAddr->ToString(false);
+	}
+
+	const FString Code = LSInviteCode::Encode(HostIPv4, Port);
+	if (Code.IsEmpty())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Lobby] Could not build an invite code. Address=%s Port=%d"), *HostIPv4, Port);
+		InviteCodeText->SetText(LOCTEXT("InviteCodeFailed", "코드를 만들 수 없습니다"));
+		return;
+	}
+
+	UE_LOG(LogLS, Log, TEXT("[Lobby] Invite code %s (%s:%d)"), *Code, *HostIPv4, Port);
+	InviteCodeText->SetText(FText::FromString(LSInviteCode::Format(Code)));
 }
 
 void ULSLobbyMenuWidget::ShowSessionNoticeOnOpen()
 {
+	RefreshInviteCode();
+
 	// 접속 실패로 되돌아온 경우가 우선이다.
 	const UGameInstance* GameInstance = GetGameInstance();
 	ULSSessionSubsystem* SessionSub = GameInstance ? GameInstance->GetSubsystem<ULSSessionSubsystem>() : nullptr;

@@ -125,13 +125,18 @@ protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
 	TObjectPtr<UButton> MissionStartButton;
 
-	// --- 친구 방 참가 (IP 직접 접속) ---
-	// 호스트는 타이틀에서 로비를 리슨 서버로 열고, 참가자는 자기 로비에서 여기에 주소를 넣어 합류한다.
+	// --- 친구 방 참가 ---
+	// 로비는 열릴 때 리슨 서버가 된다. 호스트는 InviteCodeText의 코드를 친구에게 불러주고,
+	// 참가자는 JoinAddressTextBox에 그 코드를 넣어 합류한다. 접속 입력은 초대 코드만 받는다.
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
 	TObjectPtr<UButton> JoinButton;
 
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
 	TObjectPtr<UEditableTextBox> JoinAddressTextBox;
+
+	// 내 초대 코드. 포트까지 담고 있어서 리슨 포트가 7778로 밀려도 그대로 붙는다.
+	UPROPERTY(meta=(BindWidget), BlueprintReadOnly, Category="LS/UI|Lobby")
+	TObjectPtr<UTextBlock> InviteCodeText;
 
 	// BP(WBP_LobbyMenu)에서 WBP_Settings를 매핑한다.
 	UPROPERTY(EditDefaultsOnly, Category="LS/UI|Lobby")
@@ -199,6 +204,12 @@ private:
 	// 들어왔으면 접속 성공을 띄운다. 호스트(리슨/싱글)에게는 아무것도 띄우지 않는다.
 	void ShowSessionNoticeOnOpen();
 	void ShowSessionNotice(const FText& Message);
+
+	// 내 초대 코드를 계산해 InviteCodeText에 표시한다. 리슨 서버가 아니면 안내 문구를 대신 넣는다.
+	void RefreshInviteCode() const;
+
+	// 초대 코드를 접속 URL(IP:포트)로 푼다. 코드가 아니면 빈 문자열.
+	static FString ResolveJoinUrl(const FString& RawInput);
 
 	UFUNCTION()
 	void HandleSessionNoticeClosed();

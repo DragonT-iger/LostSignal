@@ -147,7 +147,10 @@ private:
 	void HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
 	void HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString);
 	void ReturnToLobbyAfterFailure(const FText& Reason, const FString& LogContext);
+	// 엔진이 우리 목적지를 덮어썼는지 확인하는 백스톱. 아래 cpp 구현의 주석 참고.
 	void HandlePostLoadMap(UWorld* LoadedWorld);
+	FString ResolveLobbyMapName() const;
+	void OpenOwnLobby();
 
 	FText PendingNetworkFailureMessage;
 

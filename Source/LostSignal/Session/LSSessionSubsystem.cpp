@@ -7,6 +7,7 @@
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
+#include "Misc/Paths.h"
 #include "UObject/UObjectGlobals.h"
 
 #define LOCTEXT_NAMESPACE "LSSession"
@@ -91,11 +92,7 @@ void ULSSessionSubsystem::ReturnToLobbyAfterFailure(const FText& Reason, const F
 
 	UE_LOG(LogLS, Warning, TEXT("[Session] Returning to the lobby after a network problem. %s"), *LogContext);
 
-	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
-	const FString LobbyMapName = (Settings && !Settings->LobbyLevel.IsNull())
-		? Settings->LobbyLevel.ToSoftObjectPath().GetLongPackageName()
-		: FString();
-	if (LobbyMapName.IsEmpty())
+	if (ResolveLobbyMapName().IsEmpty())
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Session] LobbyLevel is not set. Check Project Settings > LS Session Settings."));
 		return;
@@ -107,14 +104,54 @@ void ULSSessionSubsystem::ReturnToLobbyAfterFailure(const FText& Reason, const F
 	// 레이드 상태를 들고 로비로 돌아가면 인벤토리 표시가 어긋나므로 먼저 정리한다.
 	ClearRaidSessionState();
 
-	// 다시 자기 방(리슨 서버)으로 돌아간다. 타이틀로 나가면 로비 작업이 통째로 날아간 것처럼 보인다.
-	UGameplayStatics::OpenLevel(this, FName(*LobbyMapName), true, TEXT("listen"));
+	// 여기서 거는 이동은 엔진에 덮일 수 있다. 접속 대기 중 실패(PendingNetGame)면 엔진이 다음 프레임
+	// TickWorldTravel에서 "?closed"로 GameDefaultMap(타이틀)에 보내버린다. 그래서 HandlePostLoadMap이
+	// 백스톱으로 한 번 더 확인한다. 그래도 여기서 먼저 걸어두면 그 외 경우엔 타이틀을 거치지 않는다.
+	OpenOwnLobby();
 }
 
 void ULSSessionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
 {
-	// 로비 로드가 끝났으니 다음 실패를 다시 받을 수 있게 푼다.
+	if (!bReturningToLobbyAfterFailure)
+	{
+		return;
+	}
+
+	// 다음 실패를 다시 받을 수 있게 먼저 푼다. 여기서 안 풀면 로비 로드가 실패했을 때 무한히 재시도한다.
 	bReturningToLobbyAfterFailure = false;
+
+	const FString LobbyMapName = ResolveLobbyMapName();
+	const FString LoadedMapName = LoadedWorld ? LoadedWorld->GetOutermost()->GetName() : FString();
+	if (LobbyMapName.IsEmpty()
+		|| FPaths::GetBaseFilename(LoadedMapName).Contains(FPaths::GetBaseFilename(LobbyMapName)))
+	{
+		// 로비에 잘 도착했다. 사유 메시지는 로비 메뉴가 꺼내 간다.
+		return;
+	}
+
+	// 엔진이 우리를 다른 곳(보통 타이틀)으로 보냈다. 다시 로비로 돌린다.
+	UE_LOG(LogLS, Warning, TEXT("[Session] The engine sent us to %s after the network problem. Redirecting to the lobby."), *LoadedMapName);
+	OpenOwnLobby();
+}
+
+FString ULSSessionSubsystem::ResolveLobbyMapName() const
+{
+	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
+	return (Settings && !Settings->LobbyLevel.IsNull())
+		? Settings->LobbyLevel.ToSoftObjectPath().GetLongPackageName()
+		: FString();
+}
+
+void ULSSessionSubsystem::OpenOwnLobby()
+{
+	// 자기 방(리슨 서버)으로 돌아간다. 돌아온 로비에서 바로 다시 친구를 받을 수 있다.
+	const FString LobbyMapName = ResolveLobbyMapName();
+	if (LobbyMapName.IsEmpty())
+	{
+		return;
+	}
+
+	UGameplayStatics::OpenLevel(this, FName(*LobbyMapName), true, TEXT("listen"));
 }
 
 bool ULSSessionSubsystem::ConsumePendingNetworkFailureMessage(FText& OutMessage)
