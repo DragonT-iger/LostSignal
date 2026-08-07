@@ -65,9 +65,16 @@ class LOSTSIGNAL_API ULSSessionSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+
 	// 탈주 시 출발 장비 복구 허용 여부
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="LS/Session")
 	bool bAllowQuitRecovery = false;
+
+	// 접속/이동 실패로 로비에 되돌아왔을 때 보여줄 사유. 로비 메뉴가 한 번 꺼내 가면 비워진다.
+	// 실패는 여러 번 브로드캐스트되므로(체크섬 불일치는 액터 수만큼 뜬다) 첫 사유만 남긴다.
+	bool ConsumePendingNetworkFailureMessage(FText& OutMessage);
 
 	// 레이드 시작 - 스냅샷 찍고 세션 초기화
 	UFUNCTION(BlueprintCallable, Category="LS/Session")
@@ -125,4 +132,16 @@ private:
 	TArray<FLSSessionItem> ConsumedItems;
 
 	void StartRaidInternal(const TArray<FLSSessionItem>& Loadout, bool bPersistRaidSave);
+
+	// 접속이 끊기면 엔진 기본값은 GameDefaultMap(타이틀)으로 나가는 것이다. 그러면 로비에서 하던
+	// 장비·창고 작업이 통째로 날아간 것처럼 보이므로, 자기 로비(리슨 서버)로 되돌린다.
+	void HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
+	void HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString);
+	void ReturnToLobbyAfterFailure(const FText& Reason, const FString& LogContext);
+	void HandlePostLoadMap(UWorld* LoadedWorld);
+
+	FText PendingNetworkFailureMessage;
+
+	// 실패 브로드캐스트가 연달아 오므로 첫 번째만 처리한다. 로비 로드가 끝나면 풀린다.
+	bool bReturningToLobbyAfterFailure = false;
 };

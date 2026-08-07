@@ -277,6 +277,14 @@ IP 직접 입력  플레이어가 주소를 직접 넣는다
          -> ClientTravel(주소, TRAVEL_Absolute) -> 호스트의 현재 맵(로비)으로 들어간다
 ```
 
+##### 접속 실패는 타이틀이 아니라 로비로 되돌린다
+
+엔진 기본 동작은 접속이 끊기면 `GameDefaultMap`(= 타이틀)으로 `Browse`하는 것이다. 그러면 로비에서 하던 장비·창고 작업이 통째로 날아간 것처럼 보인다. `ULSSessionSubsystem`이 `GEngine->OnNetworkFailure` / `OnTravelFailure`를 구독해 **자기 로비(리슨 서버)로 되돌리고** 사유를 남긴다. 로비 메뉴가 열릴 때 `ShowSessionNoticeOnOpen`이 그 사유를 다이얼로그로 한 번 보여주고, 실패가 없고 클라이언트 월드면 대신 "접속했습니다"를 띄운다.
+
+실패는 한 번이 아니라 여러 번 브로드캐스트된다(체크섬 불일치는 액터 수만큼). 첫 사유만 남기고 `PostLoadMapWithWorld`에서 가드를 푼다.
+
+**빌드가 다르면 `NetChecksumMismatch`로 끊긴다.** 접속·레벨 이동까지는 멀쩡히 되다가 AttributeSet 같은 복제 클래스가 처음 등장하는 순간 터지므로 원인을 오해하기 쉽다. 참가자 전원이 같은 C++ 빌드와 같은 Content여야 한다.
+
 **참가 UI는 타이틀이 아니라 로비에 둔다.** 로비가 장비·창고·제작을 다루는 허브이고 "친구 방 참가"도 그 허브의 행동이다. 타이틀은 Continue/New/설정만 남긴다. 구현은 `ULSLobbyMenuWidget`의 `JoinButton` / `JoinAddressTextBox`이며 핸들러는 `LSLobbyMenuWidget_Session.cpp`가 소유한다(3단계 레디도 이 파일에 들어온다).
 
 **타이틀·로비 메뉴 위젯은 각 PlayerController가 만든다.** GameMode는 서버에만 존재하므로 거기서 `CreateWidget`을 하면 호스트 화면에만 뜬다. GameMode는 `PostLogin`과 `HandleSeamlessTravelPlayer`에서 위젯 **클래스**를 넘기고, `ALSPlayerControllerBase::ShowLobbyMenuWidget` / `ShowTitleMenuWidget`이 로컬이면 직접, 원격이면 Client RPC로 생성한다. (`ClientShowLobbyStorageWidget`과 같은 패턴이라 BP 매핑은 그대로 GameMode에 둔다)

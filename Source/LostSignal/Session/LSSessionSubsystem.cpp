@@ -1,12 +1,107 @@
 ﻿#include "Session/LSSessionSubsystem.h"
 #include "Session/LSSaveSubsystem.h"
+#include "Session/LSSessionSettings.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
 #include "Inventory/LSInventorySlotUtils.h"
+#include "Kismet/GameplayStatics.h"
 #include "LostSignal.h"
+#include "UObject/UObjectGlobals.h"
+
+#define LOCTEXT_NAMESPACE "LSSession"
 
 namespace
 {
 constexpr int32 SessionDefaultMaxInventorySlotCount = 10;
 constexpr int32 SessionDefaultMaxSafeSlotCount = 4;
+}
+
+void ULSSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+
+	if (GEngine)
+	{
+		GEngine->OnNetworkFailure().AddUObject(this, &ULSSessionSubsystem::HandleNetworkFailure);
+		GEngine->OnTravelFailure().AddUObject(this, &ULSSessionSubsystem::HandleTravelFailure);
+	}
+	FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &ULSSessionSubsystem::HandlePostLoadMap);
+}
+
+void ULSSessionSubsystem::Deinitialize()
+{
+	if (GEngine)
+	{
+		GEngine->OnNetworkFailure().RemoveAll(this);
+		GEngine->OnTravelFailure().RemoveAll(this);
+	}
+	FCoreUObjectDelegates::PostLoadMapWithWorld.RemoveAll(this);
+
+	Super::Deinitialize();
+}
+
+void ULSSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, const ENetworkFailure::Type FailureType, const FString& ErrorString)
+{
+	// 체크섬 불일치는 액터 수만큼 브로드캐스트된다. 첫 사유만 남기고 나머지는 무시한다.
+	const FText Reason = (FailureType == ENetworkFailure::NetChecksumMismatch)
+		? LOCTEXT("NetChecksumMismatch", "호스트와 <Emph>게임 버전</>이 달라 접속이 끊겼습니다. 양쪽 모두 같은 빌드인지 확인해 주세요.")
+		: LOCTEXT("NetworkFailure", "호스트와의 <Emph>접속이 끊겼습니다</>.");
+
+	ReturnToLobbyAfterFailure(Reason, FString::Printf(TEXT("NetworkFailure=%s Error=%s"), ENetworkFailure::ToString(FailureType), *ErrorString));
+}
+
+void ULSSessionSubsystem::HandleTravelFailure(UWorld* World, const ETravelFailure::Type FailureType, const FString& ErrorString)
+{
+	ReturnToLobbyAfterFailure(
+		LOCTEXT("TravelFailure", "호스트에 <Emph>접속하지 못했습니다</>. 주소와 네트워크를 확인해 주세요."),
+		FString::Printf(TEXT("TravelFailure=%s Error=%s"), ETravelFailure::ToString(FailureType), *ErrorString));
+}
+
+void ULSSessionSubsystem::ReturnToLobbyAfterFailure(const FText& Reason, const FString& LogContext)
+{
+	if (bReturningToLobbyAfterFailure)
+	{
+		return;
+	}
+
+	UE_LOG(LogLS, Warning, TEXT("[Session] Returning to the lobby after a network problem. %s"), *LogContext);
+
+	const ULSSessionSettings* Settings = GetDefault<ULSSessionSettings>();
+	const FString LobbyMapName = (Settings && !Settings->LobbyLevel.IsNull())
+		? Settings->LobbyLevel.ToSoftObjectPath().GetLongPackageName()
+		: FString();
+	if (LobbyMapName.IsEmpty())
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Session] LobbyLevel is not set. Check Project Settings > LS Session Settings."));
+		return;
+	}
+
+	bReturningToLobbyAfterFailure = true;
+	PendingNetworkFailureMessage = Reason;
+
+	// 레이드 상태를 들고 로비로 돌아가면 인벤토리 표시가 어긋나므로 먼저 정리한다.
+	ClearRaidSessionState();
+
+	// 다시 자기 방(리슨 서버)으로 돌아간다. 타이틀로 나가면 로비 작업이 통째로 날아간 것처럼 보인다.
+	UGameplayStatics::OpenLevel(this, FName(*LobbyMapName), true, TEXT("listen"));
+}
+
+void ULSSessionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
+{
+	// 로비 로드가 끝났으니 다음 실패를 다시 받을 수 있게 푼다.
+	bReturningToLobbyAfterFailure = false;
+}
+
+bool ULSSessionSubsystem::ConsumePendingNetworkFailureMessage(FText& OutMessage)
+{
+	if (PendingNetworkFailureMessage.IsEmpty())
+	{
+		return false;
+	}
+
+	OutMessage = PendingNetworkFailureMessage;
+	PendingNetworkFailureMessage = FText::GetEmpty();
+	return true;
 }
 
 void ULSSessionSubsystem::StartRaid(const TArray<FLSSessionItem>& Loadout)
@@ -272,3 +367,5 @@ void ULSSessionSubsystem::ConsumeItem(FName ItemRowName, int32 Amount)
 		SaveSub->UpdateRaidConsumedItems(ConsumedItems);
 	}
 }
+
+#undef LOCTEXT_NAMESPACE

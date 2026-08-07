@@ -194,6 +194,14 @@ private:
 	UFUNCTION()
 	void HandleJoinClicked();
 
+	// 로비를 열 때 접속 결과를 한 번 알린다. 실패 사유가 남아 있으면 그걸, 없고 클라이언트로
+	// 들어왔으면 접속 성공을 띄운다. 호스트(리슨/싱글)에게는 아무것도 띄우지 않는다.
+	void ShowSessionNoticeOnOpen();
+	void ShowSessionNotice(const FText& Message);
+
+	UFUNCTION()
+	void HandleSessionNoticeClosed();
+
 	// --- 입력 / 포커스 / 오버레이 (LSLobbyMenuWidget_Input.cpp) ---
 	// TAB 동작: 보급소 안쪽 화면이면 한 단계 뒤로, 그 외에는 가방 패널을 토글한다.
 	void ToggleBagPanel();
@@ -231,6 +239,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ULSConfirmDialogWidget> ActiveConfirmDialog;
+
+	// 참가 버튼 연타 가드. ClientTravel이 진행 중인데 또 누르면 접속이 매번 새로 시작돼 끊긴다.
+	UPROPERTY(Transient)
+	bool bJoinInProgress = false;
 
 	// 클래스 디폴트로 받은 WBP를 런타임에 생성한 패널 인스턴스.
 	UPROPERTY(Transient)

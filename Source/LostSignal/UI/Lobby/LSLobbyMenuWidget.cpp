@@ -51,6 +51,7 @@ void ULSLobbyMenuWidget::NativeConstruct()
 	}
 	RefreshGoldText();
 	InitializeLobbyView();
+	ShowSessionNoticeOnOpen();
 }
 
 void ULSLobbyMenuWidget::BindLobbyTabs()
