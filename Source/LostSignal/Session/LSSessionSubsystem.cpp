@@ -2,6 +2,7 @@
 #include "Session/LSSaveSubsystem.h"
 #include "Session/LSSessionSettings.h"
 #include "Engine/Engine.h"
+#include "Engine/NetDriver.h"
 #include "Engine/World.h"
 #include "Inventory/LSInventorySlotUtils.h"
 #include "Kismet/GameplayStatics.h"
@@ -42,6 +43,15 @@ void ULSSessionSubsystem::Deinitialize()
 
 void ULSSessionSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, const ENetworkFailure::Type FailureType, const FString& ErrorString)
 {
+	// 실패한 드라이버가 클라이언트일 때만 이동한다. 호스트는 참가자가 나가도 자기 세션을 유지해야 한다.
+	// (엔진도 UEngine::HandleNetworkFailure에서 같은 기준으로 bShouldTravel을 정한다)
+	if (!NetDriver || NetDriver->GetNetMode() != NM_Client)
+	{
+		UE_LOG(LogLS, Log, TEXT("[Session] Ignoring a network failure that is not ours to travel on. Type=%s Error=%s"),
+			ENetworkFailure::ToString(FailureType), *ErrorString);
+		return;
+	}
+
 	// 체크섬 불일치는 액터 수만큼 브로드캐스트된다. 첫 사유만 남기고 나머지는 무시한다.
 	const FText Reason = (FailureType == ENetworkFailure::NetChecksumMismatch)
 		? LOCTEXT("NetChecksumMismatch", "호스트와 <Emph>게임 버전</>이 달라 접속이 끊겼습니다. 양쪽 모두 같은 빌드인지 확인해 주세요.")
