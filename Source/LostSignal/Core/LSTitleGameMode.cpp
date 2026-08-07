@@ -7,6 +7,7 @@
 #include "GameFramework/PlayerController.h"
 #include "LostSignal.h"
 #include "Session/LSSessionSettings.h"
+#include "UI/Lobby/LSLobbyMenuWidget.h"
 #include "UI/Title/LSTitleMenuWidget.h"
 
 namespace
@@ -130,30 +131,59 @@ void ALSTitleGameMode::HandlePendingPlayerConnectionTimeout()
 
 void ALSTitleGameMode::ShowTitleMenuFor(AController* Controller)
 {
+	APlayerController* PlayerController = Cast<APlayerController>(Controller);
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	// 손님(원격)에게는 타이틀 메뉴가 아니라 자기 로비 화면을 띄운다.
+	if (!PlayerController->IsLocalController())
+	{
+		ShowGuestLobbyMenuFor(PlayerController);
+		return;
+	}
+
 	if (!TitleMenuWidgetClass)
 	{
 		UE_LOG(LogLS, Warning, TEXT("[Title] TitleMenuWidgetClass is not set on %s. Check BP_TitleGameMode."), *GetNameSafe(this));
 		return;
 	}
 
-	// GameMode는 서버에만 존재한다. 위젯은 각 PlayerController가 자기 화면에 만든다(원격은 Client RPC).
-	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(Controller))
+	// GameMode는 서버에만 존재한다. 위젯은 PlayerController가 자기 화면에 만든다.
+	if (ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(PlayerController))
 	{
 		LSPlayerController->ShowTitleMenuWidget(TitleMenuWidgetClass);
 		return;
 	}
 
-	// 타이틀 레벨은 PlayerControllerClass를 지정하지 않아 엔진 기본 APlayerController가 온다.
-	// 그 경우엔 Client RPC 경로가 없으므로 로컬 컨트롤러에 한해 여기서 직접 만든다.
-	// (타이틀은 접속 지점이 아니라 원격 참가자가 올 일이 없다 — 참가는 로비에서 한다)
-	APlayerController* PlayerController = Cast<APlayerController>(Controller);
-	if (!PlayerController || !PlayerController->IsLocalController())
+	CreateTitleMenuLocally(PlayerController);
+}
+
+void ALSTitleGameMode::ShowGuestLobbyMenuFor(APlayerController* PlayerController)
+{
+	ALSPlayerControllerBase* LSPlayerController = Cast<ALSPlayerControllerBase>(PlayerController);
+	if (!LSPlayerController)
 	{
-		UE_LOG(LogLS, Warning, TEXT("[Title] Cannot show the title menu for %s. Set PlayerControllerClass to ALSPlayerControllerBase on BP_TitleGameMode to support remote players."),
-			*GetNameSafe(Controller));
+		// Client RPC 경로가 없어 손님 화면이 검은 채로 남는다.
+		UE_LOG(LogLS, Warning, TEXT("[Title] Guest %s cannot be shown any UI. Set PlayerControllerClass to BP_PC_Test on BP_TitleGameMode."),
+			*GetNameSafe(PlayerController));
 		return;
 	}
 
+	if (!GuestLobbyMenuWidgetClass)
+	{
+		UE_LOG(LogLS, Warning, TEXT("[Title] GuestLobbyMenuWidgetClass is not set on %s. Check BP_TitleGameMode."), *GetNameSafe(this));
+		return;
+	}
+
+	UE_LOG(LogLS, Log, TEXT("[Title] Guest %s joined while the host is on the title. Showing the lobby screen."), *GetNameSafe(PlayerController));
+	LSPlayerController->ShowLobbyMenuWidget(GuestLobbyMenuWidgetClass);
+}
+
+void ALSTitleGameMode::CreateTitleMenuLocally(APlayerController* PlayerController)
+{
+	// PlayerControllerClass가 지정되지 않아 엔진 기본 APlayerController가 온 경우의 폴백.
 	ULSTitleMenuWidget* TitleMenuWidget = CreateWidget<ULSTitleMenuWidget>(PlayerController, TitleMenuWidgetClass);
 	if (!TitleMenuWidget)
 	{
